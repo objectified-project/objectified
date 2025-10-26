@@ -53,8 +53,6 @@ CREATE TABLE roles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -64,8 +62,6 @@ CREATE TABLE permissions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL UNIQUE, -- e.g., 'documents.create', 'users.assign_to_group'
     description TEXT,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -76,8 +72,6 @@ CREATE TABLE role_permissions (
     role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
     scope VARCHAR(10) NOT NULL CHECK (scope IN ('allow', 'deny')),
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(role_id, permission_id)
@@ -90,8 +84,6 @@ CREATE TABLE user_roles (
     role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, -- NULL means global
     group_id UUID REFERENCES groups(id) ON DELETE CASCADE,   -- NULL means not group-specific
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, role_id, tenant_id, group_id)
@@ -112,8 +104,6 @@ CREATE TABLE user_groups (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, group_id)
@@ -124,8 +114,6 @@ CREATE TABLE group_hierarchies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     parent_group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     child_group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(parent_group_id, child_group_id),
@@ -137,8 +125,6 @@ CREATE TABLE tenant_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tenant_id, user_id)
@@ -149,8 +135,6 @@ CREATE TABLE tenant_groups (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tenant_id, group_id)
@@ -161,8 +145,6 @@ CREATE TABLE group_administrators (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(group_id, user_id)
@@ -173,8 +155,6 @@ CREATE TABLE tenant_administrators (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tenant_id, user_id)
