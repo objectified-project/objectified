@@ -1,0 +1,8 @@
+{
+  "name": "objectified",
+  "private": true,
+  "workspaces": [
+    "objectified-ui"
+  ],
+  "packageManager": "yarn@4.10.3"
+}
