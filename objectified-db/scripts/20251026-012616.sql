@@ -10,6 +10,7 @@ SET search_path TO odb, public;
 
 -- Enable UUID extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- Users table
 CREATE TABLE users (
@@ -166,19 +167,11 @@ CREATE INDEX idx_group_administrators_user_id ON group_administrators(user_id);
 CREATE INDEX idx_tenant_administrators_tenant_id ON tenant_administrators(tenant_id);
 CREATE INDEX idx_tenant_administrators_user_id ON tenant_administrators(user_id);
 
--- Table descriptions
-COMMENT ON TABLE group_administrators IS 'Assigns users as administrators of groups with management privileges';
-COMMENT ON TABLE tenant_administrators IS 'Assigns users as administrators of tenants with management privileges';
-
 -- Indexes for tenant membership tables
 CREATE INDEX idx_tenant_users_tenant_id ON tenant_users(tenant_id);
 CREATE INDEX idx_tenant_users_user_id ON tenant_users(user_id);
 CREATE INDEX idx_tenant_groups_tenant_id ON tenant_groups(tenant_id);
 CREATE INDEX idx_tenant_groups_group_id ON tenant_groups(group_id);
-
--- Table descriptions
-COMMENT ON TABLE tenant_users IS 'Assigns users to tenants for multi-tenant access control';
-COMMENT ON TABLE tenant_groups IS 'Assigns groups to tenants, allowing group-based tenant membership';
 
 -- Indexes for join tables
 CREATE INDEX idx_user_groups_user_id ON user_groups(user_id);
@@ -187,12 +180,22 @@ CREATE INDEX idx_group_hierarchies_parent ON group_hierarchies(parent_group_id);
 CREATE INDEX idx_group_hierarchies_child ON group_hierarchies(child_group_id);
 
 -- Table descriptions
+COMMENT ON TABLE users IS 'Stores user accounts with authentication credentials, verification status, and soft delete support';
+COMMENT ON TABLE groups IS 'Defines organizational groups that can contain users and be nested hierarchically';
+COMMENT ON TABLE tenants IS 'Multi-tenant isolation boundaries that can contain users and groups';
+COMMENT ON TABLE roles IS 'Named collections of permissions that can be assigned to users';
+COMMENT ON TABLE permissions IS 'Individual named permissions representing specific actions or access rights';
+COMMENT ON TABLE role_permissions IS 'Maps permissions to roles with allow or deny scope for access control';
+COMMENT ON TABLE user_roles IS 'Assigns roles to users, optionally scoped to specific tenants or groups';
+COMMENT ON TABLE user_verification_codes IS 'Temporary verification codes for email validation with automatic 30-minute expiry';
 COMMENT ON TABLE user_groups IS 'Assigns users to groups for membership and access control';
 COMMENT ON TABLE group_hierarchies IS 'Defines parent-child relationships between groups, allowing nested group structures';
-COMMENT ON COLUMN group_hierarchies.parent_group_id IS 'The parent group that contains the child group';
-COMMENT ON COLUMN group_hierarchies.child_group_id IS 'The child group that belongs to the parent group';
+COMMENT ON TABLE tenant_users IS 'Assigns users to tenants for multi-tenant access control';
+COMMENT ON TABLE tenant_groups IS 'Assigns groups to tenants, allowing group-based tenant membership';
+COMMENT ON TABLE group_administrators IS 'Assigns users as administrators of groups with management privileges';
+COMMENT ON TABLE tenant_administrators IS 'Assigns users as administrators of tenants with management privileges';
 
-        -- Indexes for common queries
+-- Indexes for common queries
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_verified ON users(verified);
 CREATE INDEX idx_groups_slug ON groups(slug);
