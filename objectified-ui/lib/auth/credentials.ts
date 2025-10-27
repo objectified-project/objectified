@@ -50,7 +50,7 @@ export const credentialsAuthorize = async (credentials: ICredentials) => {
  *
  * If all passes, true is returned.
  */
-export const credentialsSignIn = (payload: string) => {
+export const credentialsSignIn = (payload: any) => {
   const user = payload.user;
 
   console.log('[credentialsSignIn] Handling credentials provider');

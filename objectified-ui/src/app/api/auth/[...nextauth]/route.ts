@@ -18,7 +18,6 @@ export const authOptions: NextAuthOptions = {
   //     clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
   // }),
     CredentialsProvider({
-      name: 'Credentials',
       credentials: {},
       async authorize(credentials: any, req) {
         const credentialPayload = JSON.parse(credentials?.payload ?? '{}');
