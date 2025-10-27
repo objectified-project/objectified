@@ -2,8 +2,8 @@
 
 const connectionPool = require('./db');
 
-export async function getUserIdByEmail(emailAddress: string) {
-  return await connectionPool.query('SELECT id FROM odb.users WHERE email = $1', [emailAddress]);
+export async function getUserByEmail(emailAddress: string) {
+  return await connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
 }
 
 // export async function updateLastLogin(userId: string) {

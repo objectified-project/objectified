@@ -1,4 +1,4 @@
-import * as helpers from '../../db/helpers';
+import * as helper from '../db/helper';
 const bcrypt = require('bcrypt');
 
 export interface ICredentials {
@@ -6,53 +6,64 @@ export interface ICredentials {
   password: string;
 }
 
-export const credentialsSignIn = async (credentials: ICredentials) => {
-  console.log('[credentialsSignIn] credentials login for user', credentials);
+export const credentialsAuthorize = async (credentials: ICredentials) => {
+  console.log('[credentialsAuthorize] credentials login for user', credentials);
 
-  // const { emailAddress, password } = credentials as {
-  //   emailAddress: string,
-  //   password: string,
-  // };
-  //
-  // console.log(`[credentialsSignIn] credentials login for user ${emailAddress}`);
-  //
-  // const results = await helpers.getUserByEmail(emailAddress);
-  //
-  // if (results.rowCount > 0) {
-  //   const userResult = results.rows[0];
-  //   const source = userResult.source.substring(1, userResult.source.length - 1).split(',');
-  //   const hashPassword = userResult.password;
-  //
-  //   if (source.includes('credentials')) {
-  //     if (userResult.password) {
-  //       try {
-  //         if (bcrypt.compareSync(password, hashPassword)) {
-  //           console.log(`[credentialsSignIn] credentials login for user ${emailAddress} successful: source=${source}`);
-  //
-  //           await helpers.updateLastLogin(userResult.id);
-  //
-  //           const license = await getLicense(userResult.id)
-  //             .then((x) => x);
-  //
-  //           userResult['license'] = license;
-  //
-  //           return userResult;
-  //         }
-  //       } catch (e) {
-  //         console.log(`Failed to authenticate: possibly misconfigured user in the database for '${emailAddress}'`, results.rows);
-  //         return null;
-  //       }
-  //     } else {
-  //       console.log(`[credentialsSignIn] credentials login for user ${emailAddress} failed: no password is set`);
-  //       return null;
-  //     }
-  //   } else {
-  //     console.log(`[credentialsSignIn] credentials login for user ${emailAddress} found, source does not ` +
-  //       `include 'credentials': source=${source}`);
-  //   }
-  // }
-  //
-  // console.log(`[credentialsSignIn] credentials login for user ${emailAddress} not found`);
+  const emailAddress = credentials.email;
+  const password = credentials.password;
+  const results = await helper.getUserByEmail(credentials.email);
+
+  if (results.rowCount > 0) {
+    const userResult = results.rows[0];
+    const hashPassword = userResult.password;
+
+    if (userResult.password) {
+      if (bcrypt.compareSync(password, hashPassword)) {
+        delete userResult.password;
+
+        return userResult;
+      }
+
+      console.log(`[credentialsAuthorize] credentials login for user ${emailAddress} failed: password mismatch`);
+      return null;
+    } else {
+      console.log(`[credentialsAuthorize] credentials login for user ${emailAddress} failed: no password is set`);
+      return null;
+    }
+  }
+
+  console.log(`[credentialsAuthorize] credentials login for user ${emailAddress} not found`);
 
   return null;
+}
+
+/*
+ * Sign-in Steps:
+ * 1. User must exist.
+ *    If user is null, return 'User account not found'
+ * 2. Enabled must be true.
+ *    If not enabled, return 'Your account is currently disabled'
+ * 3. Verified must be true.
+ *    If not verified, return 'You have not yet verified your account e-mail address'
+ *
+ * TODO: Check licenses here.
+ *
+ * If all passes, true is returned.
+ */
+export const credentialsSignIn = (payload: string) => {
+  const user = payload.user;
+
+  console.log('[credentialsSignIn] Handling credentials provider');
+
+  if (!user.enabled) {
+    return '/login?error=Your account is currently disabled';
+  }
+
+  if (!user.verified) {
+    return '/login?error=You have not yet verified your account e-mail address';
+  }
+
+  console.log('[credentialsSignIn] Login successful for ', user.email);
+
+  return true;
 }

@@ -24,7 +24,10 @@ const SSOButton = ({ provider, icon, onClick }: { provider: string; icon: React.
 
 const Login = () => {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [payload, setPayload] = useState<any>({});
+  const [payload, setPayload] = useState<any>({
+    email: 'admin@objectified.dev',
+    password: '1234',
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -85,7 +88,6 @@ const Login = () => {
                     <User size={20} className="text-gray-400" />
                   </div>
                   <input
-                    id="name"
                     type="text"
                     name={'name'}
                     value={payload['name']}
@@ -107,7 +109,6 @@ const Login = () => {
                   <Mail size={20} className="text-gray-400" />
                 </div>
                 <input
-                  id="email"
                   type="email"
                   name={'email'}
                   value={payload['email']}
@@ -128,7 +129,6 @@ const Login = () => {
                   <Lock size={20} className="text-gray-400" />
                 </div>
                 <input
-                  id="password"
                   type="password"
                   name={'password'}
                   value={payload['password']}
