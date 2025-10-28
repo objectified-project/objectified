@@ -44,14 +44,13 @@ export default function TopHeader() {
 
   return (
     <header
+      className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700"
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
         padding: "8px 12px",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
-        background: "var(--geist-background, #fff)",
         height: 48,
       }}
     >
@@ -75,8 +74,8 @@ export default function TopHeader() {
           O
         </div>
         <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-          <span style={{ fontWeight: 700, color: 'black', fontSize: 13 }}>Objectified</span>
-          <small style={{ color: "rgba(0,0,0,0.5)", fontSize: 11 }}>Admin</small>
+          <span className="font-bold text-gray-900 dark:text-gray-100" style={{ fontSize: 13 }}>Objectified</span>
+          <small className="text-gray-500 dark:text-gray-400" style={{ fontSize: 11 }}>Admin</small>
         </div>
       </div>
 
@@ -97,13 +96,13 @@ export default function TopHeader() {
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`text-gray-800 hover:text-blue-600 transition-colors ${pathname === item.href ? 'underline' : ''}`}
+                className={`text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors ${
+                  pathname === item.href ? 'underline bg-gray-200 dark:bg-gray-600' : ''
+                }`}
                 style={{
                   padding: "4px 6px",
                   borderRadius: 6,
-                  transition: "background 0.12s",
                   fontSize: 13,
-                  backgroundColor: pathname === item.href ? 'rgba(0,0,0,0.1)' : 'transparent',
                 }}
               >
                 {item.label}
@@ -119,13 +118,13 @@ export default function TopHeader() {
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={() => setOpen((s) => !s)}
+          className="border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
             padding: "4px 8px",
             borderRadius: 8,
-            border: "1px solid rgba(0,0,0,0.06)",
             background: "transparent",
             cursor: "pointer",
           }}
@@ -140,31 +139,31 @@ export default function TopHeader() {
           <div
             role="menu"
             aria-label="Profile menu"
+            className="bg-white dark:bg-gray-800 shadow-lg dark:shadow-gray-900/50"
             style={{
               position: "absolute",
               right: 0,
               marginTop: 8,
               minWidth: 160,
-              background: "white",
-              boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
               borderRadius: 8,
               padding: 4,
               zIndex: 50,
             }}
-            className={'dark:text-black dark:bg-gray-800'}
           >
-            <Link href="/ade/profile" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-white rounded text-sm transition-colors text-black dark:text-black" style={{ textDecoration: "none" }}>
+            <Link href="/ade/profile" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300" style={{ textDecoration: "none" }}>
               View Profile
             </Link>
-            <Link href="/ade/account" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-white rounded text-sm transition-colors text-black dark:text-black" style={{ textDecoration: "none" }}>
+            <Link href="/ade/account" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300" style={{ textDecoration: "none" }}>
               Account
             </Link>
-            <div style={{ height: 1, background: "rgba(0,0,0,0.45)", margin: "4px 0" }} className="dark:bg-gray-600" />
-            <Link href="/ade/account" role="menuitem"
-                  onClick={() => signOut()}
-                  className="block px-3 py-2 hover:bg-red-100 dark:hover:bg-red-700 hover:text-white rounded text-sm transition-colors text-black dark:text-black" style={{ textDecoration: "none" }}>
+            <div className="h-px bg-gray-200 dark:bg-gray-600 my-1" />
+            <button
+              onClick={() => signOut()}
+              className="w-full text-left block px-3 py-2 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-700 dark:hover:text-red-300 rounded text-sm transition-colors text-gray-700 dark:text-gray-300"
+              style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            >
               Sign out
-            </Link>
+            </button>
           </div>
         )}
       </div>
