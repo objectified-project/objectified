@@ -12,7 +12,7 @@ SET search_path TO odb, public;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
--- Users table
+-- Users table: Stores application users with authentication credentials
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -25,19 +25,14 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Groups table
-CREATE TABLE groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    slug VARCHAR(255) NOT NULL UNIQUE,
-    enabled BOOLEAN NOT NULL DEFAULT true,
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Indices for users table
+CREATE INDEX idx_users_email ON users(email) WHERE deleted_at IS NULL;
+CREATE INDEX idx_users_enabled ON users(enabled) WHERE deleted_at IS NULL;
+CREATE INDEX idx_users_verified ON users(verified) WHERE deleted_at IS NULL;
+CREATE INDEX idx_users_deleted_at ON users(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_users_created_at ON users(created_at);
 
--- Tenants table
+-- Tenants table: Represents separate organizational entities in the multi-tenant system
 CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -49,79 +44,14 @@ CREATE TABLE tenants (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Roles table
-CREATE TABLE roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Indices for tenants table
+CREATE INDEX idx_tenants_slug ON tenants(slug) WHERE deleted_at IS NULL;
+CREATE INDEX idx_tenants_enabled ON tenants(enabled) WHERE deleted_at IS NULL;
+CREATE INDEX idx_tenants_deleted_at ON tenants(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_tenants_created_at ON tenants(created_at);
+CREATE INDEX idx_tenants_name ON tenants(name) WHERE deleted_at IS NULL;
 
--- Permissions table (named permissions with allow/deny scope)
-CREATE TABLE permissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL UNIQUE, -- e.g., 'documents.create', 'users.assign_to_group'
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Role permissions (assigns permissions to roles with allow/deny)
-CREATE TABLE role_permissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-    scope VARCHAR(10) NOT NULL CHECK (scope IN ('allow', 'deny')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(role_id, permission_id)
-);
-
--- User roles (assigns roles to users, can be scoped to tenant or group)
-CREATE TABLE user_roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE, -- NULL means global
-    group_id UUID REFERENCES groups(id) ON DELETE CASCADE,   -- NULL means not group-specific
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, role_id, tenant_id, group_id)
-);
-
--- User verification codes (for email verification with 30-minute expiry)
-CREATE TABLE user_verification_codes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    code VARCHAR(255) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT (CURRENT_TIMESTAMP + INTERVAL '30 minutes'),
-    used_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- User Groups (assigns users to groups)
-CREATE TABLE user_groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, group_id)
-);
-
--- Group Hierarchies (groups can contain other groups)
-CREATE TABLE group_hierarchies (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    parent_group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    child_group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(parent_group_id, child_group_id),
-    CHECK (parent_group_id != child_group_id) -- Prevent self-reference
-);
-
--- Tenant Users (assigns users to tenants)
+-- Tenant Users: Junction table assigning users to tenants
 CREATE TABLE tenant_users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -131,27 +61,12 @@ CREATE TABLE tenant_users (
     UNIQUE(tenant_id, user_id)
 );
 
--- Tenant Groups (assigns groups to tenants)
-CREATE TABLE tenant_groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(tenant_id, group_id)
-);
+-- Indices for tenant_users table
+CREATE INDEX idx_tenant_users_tenant_id ON tenant_users(tenant_id);
+CREATE INDEX idx_tenant_users_user_id ON tenant_users(user_id);
+CREATE INDEX idx_tenant_users_created_at ON tenant_users(created_at);
 
--- Group Administrators (assigns users as admins of groups)
-CREATE TABLE group_administrators (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(group_id, user_id)
-);
-
--- Tenant Administrators (assigns users as admins of tenants)
+-- Tenant Administrators: Junction table assigning users as administrators of tenants
 CREATE TABLE tenant_administrators (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -161,75 +76,18 @@ CREATE TABLE tenant_administrators (
     UNIQUE(tenant_id, user_id)
 );
 
--- Indexes for administrator tables
-CREATE INDEX idx_group_administrators_group_id ON group_administrators(group_id);
-CREATE INDEX idx_group_administrators_user_id ON group_administrators(user_id);
+-- Add table and column comments for tenant_administrators
+COMMENT ON TABLE tenant_administrators IS 'Associates users with tenants they administer';
+COMMENT ON TABLE tenant_users IS 'Associates users with tenants they belong to';
+COMMENT ON TABLE tenants IS 'Organizational tenants in the multi-tenant system';
+COMMENT ON TABLE users IS 'Application users with authentication credentials and verification status';
+
+-- Indices for tenant_administrators table
 CREATE INDEX idx_tenant_administrators_tenant_id ON tenant_administrators(tenant_id);
 CREATE INDEX idx_tenant_administrators_user_id ON tenant_administrators(user_id);
+CREATE INDEX idx_tenant_administrators_created_at ON tenant_administrators(created_at);
 
--- Indexes for tenant membership tables
-CREATE INDEX idx_tenant_users_tenant_id ON tenant_users(tenant_id);
-CREATE INDEX idx_tenant_users_user_id ON tenant_users(user_id);
-CREATE INDEX idx_tenant_groups_tenant_id ON tenant_groups(tenant_id);
-CREATE INDEX idx_tenant_groups_group_id ON tenant_groups(group_id);
-
--- Indexes for join tables
-CREATE INDEX idx_user_groups_user_id ON user_groups(user_id);
-CREATE INDEX idx_user_groups_group_id ON user_groups(group_id);
-CREATE INDEX idx_group_hierarchies_parent ON group_hierarchies(parent_group_id);
-CREATE INDEX idx_group_hierarchies_child ON group_hierarchies(child_group_id);
-
--- Table descriptions
-COMMENT ON TABLE users IS 'Stores user accounts with authentication credentials, verification status, and soft delete support';
-COMMENT ON TABLE groups IS 'Defines organizational groups that can contain users and be nested hierarchically';
-COMMENT ON TABLE tenants IS 'Multi-tenant isolation boundaries that can contain users and groups';
-COMMENT ON TABLE roles IS 'Named collections of permissions that can be assigned to users';
-COMMENT ON TABLE permissions IS 'Individual named permissions representing specific actions or access rights';
-COMMENT ON TABLE role_permissions IS 'Maps permissions to roles with allow or deny scope for access control';
-COMMENT ON TABLE user_roles IS 'Assigns roles to users, optionally scoped to specific tenants or groups';
-COMMENT ON TABLE user_verification_codes IS 'Temporary verification codes for email validation with automatic 30-minute expiry';
-COMMENT ON TABLE user_groups IS 'Assigns users to groups for membership and access control';
-COMMENT ON TABLE group_hierarchies IS 'Defines parent-child relationships between groups, allowing nested group structures';
-COMMENT ON TABLE tenant_users IS 'Assigns users to tenants for multi-tenant access control';
-COMMENT ON TABLE tenant_groups IS 'Assigns groups to tenants, allowing group-based tenant membership';
-COMMENT ON TABLE group_administrators IS 'Assigns users as administrators of groups with management privileges';
-COMMENT ON TABLE tenant_administrators IS 'Assigns users as administrators of tenants with management privileges';
-
--- Indexes for common queries
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_verified ON users(verified);
-CREATE INDEX idx_groups_slug ON groups(slug);
-CREATE INDEX idx_tenants_slug ON tenants(slug);
-CREATE INDEX idx_permissions_name ON permissions(name);
-CREATE INDEX idx_role_permissions_role_id ON role_permissions(role_id);
-CREATE INDEX idx_role_permissions_permission_id ON role_permissions(permission_id);
-CREATE INDEX idx_user_roles_user_id ON user_roles(user_id);
-CREATE INDEX idx_user_roles_role_id ON user_roles(role_id);
-CREATE INDEX idx_user_roles_tenant_id ON user_roles(tenant_id);
-CREATE INDEX idx_user_roles_group_id ON user_roles(group_id);
-CREATE INDEX idx_verification_codes_user_id ON user_verification_codes(user_id);
-CREATE INDEX idx_verification_codes_code ON user_verification_codes(code);
-CREATE INDEX idx_verification_codes_expires_at ON user_verification_codes(expires_at);
-
--- Trigger function to automatically clean up expired codes
-CREATE OR REPLACE FUNCTION cleanup_expired_verification_codes_trigger()
-RETURNS TRIGGER AS $$
-BEGIN
-    DELETE FROM user_verification_codes
-    WHERE expires_at < CURRENT_TIMESTAMP AND used_at IS NULL;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Trigger to clean up on INSERT (when new verification codes are created)
-CREATE TRIGGER trigger_cleanup_on_insert
-BEFORE INSERT ON user_verification_codes
-FOR EACH STATEMENT
-EXECUTE FUNCTION cleanup_expired_verification_codes_trigger();
-
--- Trigger to clean up on UPDATE (when verification codes are checked/used)
-CREATE TRIGGER trigger_cleanup_on_update
-BEFORE UPDATE ON user_verification_codes
-FOR EACH STATEMENT
-EXECUTE FUNCTION cleanup_expired_verification_codes_trigger();
-
+INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
+    ('Objectified Administrator', 'admin@objectified.dev',
+     '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
+     true, true);

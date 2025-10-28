@@ -10,6 +10,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
+  disabled?: boolean;
 }
 
 interface NavSection {
@@ -23,21 +24,20 @@ const SideNav: React.FC = () => {
   const navSections: NavSection[] = [
     {
       header: 'Account',
-      items: [{ label: 'Profile', href: '/profile', icon: User }],
+      items: [{ label: 'Profile', href: '/ade/dashboard/profile', icon: User }],
     },
     {
       header: 'Administration',
       items: [
-        { label: 'Groups', href: '/groups', icon: Users },
-        { label: 'Tenants', href: '/tenants', icon: Building2 },
+        { label: 'Tenants', href: '/ade/dashboard/tenants', icon: Building2 },
       ],
     },
     {
       header: 'Publications',
       items: [
-        { label: 'Schemas', href: '/schemas', icon: FileJson },
-        { label: 'Databases', href: '/databases', icon: Database },
-        { label: 'APIs', href: '/apis', icon: Code },
+        { label: 'Schemas', href: '/ade/dashboard/schemas', icon: FileJson, disabled: true },
+        { label: 'Databases', href: '/ade/dashboard/databases', icon: Database, disabled: true },
+        { label: 'APIs', href: '/ade/dashboard/apis', icon: Code, disabled: true },
       ],
     },
   ];
@@ -54,19 +54,30 @@ const SideNav: React.FC = () => {
           <ul className="space-y-1">
             {section.items.map((item) => {
               const Icon = item.icon;
+              const isDisabled = item.disabled;
+
               return (
                 <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={`flex items-center gap-3 py-2 px-3 rounded-md transition-colors ${
-                      isActive(item.href)
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-medium'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    <Icon size={18} className="flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </Link>
+                  {isDisabled ? (
+                    <div
+                      className="flex items-center gap-3 py-2 px-3 rounded-md text-gray-400 dark:text-gray-600 cursor-pointer opacity-60"
+                    >
+                      <Icon size={18} className="flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </div>
+                  ) : (
+                    <Link
+                      href={item.href}
+                      className={`flex items-center gap-3 py-2 px-3 rounded-md transition-colors ${
+                        isActive(item.href)
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-medium'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <Icon size={18} className="flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  )}
                 </li>
               );
             })}

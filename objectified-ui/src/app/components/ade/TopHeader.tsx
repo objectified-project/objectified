@@ -15,7 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Studio", href: "/ade/studio" },
 ];
 
-export default function TopHeader() {
+const TopHeader = () => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { data: session, status, update } = useSession();
@@ -92,23 +92,31 @@ export default function TopHeader() {
             fontSize: 13,
           }}
         >
-          {NAV_ITEMS.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors ${
-                  pathname === item.href ? 'underline bg-gray-200 dark:bg-gray-600' : ''
-                }`}
-                style={{
-                  padding: "4px 6px",
-                  borderRadius: 6,
-                  fontSize: 13,
-                }}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            // Check if current path matches or is a subdirectory of this nav item
+            // For exact matches, always activate
+            // For subdirectory matches, only activate if the path continues with a slash
+            const isActive = pathname === item.href ||
+                            (item.href !== '/ade' && pathname?.startsWith(item.href + '/'));
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors ${
+                    isActive ? 'underline bg-gray-200 dark:bg-gray-600' : ''
+                  }`}
+                  style={{
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                  }}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
@@ -170,3 +178,5 @@ export default function TopHeader() {
     </header>
   );
 }
+
+export default TopHeader;
