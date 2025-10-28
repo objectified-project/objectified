@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { Mail, Lock, User, Github } from 'lucide-react';
 import { signIn } from "next-auth/react";
 
-const PROVIDER_LIST = {
+const PROVIDER_LIST: any = {
   "Google": "google",
   "GitHub": "github",
   "GitLab": "gitlab",
   "Microsoft": "azure-ad",
-}
+};
 
 const SSOButton = ({ provider, icon, onClick }: { provider: string; icon: React.ReactNode; onClick: () => void }) => (
   <button
