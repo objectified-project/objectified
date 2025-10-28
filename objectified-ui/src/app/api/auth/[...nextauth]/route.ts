@@ -39,40 +39,12 @@ export const authOptions: NextAuthOptions = {
         return '/login?error=User account not found';
       }
 
+      // Handle different types of login providers here.
       if (loginProvider === 'credentials') {
         return credentialsSignIn(payload);
       }
 
       console.log('[signIn] unsupported provider:', loginProvider, 'user:', user, 'payload:', payload);
-
-    //     if (!account || !account.provider) {
-    //         console.log('[next-auth::signIn] No account or provider found');
-    //         return '/login?error=Login failure';
-    //     }
-    //
-    //     const { provider } = account;
-    //
-    //     console.log(`[next-auth::signIn] provider=${provider}`);
-    //
-    //     if (provider === 'github') {
-    //         return await githubSignin(user);
-    //     } else if (provider === 'google') {
-    //         return await googleSignin(user);
-    //     } else if (provider === 'gitlab') {
-    //         return await gitlabSignin(user);
-    //     } else if (provider === 'credentials') {
-    //         const userObject = (user as any);
-    //
-    //         if (userObject.access && userObject.id) {
-    //             console.log(`[next-auth::signIn] login for user ${userObject.emailAddress} succeeded: ${userObject.access} access`);
-    //             return true;
-    //         } else if (!userObject.access && userObject.id) {
-    //             console.log(`[next-auth::signIn] login for user ${userObject.emailAddress} succeeded, but missing 'access' type: free/paid`);
-    //             return false;
-    //         }
-    //     }
-    //
-    //     console.log(`[next-auth::signIn] login for user failed: no such user found`, user);
 
       return `/login?error=Your login attempt failed, provider "${loginProvider}" is not yet supported`;
     },
@@ -91,8 +63,10 @@ export const authOptions: NextAuthOptions = {
     //
     //     return baseUrl;
     // },
-    async session(payload: any) {
-      console.log('[session] payload:', payload);
+    async session({ session, token, user }) {
+      session.user.id = token.sub;
+
+      console.log('[session] Returning session:', session);
 
       // // Set session variables if not set, and the token contains the data necessary.
       // (session as any).objectified = token.objectified;
@@ -107,7 +81,7 @@ export const authOptions: NextAuthOptions = {
       //
       // (session as any).currentVersion = token.currentVersion || null;
 
-      return payload.session;
+      return session;
     },
     // // @ts-ignore
     // async jwt({ token, user, account, profile, trigger, session }) {

@@ -6,6 +6,13 @@ export interface ICredentials {
   password: string;
 }
 
+/*
+ * Authorization steps:
+ * 1. User is retrieved by e-mail address.
+ * 2. Comparison is checked against user password and stored password using bcrypt.
+ * 3. If the user login succeeds, the record is returned without the password field.
+ * 4. Failure returns a null, which the next-auth `authorize()` handler will interpret as an invalid account.
+ */
 export const credentialsAuthorize = async (credentials: ICredentials) => {
   console.log('[credentialsAuthorize] credentials login for user', credentials);
 
@@ -63,7 +70,7 @@ export const credentialsSignIn = (payload: any) => {
     return '/login?error=You have not yet verified your account e-mail address';
   }
 
-  console.log('[credentialsSignIn] Login successful for ', user.email);
+  console.log('[credentialsSignIn] Login successful', user.email);
 
   return true;
 }
