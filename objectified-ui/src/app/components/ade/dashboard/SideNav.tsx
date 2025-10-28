@@ -32,14 +32,14 @@ const SideNav: React.FC = () => {
         { label: 'Tenants', href: '/ade/dashboard/tenants', icon: Building2 },
       ],
     },
-    {
-      header: 'Publications',
-      items: [
-        { label: 'Schemas', href: '/ade/dashboard/schemas', icon: FileJson, disabled: true },
-        { label: 'Databases', href: '/ade/dashboard/databases', icon: Database, disabled: true },
-        { label: 'APIs', href: '/ade/dashboard/apis', icon: Code, disabled: true },
-      ],
-    },
+    // {
+    //   header: 'Publications',
+    //   items: [
+    //     { label: 'Schemas', href: '/ade/dashboard/schemas', icon: FileJson, disabled: true },
+    //     { label: 'Databases', href: '/ade/dashboard/databases', icon: Database, disabled: true },
+    //     { label: 'APIs', href: '/ade/dashboard/apis', icon: Code, disabled: true },
+    //   ],
+    // },
   ];
 
   const isActive = (href: string) => pathname === href;
