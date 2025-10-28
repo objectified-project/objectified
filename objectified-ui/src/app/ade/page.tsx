@@ -10,7 +10,7 @@ const Ade = () => {
 
   React.useEffect(() => {
     if (session) {
-      console.log('Session:', session, 'status:', status, 'update:', update);
+      console.log('Session:', session, 'status:', status);
     }
 
     if (session === null) {
