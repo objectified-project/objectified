@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../../globals.css";
-import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import * as React from 'react';
 import SideNav from '@/app/components/ade/dashboard/SideNav';
 
@@ -26,14 +25,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <SessionWrapper>
-      <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
-        <SideNav/>
+    <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
+      <SideNav/>
 
-        <main style={{ flex: 1, overflow: "auto" }}>
-          {children}
-        </main>
-      </div>
-    </SessionWrapper>
+      <main style={{ flex: 1, overflow: "auto" }}>
+        {children}
+      </main>
+    </div>
   );
 }

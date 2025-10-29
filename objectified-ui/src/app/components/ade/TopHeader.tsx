@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import Avatar from '@mui/material/Avatar';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 type NavItem = { label: string; href: string };
 
@@ -18,19 +18,8 @@ const NAV_ITEMS: NavItem[] = [
 const TopHeader = () => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const { data: session, status, update } = useSession();
-  const router = useRouter();
+  const { data: session } = useSession();
   const pathname = usePathname();
-
-  React.useEffect(() => {
-    if (session) {
-      console.log('Session:', session, 'status:', status);
-    }
-
-    if (session === null) {
-      router.push('/login');
-    }
-  }, [session]);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {

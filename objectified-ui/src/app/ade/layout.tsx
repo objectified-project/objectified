@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
+import AuthenticatedLayout from "@/app/components/auth/AuthenticatedLayout";
 import TopHeader from '@/app/components/ade/TopHeader';
 import * as React from 'react';
 
@@ -31,9 +32,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SessionWrapper>
-          <TopHeader/>
-
-          {children}
+          <AuthenticatedLayout>
+            <TopHeader/>
+            {children}
+          </AuthenticatedLayout>
         </SessionWrapper>
       </body>
     </html>
