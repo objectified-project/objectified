@@ -71,6 +71,10 @@ export const authOptions: NextAuthOptions = {
         payload.session.user.current_tenant_id = payload.token.current_tenant_id;
       }
 
+      if (payload.token?.name) {
+        payload.session.user.name = payload.token.name;
+      }
+
       console.log('Token', payload);
 
       return payload.session;
@@ -78,15 +82,26 @@ export const authOptions: NextAuthOptions = {
     async jwt(payload: any) {
       const token = payload.token;
 
-      console.log('[JWT] JWT:', payload);
+      console.log('[JWT] JWT: trigger:', payload.trigger, 'payload:', payload);
+
+      // If the trigger is "update", this indicates that the session payload has changed,
+      // and the token should be updated accordingly.
+      if (payload.trigger === 'update') {
+        console.log('[JWT] Updating session');
+
+        if (payload.session?.user?.name) {
+          console.log('[JWT] Adjusting name (rename):', payload.session.user.name);
+          token.name = payload.session.user.name;
+        }
+
+        if (payload.session?.current_tenant_id) {
+          console.log('[JWT] Adjusting session:', payload.session);
+          token.current_tenant_id = payload.session.current_tenant_id;
+        }
+      }
 
       if (payload.user) {
         token.user_id = payload.user.id;
-      }
-
-      if (payload.session) {
-        console.log('[JWT] Adjusting session:', payload.session);
-        token.current_tenant_id = payload.session.current_tenant_id;
       }
 
       return token;

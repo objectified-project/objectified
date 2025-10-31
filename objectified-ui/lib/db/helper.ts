@@ -1,6 +1,7 @@
 'use server';
 
 const connectionPool = require('./db');
+const bcrypt = require('bcrypt');
 
 export async function getUserByEmail(emailAddress: string) {
   return await connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
@@ -143,6 +144,79 @@ export async function removeTenantUser(userRecordId: string) {
     await connectionPool.query(
       'DELETE FROM odb.tenant_users WHERE id = $1',
       [userRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateUserName(userId: string, name: string) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Name cannot be empty' });
+    }
+
+    await connectionPool.query(
+      'UPDATE odb.users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [name.trim(), userId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateUserPassword(userId: string, currentPassword: string, newPassword: string) {
+  try {
+    // Validate new password format
+    if (!newPassword || newPassword.length < 8) {
+      return JSON.stringify({ success: false, error: 'Password must be at least 8 characters long' });
+    }
+
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(newPassword)) {
+      return JSON.stringify({ success: false, error: 'Password must contain at least one uppercase letter' });
+    }
+
+    // Check for lowercase letter
+    if (!/[a-z]/.test(newPassword)) {
+      return JSON.stringify({ success: false, error: 'Password must contain at least one lowercase letter' });
+    }
+
+    // Check for number or special character
+    if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) {
+      return JSON.stringify({ success: false, error: 'Password must contain at least one number or special character' });
+    }
+
+    // Get current password hash from database
+    const userResult = await connectionPool.query(
+      'SELECT password FROM odb.users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'User not found' });
+    }
+
+    const currentPasswordHash = userResult.rows[0].password;
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, currentPasswordHash);
+    if (!isPasswordValid) {
+      return JSON.stringify({ success: false, error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password in database
+    await connectionPool.query(
+      'UPDATE odb.users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [newPasswordHash, userId]
     );
 
     return JSON.stringify({ success: true });
