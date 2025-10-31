@@ -98,3 +98,7 @@ INSERT INTO odb.tenants (name, description, slug, enabled) VALUES
 INSERT INTO odb.tenant_users (user_id, tenant_id) VALUES
     ((SELECT id FROM odb.users WHERE email='admin@objectified.dev'),
      (SELECT id FROM odb.tenants WHERE slug='objectified'));
+
+INSERT INTO odb.tenant_administrators (tenant_id, user_id) VALUES
+    ((SELECT id FROM odb.tenants WHERE slug='objectified'),
+     (SELECT id FROM odb.users WHERE email='admin@objectified.dev'));

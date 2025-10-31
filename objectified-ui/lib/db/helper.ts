@@ -12,8 +12,30 @@ export async function getTenantsForUser(userId: string) {
   return JSON.stringify(result.rows);
 }
 
-export async function getAdminsForTenant(tenantId: string) {
-  const result = await connectionPool.query('SELECT a.* FROM odb.users a, odb.tenant_administrators b WHERE b.user_id = a.id AND b.tenant_id = $1', [tenantId]);
+export async function getTenantsAdministratedByUser(userId: string) {
+  // Get all administrators for tenants where the current user is an admin
+  const result = await connectionPool.query(
+    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email 
+     FROM odb.tenant_administrators a, odb.users b 
+     WHERE b.id = a.user_id 
+     AND a.tenant_id IN (
+       SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = $1
+     )`,
+    [userId]
+  );
+
+  return JSON.stringify(result.rows);
+}
+
+export async function getTenantUsers(tenantId: string) {
+  // Get all users for a specific tenant (including administrators)
+  const result = await connectionPool.query(
+    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email 
+     FROM odb.tenant_users a, odb.users b 
+     WHERE b.id = a.user_id 
+     AND a.tenant_id = $1`,
+    [tenantId]
+  );
 
   return JSON.stringify(result.rows);
 }
