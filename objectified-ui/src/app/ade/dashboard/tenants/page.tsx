@@ -4,6 +4,13 @@ import { useSession } from 'next-auth/react';
 import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers, addTenantAdministrator, addTenantUser, removeTenantAdministrator, removeTenantUser } from '../../../../../lib/db/helper';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X } from 'lucide-react';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Alert from '@mui/material/Alert';
 
 interface Tenant {
   id: string;
@@ -441,88 +448,80 @@ const Tenants = () => {
       )}
 
       {/* Add Admin Modal */}
-      {showAddAdminModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Add Administrator</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Email Address</label>
-              <input
-                type="email"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddAdminSubmit()}
-                placeholder="user@example.com"
-                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading}
-              />
-            </div>
-            {errorMessage && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
-                {errorMessage}
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowAddAdminModal(false)}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddAdminSubmit}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded cursor-pointer"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Adding...' : 'Add Administrator'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={showAddAdminModal}
+        onClose={() => !isLoading && setShowAddAdminModal(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add Administrator</DialogTitle>
+        <DialogContent>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={adminEmail}
+            onChange={(e) => setAdminEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleAddAdminSubmit()}
+            placeholder="user@example.com"
+            disabled={isLoading}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddAdminModal(false)} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddAdminSubmit} variant="contained" disabled={isLoading}>
+            {isLoading ? 'Adding...' : 'Add Administrator'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Add User Modal */}
-      {showAddUserModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Add User</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">Email Address</label>
-              <input
-                type="email"
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddUserSubmit()}
-                placeholder="user@example.com"
-                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading}
-              />
-            </div>
-            {errorMessage && (
-              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
-                {errorMessage}
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowAddUserModal(false)}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddUserSubmit}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded cursor-pointer"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Adding...' : 'Add User'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={showAddUserModal}
+        onClose={() => !isLoading && setShowAddUserModal(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Add User</DialogTitle>
+        <DialogContent>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={userEmail}
+            onChange={(e) => setUserEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleAddUserSubmit()}
+            placeholder="user@example.com"
+            disabled={isLoading}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAddUserModal(false)} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button onClick={handleAddUserSubmit} variant="contained" disabled={isLoading}>
+            {isLoading ? 'Adding...' : 'Add User'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
