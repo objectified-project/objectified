@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React from 'react';
-import { User, Users, Building2, FileJson, Database, Code } from 'lucide-react';
+import { User, Users, Building2, FileJson, Database, Code, Folders } from 'lucide-react';
 
 interface NavItem {
   label: string;
@@ -32,14 +32,15 @@ const SideNav: React.FC = () => {
         { label: 'Tenants', href: '/ade/dashboard/tenants', icon: Building2 },
       ],
     },
-    // {
-    //   header: 'Projects',
-    //   items: [
+    {
+      header: 'Specifications',
+      items: [
+        { label: 'Projects', href: '/ade/dashboard/projects', icon: Folders },
     //     { label: 'Schemas', href: '/ade/dashboard/schemas', icon: FileJson, disabled: true },
     //     { label: 'Databases', href: '/ade/dashboard/databases', icon: Database, disabled: true },
     //     { label: 'APIs', href: '/ade/dashboard/apis', icon: Code, disabled: true },
-    //   ],
-    // },
+      ],
+    },
   ];
 
   const isActive = (href: string) => pathname === href;

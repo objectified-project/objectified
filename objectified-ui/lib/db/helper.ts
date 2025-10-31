@@ -225,6 +225,105 @@ export async function updateUserPassword(userId: string, currentPassword: string
   }
 }
 
+// Project Management Functions
+
+export async function getProjectsForTenant(tenantId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT p.*, u.name as creator_name, u.email as creator_email
+       FROM odb.projects p
+       LEFT JOIN odb.users u ON p.creator_id = u.id
+       WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC`,
+      [tenantId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    return JSON.stringify([]);
+  }
+}
+
+export async function createProject(tenantId: string, creatorId: string, name: string, description: string, slug: string) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Project name is required' });
+    }
+
+    if (!slug || slug.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Project slug is required' });
+    }
+
+    // Validate slug format (lowercase, alphanumeric, dashes only)
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(slug.trim())) {
+      return JSON.stringify({ success: false, error: 'Slug must contain only lowercase letters, numbers, and dashes' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [tenantId, creatorId, name.trim(), description?.trim() || null, slug.trim().toLowerCase()]
+    );
+
+    return JSON.stringify({ success: true, project: result.rows[0] });
+  } catch (error: any) {
+    if (error.code === '23505') { // Unique constraint violation
+      return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
+    }
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateProject(projectId: string, name: string, description: string, slug: string, enabled: boolean) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Project name is required' });
+    }
+
+    if (!slug || slug.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Project slug is required' });
+    }
+
+    // Validate slug format (lowercase, alphanumeric, dashes only)
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(slug.trim())) {
+      return JSON.stringify({ success: false, error: 'Slug must contain only lowercase letters, numbers, and dashes' });
+    }
+
+    await connectionPool.query(
+      `UPDATE odb.projects 
+       SET name = $1, description = $2, slug = $3, enabled = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5 AND deleted_at IS NULL`,
+      [name.trim(), description?.trim() || null, slug.trim().toLowerCase(), enabled, projectId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    if (error.code === '23505') { // Unique constraint violation
+      return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
+    }
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function deleteProject(projectId: string) {
+  try {
+    // Soft delete - set enabled to false and deleted_at timestamp
+    await connectionPool.query(
+      `UPDATE odb.projects 
+       SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [projectId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 // export async function updateLastLogin(userId: string) {
 //   return await connectionPool.query('UPDATE odb.user SET last_login = NOW() WHERE id = $1', [userId]);
 // }
