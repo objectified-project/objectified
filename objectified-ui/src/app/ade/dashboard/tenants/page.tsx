@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers } from '../../../../../lib/db/helper';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Users, Shield } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 interface Tenant {
   id: string;
@@ -37,6 +37,10 @@ const Tenants = () => {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [adminTenants, setAdminTenants] = useState<AdminUser[]>([]);
   const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
+  const [isAdminsExpanded, setIsAdminsExpanded] = useState(false);
+  const [isUsersExpanded, setIsUsersExpanded] = useState(false);
+  const [adminFilter, setAdminFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
 
@@ -46,13 +50,11 @@ const Tenants = () => {
 
       getTenantsForUser(userId)
         .then(x => {
-          console.log('Tenants:', x);
           setTenants(JSON.parse(x));
         });
 
       getTenantsAdministratedByUser(userId)
         .then(x => {
-          console.log('Admin Tenants:', x);
           setAdminTenants(JSON.parse(x));
         });
     }
@@ -62,7 +64,6 @@ const Tenants = () => {
     if (currentTenantId && isCurrentUserAdmin(currentTenantId)) {
       getTenantUsers(currentTenantId)
         .then(x => {
-          console.log('Tenant Users:', x);
           setTenantUsers(JSON.parse(x));
         });
     }
@@ -97,11 +98,25 @@ const Tenants = () => {
   };
 
   const getAdminsForTenant = (tenantId: string) => {
-    return adminTenants.filter((admin: AdminUser) => admin.tenant_id === tenantId);
+    const admins = adminTenants.filter((admin: AdminUser) => admin.tenant_id === tenantId);
+    if (!adminFilter) return admins;
+
+    const filterLower = adminFilter.toLowerCase();
+    return admins.filter((admin: AdminUser) =>
+      admin.name.toLowerCase().includes(filterLower) ||
+      admin.email.toLowerCase().includes(filterLower)
+    );
   };
 
   const getUsersForTenant = (tenantId: string) => {
-    return tenantUsers.filter((user: TenantUser) => user.tenant_id === tenantId);
+    const users = tenantUsers.filter((user: TenantUser) => user.tenant_id === tenantId);
+    if (!userFilter) return users;
+
+    const filterLower = userFilter.toLowerCase();
+    return users.filter((user: TenantUser) =>
+      user.name.toLowerCase().includes(filterLower) ||
+      user.email.toLowerCase().includes(filterLower)
+    );
   };
 
   const isCurrentUserAdmin = (tenantId: string) => {
@@ -146,10 +161,18 @@ const Tenants = () => {
                   {/* Administrators */}
                   <div>
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="text-lg font-semibold flex items-center gap-2">
+                      <button
+                        onClick={() => setIsAdminsExpanded(!isAdminsExpanded)}
+                        className="text-lg font-semibold flex items-center gap-2 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                      >
                         <Shield className="h-5 w-5" />
                         Administrators
-                      </h4>
+                        {isAdminsExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleAddAdmin(tenant.id)}
                         className="flex items-center gap-1 bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded cursor-pointer text-sm"
@@ -158,37 +181,72 @@ const Tenants = () => {
                         Add Admin
                       </button>
                     </div>
-                    <ul className="space-y-2">
-                      {getAdminsForTenant(tenant.id).map((admin: AdminUser) => (
-                        <li
-                          key={admin.id}
-                          className="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-3 rounded"
-                        >
-                          <div>
-                            <p className="font-medium">{admin.name}</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">{admin.email}</p>
-                          </div>
-                          {admin.user_id !== currentUserId && (
+                    {isAdminsExpanded && (
+                      <>
+                        <div className="relative mb-3">
+                          <input
+                            type="text"
+                            placeholder="Filter by name or email..."
+                            value={adminFilter}
+                            onChange={(e) => setAdminFilter(e.target.value)}
+                            className="w-full p-2 pr-8 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          {adminFilter && (
                             <button
-                              onClick={() => handleRemoveAdmin(admin.id)}
-                              className="flex items-center gap-1 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded cursor-pointer text-sm"
+                              onClick={() => setAdminFilter('')}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                             >
-                              <Trash2 className="h-4 w-4" />
-                              Remove
+                              <X className="h-4 w-4" />
                             </button>
                           )}
-                        </li>
-                      ))}
-                    </ul>
+                        </div>
+                        <ul className="space-y-2">
+                          {getAdminsForTenant(tenant.id).length === 0 ? (
+                            <li className="text-gray-500 text-sm italic p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                              No administrators match the filter
+                            </li>
+                          ) : (
+                            getAdminsForTenant(tenant.id).map((admin: AdminUser) => (
+                          <li
+                            key={admin.id}
+                            className="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-3 rounded"
+                          >
+                            <div>
+                              <p className="font-medium">{admin.name}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">{admin.email}</p>
+                            </div>
+                            {admin.user_id !== currentUserId && (
+                              <button
+                                onClick={() => handleRemoveAdmin(admin.id)}
+                                className="flex items-center gap-1 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded cursor-pointer text-sm"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Remove
+                              </button>
+                            )}
+                            </li>
+                            ))
+                          )}
+                        </ul>
+                      </>
+                    )}
                   </div>
 
                   {/* Tenant Users */}
                   <div>
                     <div className="flex justify-between items-center mb-3">
-                      <h4 className="text-lg font-semibold flex items-center gap-2">
+                      <button
+                        onClick={() => setIsUsersExpanded(!isUsersExpanded)}
+                        className="text-lg font-semibold flex items-center gap-2 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
+                      >
                         <Users className="h-5 w-5" />
                         Tenant Users
-                      </h4>
+                        {isUsersExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleAddUser(tenant.id)}
                         className="flex items-center gap-1 bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-3 rounded cursor-pointer text-sm"
@@ -197,34 +255,55 @@ const Tenants = () => {
                         Add User
                       </button>
                     </div>
-                    <ul className="space-y-2">
-                      {getUsersForTenant(tenant.id).length === 0 ? (
-                        <li className="text-gray-500 text-sm italic p-3 bg-gray-50 dark:bg-gray-800 rounded">
-                          No users in this tenant
-                        </li>
-                      ) : (
-                        getUsersForTenant(tenant.id).map((user: TenantUser) => (
-                          <li
-                            key={user.id}
-                            className="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-3 rounded"
-                          >
-                            <div>
-                              <p className="font-medium">{user.name}</p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
-                            </div>
-                            {user.user_id !== currentUserId && (
-                              <button
-                                onClick={() => handleRemoveUser(user.id)}
-                                className="flex items-center gap-1 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded cursor-pointer text-sm"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Remove
-                              </button>
-                            )}
-                          </li>
-                        ))
-                      )}
-                    </ul>
+                    {isUsersExpanded && (
+                      <>
+                        <div className="relative mb-3">
+                          <input
+                            type="text"
+                            placeholder="Filter by name or email..."
+                            value={userFilter}
+                            onChange={(e) => setUserFilter(e.target.value)}
+                            className="w-full p-2 pr-8 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          {userFilter && (
+                            <button
+                              onClick={() => setUserFilter('')}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        <ul className="space-y-2">
+                          {getUsersForTenant(tenant.id).length === 0 ? (
+                            <li className="text-gray-500 text-sm italic p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                              No users match the filter
+                            </li>
+                          ) : (
+                            getUsersForTenant(tenant.id).map((user: TenantUser) => (
+                            <li
+                              key={user.id}
+                              className="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-3 rounded"
+                            >
+                              <div>
+                                <p className="font-medium">{user.name}</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
+                              </div>
+                              {user.user_id !== currentUserId && (
+                                <button
+                                  onClick={() => handleRemoveUser(user.id)}
+                                  className="flex items-center gap-1 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded cursor-pointer text-sm"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Remove
+                                </button>
+                              )}
+                              </li>
+                            ))
+                          )}
+                        </ul>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
