@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers } from '../../../../../lib/db/helper';
+import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers, addTenantAdministrator, addTenantUser, removeTenantAdministrator, removeTenantUser } from '../../../../../lib/db/helper';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X } from 'lucide-react';
 
@@ -41,6 +41,13 @@ const Tenants = () => {
   const [isUsersExpanded, setIsUsersExpanded] = useState(false);
   const [adminFilter, setAdminFilter] = useState('');
   const [userFilter, setUserFilter] = useState('');
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
 
@@ -77,6 +84,34 @@ const Tenants = () => {
     }
   }, [adminTenants]);
 
+  const refreshData = async () => {
+    if (session) {
+      const userId: string = (session.user as any)?.user_id;
+
+      const [tenantsData, adminTenantsData] = await Promise.all([
+        getTenantsForUser(userId),
+        getTenantsAdministratedByUser(userId)
+      ]);
+
+      setTenants(JSON.parse(tenantsData));
+      const admins = JSON.parse(adminTenantsData);
+      setAdminTenants(admins);
+
+      // Refresh tenant users for all admin tenants
+      const adminTenantIds = [...new Set(admins.map((admin: AdminUser) => admin.tenant_id))];
+      const usersMap: Record<string, TenantUser[]> = {};
+
+      await Promise.all(
+        adminTenantIds.map(async (tenantId: any) => {
+          const users = await getTenantUsers(tenantId);
+          usersMap[tenantId] = JSON.parse(users);
+        })
+      );
+
+      setTenantUsers(usersMap);
+    }
+  };
+
   const handleSelectTenant = async (tenant: Tenant) => {
     const tenantId = tenant.id;
 
@@ -86,23 +121,109 @@ const Tenants = () => {
   };
 
   const handleAddAdmin = (tenantId: string) => {
-    // TODO: Implement add admin functionality
-    console.log('Add admin for tenant:', tenantId);
+    setSelectedTenantId(tenantId);
+    setAdminEmail('');
+    setErrorMessage('');
+    setShowAddAdminModal(true);
   };
 
-  const handleRemoveAdmin = (adminId: string) => {
-    // TODO: Implement remove admin functionality
-    console.log('Remove admin:', adminId);
+  const handleAddAdminSubmit = async () => {
+    if (!adminEmail.trim()) {
+      setErrorMessage('Please enter an email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await addTenantAdministrator(selectedTenantId, adminEmail.trim());
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        setShowAddAdminModal(false);
+        setAdminEmail('');
+        await refreshData();
+      } else {
+        setErrorMessage(response.error || 'Failed to add administrator');
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveAdmin = async (adminId: string) => {
+    if (!confirm('Are you sure you want to remove this administrator?')) {
+      return;
+    }
+
+    try {
+      const result = await removeTenantAdministrator(adminId);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        await refreshData();
+      } else {
+        alert(response.error || 'Failed to remove administrator');
+      }
+    } catch (error: any) {
+      alert(error.message || 'An error occurred');
+    }
   };
 
   const handleAddUser = (tenantId: string) => {
-    // TODO: Implement add user functionality
-    console.log('Add user for tenant:', tenantId);
+    setSelectedTenantId(tenantId);
+    setUserEmail('');
+    setErrorMessage('');
+    setShowAddUserModal(true);
   };
 
-  const handleRemoveUser = (userId: string) => {
-    // TODO: Implement remove user functionality
-    console.log('Remove user:', userId);
+  const handleAddUserSubmit = async () => {
+    if (!userEmail.trim()) {
+      setErrorMessage('Please enter an email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await addTenantUser(selectedTenantId, userEmail.trim());
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        setShowAddUserModal(false);
+        setUserEmail('');
+        await refreshData();
+      } else {
+        setErrorMessage(response.error || 'Failed to add user');
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveUser = async (userRecordId: string) => {
+    if (!confirm('Are you sure you want to remove this user?')) {
+      return;
+    }
+
+    try {
+      const result = await removeTenantUser(userRecordId);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        await refreshData();
+      } else {
+        alert(response.error || 'Failed to remove user');
+      }
+    } catch (error: any) {
+      alert(error.message || 'An error occurred');
+    }
   };
 
   const getAdminsForTenant = (tenantId: string) => {
@@ -317,6 +438,90 @@ const Tenants = () => {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Add Admin Modal */}
+      {showAddAdminModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Add Administrator</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Email Address</label>
+              <input
+                type="email"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddAdminSubmit()}
+                placeholder="user@example.com"
+                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              />
+            </div>
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+                {errorMessage}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowAddAdminModal(false)}
+                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddAdminSubmit}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded cursor-pointer"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Adding...' : 'Add Administrator'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Add User</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Email Address</label>
+              <input
+                type="email"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddUserSubmit()}
+                placeholder="user@example.com"
+                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              />
+            </div>
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+                {errorMessage}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowAddUserModal(false)}
+                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded"
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddUserSubmit}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded cursor-pointer"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Adding...' : 'Add User'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

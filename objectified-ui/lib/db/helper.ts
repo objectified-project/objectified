@@ -40,6 +40,117 @@ export async function getTenantUsers(tenantId: string) {
   return JSON.stringify(result.rows);
 }
 
+export async function addTenantAdministrator(tenantId: string, userEmail: string) {
+  try {
+    // First, get the user by email
+    const userResult = await connectionPool.query(
+      'SELECT id FROM odb.users WHERE email = $1',
+      [userEmail]
+    );
+
+    if (userResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Check if already an admin
+    const existingAdmin = await connectionPool.query(
+      'SELECT id FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2',
+      [tenantId, userId]
+    );
+
+    if (existingAdmin.rowCount > 0) {
+      return JSON.stringify({ success: false, error: 'User is already an administrator' });
+    }
+
+    // Add to tenant_administrators
+    await connectionPool.query(
+      'INSERT INTO odb.tenant_administrators (tenant_id, user_id) VALUES ($1, $2)',
+      [tenantId, userId]
+    );
+
+    // Ensure user is also in tenant_users
+    const existingUser = await connectionPool.query(
+      'SELECT id FROM odb.tenant_users WHERE tenant_id = $1 AND user_id = $2',
+      [tenantId, userId]
+    );
+
+    if (existingUser.rowCount === 0) {
+      await connectionPool.query(
+        'INSERT INTO odb.tenant_users (tenant_id, user_id) VALUES ($1, $2)',
+        [tenantId, userId]
+      );
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function addTenantUser(tenantId: string, userEmail: string) {
+  try {
+    // First, get the user by email
+    const userResult = await connectionPool.query(
+      'SELECT id FROM odb.users WHERE email = $1',
+      [userEmail]
+    );
+
+    if (userResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Check if already a member
+    const existingUser = await connectionPool.query(
+      'SELECT id FROM odb.tenant_users WHERE tenant_id = $1 AND user_id = $2',
+      [tenantId, userId]
+    );
+
+    if (existingUser.rowCount > 0) {
+      return JSON.stringify({ success: false, error: 'User is already a member of this tenant' });
+    }
+
+    // Add to tenant_users
+    await connectionPool.query(
+      'INSERT INTO odb.tenant_users (tenant_id, user_id) VALUES ($1, $2)',
+      [tenantId, userId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function removeTenantAdministrator(adminRecordId: string) {
+  try {
+    await connectionPool.query(
+      'DELETE FROM odb.tenant_administrators WHERE id = $1',
+      [adminRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function removeTenantUser(userRecordId: string) {
+  try {
+    await connectionPool.query(
+      'DELETE FROM odb.tenant_users WHERE id = $1',
+      [userRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 // export async function updateLastLogin(userId: string) {
 //   return await connectionPool.query('UPDATE odb.user SET last_login = NOW() WHERE id = $1', [userId]);
 // }
