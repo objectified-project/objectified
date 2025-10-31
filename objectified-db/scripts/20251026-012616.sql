@@ -92,6 +92,31 @@ INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
      '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
      true, true);
 
+INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
+    ('Test User 1', 'test1@user.com',
+     '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
+     true, true);
+
+INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
+    ('Test User 2', 'test2@user.com',
+     '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
+     true, true);
+
+INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
+    ('Test User 3', 'test3@user.com',
+     '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
+     true, true);
+
+INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
+    ('Test User 4', 'test4@user.com',
+     '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
+     true, true);
+
+INSERT INTO odb.users (name, email, password, verified, enabled) VALUES
+    ('Test User 5', 'test5@user.com',
+     '$2a$12$.1v68JPMx8lR1KFO.nbZcegTSnb1Tqp0J86sK5junucFOSkyI.jHe',
+     true, true);
+
 INSERT INTO odb.tenants (name, description, slug, enabled) VALUES
     ('Objectified', 'The Objectified Project', 'objectified', true);
 

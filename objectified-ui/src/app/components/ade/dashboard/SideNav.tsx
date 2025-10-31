@@ -33,7 +33,7 @@ const SideNav: React.FC = () => {
       ],
     },
     // {
-    //   header: 'Publications',
+    //   header: 'Projects',
     //   items: [
     //     { label: 'Schemas', href: '/ade/dashboard/schemas', icon: FileJson, disabled: true },
     //     { label: 'Databases', href: '/ade/dashboard/databases', icon: Database, disabled: true },
