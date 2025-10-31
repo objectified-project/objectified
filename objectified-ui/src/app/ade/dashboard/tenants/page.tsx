@@ -282,12 +282,14 @@ const Tenants = () => {
                   </div>
                   <p className="text-gray-600 dark:text-gray-400">{tenant.description}</p>
                 </div>
-                <button
-                  onClick={() => handleSelectTenant(tenant)}
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded cursor-pointer"
-                >
-                  Select
-                </button>
+                {tenant.id !== currentTenantId && (
+                  <button
+                    onClick={() => handleSelectTenant(tenant)}
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded cursor-pointer"
+                  >
+                    Select
+                  </button>
+                )}
               </div>
 
               {/* Administration Section */}
