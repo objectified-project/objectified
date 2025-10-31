@@ -36,7 +36,7 @@ const Tenants = () => {
   const { data: session, update } = useSession();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [adminTenants, setAdminTenants] = useState<AdminUser[]>([]);
-  const [tenantUsers, setTenantUsers] = useState<TenantUser[]>([]);
+  const [tenantUsers, setTenantUsers] = useState<Record<string, TenantUser[]>>({});
   const [isAdminsExpanded, setIsAdminsExpanded] = useState(false);
   const [isUsersExpanded, setIsUsersExpanded] = useState(false);
   const [adminFilter, setAdminFilter] = useState('');
@@ -61,13 +61,21 @@ const Tenants = () => {
   }, [session]);
 
   useEffect(() => {
-    if (currentTenantId && isCurrentUserAdmin(currentTenantId)) {
-      getTenantUsers(currentTenantId)
-        .then(x => {
-          setTenantUsers(JSON.parse(x));
+    // Load tenant users for all tenants where current user is an admin
+    if (adminTenants.length > 0) {
+      const adminTenantIds = [...new Set(adminTenants.map(admin => admin.tenant_id))];
+
+      adminTenantIds.forEach(tenantId => {
+        getTenantUsers(tenantId).then(x => {
+          const users = JSON.parse(x);
+          setTenantUsers(prev => ({
+            ...prev,
+            [tenantId]: users
+          }));
         });
+      });
     }
-  }, [currentTenantId, adminTenants]);
+  }, [adminTenants]);
 
   const handleSelectTenant = async (tenant: Tenant) => {
     const tenantId = tenant.id;
@@ -109,7 +117,7 @@ const Tenants = () => {
   };
 
   const getUsersForTenant = (tenantId: string) => {
-    const users = tenantUsers.filter((user: TenantUser) => user.tenant_id === tenantId);
+    const users = tenantUsers[tenantId] || [];
     if (!userFilter) return users;
 
     const filterLower = userFilter.toLowerCase();
@@ -133,19 +141,18 @@ const Tenants = () => {
           {tenants.map(tenant => (
             <li
               key={tenant.id}
-              className="border rounded-lg p-4"
+              className={`border rounded-lg p-4 transition-colors ${
+                tenant.id === currentTenantId 
+                  ? 'bg-blue-100 dark:bg-blue-800/30 border-blue-400 dark:border-blue-600' 
+                  : 'bg-white dark:bg-gray-800'
+              }`}
             >
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-xl font-semibold">{tenant.name} ({tenant.slug})</h3>
-                    {tenant.id === currentTenantId && (
-                      <span className="bg-blue-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                        current
-                      </span>
-                    )}
                   </div>
-                  <p className="text-gray-600">{tenant.description}</p>
+                  <p className="text-gray-600 dark:text-gray-400">{tenant.description}</p>
                 </div>
                 <button
                   onClick={() => handleSelectTenant(tenant)}
@@ -156,7 +163,7 @@ const Tenants = () => {
               </div>
 
               {/* Administration Section */}
-              {tenant.id === currentTenantId && isCurrentUserAdmin(tenant.id) && (
+              {isCurrentUserAdmin(tenant.id) && (
                 <div className="mt-4 pt-4 border-t space-y-6">
                   {/* Administrators */}
                   <div>
