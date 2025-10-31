@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const TopHeader = () => {
   const [open, setOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { data: session } = useSession();
   const pathname = usePathname();
@@ -31,6 +32,32 @@ const TopHeader = () => {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
+  useEffect(() => {
+    // Detect dark mode
+    const checkDarkMode = () => {
+      const isDark = document.documentElement.classList.contains('dark') ||
+                     window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDarkMode(isDark);
+    };
+
+    checkDarkMode();
+
+    // Listen for changes to dark mode
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkDarkMode);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', checkDarkMode);
+    };
+  }, []);
+
   return (
     <header
       className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700"
@@ -43,29 +70,13 @@ const TopHeader = () => {
         height: 48,
       }}
     >
-      {/* Left: Logo / App Title */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div
-          aria-hidden
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            background: "linear-gradient(135deg,#5b8def,#7b61ff)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "white",
-            fontWeight: 700,
-            fontSize: 12,
-          }}
-        >
-          O
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-          <span className="font-bold text-gray-900 dark:text-gray-100" style={{ fontSize: 13 }}>Objectified</span>
-          <small className="text-gray-500 dark:text-gray-400" style={{ fontSize: 11 }}>Admin</small>
-        </div>
+      {/* Left: Logo */}
+      <div style={{ display: "flex", alignItems: "center", height: 40 }}>
+        <img
+          src={isDarkMode ? "/Objectified-05.png" : "/Objectified-02.png"}
+          alt="Objectified Logo"
+          style={{ height: "100%", width: "auto", objectFit: "contain" }}
+        />
       </div>
 
       {/* Center: Navigation */}
@@ -147,17 +158,14 @@ const TopHeader = () => {
               zIndex: 50,
             }}
           >
-            <Link href="/ade/dashboard/profile" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300" style={{ textDecoration: "none" }}>
+            <Link href="/ade/dashboard/profile" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300" style={{ textDecoration: "none" }} onClick={() => setOpen(false)}>
               View Profile
             </Link>
-            {/*<Link href="/ade/account" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300" style={{ textDecoration: "none" }}>*/}
-            {/*  Account*/}
-            {/*</Link>*/}
             <div className="h-px bg-gray-200 dark:bg-gray-600 my-1" />
             <button
               onClick={() => signOut()}
               className="w-full text-left block px-3 py-2 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-700 dark:hover:text-red-300 rounded text-sm transition-colors text-gray-700 dark:text-gray-300"
-              style={{ background: "transparent", border: "none", cursor: "pointer" }}
+              style={{ border: "none", cursor: "pointer" }}
             >
               Sign out
             </button>

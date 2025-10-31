@@ -64,6 +64,15 @@ const Login = () => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-lg p-8">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <img
+              src="/Objectified-02.png"
+              alt="Objectified Logo"
+              style={{ height: "60px", width: "auto", objectFit: "contain" }}
+            />
+          </div>
+
           {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-3xl font-semibold text-gray-900 mb-2">
@@ -91,7 +100,7 @@ const Login = () => {
                     value={payload['name']}
                     onChange={handleChange}
                     required
-                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
                     placeholder="John Doe"
                   />
                 </div>
