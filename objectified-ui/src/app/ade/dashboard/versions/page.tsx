@@ -58,6 +58,7 @@ const Versions = () => {
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const [versionId, setVersionId] = useState('');
   const [autoGenerate, setAutoGenerate] = useState(true);
+  const [bumpStrategy, setBumpStrategy] = useState<'patch' | 'minor'>('patch');
   const [nextAutoVersion, setNextAutoVersion] = useState<string>('');
   const [description, setDescription] = useState('');
   const [changeLog, setChangeLog] = useState('');
@@ -110,7 +111,7 @@ const Versions = () => {
     }
   };
 
-  const calculateNextVersion = (): string => {
+  const calculateNextVersion = (strategy: 'patch' | 'minor' = 'patch'): string => {
     if (versions.length === 0) {
       return '0.1.0';
     }
@@ -125,14 +126,20 @@ const Versions = () => {
 
     const major = parseInt(match[1], 10);
     const minor = parseInt(match[2], 10);
+    const patch = parseInt(match[3], 10);
 
-    return `${major}.${minor + 1}.0`;
+    if (strategy === 'minor') {
+      return `${major}.${minor + 1}.0`;
+    } else {
+      return `${major}.${minor}.${patch + 1}`;
+    }
   };
 
   const handleCreateClick = () => {
     setVersionId('');
     setAutoGenerate(true);
-    setNextAutoVersion(calculateNextVersion());
+    setBumpStrategy('patch');
+    setNextAutoVersion(calculateNextVersion('patch'));
     setDescription('');
     setChangeLog('');
     setEnabled(true);
@@ -602,17 +609,50 @@ const Versions = () => {
             <Select
               value={autoGenerate ? 'auto' : 'manual'}
               label="Version Strategy"
-              onChange={(e) => setAutoGenerate(e.target.value === 'auto')}
+              onChange={(e) => {
+                const isAuto = e.target.value === 'auto';
+                setAutoGenerate(isAuto);
+                if (isAuto) {
+                  setNextAutoVersion(calculateNextVersion(bumpStrategy));
+                }
+              }}
               disabled={isLoading}
             >
-              <MenuItem value="auto">Auto-generate (bump minor version)</MenuItem>
+              <MenuItem value="auto">Auto-generate version</MenuItem>
               <MenuItem value="manual">Manual entry</MenuItem>
             </Select>
           </FormControl>
           {autoGenerate ? (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Version <strong>{nextAutoVersion}</strong> will be created
-            </Alert>
+            <>
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Bump Strategy</InputLabel>
+                <Select
+                  value={bumpStrategy}
+                  label="Bump Strategy"
+                  onChange={(e) => {
+                    const strategy = e.target.value as 'patch' | 'minor';
+                    setBumpStrategy(strategy);
+                    setNextAutoVersion(calculateNextVersion(strategy));
+                  }}
+                  disabled={isLoading}
+                >
+                  <MenuItem value="patch">
+                    Patch version (bug fixes) - {calculateNextVersion('patch')}
+                  </MenuItem>
+                  <MenuItem value="minor">
+                    Minor version (new features) - {calculateNextVersion('minor')}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Version <strong>{nextAutoVersion}</strong> will be created
+                <div style={{ fontSize: '0.875rem', marginTop: '4px' }}>
+                  {bumpStrategy === 'patch'
+                    ? 'Patch bump: For bug fixes and small changes'
+                    : 'Minor bump: For new features and functionality'}
+                </div>
+              </Alert>
+            </>
           ) : (
             <TextField
               autoFocus={!autoGenerate}
