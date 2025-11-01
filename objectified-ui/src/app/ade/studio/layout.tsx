@@ -3,6 +3,7 @@
 import "../../globals.css";
 import * as React from 'react';
 import { useState } from 'react';
+import { StudioProvider, useStudio } from './StudioContext';
 import StudioSideNav, {
   ClassItem,
   PropertyItem,
@@ -26,11 +27,14 @@ import Box from '@mui/material/Box';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-export default function StudioLayout({
+function StudioLayoutContent({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Get selected project from context
+  const { selectedProjectId } = useStudio();
+
   // State for classes and properties
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
@@ -75,6 +79,10 @@ export default function StudioLayout({
 
   // Class callbacks
   const handleClassAdd = () => {
+    if (!selectedProjectId) {
+      alert('Please select a project from the canvas first');
+      return;
+    }
     setClassDialogMode('add');
     setClassName('');
     setClassDescription('');
@@ -84,6 +92,10 @@ export default function StudioLayout({
   };
 
   const handleClassEdit = (classItem: ClassItem) => {
+    if (!selectedProjectId) {
+      alert('Please select a project from the canvas first');
+      return;
+    }
     setClassDialogMode('edit');
     setSelectedClass(classItem);
     setClassName(classItem.name);
@@ -93,6 +105,10 @@ export default function StudioLayout({
   };
 
   const handleClassDelete = (classId: string) => {
+    if (!selectedProjectId) {
+      alert('Please select a project from the canvas first');
+      return;
+    }
     setDeleteTarget({ type: 'class', id: classId });
     setDeleteDialogOpen(true);
   };
@@ -129,6 +145,10 @@ export default function StudioLayout({
 
   // Property callbacks
   const handlePropertyAdd = () => {
+    if (!selectedProjectId) {
+      alert('Please select a project from the canvas first');
+      return;
+    }
     setPropertyDialogMode('add');
     setPropertyName('');
     setPropertyType('string');
@@ -155,6 +175,10 @@ export default function StudioLayout({
   };
 
   const handlePropertyEdit = (propertyItem: PropertyItem) => {
+    if (!selectedProjectId) {
+      alert('Please select a project from the canvas first');
+      return;
+    }
     setPropertyDialogMode('edit');
     setSelectedProperty(propertyItem);
     setPropertyName(propertyItem.name);
@@ -189,6 +213,10 @@ export default function StudioLayout({
   };
 
   const handlePropertyDelete = (propertyId: string) => {
+    if (!selectedProjectId) {
+      alert('Please select a project from the canvas first');
+      return;
+    }
     setDeleteTarget({ type: 'property', id: propertyId });
     setDeleteDialogOpen(true);
   };
@@ -283,6 +311,7 @@ export default function StudioLayout({
         properties={properties}
         callbacks={callbacks}
         refreshKey={refreshKey}
+        selectedProjectId={selectedProjectId}
       />
 
       <main style={{ flex: 1, overflow: "auto" }}>
@@ -738,3 +767,16 @@ export default function StudioLayout({
     </div>
   );
 }
+
+export default function StudioLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <StudioProvider>
+      <StudioLayoutContent>{children}</StudioLayoutContent>
+    </StudioProvider>
+  );
+}
+

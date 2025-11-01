@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
+import { useStudio } from './StudioContext';
 import {
   ReactFlow,
   useNodesState,
@@ -44,6 +45,7 @@ type ViewMode = 'canvas' | 'code';
 
 const Studio = () => {
   const { data: session } = useSession();
+  const { setSelectedProjectId: setContextProjectId } = useStudio();
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -66,6 +68,11 @@ const Studio = () => {
       loadProjects();
     }
   }, [currentTenantId]);
+
+  // Sync selected project ID to context for sidebar
+  useEffect(() => {
+    setContextProjectId(selectedProjectId || null);
+  }, [selectedProjectId, setContextProjectId]);
 
   // Load versions when project is selected
   useEffect(() => {

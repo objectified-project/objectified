@@ -64,6 +64,7 @@ interface StudioSideNavProps {
   properties?: PropertyItem[];
   callbacks?: StudioSideNavCallbacks;
   refreshKey?: number; // Used to trigger refresh from parent
+  selectedProjectId?: string | null; // Currently selected project from canvas
 }
 
 const StudioSideNav: React.FC<StudioSideNavProps> = ({
@@ -71,6 +72,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   properties = [],
   callbacks = {},
   refreshKey = 0,
+  selectedProjectId = null,
 }) => {
   const [currentTab, setCurrentTab] = useState<'classes' | 'properties'>('classes');
   const [classesSearchQuery, setClassesSearchQuery] = useState('');
@@ -122,6 +124,24 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
       }}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {/* Project Status Indicator */}
+        {!selectedProjectId && (
+          <Box
+            sx={{
+              p: 1.5,
+              bgcolor: 'warning.light',
+              color: 'warning.contrastText',
+              textAlign: 'center',
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              borderBottom: 1,
+              borderColor: 'divider'
+            }}
+          >
+            ⚠️ Select a project from the canvas to manage classes and properties
+          </Box>
+        )}
+
         {/* Tabs Navigation */}
         <Tabs
           value={currentTab}
@@ -201,20 +221,24 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                             <IconButton
                               edge="end"
                               size="small"
+                              disabled={!selectedProjectId}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 callbacks.onClassEdit?.(classItem);
                               }}
+                              title={!selectedProjectId ? 'Select a project first' : 'Edit class'}
                             >
                               <Edit fontSize="small" />
                             </IconButton>
                             <IconButton
                               edge="end"
                               size="small"
+                              disabled={!selectedProjectId}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 callbacks.onClassDelete?.(classItem.id);
                               }}
+                              title={!selectedProjectId ? 'Select a project first' : 'Delete class'}
                             >
                               <Delete fontSize="small" />
                             </IconButton>
@@ -246,7 +270,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   color="primary"
                   size="small"
                   onClick={() => callbacks.onClassAdd?.()}
+                  disabled={!selectedProjectId}
                   aria-label="Add class"
+                  title={!selectedProjectId ? 'Select a project first' : 'Add class'}
                 >
                   <Add />
                 </Fab>
@@ -298,20 +324,24 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                             <IconButton
                               edge="end"
                               size="small"
+                              disabled={!selectedProjectId}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 callbacks.onPropertyEdit?.(propertyItem);
                               }}
+                              title={!selectedProjectId ? 'Select a project first' : 'Edit property'}
                             >
                               <Edit fontSize="small" />
                             </IconButton>
                             <IconButton
                               edge="end"
                               size="small"
+                              disabled={!selectedProjectId}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 callbacks.onPropertyDelete?.(propertyItem.id);
                               }}
+                              title={!selectedProjectId ? 'Select a project first' : 'Delete property'}
                             >
                               <Delete fontSize="small" />
                             </IconButton>
@@ -343,7 +373,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   color="primary"
                   size="small"
                   onClick={() => callbacks.onPropertyAdd?.()}
+                  disabled={!selectedProjectId}
                   aria-label="Add property"
+                  title={!selectedProjectId ? 'Select a project first' : 'Add property'}
                 >
                   <Add />
                 </Fab>
