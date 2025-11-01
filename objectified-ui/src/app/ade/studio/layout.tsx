@@ -14,6 +14,10 @@ import {
   createProperty,
   updateProperty,
   deleteProperty,
+  getClassesForVersion,
+  createClass,
+  updateClass,
+  deleteClass,
 } from '../../../../lib/db/helper';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -38,8 +42,8 @@ function StudioLayoutContent({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Get selected project from context
-  const { selectedProjectId } = useStudio();
+  // Get selected project and version from context
+  const { selectedProjectId, selectedVersionId } = useStudio();
 
   // State for classes and properties
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -77,6 +81,33 @@ function StudioLayoutContent({
 
     loadProps();
   }, [selectedProjectId, refreshKey]);
+
+  // Load classes when version is selected or refreshKey changes
+  React.useEffect(() => {
+    const loadClasses = async () => {
+      if (!selectedVersionId) {
+        setClasses([]);
+        return;
+      }
+
+      try {
+        const result = await getClassesForVersion(selectedVersionId);
+        const data = JSON.parse(result);
+        // Transform database format to ClassItem format
+        const transformedClasses: ClassItem[] = data.map((cls: any) => ({
+          id: cls.id,
+          name: cls.name,
+          description: cls.description,
+        }));
+        setClasses(transformedClasses);
+      } catch (error) {
+        console.error('Error loading classes:', error);
+        setClasses([]);
+      }
+    };
+
+    loadClasses();
+  }, [selectedVersionId, refreshKey]);
 
   // Dialog state for classes
   const [classDialogOpen, setClassDialogOpen] = useState(false);
@@ -118,8 +149,8 @@ function StudioLayoutContent({
 
   // Class callbacks
   const handleClassAdd = () => {
-    if (!selectedProjectId) {
-      alert('Please select a project from the canvas first');
+    if (!selectedVersionId) {
+      alert('Please select a version from the canvas first');
       return;
     }
     setClassDialogMode('add');
@@ -131,8 +162,8 @@ function StudioLayoutContent({
   };
 
   const handleClassEdit = (classItem: ClassItem) => {
-    if (!selectedProjectId) {
-      alert('Please select a project from the canvas first');
+    if (!selectedVersionId) {
+      alert('Please select a version from the canvas first');
       return;
     }
     setClassDialogMode('edit');
@@ -144,8 +175,8 @@ function StudioLayoutContent({
   };
 
   const handleClassDelete = (classId: string) => {
-    if (!selectedProjectId) {
-      alert('Please select a project from the canvas first');
+    if (!selectedVersionId) {
+      alert('Please select a version from the canvas first');
       return;
     }
     setDeleteTarget({ type: 'class', id: classId });
@@ -157,29 +188,56 @@ function StudioLayoutContent({
     // Handle class selection (e.g., show in canvas)
   };
 
-  const handleClassDialogSubmit = () => {
+  const handleClassDialogSubmit = async () => {
     if (!className.trim()) {
       setClassError('Class name is required');
       return;
     }
 
-    if (classDialogMode === 'add') {
-      const newClass: ClassItem = {
-        id: Date.now().toString(),
-        name: className,
-        description: classDescription,
-      };
-      setClasses([...classes, newClass]);
-    } else if (selectedClass) {
-      setClasses(classes.map(cls =>
-        cls.id === selectedClass.id
-          ? { ...cls, name: className, description: classDescription }
-          : cls
-      ));
+    if (!selectedVersionId) {
+      setClassError('No version selected');
+      return;
     }
 
-    setClassDialogOpen(false);
-    setRefreshKey(prev => prev + 1);
+    // Build a default schema object
+    const defaultSchema = {
+      type: 'object',
+      properties: {},
+      required: []
+    };
+
+    try {
+      let result;
+      if (classDialogMode === 'add') {
+        // Create new class
+        result = await createClass(
+          selectedVersionId,
+          className,
+          classDescription || null,
+          defaultSchema
+        );
+      } else if (selectedClass) {
+        // Update existing class
+        result = await updateClass(
+          selectedClass.id,
+          className,
+          classDescription || null,
+          defaultSchema
+        );
+      }
+
+      const response = JSON.parse(result!);
+      if (!response.success) {
+        setClassError(response.error || 'Failed to save class');
+        return;
+      }
+
+      setClassDialogOpen(false);
+      setRefreshKey(prev => prev + 1); // Trigger reload of classes
+    } catch (error) {
+      console.error('Error saving class:', error);
+      setClassError('An error occurred while saving the class');
+    }
   };
 
   // Property callbacks
@@ -354,8 +412,15 @@ function StudioLayoutContent({
 
     try {
       if (deleteTarget.type === 'class') {
-        // TODO: Implement class deletion with helper
-        setClasses(classes.filter(cls => cls.id !== deleteTarget.id));
+        // Delete class from database
+        const result = await deleteClass(deleteTarget.id);
+        const response = JSON.parse(result);
+
+        if (!response.success) {
+          console.error('Failed to delete class:', response.error);
+          alert(response.error || 'Failed to delete class');
+          return;
+        }
       } else {
         // Delete property from database
         const result = await deleteProperty(deleteTarget.id);
@@ -370,7 +435,7 @@ function StudioLayoutContent({
 
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
-      setRefreshKey(prev => prev + 1); // Trigger reload of properties
+      setRefreshKey(prev => prev + 1); // Trigger reload
     } catch (error) {
       console.error('Error deleting:', error);
       alert('An error occurred while deleting');
@@ -396,6 +461,7 @@ function StudioLayoutContent({
         callbacks={callbacks}
         refreshKey={refreshKey}
         selectedProjectId={selectedProjectId}
+        selectedVersionId={selectedVersionId}
       />
 
       <main style={{ flex: 1, overflow: "auto" }}>

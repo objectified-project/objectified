@@ -45,7 +45,7 @@ type ViewMode = 'canvas' | 'code';
 
 const Studio = () => {
   const { data: session } = useSession();
-  const { setSelectedProjectId: setContextProjectId } = useStudio();
+  const { setSelectedProjectId: setContextProjectId, setSelectedVersionId: setContextVersionId } = useStudio();
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -73,6 +73,11 @@ const Studio = () => {
   useEffect(() => {
     setContextProjectId(selectedProjectId || null);
   }, [selectedProjectId, setContextProjectId]);
+
+  // Sync selected version ID to context for sidebar
+  useEffect(() => {
+    setContextVersionId(selectedVersionId || null);
+  }, [selectedVersionId, setContextVersionId]);
 
   // Load versions when project is selected
   useEffect(() => {

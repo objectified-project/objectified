@@ -589,3 +589,110 @@ export async function deleteProperty(propertyId: string) {
     return JSON.stringify({ success: false, error: error.message });
   }
 }
+
+// Class Management Functions
+
+export async function getClassesForVersion(versionId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, version_id, name, description, schema, enabled, created_at, updated_at
+       FROM odb.classes
+       WHERE version_id = $1 AND deleted_at IS NULL
+       ORDER BY name ASC`,
+      [versionId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching classes:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function createClass(versionId: string, name: string, description: string | null, schema: any) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Class name is required' });
+    }
+
+    if (!schema) {
+      return JSON.stringify({ success: false, error: 'Class schema is required' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.classes (version_id, name, description, schema)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, version_id, name, description, schema, enabled, created_at, updated_at`,
+      [versionId, name.trim(), description, JSON.stringify(schema)]
+    );
+
+    return JSON.stringify({ success: true, class: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating class:', error);
+
+    // Handle unique constraint violation (duplicate name in same version)
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A class with this name already exists in this version' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateClass(classId: string, name: string, description: string | null, schema: any) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Class name is required' });
+    }
+
+    if (!schema) {
+      return JSON.stringify({ success: false, error: 'Class schema is required' });
+    }
+
+    const result = await connectionPool.query(
+      `UPDATE odb.classes
+       SET name = $1, description = $2, schema = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND deleted_at IS NULL
+       RETURNING id, version_id, name, description, schema, enabled, created_at, updated_at`,
+      [name.trim(), description, JSON.stringify(schema), classId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    return JSON.stringify({ success: true, class: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating class:', error);
+
+    // Handle unique constraint violation
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A class with this name already exists in this version' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function deleteClass(classId: string) {
+  try {
+    // Soft delete - set deleted_at timestamp
+    const result = await connectionPool.query(
+      `UPDATE odb.classes
+       SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id`,
+      [classId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting class:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
