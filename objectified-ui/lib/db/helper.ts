@@ -484,3 +484,108 @@ export async function deleteVersion(versionRecordId: string) {
   }
 }
 
+// Property Management Functions
+
+export async function getPropertiesForProject(projectId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, project_id, name, description, data, enabled, created_at, updated_at
+       FROM odb.properties
+       WHERE project_id = $1 AND deleted_at IS NULL
+       ORDER BY name ASC`,
+      [projectId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching properties:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function createProperty(projectId: string, name: string, description: string | null, data: any) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Property name is required' });
+    }
+
+    if (!data) {
+      return JSON.stringify({ success: false, error: 'Property data is required' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.properties (project_id, name, description, data)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, project_id, name, description, data, enabled, created_at, updated_at`,
+      [projectId, name.trim(), description, JSON.stringify(data)]
+    );
+
+    return JSON.stringify({ success: true, property: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating property:', error);
+
+    // Handle unique constraint violation (duplicate name in same project)
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A property with this name already exists in this project' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateProperty(propertyId: string, name: string, description: string | null, data: any) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Property name is required' });
+    }
+
+    if (!data) {
+      return JSON.stringify({ success: false, error: 'Property data is required' });
+    }
+
+    const result = await connectionPool.query(
+      `UPDATE odb.properties
+       SET name = $1, description = $2, data = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND deleted_at IS NULL
+       RETURNING id, project_id, name, description, data, enabled, created_at, updated_at`,
+      [name.trim(), description, JSON.stringify(data), propertyId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Property not found' });
+    }
+
+    return JSON.stringify({ success: true, property: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating property:', error);
+
+    // Handle unique constraint violation
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A property with this name already exists in this project' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function deleteProperty(propertyId: string) {
+  try {
+    // Soft delete - set deleted_at timestamp
+    const result = await connectionPool.query(
+      `UPDATE odb.properties
+       SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id`,
+      [propertyId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Property not found' });
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting property:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}

@@ -9,6 +9,12 @@ import StudioSideNav, {
   PropertyItem,
   StudioSideNavCallbacks
 } from '@/app/components/ade/studio/StudioSideNav';
+import {
+  getPropertiesForProject,
+  createProperty,
+  updateProperty,
+  deleteProperty,
+} from '../../../../lib/db/helper';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -39,6 +45,38 @@ function StudioLayoutContent({
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoadingProperties, setIsLoadingProperties] = useState(false);
+
+  // Load properties when project is selected or refreshKey changes
+  React.useEffect(() => {
+    const loadProps = async () => {
+      if (!selectedProjectId) {
+        setProperties([]);
+        return;
+      }
+
+      setIsLoadingProperties(true);
+      try {
+        const result = await getPropertiesForProject(selectedProjectId);
+        const data = JSON.parse(result);
+        // Transform database format to PropertyItem format
+        const transformedProperties: PropertyItem[] = data.map((prop: any) => ({
+          id: prop.id,
+          name: prop.name,
+          description: prop.description,
+          ...prop.data, // Spread the JSON data which contains type, title, format, etc.
+        }));
+        setProperties(transformedProperties);
+      } catch (error) {
+        console.error('Error loading properties:', error);
+        setProperties([]);
+      } finally {
+        setIsLoadingProperties(false);
+      }
+    };
+
+    loadProps();
+  }, [selectedProjectId, refreshKey]);
 
   // Dialog state for classes
   const [classDialogOpen, setClassDialogOpen] = useState(false);
@@ -226,7 +264,7 @@ function StudioLayoutContent({
     // Handle property selection
   };
 
-  const handlePropertyDialogSubmit = () => {
+  const handlePropertyDialogSubmit = async () => {
     if (!propertyName.trim()) {
       setPropertyError('Property name is required');
       return;
@@ -238,59 +276,102 @@ function StudioLayoutContent({
       return;
     }
 
-    const propertyData: PropertyItem = {
-      id: propertyDialogMode === 'add' ? Date.now().toString() : selectedProperty!.id,
-      name: propertyName,
-      title: propertyTitle || undefined,
-      description: propertyDescription || undefined,
+    if (!selectedProjectId) {
+      setPropertyError('No project selected');
+      return;
+    }
+
+    // Build the data object that will be stored in the JSONB column
+    const dataObject: any = {
       required: propertyRequired,
       readOnly: propertyReadOnly,
       writeOnly: propertyWriteOnly,
     };
 
+    // Add title to data object if provided
+    if (propertyTitle) {
+      dataObject.title = propertyTitle;
+    }
+
     // If type is $ref, use $ref field instead of type
     if (propertyType === '$ref') {
-      propertyData.$ref = propertyRef;
+      dataObject.$ref = propertyRef;
     } else {
       // Otherwise use type and validation fields
-      propertyData.type = propertyType;
-      propertyData.format = propertyFormat || undefined;
-      propertyData.pattern = propertyPattern || undefined;
-      propertyData.minLength = propertyMinLength ? parseInt(propertyMinLength) : undefined;
-      propertyData.maxLength = propertyMaxLength ? parseInt(propertyMaxLength) : undefined;
-      propertyData.minimum = propertyMinimum ? parseFloat(propertyMinimum) : undefined;
-      propertyData.maximum = propertyMaximum ? parseFloat(propertyMaximum) : undefined;
-      propertyData.minItems = propertyMinItems ? parseInt(propertyMinItems) : undefined;
-      propertyData.maxItems = propertyMaxItems ? parseInt(propertyMaxItems) : undefined;
-      propertyData.enum = propertyEnum.length > 0 ? propertyEnum : undefined;
-      propertyData.default = propertyDefault || undefined;
+      dataObject.type = propertyType;
+      if (propertyFormat) dataObject.format = propertyFormat;
+      if (propertyPattern) dataObject.pattern = propertyPattern;
+      if (propertyMinLength) dataObject.minLength = parseInt(propertyMinLength);
+      if (propertyMaxLength) dataObject.maxLength = parseInt(propertyMaxLength);
+      if (propertyMinimum) dataObject.minimum = parseFloat(propertyMinimum);
+      if (propertyMaximum) dataObject.maximum = parseFloat(propertyMaximum);
+      if (propertyMinItems) dataObject.minItems = parseInt(propertyMinItems);
+      if (propertyMaxItems) dataObject.maxItems = parseInt(propertyMaxItems);
+      if (propertyEnum.length > 0) dataObject.enum = propertyEnum;
+      if (propertyDefault) dataObject.default = propertyDefault;
     }
 
-    if (propertyDialogMode === 'add') {
-      setProperties([...properties, propertyData]);
-    } else if (selectedProperty) {
-      setProperties(properties.map(prop =>
-        prop.id === selectedProperty.id ? propertyData : prop
-      ));
-    }
+    try {
+      let result;
+      if (propertyDialogMode === 'add') {
+        // Create new property
+        result = await createProperty(
+          selectedProjectId,
+          propertyName,
+          propertyDescription || null,
+          dataObject
+        );
+      } else if (selectedProperty) {
+        // Update existing property
+        result = await updateProperty(
+          selectedProperty.id,
+          propertyName,
+          propertyDescription || null,
+          dataObject
+        );
+      }
 
-    setPropertyDialogOpen(false);
-    setRefreshKey(prev => prev + 1);
+      const response = JSON.parse(result!);
+      if (!response.success) {
+        setPropertyError(response.error || 'Failed to save property');
+        return;
+      }
+
+      setPropertyDialogOpen(false);
+      setRefreshKey(prev => prev + 1); // Trigger reload of properties
+    } catch (error) {
+      console.error('Error saving property:', error);
+      setPropertyError('An error occurred while saving the property');
+    }
   };
 
   // Delete confirmation
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
 
-    if (deleteTarget.type === 'class') {
-      setClasses(classes.filter(cls => cls.id !== deleteTarget.id));
-    } else {
-      setProperties(properties.filter(prop => prop.id !== deleteTarget.id));
-    }
+    try {
+      if (deleteTarget.type === 'class') {
+        // TODO: Implement class deletion with helper
+        setClasses(classes.filter(cls => cls.id !== deleteTarget.id));
+      } else {
+        // Delete property from database
+        const result = await deleteProperty(deleteTarget.id);
+        const response = JSON.parse(result);
 
-    setDeleteDialogOpen(false);
-    setDeleteTarget(null);
-    setRefreshKey(prev => prev + 1);
+        if (!response.success) {
+          console.error('Failed to delete property:', response.error);
+          alert(response.error || 'Failed to delete property');
+          return;
+        }
+      }
+
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+      setRefreshKey(prev => prev + 1); // Trigger reload of properties
+    } catch (error) {
+      console.error('Error deleting:', error);
+      alert('An error occurred while deleting');
+    }
   };
 
   const callbacks: StudioSideNavCallbacks = {
