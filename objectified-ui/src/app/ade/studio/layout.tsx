@@ -105,6 +105,7 @@ function StudioLayoutContent({
   const [propertyMaxItems, setPropertyMaxItems] = useState('');
   const [propertyEnum, setPropertyEnum] = useState<string[]>([]);
   const [propertyEnumInput, setPropertyEnumInput] = useState('');
+  const [propertyEnumError, setPropertyEnumError] = useState('');
   const [propertyDefault, setPropertyDefault] = useState('');
   const [propertyRequired, setPropertyRequired] = useState(false);
   const [propertyReadOnly, setPropertyReadOnly] = useState(false);
@@ -203,6 +204,7 @@ function StudioLayoutContent({
     setPropertyMaxItems('');
     setPropertyEnum([]);
     setPropertyEnumInput('');
+    setPropertyEnumError('');
     setPropertyDefault('');
     setPropertyRequired(false);
     setPropertyReadOnly(false);
@@ -242,6 +244,7 @@ function StudioLayoutContent({
     setPropertyMaxItems(propertyItem.maxItems?.toString() || '');
     setPropertyEnum(propertyItem.enum || []);
     setPropertyEnumInput('');
+    setPropertyEnumError('');
     setPropertyDefault(propertyItem.default?.toString() || '');
     setPropertyRequired(propertyItem.required || false);
     setPropertyReadOnly(propertyItem.readOnly || false);
@@ -518,12 +521,15 @@ function StudioLayoutContent({
               }
             }}
             SelectProps={{ native: true }}
+            disabled={propertyDialogMode === 'edit'}
+            helperText={propertyDialogMode === 'edit' ? 'Type cannot be changed after creation' : undefined}
             sx={{ mb: 2 }}
           >
             <option value="string">string</option>
             <option value="number">number</option>
             <option value="integer">integer</option>
             <option value="boolean">boolean</option>
+            <option value="object">object</option>
             <option value="array">array</option>
             <option value="null">null</option>
             <option value="$ref">$ref (reference to class)</option>
@@ -540,7 +546,9 @@ function StudioLayoutContent({
               value={propertyRef}
               onChange={(e) => setPropertyRef(e.target.value)}
               SelectProps={{ native: true }}
-              helperText="Select a class to reference as this property's schema"
+              InputLabelProps={{ shrink: true }}
+              disabled={propertyDialogMode === 'edit'}
+              helperText={propertyDialogMode === 'edit' ? 'Schema reference cannot be changed after creation' : 'Select a class to reference as this property\'s schema'}
               sx={{ mb: 2 }}
             >
               <option value="">Select a class...</option>
@@ -689,8 +697,8 @@ function StudioLayoutContent({
             </div>
           )}
 
-          {/* Enum values editor - not applicable for $ref */}
-          {propertyType !== '$ref' && (
+          {/* Enum values editor - only for string, number, and integer types */}
+          {(propertyType === 'string' || propertyType === 'number' || propertyType === 'integer') && (
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                 <TextField
@@ -700,25 +708,66 @@ function StudioLayoutContent({
                   fullWidth
                   placeholder="Enter a value"
                   value={propertyEnumInput}
-                  onChange={(e) => setPropertyEnumInput(e.target.value)}
+                  onChange={(e) => {
+                    setPropertyEnumInput(e.target.value);
+                    setPropertyEnumError(''); // Clear error when typing
+                  }}
                   onKeyPress={(e) => {
                     if (e.key === 'Enter' && propertyEnumInput.trim()) {
                       e.preventDefault();
-                      if (!propertyEnum.includes(propertyEnumInput.trim())) {
-                        setPropertyEnum([...propertyEnum, propertyEnumInput.trim()]);
+                      const trimmedValue = propertyEnumInput.trim();
+
+                      // Validate based on property type
+                      if (propertyType === 'number' || propertyType === 'integer') {
+                        const numValue = Number(trimmedValue);
+                        if (isNaN(numValue)) {
+                          setPropertyEnumError(`Value must be a valid ${propertyType}`);
+                          return;
+                        }
+                        if (propertyType === 'integer' && !Number.isInteger(numValue)) {
+                          setPropertyEnumError('Value must be an integer (no decimals)');
+                          return;
+                        }
+                      }
+
+                      if (!propertyEnum.includes(trimmedValue)) {
+                        setPropertyEnum([...propertyEnum, trimmedValue]);
                         setPropertyEnumInput('');
+                        setPropertyEnumError('');
+                      } else {
+                        setPropertyEnumError('This value already exists in the enumeration');
                       }
                     }
                   }}
-                  helperText="Press Enter or click + to add"
+                  error={!!propertyEnumError}
+                  helperText={propertyEnumError || "Press Enter or click + to add"}
                   sx={{ flex: 1 }}
                 />
                 <IconButton
                   color="primary"
                   onClick={() => {
-                    if (propertyEnumInput.trim() && !propertyEnum.includes(propertyEnumInput.trim())) {
-                      setPropertyEnum([...propertyEnum, propertyEnumInput.trim()]);
+                    const trimmedValue = propertyEnumInput.trim();
+                    if (!trimmedValue) return;
+
+                    // Validate based on property type
+                    if (propertyType === 'number' || propertyType === 'integer') {
+                      const numValue = Number(trimmedValue);
+                      if (isNaN(numValue)) {
+                        setPropertyEnumError(`Value must be a valid ${propertyType}`);
+                        return;
+                      }
+                      if (propertyType === 'integer' && !Number.isInteger(numValue)) {
+                        setPropertyEnumError('Value must be an integer (no decimals)');
+                        return;
+                      }
+                    }
+
+                    if (!propertyEnum.includes(trimmedValue)) {
+                      setPropertyEnum([...propertyEnum, trimmedValue]);
                       setPropertyEnumInput('');
+                      setPropertyEnumError('');
+                    } else {
+                      setPropertyEnumError('This value already exists in the enumeration');
                     }
                   }}
                   disabled={!propertyEnumInput.trim()}
@@ -772,8 +821,8 @@ function StudioLayoutContent({
             </Box>
           )}
 
-          {/* Default value - not applicable for $ref */}
-          {propertyType !== '$ref' && (
+          {/* Default value - applicable for string, number, integer, boolean, and array */}
+          {(propertyType === 'string' || propertyType === 'number' || propertyType === 'integer' || propertyType === 'boolean' || propertyType === 'array') && (
             <TextField
               margin="dense"
               label="Default Value"
