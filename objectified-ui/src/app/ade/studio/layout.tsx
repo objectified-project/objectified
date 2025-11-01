@@ -43,7 +43,7 @@ function StudioLayoutContent({
   children: React.ReactNode;
 }>) {
   // Get selected project and version from context
-  const { selectedProjectId, selectedVersionId } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh } = useStudio();
 
   // State for classes and properties
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -233,7 +233,8 @@ function StudioLayoutContent({
       }
 
       setClassDialogOpen(false);
-      setRefreshKey(prev => prev + 1); // Trigger reload of classes
+      setRefreshKey(prev => prev + 1); // Trigger reload of classes in sidebar
+      triggerCanvasRefresh(); // Trigger reload of classes in canvas
     } catch (error) {
       console.error('Error saving class:', error);
       setClassError('An error occurred while saving the class');
@@ -435,7 +436,10 @@ function StudioLayoutContent({
 
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
-      setRefreshKey(prev => prev + 1); // Trigger reload
+      setRefreshKey(prev => prev + 1); // Trigger reload in sidebar
+      if (deleteTarget.type === 'class') {
+        triggerCanvasRefresh(); // Trigger reload of classes in canvas
+      }
     } catch (error) {
       console.error('Error deleting:', error);
       alert('An error occurred while deleting');

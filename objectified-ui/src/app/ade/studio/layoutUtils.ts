@@ -1,0 +1,97 @@
+import dagre from 'dagre';
+import { Node, Edge } from '@xyflow/react';
+
+// Default node dimensions
+const NODE_WIDTH = 200;
+const NODE_HEIGHT = 100;
+
+export type LayoutDirection = 'TB' | 'BT' | 'LR' | 'RL';
+
+export interface LayoutOptions {
+  direction?: LayoutDirection;
+  nodeWidth?: number;
+  nodeHeight?: number;
+  rankSeparation?: number;
+  nodeSeparation?: number;
+  edgeSeparation?: number;
+}
+
+/**
+ * Applies Dagre layout algorithm to position nodes automatically
+ * @param nodes - Array of React Flow nodes
+ * @param edges - Array of React Flow edges
+ * @param options - Layout configuration options
+ * @returns Array of nodes with updated positions
+ */
+export function getLayoutedElements(
+  nodes: Node[],
+  edges: Edge[],
+  options: LayoutOptions = {}
+): Node[] {
+  const {
+    direction = 'TB',
+    nodeWidth = NODE_WIDTH,
+    nodeHeight = NODE_HEIGHT,
+    rankSeparation = 100,
+    nodeSeparation = 80,
+    edgeSeparation = 10,
+  } = options;
+
+  // Create a new directed graph
+  const dagreGraph = new dagre.graphlib.Graph();
+
+  // Set graph configuration
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+  dagreGraph.setGraph({
+    rankdir: direction,
+    ranksep: rankSeparation,
+    nodesep: nodeSeparation,
+    edgesep: edgeSeparation,
+  });
+
+  // Add nodes to the graph
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, {
+      width: nodeWidth,
+      height: nodeHeight,
+    });
+  });
+
+  // Add edges to the graph
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  // Run the layout algorithm
+  dagre.layout(dagreGraph);
+
+  // Update node positions based on layout
+  return nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+
+    // Dagre positions nodes from center, React Flow from top-left
+    // So we need to adjust the position
+    const x = nodeWithPosition.x - nodeWidth / 2;
+    const y = nodeWithPosition.y - nodeHeight / 2;
+
+    return {
+      ...node,
+      position: { x, y },
+    };
+  });
+}
+
+/**
+ * Applies horizontal layout (left to right)
+ */
+export function getHorizontalLayout(nodes: Node[], edges: Edge[]): Node[] {
+  return getLayoutedElements(nodes, edges, { direction: 'LR' });
+}
+
+/**
+ * Applies vertical layout (top to bottom)
+ */
+export function getVerticalLayout(nodes: Node[], edges: Edge[]): Node[] {
+  return getLayoutedElements(nodes, edges, { direction: 'TB' });
+}
+

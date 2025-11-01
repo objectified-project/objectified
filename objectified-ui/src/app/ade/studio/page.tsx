@@ -6,18 +6,24 @@ import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
 import {
   ReactFlow,
+  ReactFlowProvider,
   useNodesState,
   useEdgesState,
   addEdge,
   Background,
   Controls,
   MiniMap,
+  Panel,
   BackgroundVariant,
   type Connection,
   type Edge,
+  type Node,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { getProjectsForTenant, getVersionsForProject } from '../../../../lib/db/helper';
+import { getProjectsForTenant, getVersionsForProject, getClassesForVersion } from '../../../../lib/db/helper';
+import ClassNode from './ClassNode';
+import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -43,9 +49,13 @@ interface Version {
 
 type ViewMode = 'canvas' | 'code';
 
-const Studio = () => {
+const StudioContent = () => {
   const { data: session } = useSession();
-  const { setSelectedProjectId: setContextProjectId, setSelectedVersionId: setContextVersionId } = useStudio();
+  const {
+    setSelectedProjectId: setContextProjectId,
+    setSelectedVersionId: setContextVersionId,
+    canvasRefreshKey
+  } = useStudio();
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -54,13 +64,49 @@ const Studio = () => {
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
 
   // Sample OpenAPI spec - will be replaced with actual data from project/version
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const { fitView } = useReactFlow();
+
+  // Apply auto-layout to current nodes and edges
+  const onLayout = useCallback((direction: LayoutDirection) => {
+    const layoutedNodes = getLayoutedElements(nodes, edges, { direction });
+    setNodes(layoutedNodes);
+    setLayoutDirection(direction);
+
+    // Fit view after layout with a small delay to ensure layout is applied
+    setTimeout(() => {
+      fitView({ padding: 0.2, duration: 400 });
+    }, 10);
+  }, [nodes, edges, setNodes, fitView]);
+
+  // Define custom node types
+  const nodeTypes = {
+    classNode: ClassNode,
+  };
+
+  // Helper function to convert classes to React Flow nodes
+  const classesToNodes = (classes: any[]): Node[] => {
+    return classes.map((cls, index) => ({
+      id: cls.id,
+      type: 'classNode',
+      position: {
+        x: 100 + (index % 4) * 280, // Arrange in a grid (4 columns)
+        y: 100 + Math.floor(index / 4) * 180
+      },
+      data: {
+        name: cls.name,
+        description: cls.description,
+        propertyCount: 0 // TODO: Count properties when we implement class-property relationships
+      }
+    }));
+  };
 
   // Load projects on mount
   useEffect(() => {
@@ -89,18 +135,48 @@ const Studio = () => {
     }
   }, [selectedProjectId]);
 
-  // Clear canvas when version changes
+  // Load classes and render them on canvas when version changes or canvas refresh is triggered
   useEffect(() => {
-    if (selectedProjectId && selectedVersionId) {
-      // Clear existing nodes and edges
-      setNodes([]);
-      setEdges([]);
+    const loadClasses = async () => {
+      if (!selectedVersionId) {
+        setNodes([]);
+        setEdges([]);
+        return;
+      }
 
-      // Here we would load classes for the selected project/version
-      // This will be implemented later when class data structure is ready
-      console.log('Loading canvas for project:', selectedProjectId, 'version:', selectedVersionId);
-    }
-  }, [selectedProjectId, selectedVersionId, setNodes, setEdges]);
+      try {
+        const result = await getClassesForVersion(selectedVersionId);
+        const classesData = JSON.parse(result);
+
+        // Convert classes to React Flow nodes
+        const newNodes = classesToNodes(classesData);
+
+        // Clear edges for now - we'll add relationships later
+        const newEdges: Edge[] = [];
+
+        // Apply auto-layout
+        const layoutedNodes = getLayoutedElements(newNodes, newEdges, {
+          direction: layoutDirection
+        });
+
+        setNodes(layoutedNodes);
+        setEdges(newEdges);
+
+        // Fit view after a short delay to ensure nodes are rendered
+        setTimeout(() => {
+          fitView({ padding: 0.2, duration: 400 });
+        }, 50);
+
+        console.log('Loaded classes for version:', selectedVersionId, 'Classes:', classesData.length);
+      } catch (error) {
+        console.error('Failed to load classes:', error);
+        setNodes([]);
+        setEdges([]);
+      }
+    };
+
+    loadClasses();
+  }, [selectedVersionId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -268,6 +344,7 @@ const Studio = () => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
+            nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -303,6 +380,59 @@ const Studio = () => {
               className="dark:bg-gray-800 dark:border-gray-700"
               maskColor="rgb(0, 0, 0, 0.1)"
             />
+
+            {/* Layout Control Panel */}
+            <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 px-2 py-1">
+                  Auto Layout
+                </div>
+                <button
+                  onClick={() => onLayout('TB')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    layoutDirection === 'TB'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  title="Top to Bottom"
+                >
+                  ↓ Vertical
+                </button>
+                <button
+                  onClick={() => onLayout('LR')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    layoutDirection === 'LR'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  title="Left to Right"
+                >
+                  → Horizontal
+                </button>
+                <button
+                  onClick={() => onLayout('BT')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    layoutDirection === 'BT'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  title="Bottom to Top"
+                >
+                  ↑ Vertical (Up)
+                </button>
+                <button
+                  onClick={() => onLayout('RL')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                    layoutDirection === 'RL'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  title="Right to Left"
+                >
+                  ← Horizontal (Rev)
+                </button>
+              </div>
+            </Panel>
           </ReactFlow>
         ) : (
           // Monaco Editor Code View
@@ -326,6 +456,14 @@ const Studio = () => {
         )}
       </div>
     </div>
+  );
+};
+
+const Studio = () => {
+  return (
+    <ReactFlowProvider>
+      <StudioContent />
+    </ReactFlowProvider>
   );
 };
 
