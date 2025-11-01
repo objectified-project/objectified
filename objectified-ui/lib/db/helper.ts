@@ -324,26 +324,163 @@ export async function deleteProject(projectId: string) {
   }
 }
 
-// export async function updateLastLogin(userId: string) {
-//   return await connectionPool.query('UPDATE odb.user SET last_login = NOW() WHERE id = $1', [userId]);
-// }
-//
-// export async function getTenantsForUser(userId: string) {
-//   const result = await connectionPool.query('SELECT a.id, a.name, a.description, a.create_date, a.enabled, a.delete_date FROM odb.tenant a, odb.tenant_user b WHERE a.id = b.tenant_id AND b.user_id=$1', [userId]);
-//
-//   if (result.rowCount > 0) {
-//     return result.rows;
-//   }
-//
-//   return [];
-// }
-//
-// export async function validateTenantForUser(tenantId: string, userId: string) {
-//   const result = await connectionPool.query('SELECT * FROM odb.tenant_user WHERE tenant_id = $1 AND user_id = $2', [tenantId, userId]);
-//
-//   if (result.rowCount > 0) {
-//     return true;
-//   }
-//
-//   return false;
-// }
+// Version Management Functions
+
+export async function getVersionsForProject(projectId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT v.*, u.name as creator_name, u.email as creator_email
+       FROM odb.versions v
+       LEFT JOIN odb.users u ON v.creator_id = u.id
+       WHERE v.project_id = $1 AND v.deleted_at IS NULL
+       ORDER BY v.created_at DESC`,
+      [projectId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    return JSON.stringify([]);
+  }
+}
+
+export async function getLatestVersionForProject(projectId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT version_id
+       FROM odb.versions
+       WHERE project_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [projectId]
+    );
+
+    return result.rowCount > 0 ? result.rows[0].version_id : null;
+  } catch (error: any) {
+    return null;
+  }
+}
+
+function parseSemanticVersion(version: string): { major: number, minor: number, patch: number } | null {
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  return {
+    major: parseInt(match[1], 10),
+    minor: parseInt(match[2], 10),
+    patch: parseInt(match[3], 10)
+  };
+}
+
+function bumpMinorVersion(version: string): string {
+  const parsed = parseSemanticVersion(version);
+  if (!parsed) return '0.1.0';
+
+  return `${parsed.major}.${parsed.minor + 1}.0`;
+}
+
+export async function createVersion(projectId: string, creatorId: string, versionId: string | null, description: string, changeLog: string) {
+  try {
+    let finalVersionId = versionId;
+
+    // If no version ID provided, auto-generate by bumping the latest version
+    if (!finalVersionId || finalVersionId.trim().length === 0) {
+      const latestVersion = await getLatestVersionForProject(projectId);
+      finalVersionId = latestVersion ? bumpMinorVersion(latestVersion) : '0.1.0';
+    }
+
+    // Validate semantic versioning format
+    if (!parseSemanticVersion(finalVersionId)) {
+      return JSON.stringify({ success: false, error: 'Version ID must follow semantic versioning format (e.g., 1.0.0)' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.versions (project_id, creator_id, version_id, description, change_log)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [projectId, creatorId, finalVersionId.trim(), description?.trim() || null, changeLog?.trim() || null]
+    );
+
+    return JSON.stringify({ success: true, version: result.rows[0] });
+  } catch (error: any) {
+    if (error.code === '23505') { // Unique constraint violation
+      return JSON.stringify({ success: false, error: 'A version with this ID already exists for this project' });
+    }
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateVersion(versionRecordId: string, description: string, changeLog: string, enabled: boolean) {
+  try {
+    // Check if version is published (frozen)
+    const versionCheck = await connectionPool.query(
+      'SELECT published FROM odb.versions WHERE id = $1 AND deleted_at IS NULL',
+      [versionRecordId]
+    );
+
+    if (versionCheck.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Version not found' });
+    }
+
+    if (versionCheck.rows[0].published) {
+      return JSON.stringify({ success: false, error: 'Cannot edit a published version. Published versions are frozen.' });
+    }
+
+    await connectionPool.query(
+      `UPDATE odb.versions 
+       SET description = $1, change_log = $2, enabled = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND deleted_at IS NULL`,
+      [description?.trim() || null, changeLog?.trim() || null, enabled, versionRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function publishVersion(versionRecordId: string) {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.versions 
+       SET published = true, published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [versionRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function unpublishVersion(versionRecordId: string) {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.versions 
+       SET published = false, published_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [versionRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function deleteVersion(versionRecordId: string) {
+  try {
+    // Soft delete - set deleted_at timestamp
+    await connectionPool.query(
+      `UPDATE odb.versions 
+       SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [versionRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
