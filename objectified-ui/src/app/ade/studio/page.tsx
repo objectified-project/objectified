@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import dynamic from 'next/dynamic';
 import {
   ReactFlow,
   useNodesState,
@@ -17,6 +18,16 @@ import {
 import '@xyflow/react/dist/style.css';
 import { getProjectsForTenant, getVersionsForProject } from '../../../../lib/db/helper';
 
+// Dynamically import Monaco Editor with SSR disabled
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <div className="text-gray-500 dark:text-gray-400">Loading editor...</div>
+    </div>
+  ),
+});
+
 interface Project {
   id: string;
   name: string;
@@ -29,6 +40,8 @@ interface Version {
   description: string;
 }
 
+type ViewMode = 'canvas' | 'code';
+
 const Studio = () => {
   const { data: session } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -37,9 +50,13 @@ const Studio = () => {
   const [selectedVersionId, setSelectedVersionId] = useState<string>('');
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Sample OpenAPI spec - will be replaced with actual data from project/version
+  const [openApiSpec, setOpenApiSpec] = useState<string>('');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
@@ -170,6 +187,32 @@ const Studio = () => {
             </select>
           </div>
 
+          {/* View Switcher */}
+          {selectedProjectId && selectedVersionId && (
+            <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+              <button
+                onClick={() => setViewMode('canvas')}
+                className={`px-3 py-1 text-xs font-medium transition-colors ${
+                  viewMode === 'canvas'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                }`}
+              >
+                Canvas
+              </button>
+              <button
+                onClick={() => setViewMode('code')}
+                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                  viewMode === 'code'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                }`}
+              >
+                Code
+              </button>
+            </div>
+          )}
+
           {/* Context Display */}
           {selectedProject && selectedVersion && (
             <div className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
@@ -181,7 +224,7 @@ const Studio = () => {
         </div>
       </div>
 
-      {/* Canvas Area */}
+      {/* Canvas/Code Area */}
       <div className="flex-1 bg-white dark:bg-gray-900">
         {!selectedProjectId || !selectedVersionId ? (
           // Empty state when no project/version selected
@@ -208,8 +251,8 @@ const Studio = () => {
               </p>
             </div>
           </div>
-        ) : (
-          // React Flow Canvas
+        ) : viewMode === 'canvas' ? (
+          // React Flow Canvas View
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -249,6 +292,25 @@ const Studio = () => {
               maskColor="rgb(0, 0, 0, 0.1)"
             />
           </ReactFlow>
+        ) : (
+          // Monaco Editor Code View
+          <Editor
+            height="100%"
+            defaultLanguage="yaml"
+            value={openApiSpec}
+            theme="vs-dark"
+            options={{
+              readOnly: true,
+              minimap: { enabled: true },
+              scrollBeyondLastLine: false,
+              fontSize: 13,
+              lineNumbers: 'on',
+              renderWhitespace: 'selection',
+              automaticLayout: true,
+              wordWrap: 'on',
+              folding: true,
+            }}
+          />
         )}
       </div>
     </div>
