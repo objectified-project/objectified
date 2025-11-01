@@ -501,8 +501,13 @@ const Versions = () => {
                       ) : (
                         <Chip
                           label="Draft"
-                          color="default"
                           size="small"
+                          sx={{
+                            backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                            color: 'var(--foreground)',
+                            borderColor: 'rgba(128, 128, 128, 0.3)',
+                            border: '1px solid',
+                          }}
                         />
                       )}
                       {!version.enabled && (
