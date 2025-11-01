@@ -1,7 +1,7 @@
 -- Set the search path to use odb schema by default
 SET search_path TO odb, public;
 
-DROP TABLE IF EXISTS versions;
+DROP TABLE IF EXISTS versions CASCADE;
 
 -- Versions table: Stores versions of projects
 CREATE TABLE versions (

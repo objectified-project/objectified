@@ -1,7 +1,7 @@
 -- Set the search path to use odb schema by default
 SET search_path TO odb, public;
 
-DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS projects CASCADE;
 
 -- Projects table: Stores projects owned by tenants and created by users
 CREATE TABLE projects (
