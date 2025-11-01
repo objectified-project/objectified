@@ -4,7 +4,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React from 'react';
-import { User, Users, Building2, FileJson, Database, Code, Folders, FileDigit } from 'lucide-react';
+import { User, Building2, Folders, FileDigit } from 'lucide-react';
+import Box from '@mui/material/Box';
+import Drawer from '@mui/material/Drawer';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Typography from '@mui/material/Typography';
+import Divider from '@mui/material/Divider';
 
 interface NavItem {
   label: string;
@@ -37,9 +46,6 @@ const SideNav: React.FC = () => {
       items: [
         { label: 'Projects', href: '/ade/dashboard/projects', icon: Folders },
         { label: 'Versions', href: '/ade/dashboard/versions', icon: FileDigit },
-    //     { label: 'Schemas', href: '/ade/dashboard/schemas', icon: FileJson, disabled: true },
-    //     { label: 'Databases', href: '/ade/dashboard/databases', icon: Database, disabled: true },
-    //     { label: 'APIs', href: '/ade/dashboard/apis', icon: Code, disabled: true },
       ],
     },
   ];
@@ -47,46 +53,86 @@ const SideNav: React.FC = () => {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <nav className="w-64 bg-gray-50 dark:bg-gray-900 p-4 border-r border-gray-200 dark:border-gray-700 overflow-y-auto" style={{ height: 'calc(100vh - 48px)' }}>
-      {navSections.map((section, index) => (
-        <div key={section.header} className={index < navSections.length - 1 ? 'mb-6' : ''}>
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3 px-3">
-            {section.header}
-          </h2>
-          <ul className="space-y-1">
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const isDisabled = item.disabled;
+    <Drawer
+      variant="permanent"
+      sx={{
+        width: 256,
+        flexShrink: 0,
+        '& .MuiDrawer-paper': {
+          width: 256,
+          boxSizing: 'border-box',
+          top: 48, // Offset for top header
+          height: 'calc(100vh - 48px)',
+          borderRight: 1,
+          borderColor: 'divider',
+        },
+      }}
+    >
+      <Box sx={{ overflow: 'auto', p: 2 }}>
+        {navSections.map((section, index) => (
+          <Box key={section.header} sx={{ mb: index < navSections.length - 1 ? 3 : 0 }}>
+            <Typography
+              variant="overline"
+              sx={{
+                px: 2,
+                py: 1,
+                display: 'block',
+                fontWeight: 600,
+                color: 'text.secondary',
+                letterSpacing: 1.1,
+              }}
+            >
+              {section.header}
+            </Typography>
+            <List disablePadding>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
 
-              return (
-                <li key={item.href}>
-                  {isDisabled ? (
-                    <div
-                      className="flex items-center gap-3 py-2 px-3 rounded-md text-gray-400 dark:text-gray-600 cursor-pointer opacity-60"
-                    >
-                      <Icon size={18} className="flex-shrink-0" />
-                      <span>{item.label}</span>
-                    </div>
-                  ) : (
-                    <Link
+                return (
+                  <ListItem key={item.href} disablePadding>
+                    <ListItemButton
+                      component={Link}
                       href={item.href}
-                      className={`flex items-center gap-3 py-2 px-3 rounded-md transition-colors ${
-                        isActive(item.href)
-                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-medium'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}
+                      disabled={item.disabled}
+                      selected={active}
+                      sx={{
+                        borderRadius: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          bgcolor: 'primary.main',
+                          color: 'primary.contrastText',
+                          '&:hover': {
+                            bgcolor: 'primary.dark',
+                          },
+                          '& .MuiListItemIcon-root': {
+                            color: 'primary.contrastText',
+                          },
+                        },
+                      }}
                     >
-                      <Icon size={18} className="flex-shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </nav>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Icon size={20} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.label}
+                        slotProps={{
+                          primary: {
+                            fontSize: '0.875rem',
+                            fontWeight: active ? 600 : 400,
+                          },
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
+            </List>
+            {index < navSections.length - 1 && <Divider sx={{ my: 2 }} />}
+          </Box>
+        ))}
+      </Box>
+    </Drawer>
   );
 };
 
