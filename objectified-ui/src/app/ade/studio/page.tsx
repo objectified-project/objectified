@@ -706,18 +706,66 @@ const StudioContent = () => {
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const selectedVersion = versions.find(v => v.id === selectedVersionId);
 
+  // Show tenant selection prompt if no tenant is selected
+  if (!currentTenantId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
+        <div className="text-center max-w-md px-6">
+          <svg
+            className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600 mb-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+            />
+          </svg>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            No Tenant Selected
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Please select a tenant to get started with the Studio. You'll need to choose a tenant before you can manage projects, versions, and schemas.
+          </p>
+          <button
+            onClick={() => window.location.href = '/ade/dashboard/tenants'}
+            className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <svg
+              className="mr-2 h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            Go to Tenant Selection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with Project and Version Selectors */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2" style={{ position: 'relative', zIndex: 1000 }}>
         <div className="flex items-center gap-3">
           {/* Project Selector */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" style={{ position: 'relative', zIndex: 1001 }}>
             <select
               value={selectedProjectId}
               onChange={handleProjectChange}
               disabled={isLoadingProjects || !currentTenantId}
-              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent min-w-[180px]"
+              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent min-w-[180px] pointer-events-auto"
             >
               <option value="">Select project...</option>
               {projects.map((project) => (
@@ -729,12 +777,12 @@ const StudioContent = () => {
           </div>
 
           {/* Version Selector */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" style={{ position: 'relative', zIndex: 1001 }}>
             <select
               value={selectedVersionId}
               onChange={handleVersionChange}
               disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
-              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent min-w-[180px]"
+              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent min-w-[180px] pointer-events-auto"
             >
               <option value="">Select version...</option>
               {versions.map((version) => (
@@ -783,7 +831,7 @@ const StudioContent = () => {
       </div>
 
       {/* Canvas/Code Area */}
-      <div className="flex-1 bg-white dark:bg-gray-900">
+      <div className="flex-1 bg-white dark:bg-gray-900 overflow-hidden relative">
         {!selectedProjectId || !selectedVersionId ? (
           // Empty state when no project/version selected
           <div className="h-full flex items-center justify-center">

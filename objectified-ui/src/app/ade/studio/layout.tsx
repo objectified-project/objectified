@@ -4,6 +4,7 @@ import "../../globals.css";
 import * as React from 'react';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useSession } from 'next-auth/react';
 import { StudioProvider, useStudio } from './StudioContext';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -55,6 +56,9 @@ function StudioLayoutContent({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { data: session } = useSession();
+  const currentTenantId = (session?.user as any)?.current_tenant_id;
+
   // Get selected project and version from context
   const { selectedProjectId, selectedVersionId, triggerCanvasRefresh } = useStudio();
 
@@ -639,16 +643,19 @@ function StudioLayoutContent({
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
-      <StudioSideNav
-        classes={classes}
-        properties={properties}
-        callbacks={callbacks}
-        refreshKey={refreshKey}
-        selectedProjectId={selectedProjectId}
-        selectedVersionId={selectedVersionId}
-      />
+      {/* Only show StudioSideNav if a tenant is selected */}
+      {currentTenantId && (
+        <StudioSideNav
+          classes={classes}
+          properties={properties}
+          callbacks={callbacks}
+          refreshKey={refreshKey}
+          selectedProjectId={selectedProjectId}
+          selectedVersionId={selectedVersionId}
+        />
+      )}
 
-      <main style={{ flex: 1, overflow: "auto" }}>
+      <main style={{ flex: 1, overflow: "auto", position: "relative", zIndex: 100 }}>
         {children}
       </main>
 
