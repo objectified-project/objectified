@@ -138,6 +138,8 @@ function StudioLayoutContent({
   const [classAllOf, setClassAllOf] = useState<string[]>([]);
   const [classAnyOf, setClassAnyOf] = useState<string[]>([]);
   const [classOneOf, setClassOneOf] = useState<string[]>([]);
+  const [classDiscriminatorProperty, setClassDiscriminatorProperty] = useState('');
+  const [classDiscriminatorUseAuto, setClassDiscriminatorUseAuto] = useState(true);
   const [classError, setClassError] = useState('');
 
   // Dialog state for properties
@@ -186,6 +188,8 @@ function StudioLayoutContent({
     setClassAllOf([]);
     setClassAnyOf([]);
     setClassOneOf([]);
+    setClassDiscriminatorProperty('');
+    setClassDiscriminatorUseAuto(true);
     setClassError('');
     setSelectedClass(null);
     setClassDialogOpen(true);
@@ -231,6 +235,16 @@ function StudioLayoutContent({
     setClassAllOf(allOfValues);
     setClassAnyOf(anyOfValues);
     setClassOneOf(oneOfValues);
+
+    // Load discriminator if it exists
+    if (schema?.discriminator) {
+      setClassDiscriminatorProperty(schema.discriminator.propertyName || '');
+      // Check if mapping exists and is automatic (uses class names)
+      setClassDiscriminatorUseAuto(!schema.discriminator.mapping || Object.keys(schema.discriminator.mapping).length === 0);
+    } else {
+      setClassDiscriminatorProperty('');
+      setClassDiscriminatorUseAuto(true);
+    }
 
     setClassError('');
     setClassDialogOpen(true);
@@ -290,6 +304,31 @@ function StudioLayoutContent({
         const refPath = ref.startsWith('#') ? ref : `#/components/schemas/${ref}`;
         return { $ref: refPath };
       });
+    }
+
+    // Add discriminator if property name is set and class has composition
+    if (classDiscriminatorProperty && classDiscriminatorProperty.trim()) {
+      const hasComposition = classAllOf.length > 0 || classAnyOf.length > 0 || classOneOf.length > 0;
+      if (hasComposition) {
+        schema.discriminator = {
+          propertyName: classDiscriminatorProperty.trim()
+        };
+
+        // Add automatic mapping if enabled
+        if (classDiscriminatorUseAuto) {
+          const allClasses = [...classAllOf, ...classAnyOf, ...classOneOf];
+          if (allClasses.length > 0) {
+            schema.discriminator.mapping = {};
+            allClasses.forEach(ref => {
+              // Extract class name if it's a full $ref path
+              const className = ref.includes('/') ? ref.split('/').pop() : ref;
+              if (className && !className.startsWith('{')) {
+                schema.discriminator.mapping[className] = className;
+              }
+            });
+          }
+        }
+      }
     }
 
     try {
@@ -1457,6 +1496,258 @@ function StudioLayoutContent({
           <Button onClick={() => setPropertyDialogOpen(false)}>Cancel</Button>
           <Button onClick={handlePropertyDialogSubmit} variant="contained">
             {propertyDialogMode === 'add' ? 'Add' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Class Dialog */}
+      <Dialog
+        open={classDialogOpen}
+        onClose={() => setClassDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>{classDialogMode === 'add' ? 'Add Class' : 'Edit Class'}</DialogTitle>
+        <DialogContent>
+          {classError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {classError}
+            </Alert>
+          )}
+
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Class Name"
+            type="text"
+            fullWidth
+            required
+            value={className}
+            onChange={(e) => setClassName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Description"
+            type="text"
+            fullWidth
+            multiline
+            rows={2}
+            value={classDescription}
+            onChange={(e) => setClassDescription(e.target.value)}
+            sx={{ mb: 3 }}
+          />
+
+          {/* Composition Section */}
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            Composition (Optional)
+          </Typography>
+
+          {/* allOf Section */}
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <TextField
+                select
+                size="small"
+                label="Add allOf"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value && !classAllOf.includes(e.target.value)) {
+                    setClassAllOf([...classAllOf, e.target.value]);
+                  }
+                }}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 200 }}
+              >
+                <option value="">Select class...</option>
+                {classes.filter(c => c.name !== className).map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))}
+              </TextField>
+              <Typography variant="caption" color="text.secondary">
+                Must match all listed schemas
+              </Typography>
+            </Box>
+            {classAllOf.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {classAllOf.map((ref, index) => (
+                  <Chip
+                    key={index}
+                    label={ref}
+                    size="small"
+                    onDelete={() => setClassAllOf(classAllOf.filter((_, i) => i !== index))}
+                    sx={{
+                      bgcolor: 'primary.light',
+                      color: 'primary.contrastText',
+                      '& .MuiChip-deleteIcon': {
+                        color: 'primary.contrastText',
+                        '&:hover': {
+                          color: 'primary.dark'
+                        }
+                      }
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* anyOf Section */}
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <TextField
+                select
+                size="small"
+                label="Add anyOf"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value && !classAnyOf.includes(e.target.value)) {
+                    setClassAnyOf([...classAnyOf, e.target.value]);
+                  }
+                }}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 200 }}
+              >
+                <option value="">Select class...</option>
+                {classes.filter(c => c.name !== className).map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))}
+              </TextField>
+              <Typography variant="caption" color="text.secondary">
+                Must match at least one listed schema
+              </Typography>
+            </Box>
+            {classAnyOf.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {classAnyOf.map((ref, index) => (
+                  <Chip
+                    key={index}
+                    label={ref}
+                    size="small"
+                    onDelete={() => setClassAnyOf(classAnyOf.filter((_, i) => i !== index))}
+                    sx={{
+                      bgcolor: 'info.light',
+                      color: 'info.contrastText',
+                      '& .MuiChip-deleteIcon': {
+                        color: 'info.contrastText',
+                        '&:hover': {
+                          color: 'info.dark'
+                        }
+                      }
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* oneOf Section */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <TextField
+                select
+                size="small"
+                label="Add oneOf"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value && !classOneOf.includes(e.target.value)) {
+                    setClassOneOf([...classOneOf, e.target.value]);
+                  }
+                }}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ minWidth: 200 }}
+              >
+                <option value="">Select class...</option>
+                {classes.filter(c => c.name !== className).map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))}
+              </TextField>
+              <Typography variant="caption" color="text.secondary">
+                Must match exactly one listed schema
+              </Typography>
+            </Box>
+            {classOneOf.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {classOneOf.map((ref, index) => (
+                  <Chip
+                    key={index}
+                    label={ref}
+                    size="small"
+                    onDelete={() => setClassOneOf(classOneOf.filter((_, i) => i !== index))}
+                    sx={{
+                      bgcolor: 'secondary.light',
+                      color: 'secondary.contrastText',
+                      '& .MuiChip-deleteIcon': {
+                        color: 'secondary.contrastText',
+                        '&:hover': {
+                          color: 'secondary.dark'
+                        }
+                      }
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* Discriminator Section - Only show if composition exists */}
+          {(classAllOf.length > 0 || classAnyOf.length > 0 || classOneOf.length > 0) && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Discriminator (Optional)
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                The discriminator helps deserializers determine which schema to use for polymorphic data.
+                Useful for improving performance and error messages when using oneOf/anyOf/allOf.
+              </Typography>
+
+              <TextField
+                margin="dense"
+                label="Discriminator Property Name"
+                type="text"
+                fullWidth
+                placeholder="e.g., type, petType, kind"
+                value={classDiscriminatorProperty}
+                onChange={(e) => setClassDiscriminatorProperty(e.target.value)}
+                helperText="The property name that indicates which schema to use"
+                sx={{ mb: 2 }}
+              />
+
+              {classDiscriminatorProperty && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={classDiscriminatorUseAuto}
+                      onChange={(e) => setClassDiscriminatorUseAuto(e.target.checked)}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">Use automatic mapping</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Automatically map discriminator values to class names
+                      </Typography>
+                    </Box>
+                  }
+                />
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClassDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleClassDialogSubmit} variant="contained">
+            {classDialogMode === 'add' ? 'Add' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>

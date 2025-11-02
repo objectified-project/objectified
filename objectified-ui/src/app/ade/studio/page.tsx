@@ -151,6 +151,11 @@ const StudioContent = () => {
       required: required.length > 0 ? required : undefined
     };
 
+    // Delete class properties if properties is empty.
+    if (classSchema.properties && Object.keys(classSchema.properties).length === 0) {
+      delete classSchema.properties;
+    }
+
     // Remove undefined values
     Object.keys(classSchema).forEach(key => {
       if (classSchema[key] === undefined) {
