@@ -109,6 +109,82 @@ const StudioContent = () => {
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const { fitView } = useReactFlow();
 
+  // Helper function to build class schema
+  const buildClassSchema = useCallback((classData: any) => {
+    const schema = typeof classData.schema === 'string'
+      ? JSON.parse(classData.schema)
+      : (classData.schema || {});
+
+    const properties: any = {};
+    const required: string[] = [];
+
+    if (classData.properties && classData.properties.length > 0) {
+      classData.properties.forEach((prop: any) => {
+        const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+        properties[prop.name] = propData;
+
+        if (propData.required) {
+          required.push(prop.name);
+          delete propData.required;
+        }
+
+        // If property data is not required, remove the field all together.
+        if (propData.required === false) {
+          delete propData.required;
+        }
+
+        if (propData.description === null) {
+          delete propData.description;
+
+          if (propData.title) {
+            propData.description = propData.title;
+          }
+        }
+      });
+    }
+
+    const classSchema = {
+      type: 'object',
+      description: classData.description || undefined,
+      ...schema,
+      properties,
+      required: required.length > 0 ? required : undefined
+    };
+
+    // Remove undefined values
+    Object.keys(classSchema).forEach(key => {
+      if (classSchema[key] === undefined) {
+        delete classSchema[key];
+      }
+    });
+
+    return classSchema;
+  }, []);
+
+  // Generate complete OpenAPI 3.2.0 specification from classes
+  const generateOpenApiSpec = useCallback((classes: any[], projectName?: string, versionId?: string) => {
+    const schemas: any = {};
+
+    // Build schema for each class
+    classes.forEach((cls) => {
+      schemas[cls.name] = buildClassSchema(cls);
+    });
+
+    const openApiDoc = {
+      openapi: '3.1.0',
+      info: {
+        title: projectName || 'API Schema',
+        version: versionId || '1.0.0',
+        description: 'Generated OpenAPI 3.1.0 specification from Objectified Studio'
+      },
+      components: {
+        schemas
+      }
+    };
+
+    return JSON.stringify(openApiDoc, null, 2);
+  }, [buildClassSchema]);
+
   // Apply auto-layout to current nodes and edges
   const onLayout = useCallback((direction: LayoutDirection) => {
     const layoutedNodes = getLayoutedElements(nodes, edges, { direction });
@@ -632,6 +708,12 @@ const StudioContent = () => {
         setNodes(layoutedNodes);
         setEdges(newEdges);
 
+        // Generate OpenAPI specification
+        const currentProject = projects.find(p => p.id === selectedProjectId);
+        const currentVersion = versions.find(v => v.id === selectedVersionId);
+        const spec = generateOpenApiSpec(classesWithProperties, currentProject?.name, currentVersion?.version_id);
+        setOpenApiSpec(spec);
+
         // Fit view after a short delay to ensure nodes are rendered
         setTimeout(() => {
           fitView({ padding: 0.2, duration: 400 });
@@ -646,7 +728,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyEdit, handlePropertyDelete, handleClassEdit]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyEdit, handlePropertyDelete, handleClassEdit, generateOpenApiSpec, projects, versions]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -953,24 +1035,53 @@ const StudioContent = () => {
             </Panel>
           </ReactFlow>
         ) : (
-          // Monaco Editor Code View
-          <Editor
-            height="100%"
-            defaultLanguage="yaml"
-            value={openApiSpec}
-            theme="vs-dark"
-            options={{
-              readOnly: true,
-              minimap: { enabled: true },
-              scrollBeyondLastLine: false,
-              fontSize: 13,
-              lineNumbers: 'on',
-              renderWhitespace: 'selection',
-              automaticLayout: true,
-              wordWrap: 'on',
-              folding: true,
-            }}
-          />
+          // Monaco Editor Code View - OpenAPI 3.1.0 Specification
+          <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    OpenAPI 3.1.0 Specification
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Complete schema definition for {selectedProject?.name} v{selectedVersion?.version_id}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(openApiSpec);
+                    alert('OpenAPI specification copied to clipboard!');
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                >
+                  Copy to Clipboard
+                </button>
+              </div>
+            </div>
+            <div className="flex-1">
+              <Editor
+                height="100%"
+                defaultLanguage="json"
+                value={openApiSpec || '{\n  "openapi": "3.1.0",\n  "info": {\n    "title": "No classes defined",\n    "version": "1.0.0"\n  },\n  "components": {\n    "schemas": {}\n  }\n}'}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: true },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  lineNumbers: 'on',
+                  renderWhitespace: 'selection',
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  folding: true,
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  contextmenu: true,
+                  selectOnLineNumbers: true,
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
