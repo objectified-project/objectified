@@ -164,8 +164,10 @@ const StudioContent = () => {
           );
 
           const newNodes = await classesToNodes(classesWithProperties);
-          const layoutedNodes = getLayoutedElements(newNodes, [], { direction: layoutDirection });
+          const newEdges = createAllEdges(classesWithProperties);
+          const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
           setNodes(layoutedNodes);
+          setEdges(newEdges);
         }
       } else {
         alert(response.error || 'Failed to add property to class');
@@ -201,8 +203,10 @@ const StudioContent = () => {
           );
 
           const newNodes = await classesToNodes(classesWithProperties);
-          const layoutedNodes = getLayoutedElements(newNodes, [], { direction: layoutDirection });
+          const newEdges = createAllEdges(classesWithProperties);
+          const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
           setNodes(layoutedNodes);
+          setEdges(newEdges);
         }
       } else {
         alert(response.error || 'Failed to remove property from class');
@@ -302,8 +306,10 @@ const StudioContent = () => {
           );
 
           const newNodes = await classesToNodes(classesWithProperties);
-          const layoutedNodes = getLayoutedElements(newNodes, [], { direction: layoutDirection });
+          const newEdges = createAllEdges(classesWithProperties);
+          const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
           setNodes(layoutedNodes);
+          setEdges(newEdges);
         }
       } else {
         setEditPropertyError(response.error || 'Failed to update property');
@@ -338,6 +344,213 @@ const StudioContent = () => {
         onPropertyDelete: handlePropertyDelete
       }
     }));
+  };
+
+  // Helper function to extract class name from $ref
+  const extractClassNameFromRef = (ref: string): string | null => {
+    if (ref.includes('/')) {
+      const parts = ref.split('/');
+      return parts[parts.length - 1] || null;
+    }
+    return ref;
+  };
+
+  // Helper function to create edges from property $ref relationships
+  const createPropertyRefEdges = (classes: any[]): Edge[] => {
+    const edges: Edge[] = [];
+    const classNameToId = new Map(classes.map(cls => [cls.name, cls.id]));
+
+    classes.forEach((cls) => {
+      if (!cls.properties || cls.properties.length === 0) return;
+
+      cls.properties.forEach((prop: any) => {
+        const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+        let refClassName: string | null = null;
+
+        // Direct $ref
+        if (propData.$ref) {
+          refClassName = extractClassNameFromRef(propData.$ref);
+        }
+        // $ref in items (for array types)
+        else if (propData.type === 'array' && propData.items?.$ref) {
+          refClassName = extractClassNameFromRef(propData.items.$ref);
+        }
+
+        // Create edge if we found a reference to another class
+        if (refClassName && classNameToId.has(refClassName)) {
+          const targetClassId = classNameToId.get(refClassName)!;
+          const edgeColor = propData.type === 'array' ? '#8b5cf6' : '#3b82f6';
+
+          edges.push({
+            id: `prop-${cls.id}-${prop.id}-${targetClassId}`,
+            source: cls.id,
+            sourceHandle: `prop-${prop.id}`,
+            target: targetClassId,
+            type: 'smoothstep',
+            animated: false,
+            label: prop.name,
+            style: {
+              stroke: edgeColor,
+              strokeWidth: 2
+            },
+            markerEnd: {
+              type: 'arrowclosed',
+              color: edgeColor,
+              width: 20,
+              height: 20
+            },
+            labelStyle: {
+              fill: '#6b7280',
+              fontSize: 11,
+              fontWeight: 500
+            },
+            labelBgStyle: {
+              fill: 'white',
+              fillOpacity: 0.9
+            }
+          });
+        }
+      });
+    });
+
+    return edges;
+  };
+
+  // Helper function to create edges from composition relationships (allOf/anyOf/oneOf)
+  const createCompositionEdges = (classes: any[]): Edge[] => {
+    const edges: Edge[] = [];
+    const classNameToId = new Map(classes.map(cls => [cls.name, cls.id]));
+
+    classes.forEach((cls) => {
+      const schema = typeof cls.schema === 'string' ? JSON.parse(cls.schema) : cls.schema;
+      if (!schema) return;
+
+      // allOf - Inheritance (solid line, blue)
+      if (schema.allOf && Array.isArray(schema.allOf)) {
+        schema.allOf.forEach((item: any, index: number) => {
+          if (item.$ref) {
+            const refClassName = extractClassNameFromRef(item.$ref);
+            if (refClassName && classNameToId.has(refClassName)) {
+              edges.push({
+                id: `allOf-${cls.id}-${refClassName}-${index}`,
+                source: cls.id,
+                target: classNameToId.get(refClassName)!,
+                type: 'step',
+                animated: false,
+                label: 'allOf',
+                style: {
+                  stroke: '#2563eb',
+                  strokeWidth: 3,
+                  strokeDasharray: '0'
+                },
+                markerEnd: {
+                  type: 'arrowclosed',
+                  color: '#2563eb',
+                  width: 15,
+                  height: 15
+                },
+                labelStyle: {
+                  fill: '#2563eb',
+                  fontSize: 10,
+                  fontWeight: 600
+                },
+                labelBgStyle: {
+                  fill: 'white',
+                  fillOpacity: 0.95
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // anyOf - Alternatives (dashed line, orange)
+      if (schema.anyOf && Array.isArray(schema.anyOf)) {
+        schema.anyOf.forEach((item: any, index: number) => {
+          if (item.$ref) {
+            const refClassName = extractClassNameFromRef(item.$ref);
+            if (refClassName && classNameToId.has(refClassName)) {
+              edges.push({
+                id: `anyOf-${cls.id}-${refClassName}-${index}`,
+                source: cls.id,
+                target: classNameToId.get(refClassName)!,
+                type: 'step',
+                animated: false,
+                label: 'anyOf',
+                style: {
+                  stroke: '#ea580c',
+                  strokeWidth: 3,
+                  strokeDasharray: '5,5'
+                },
+                markerEnd: {
+                  type: 'arrowclosed',
+                  color: '#ea580c',
+                  width: 15,
+                  height: 15
+                },
+                labelStyle: {
+                  fill: '#ea580c',
+                  fontSize: 10,
+                  fontWeight: 600
+                },
+                labelBgStyle: {
+                  fill: 'white',
+                  fillOpacity: 0.95
+                }
+              });
+            }
+          }
+        });
+      }
+
+      // oneOf - Exclusive (dotted line, purple)
+      if (schema.oneOf && Array.isArray(schema.oneOf)) {
+        schema.oneOf.forEach((item: any, index: number) => {
+          if (item.$ref) {
+            const refClassName = extractClassNameFromRef(item.$ref);
+            if (refClassName && classNameToId.has(refClassName)) {
+              edges.push({
+                id: `oneOf-${cls.id}-${refClassName}-${index}`,
+                source: cls.id,
+                target: classNameToId.get(refClassName)!,
+                type: 'step',
+                animated: false,
+                label: 'oneOf',
+                style: {
+                  stroke: '#9333ea',
+                  strokeWidth: 3,
+                  strokeDasharray: '2,3'
+                },
+                markerEnd: {
+                  type: 'arrowclosed',
+                  color: '#9333ea',
+                  width: 15,
+                  height: 15
+                },
+                labelStyle: {
+                  fill: '#9333ea',
+                  fontSize: 10,
+                  fontWeight: 600
+                },
+                labelBgStyle: {
+                  fill: 'white',
+                  fillOpacity: 0.95
+                }
+              });
+            }
+          }
+        });
+      }
+    });
+
+    return edges;
+  };
+
+  // Helper function to create all edges (properties + composition)
+  const createAllEdges = (classes: any[]): Edge[] => {
+    const propertyEdges = createPropertyRefEdges(classes);
+    const compositionEdges = createCompositionEdges(classes);
+    return [...propertyEdges, ...compositionEdges];
   };
 
   // Load projects on mount
@@ -392,8 +605,8 @@ const StudioContent = () => {
         // Convert classes to React Flow nodes
         const newNodes = await classesToNodes(classesWithProperties);
 
-        // Clear edges for now - we'll add relationships later
-        const newEdges: Edge[] = [];
+        // Create edges for both property $ref and composition relationships
+        const newEdges = createAllEdges(classesWithProperties);
 
         // Apply auto-layout
         const layoutedNodes = getLayoutedElements(newNodes, newEdges, {
