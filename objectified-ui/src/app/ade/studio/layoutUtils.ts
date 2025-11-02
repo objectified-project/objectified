@@ -32,9 +32,9 @@ export function getLayoutedElements(
     direction = 'TB',
     nodeWidth = NODE_WIDTH,
     nodeHeight = NODE_HEIGHT,
-    rankSeparation = 100,
-    nodeSeparation = 80,
-    edgeSeparation = 10,
+    rankSeparation = 150,    // Increased from 100 (vertical spacing between ranks)
+    nodeSeparation = 120,    // Increased from 80 (horizontal spacing between nodes)
+    edgeSeparation = 20,     // Increased from 10 (spacing between edges)
   } = options;
 
   // Create a new directed graph
