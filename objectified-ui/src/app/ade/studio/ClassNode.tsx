@@ -7,6 +7,7 @@ type ClassProperty = {
   name: string;
   type?: string;
   description?: string;
+  data?: any; // JSONB data containing the property schema
 };
 
 type ClassNodeData = {
@@ -14,6 +15,7 @@ type ClassNodeData = {
   name: string;
   description?: string;
   properties?: ClassProperty[];
+  schema?: any; // Schema containing allOf/anyOf/oneOf
   onPropertyDrop?: (classId: string, propertyData: any) => void;
   onPropertyEdit?: (classId: string, classProperty: ClassProperty) => void;
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
@@ -53,22 +55,50 @@ function ClassNode({ data, selected }: NodeProps) {
     }
   };
 
+  // Extract type from property data
+  const getPropertyType = (prop: ClassProperty): string => {
+    if (!prop.data) return prop.type || 'object';
+
+    const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+
+    if (propData.type === 'array') {
+      if (propData.items?.$ref) {
+        const refName = propData.items.$ref.split('/').pop();
+        return `array[]`;
+      }
+      return `${propData.items?.type || 'items'}[]`;
+    }
+
+    if (propData.$ref) {
+      return '$ref';
+    }
+
+    return propData.type || 'object';
+  };
+
+  // Check if property has $ref
+  const hasRef = (prop: ClassProperty): boolean => {
+    if (!prop.data) return false;
+    const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+    return !!(propData?.$ref || (propData?.type === 'array' && propData?.items?.$ref));
+  };
+
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       style={{
-        padding: '12px 16px',
-        borderRadius: '8px',
-        border: `2px solid ${isDragOver ? '#10b981' : selected ? '#3b82f6' : '#e5e7eb'}`,
-        background: isDragOver ? '#ecfdf5' : 'white',
-        minWidth: '200px',
-        maxWidth: '350px',
+        borderRadius: '6px',
+        border: `2px solid ${isDragOver ? '#10b981' : selected ? '#5b68ea' : '#d1d5db'}`,
+        background: 'white',
+        minWidth: '280px',
+        maxWidth: '420px',
         boxShadow: selected
-          ? '0 4px 12px rgba(59, 130, 246, 0.2)'
-          : '0 2px 4px rgba(0, 0, 0, 0.05)',
+          ? '0 4px 12px rgba(91, 104, 234, 0.3)'
+          : '0 2px 8px rgba(0, 0, 0, 0.1)',
         transition: 'all 0.2s ease',
+        overflow: 'hidden'
       }}
     >
       {/* Target handle at the top */}
@@ -77,92 +107,133 @@ function ClassNode({ data, selected }: NodeProps) {
         position={Position.Top}
         style={{
           background: '#6b7280',
-          width: '8px',
-          height: '8px',
-          border: '2px solid white'
+          width: '10px',
+          height: '10px',
+          border: '2px solid white',
+          borderRadius: '50%'
         }}
         isConnectable={true}
       />
 
-      {/* Class name header */}
-      <div style={{ marginBottom: typedData.description ? '8px' : '0' }}>
+      {/* Header with class name and delete button */}
+      <div style={{
+        background: 'linear-gradient(135deg, #5b68ea 0%, #4751c4 100%)',
+        padding: '12px 16px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderBottom: isDragOver ? '2px solid #10b981' : 'none'
+      }}>
         <div style={{
-          fontSize: '14px',
+          fontSize: '16px',
           fontWeight: 600,
-          color: '#111827',
-          wordBreak: 'break-word'
+          color: 'white',
+          wordBreak: 'break-word',
+          flex: 1
         }}>
           {typedData.name}
         </div>
+        <button
+          style={{
+            background: 'rgba(255, 255, 255, 0.2)',
+            border: 'none',
+            borderRadius: '4px',
+            padding: '6px 8px',
+            cursor: 'pointer',
+            color: 'white',
+            fontSize: '16px',
+            lineHeight: 1,
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+          }}
+          title="Delete class"
+        >
+          🗑
+        </button>
       </div>
 
       {/* Description */}
       {typedData.description && (
         <div style={{
-          fontSize: '12px',
+          padding: '12px 16px',
+          fontSize: '13px',
           color: '#6b7280',
-          marginBottom: '8px',
-          wordBreak: 'break-word',
-          lineHeight: '1.4'
+          fontStyle: 'italic',
+          lineHeight: '1.5',
+          background: '#f9fafb',
+          borderBottom: '1px solid #e5e7eb'
         }}>
           {typedData.description}
         </div>
       )}
 
-      {/* Properties list */}
-      {typedData.properties && typedData.properties.length > 0 && (
+      {/* Drop zone hint when dragging */}
+      {isDragOver && (
         <div style={{
-          marginTop: '12px',
-          paddingTop: '12px',
-          borderTop: '1px solid #e5e7eb'
+          padding: '8px 16px',
+          background: '#d1fae5',
+          fontSize: '12px',
+          color: '#065f46',
+          textAlign: 'center',
+          fontWeight: 500,
+          borderBottom: '1px solid #10b981'
         }}>
-          <div style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            color: '#6b7280',
-            marginBottom: '8px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            Properties ({typedData.properties.length})
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {typedData.properties.map((prop) => (
+          Drop property here
+        </div>
+      )}
+
+      {/* Properties list */}
+      <div style={{ padding: '0' }}>
+        {typedData.properties && typedData.properties.length > 0 ? (
+          typedData.properties.map((prop, index) => {
+            const propertyHasRef = hasRef(prop);
+
+            return (
               <div
                 key={prop.id}
                 style={{
-                  fontSize: '12px',
-                  padding: '4px 8px',
-                  background: '#f9fafb',
-                  borderRadius: '4px',
-                  border: '1px solid #e5e7eb',
-                  display: 'flex',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto 60px auto',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  padding: '10px 16px',
+                  borderBottom: index < typedData.properties!.length - 1 ? '1px solid #e5e7eb' : 'none',
+                  background: index % 2 === 0 ? 'white' : '#fafafa',
+                  position: 'relative',
                   gap: '8px'
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontWeight: 500,
-                    color: '#111827',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {prop.name}
-                  </div>
-                  {prop.type && (
-                    <div style={{
-                      fontSize: '10px',
-                      color: '#6b7280',
-                      marginTop: '2px'
-                    }}>
-                      {prop.type}
-                    </div>
-                  )}
+                {/* Property name */}
+                <div style={{
+                  fontWeight: 500,
+                  color: '#111827',
+                  fontSize: '13px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {prop.name}
                 </div>
-                <div style={{ display: 'flex', gap: '2px' }}>
+
+                {/* Type */}
+                <div style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {getPropertyType(prop)}
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                   {typedData.onPropertyEdit && (
                     <button
                       onClick={(e) => {
@@ -177,9 +248,9 @@ function ClassNode({ data, selected }: NodeProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
-                        color: '#6b7280',
-                        fontSize: '12px',
+                        borderRadius: '3px',
+                        color: '#9ca3af',
+                        fontSize: '14px',
                         lineHeight: 1,
                         transition: 'all 0.2s'
                       }}
@@ -189,9 +260,9 @@ function ClassNode({ data, selected }: NodeProps) {
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#6b7280';
+                        e.currentTarget.style.color = '#9ca3af';
                       }}
-                      title="Edit property in class"
+                      title="Edit property"
                     >
                       ✎
                     </button>
@@ -212,9 +283,9 @@ function ClassNode({ data, selected }: NodeProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '4px',
-                        color: '#6b7280',
-                        fontSize: '14px',
+                        borderRadius: '3px',
+                        color: '#9ca3af',
+                        fontSize: '16px',
                         lineHeight: 1,
                         transition: 'all 0.2s'
                       }}
@@ -224,48 +295,98 @@ function ClassNode({ data, selected }: NodeProps) {
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#6b7280';
+                        e.currentTarget.style.color = '#9ca3af';
                       }}
                       title="Remove property from class"
                     >
-                      ×
+                      🗑
                     </button>
                   )}
                 </div>
+
+                {/* Handle for $ref properties */}
+                {propertyHasRef && (
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={`prop-${prop.id}`}
+                    style={{
+                      right: '-6px',
+                      background: '#5b68ea',
+                      width: '10px',
+                      height: '10px',
+                      border: '2px solid white',
+                      borderRadius: '50%',
+                      position: 'absolute',
+                      top: '50%',
+                      transform: 'translateY(-50%)'
+                    }}
+                    isConnectable={false}
+                  />
+                )}
               </div>
-            ))}
+            );
+          })
+        ) : (
+          <div style={{
+            padding: '16px',
+            textAlign: 'center',
+            color: '#9ca3af',
+            fontSize: '12px',
+            fontStyle: 'italic'
+          }}>
+            No properties defined
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Drop zone hint when dragging */}
-      {isDragOver && (
-        <div style={{
-          marginTop: '8px',
-          padding: '8px',
-          background: '#d1fae5',
-          borderRadius: '4px',
-          fontSize: '11px',
-          color: '#065f46',
-          textAlign: 'center',
-          fontWeight: 500
-        }}>
-          Drop property here
-        </div>
-      )}
+      {/* Bottom handles for composition relationships (allOf/anyOf/oneOf) */}
+      {typedData.schema && (() => {
+        const schema = typeof typedData.schema === 'string' ? JSON.parse(typedData.schema) : typedData.schema;
+        const compositions: Array<{ type: string; index: number; ref: string }> = [];
 
-      {/* Source handle at the bottom */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        style={{
-          background: '#6b7280',
-          width: '8px',
-          height: '8px',
-          border: '2px solid white'
-        }}
-        isConnectable={true}
-      />
+        // Collect all composition types
+        if (schema.allOf && Array.isArray(schema.allOf)) {
+          schema.allOf.forEach((item: any, index: number) => {
+            if (item.$ref) {
+              compositions.push({ type: 'allOf', index, ref: item.$ref });
+            }
+          });
+        }
+        if (schema.anyOf && Array.isArray(schema.anyOf)) {
+          schema.anyOf.forEach((item: any, index: number) => {
+            if (item.$ref) {
+              compositions.push({ type: 'anyOf', index, ref: item.$ref });
+            }
+          });
+        }
+        if (schema.oneOf && Array.isArray(schema.oneOf)) {
+          schema.oneOf.forEach((item: any, index: number) => {
+            if (item.$ref) {
+              compositions.push({ type: 'oneOf', index, ref: item.$ref });
+            }
+          });
+        }
+
+        // Create handles for each composition
+        return compositions.map((comp, i) => (
+          <Handle
+            key={`${comp.type}-${comp.index}`}
+            type="source"
+            position={Position.Bottom}
+            id={`comp-${comp.type}-${comp.index}`}
+            style={{
+              left: `${30 + (i * 15)}%`,
+              background: comp.type === 'allOf' ? '#2563eb' : comp.type === 'anyOf' ? '#ea580c' : '#9333ea',
+              width: '10px',
+              height: '10px',
+              border: '2px solid white',
+              borderRadius: '50%'
+            }}
+            isConnectable={false}
+          />
+        ));
+      })()}
     </div>
   );
 }

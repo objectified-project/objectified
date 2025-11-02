@@ -339,6 +339,7 @@ const StudioContent = () => {
         name: cls.name,
         description: cls.description,
         properties: cls.properties || [],
+        schema: cls.schema, // Pass schema for composition handles
         onPropertyDrop: handlePropertyDrop,
         onPropertyEdit: handlePropertyEdit,
         onPropertyDelete: handlePropertyDelete
@@ -434,6 +435,7 @@ const StudioContent = () => {
               edges.push({
                 id: `allOf-${cls.id}-${refClassName}-${index}`,
                 source: cls.id,
+                sourceHandle: `comp-allOf-${index}`, // Use specific bottom handle
                 target: classNameToId.get(refClassName)!,
                 type: 'step',
                 animated: false,
@@ -473,6 +475,7 @@ const StudioContent = () => {
               edges.push({
                 id: `anyOf-${cls.id}-${refClassName}-${index}`,
                 source: cls.id,
+                sourceHandle: `comp-anyOf-${index}`, // Use specific bottom handle
                 target: classNameToId.get(refClassName)!,
                 type: 'step',
                 animated: false,
@@ -512,6 +515,7 @@ const StudioContent = () => {
               edges.push({
                 id: `oneOf-${cls.id}-${refClassName}-${index}`,
                 source: cls.id,
+                sourceHandle: `comp-oneOf-${index}`, // Use specific bottom handle
                 target: classNameToId.get(refClassName)!,
                 type: 'step',
                 animated: false,
