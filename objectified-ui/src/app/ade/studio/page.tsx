@@ -26,7 +26,8 @@ import {
   getVersionsForProject,
   getClassesForVersion,
   getPropertiesForClass,
-  addPropertyToClass
+  addPropertyToClass,
+  removePropertyFromClass
 } from '../../../../lib/db/helper';
 import ClassNode from './ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
@@ -151,6 +152,43 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, layoutDirection, setNodes]);
 
+  // Handle property deletion from class
+  const handlePropertyDelete = useCallback(async (classId: string, classPropertyId: string) => {
+    try {
+      console.log('Removing property from class:', classId, classPropertyId);
+
+      // Remove property from class in database
+      const result = await removePropertyFromClass(classPropertyId);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        // Reload classes to show updated properties
+        if (selectedVersionId) {
+          const classesResult = await getClassesForVersion(selectedVersionId);
+          const classesData = JSON.parse(classesResult);
+
+          // Load properties for each class
+          const classesWithProperties = await Promise.all(
+            classesData.map(async (cls: any) => {
+              const propsResult = await getPropertiesForClass(cls.id);
+              const properties = JSON.parse(propsResult);
+              return { ...cls, properties };
+            })
+          );
+
+          const newNodes = await classesToNodes(classesWithProperties);
+          const layoutedNodes = getLayoutedElements(newNodes, [], { direction: layoutDirection });
+          setNodes(layoutedNodes);
+        }
+      } else {
+        alert(response.error || 'Failed to remove property from class');
+      }
+    } catch (error) {
+      console.error('Error removing property from class:', error);
+      alert('An error occurred while removing the property');
+    }
+  }, [selectedVersionId, layoutDirection, setNodes]);
+
   // Define custom node types
   const nodeTypes = {
     classNode: ClassNode,
@@ -170,7 +208,8 @@ const StudioContent = () => {
         name: cls.name,
         description: cls.description,
         properties: cls.properties || [],
-        onPropertyDrop: handlePropertyDrop
+        onPropertyDrop: handlePropertyDrop,
+        onPropertyDelete: handlePropertyDelete
       }
     }));
   };
@@ -252,7 +291,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop]);
+  }, [selectedVersionId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyDelete]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;

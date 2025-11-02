@@ -15,6 +15,7 @@ type ClassNodeData = {
   description?: string;
   properties?: ClassProperty[];
   onPropertyDrop?: (classId: string, propertyData: any) => void;
+  onPropertyDelete?: (classId: string, classPropertyId: string) => void;
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -133,23 +134,67 @@ function ClassNode({ data, selected }: NodeProps) {
                   padding: '4px 8px',
                   background: '#f9fafb',
                   borderRadius: '4px',
-                  border: '1px solid #e5e7eb'
+                  border: '1px solid #e5e7eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px'
                 }}
               >
-                <div style={{
-                  fontWeight: 500,
-                  color: '#111827'
-                }}>
-                  {prop.name}
-                </div>
-                {prop.type && (
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: '10px',
-                    color: '#6b7280',
-                    marginTop: '2px'
+                    fontWeight: 500,
+                    color: '#111827',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}>
-                    {prop.type}
+                    {prop.name}
                   </div>
+                  {prop.type && (
+                    <div style={{
+                      fontSize: '10px',
+                      color: '#6b7280',
+                      marginTop: '2px'
+                    }}>
+                      {prop.type}
+                    </div>
+                  )}
+                </div>
+                {typedData.onPropertyDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Remove "${prop.name}" from this class?`)) {
+                        typedData.onPropertyDelete!(typedData.id, prop.id);
+                      }
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '4px',
+                      color: '#6b7280',
+                      fontSize: '14px',
+                      lineHeight: 1,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#fee2e2';
+                      e.currentTarget.style.color = '#dc2626';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#6b7280';
+                    }}
+                    title="Remove property from class"
+                  >
+                    ×
+                  </button>
                 )}
               </div>
             ))}
