@@ -696,3 +696,84 @@ export async function deleteClass(classId: string) {
   }
 }
 
+// Class-Property Relationship Management Functions
+
+export async function getPropertiesForClass(classId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data,
+              p.id as property_source_id, p.name as property_source_name
+       FROM odb.class_properties cp
+       LEFT JOIN odb.properties p ON cp.property_id = p.id
+       WHERE cp.class_id = $1
+       ORDER BY cp.name ASC`,
+      [classId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching class properties:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function addPropertyToClass(classId: string, propertyId: string, name: string, description: string | null, data: any) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Property name is required' });
+    }
+
+    if (!data) {
+      return JSON.stringify({ success: false, error: 'Property data is required' });
+    }
+
+    // Check if property already exists in this class
+    const existingCheck = await connectionPool.query(
+      'SELECT id FROM odb.class_properties WHERE class_id = $1 AND name = $2',
+      [classId, name]
+    );
+
+    if (existingCheck.rowCount > 0) {
+      return JSON.stringify({ success: false, error: 'A property with this name already exists in this class' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.class_properties (class_id, property_id, name, description, data)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, class_id, property_id, name, description, data`,
+      [classId, propertyId, name.trim(), description, JSON.stringify(data)]
+    );
+
+    return JSON.stringify({ success: true, classProperty: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error adding property to class:', error);
+
+    // Handle unique constraint violation
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A property with this name already exists in this class' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function removePropertyFromClass(classPropertyId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.class_properties
+       WHERE id = $1
+       RETURNING id`,
+      [classPropertyId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Class property relationship not found' });
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error removing property from class:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+

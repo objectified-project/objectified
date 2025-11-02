@@ -21,7 +21,13 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { getProjectsForTenant, getVersionsForProject, getClassesForVersion } from '../../../../lib/db/helper';
+import {
+  getProjectsForTenant,
+  getVersionsForProject,
+  getClassesForVersion,
+  getPropertiesForClass,
+  addPropertyToClass
+} from '../../../../lib/db/helper';
 import ClassNode from './ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
 
@@ -86,13 +92,72 @@ const StudioContent = () => {
     }, 10);
   }, [nodes, edges, setNodes, fitView]);
 
+  // Handle property drop on class
+  const handlePropertyDrop = useCallback(async (classId: string, propertyData: any) => {
+    try {
+      console.log('Property dropped on class:', classId, propertyData);
+
+      // Add property to class in database
+      const result = await addPropertyToClass(
+        classId,
+        propertyData.id,
+        propertyData.name,
+        propertyData.description || null,
+        {
+          type: propertyData.type,
+          $ref: propertyData.$ref,
+          title: propertyData.title,
+          description: propertyData.description,
+          format: propertyData.format,
+          pattern: propertyData.pattern,
+          minLength: propertyData.minLength,
+          maxLength: propertyData.maxLength,
+          minimum: propertyData.minimum,
+          maximum: propertyData.maximum,
+          minItems: propertyData.minItems,
+          maxItems: propertyData.maxItems,
+          enum: propertyData.enum,
+          default: propertyData.default,
+          required: propertyData.required
+        }
+      );
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        // Reload classes to show updated properties
+        if (selectedVersionId) {
+          const classesResult = await getClassesForVersion(selectedVersionId);
+          const classesData = JSON.parse(classesResult);
+
+          // Load properties for each class
+          const classesWithProperties = await Promise.all(
+            classesData.map(async (cls: any) => {
+              const propsResult = await getPropertiesForClass(cls.id);
+              const properties = JSON.parse(propsResult);
+              return { ...cls, properties };
+            })
+          );
+
+          const newNodes = await classesToNodes(classesWithProperties);
+          const layoutedNodes = getLayoutedElements(newNodes, [], { direction: layoutDirection });
+          setNodes(layoutedNodes);
+        }
+      } else {
+        alert(response.error || 'Failed to add property to class');
+      }
+    } catch (error) {
+      console.error('Error adding property to class:', error);
+      alert('An error occurred while adding the property');
+    }
+  }, [selectedVersionId, layoutDirection, setNodes]);
+
   // Define custom node types
   const nodeTypes = {
     classNode: ClassNode,
   };
 
   // Helper function to convert classes to React Flow nodes
-  const classesToNodes = (classes: any[]): Node[] => {
+  const classesToNodes = async (classes: any[]): Promise<Node[]> => {
     return classes.map((cls, index) => ({
       id: cls.id,
       type: 'classNode',
@@ -101,9 +166,11 @@ const StudioContent = () => {
         y: 100 + Math.floor(index / 4) * 180
       },
       data: {
+        id: cls.id,
         name: cls.name,
         description: cls.description,
-        propertyCount: 0 // TODO: Count properties when we implement class-property relationships
+        properties: cls.properties || [],
+        onPropertyDrop: handlePropertyDrop
       }
     }));
   };
@@ -148,8 +215,17 @@ const StudioContent = () => {
         const result = await getClassesForVersion(selectedVersionId);
         const classesData = JSON.parse(result);
 
+        // Load properties for each class
+        const classesWithProperties = await Promise.all(
+          classesData.map(async (cls: any) => {
+            const propsResult = await getPropertiesForClass(cls.id);
+            const properties = JSON.parse(propsResult);
+            return { ...cls, properties };
+          })
+        );
+
         // Convert classes to React Flow nodes
-        const newNodes = classesToNodes(classesData);
+        const newNodes = await classesToNodes(classesWithProperties);
 
         // Clear edges for now - we'll add relationships later
         const newEdges: Edge[] = [];
@@ -176,7 +252,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView]);
+  }, [selectedVersionId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;

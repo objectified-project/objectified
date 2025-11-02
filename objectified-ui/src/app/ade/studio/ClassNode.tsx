@@ -1,25 +1,68 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 // Define custom node data type for classes
+type ClassProperty = {
+  id: string;
+  name: string;
+  type?: string;
+  description?: string;
+};
+
 type ClassNodeData = {
+  id: string;
   name: string;
   description?: string;
-  propertyCount?: number;
+  properties?: ClassProperty[];
+  onPropertyDrop?: (classId: string, propertyData: any) => void;
 };
 
 function ClassNode({ data, selected }: NodeProps) {
   const typedData = data as ClassNodeData;
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      const data = e.dataTransfer.getData('application/json');
+      if (data) {
+        const dropData = JSON.parse(data);
+        if (dropData.type === 'property' && typedData.onPropertyDrop) {
+          typedData.onPropertyDrop(typedData.id, dropData.property);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling property drop:', error);
+    }
+  };
 
   return (
     <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       style={{
         padding: '12px 16px',
         borderRadius: '8px',
-        border: `2px solid ${selected ? '#3b82f6' : '#e5e7eb'}`,
-        background: 'white',
+        border: `2px solid ${isDragOver ? '#10b981' : selected ? '#3b82f6' : '#e5e7eb'}`,
+        background: isDragOver ? '#ecfdf5' : 'white',
         minWidth: '200px',
-        maxWidth: '300px',
+        maxWidth: '350px',
         boxShadow: selected
           ? '0 4px 12px rgba(59, 130, 246, 0.2)'
           : '0 2px 4px rgba(0, 0, 0, 0.05)',
@@ -64,19 +107,69 @@ function ClassNode({ data, selected }: NodeProps) {
         </div>
       )}
 
-      {/* Property count badge */}
-      {typedData.propertyCount !== undefined && (
+      {/* Properties list */}
+      {typedData.properties && typedData.properties.length > 0 && (
         <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          fontSize: '11px',
-          color: '#6b7280',
-          background: '#f3f4f6',
-          padding: '2px 8px',
-          borderRadius: '12px',
-          marginTop: '4px'
+          marginTop: '12px',
+          paddingTop: '12px',
+          borderTop: '1px solid #e5e7eb'
         }}>
-          {typedData.propertyCount} {typedData.propertyCount === 1 ? 'property' : 'properties'}
+          <div style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: '#6b7280',
+            marginBottom: '8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+          }}>
+            Properties ({typedData.properties.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {typedData.properties.map((prop) => (
+              <div
+                key={prop.id}
+                style={{
+                  fontSize: '12px',
+                  padding: '4px 8px',
+                  background: '#f9fafb',
+                  borderRadius: '4px',
+                  border: '1px solid #e5e7eb'
+                }}
+              >
+                <div style={{
+                  fontWeight: 500,
+                  color: '#111827'
+                }}>
+                  {prop.name}
+                </div>
+                {prop.type && (
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#6b7280',
+                    marginTop: '2px'
+                  }}>
+                    {prop.type}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Drop zone hint when dragging */}
+      {isDragOver && (
+        <div style={{
+          marginTop: '8px',
+          padding: '8px',
+          background: '#d1fae5',
+          borderRadius: '4px',
+          fontSize: '11px',
+          color: '#065f46',
+          textAlign: 'center',
+          fontWeight: 500
+        }}>
+          Drop property here
         </div>
       )}
 
