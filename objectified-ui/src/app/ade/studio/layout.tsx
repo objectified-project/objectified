@@ -44,6 +44,7 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
+import Chip from '@mui/material/Chip';
 import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
 import AddIcon from '@mui/icons-material/Add';
@@ -127,6 +128,9 @@ function StudioLayoutContent({
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
   const [className, setClassName] = useState('');
   const [classDescription, setClassDescription] = useState('');
+  const [classAllOf, setClassAllOf] = useState<string[]>([]);
+  const [classAnyOf, setClassAnyOf] = useState<string[]>([]);
+  const [classOneOf, setClassOneOf] = useState<string[]>([]);
   const [classError, setClassError] = useState('');
 
   // Dialog state for properties
@@ -168,6 +172,9 @@ function StudioLayoutContent({
     setClassDialogMode('add');
     setClassName('');
     setClassDescription('');
+    setClassAllOf([]);
+    setClassAnyOf([]);
+    setClassOneOf([]);
     setClassError('');
     setSelectedClass(null);
     setClassDialogOpen(true);
@@ -182,6 +189,13 @@ function StudioLayoutContent({
     setSelectedClass(classItem);
     setClassName(classItem.name);
     setClassDescription(classItem.description || '');
+
+    // Load composition arrays from schema if they exist
+    const schema = typeof classItem.schema === 'string' ? JSON.parse(classItem.schema) : classItem.schema;
+    setClassAllOf(schema?.allOf?.map((s: any) => s.$ref || JSON.stringify(s)) || []);
+    setClassAnyOf(schema?.anyOf?.map((s: any) => s.$ref || JSON.stringify(s)) || []);
+    setClassOneOf(schema?.oneOf?.map((s: any) => s.$ref || JSON.stringify(s)) || []);
+
     setClassError('');
     setClassDialogOpen(true);
   };
@@ -211,12 +225,29 @@ function StudioLayoutContent({
       return;
     }
 
-    // Build a default schema object
-    const defaultSchema = {
+    // Build schema object with composition keywords
+    const schema: any = {
       type: 'object',
       properties: {},
       required: []
     };
+
+    // Add composition arrays if they have values
+    if (classAllOf.length > 0) {
+      schema.allOf = classAllOf.map(ref =>
+        ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref }
+      );
+    }
+    if (classAnyOf.length > 0) {
+      schema.anyOf = classAnyOf.map(ref =>
+        ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref }
+      );
+    }
+    if (classOneOf.length > 0) {
+      schema.oneOf = classOneOf.map(ref =>
+        ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref }
+      );
+    }
 
     try {
       let result;
@@ -226,7 +257,7 @@ function StudioLayoutContent({
           selectedVersionId,
           className,
           classDescription || null,
-          defaultSchema
+          schema
         );
       } else if (selectedClass) {
         // Update existing class
@@ -234,7 +265,7 @@ function StudioLayoutContent({
           selectedClass.id,
           className,
           classDescription || null,
-          defaultSchema
+          schema
         );
       }
 
@@ -622,7 +653,127 @@ function StudioLayoutContent({
             rows={3}
             value={classDescription}
             onChange={(e) => setClassDescription(e.target.value)}
+            sx={{ mb: 3 }}
           />
+
+          {/* Composition Keywords Section */}
+          <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>
+            Schema Composition (JSON Schema)
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+            Extend or combine this class with other classes using JSON Schema composition keywords
+          </Typography>
+
+          {/* allOf - Inheritance/Extension */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
+              allOf (Inheritance)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              This class must satisfy ALL of the referenced schemas (AND logic)
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Enter class name or $ref (e.g., BaseClass or #/components/schemas/BaseClass)"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value && !classAllOf.includes(value)) {
+                    setClassAllOf([...classAllOf, value]);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }
+              }}
+            />
+            {classAllOf.length > 0 && (
+              <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {classAllOf.map((ref, index) => (
+                  <Chip
+                    key={index}
+                    label={ref}
+                    size="small"
+                    onDelete={() => setClassAllOf(classAllOf.filter((_, i) => i !== index))}
+                    sx={{ bgcolor: '#dbeafe' }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* anyOf - Alternatives */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
+              anyOf (Alternatives)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              This class must satisfy AT LEAST ONE of the referenced schemas (OR logic)
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Enter class name or $ref"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value && !classAnyOf.includes(value)) {
+                    setClassAnyOf([...classAnyOf, value]);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }
+              }}
+            />
+            {classAnyOf.length > 0 && (
+              <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {classAnyOf.map((ref, index) => (
+                  <Chip
+                    key={index}
+                    label={ref}
+                    size="small"
+                    onDelete={() => setClassAnyOf(classAnyOf.filter((_, i) => i !== index))}
+                    sx={{ bgcolor: '#fef3c7' }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+
+          {/* oneOf - Exclusive Alternatives */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>
+              oneOf (Exclusive)
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              This class must satisfy EXACTLY ONE of the referenced schemas (XOR logic)
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Enter class name or $ref"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  const value = (e.target as HTMLInputElement).value.trim();
+                  if (value && !classOneOf.includes(value)) {
+                    setClassOneOf([...classOneOf, value]);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }
+              }}
+            />
+            {classOneOf.length > 0 && (
+              <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {classOneOf.map((ref, index) => (
+                  <Chip
+                    key={index}
+                    label={ref}
+                    size="small"
+                    onDelete={() => setClassOneOf(classOneOf.filter((_, i) => i !== index))}
+                    sx={{ bgcolor: '#fce7f3' }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setClassDialogOpen(false)}>Cancel</Button>
