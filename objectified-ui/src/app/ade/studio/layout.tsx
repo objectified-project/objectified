@@ -106,12 +106,15 @@ function StudioLayoutContent({
       try {
         const result = await getClassesForVersion(selectedVersionId);
         const data = JSON.parse(result);
+        console.log('Loaded classes from database:', data);
         // Transform database format to ClassItem format
         const transformedClasses: ClassItem[] = data.map((cls: any) => ({
           id: cls.id,
           name: cls.name,
           description: cls.description,
+          schema: cls.schema, // Include schema field
         }));
+        console.log('Transformed classes:', transformedClasses);
         setClasses(transformedClasses);
       } catch (error) {
         console.error('Error loading classes:', error);
@@ -192,9 +195,34 @@ function StudioLayoutContent({
 
     // Load composition arrays from schema if they exist
     const schema = typeof classItem.schema === 'string' ? JSON.parse(classItem.schema) : classItem.schema;
-    setClassAllOf(schema?.allOf?.map((s: any) => s.$ref || JSON.stringify(s)) || []);
-    setClassAnyOf(schema?.anyOf?.map((s: any) => s.$ref || JSON.stringify(s)) || []);
-    setClassOneOf(schema?.oneOf?.map((s: any) => s.$ref || JSON.stringify(s)) || []);
+
+    console.log('Loading class for edit:', classItem.name);
+    console.log('Schema:', schema);
+    console.log('allOf from schema:', schema?.allOf);
+    console.log('anyOf from schema:', schema?.anyOf);
+    console.log('oneOf from schema:', schema?.oneOf);
+
+    // Helper to extract class name from $ref or return as-is
+    const extractClassName = (s: any) => {
+      if (s.$ref) {
+        // Extract class name from $ref path (e.g., "#/components/schemas/ClassName" -> "ClassName")
+        const parts = s.$ref.split('/');
+        return parts[parts.length - 1];
+      }
+      return JSON.stringify(s);
+    };
+
+    const allOfValues = schema?.allOf?.map(extractClassName) || [];
+    const anyOfValues = schema?.anyOf?.map(extractClassName) || [];
+    const oneOfValues = schema?.oneOf?.map(extractClassName) || [];
+
+    console.log('Extracted allOf values:', allOfValues);
+    console.log('Extracted anyOf values:', anyOfValues);
+    console.log('Extracted oneOf values:', oneOfValues);
+
+    setClassAllOf(allOfValues);
+    setClassAnyOf(anyOfValues);
+    setClassOneOf(oneOfValues);
 
     setClassError('');
     setClassDialogOpen(true);
@@ -234,19 +262,26 @@ function StudioLayoutContent({
 
     // Add composition arrays if they have values
     if (classAllOf.length > 0) {
-      schema.allOf = classAllOf.map(ref =>
-        ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref }
-      );
+      schema.allOf = classAllOf.map(ref => {
+        if (ref.startsWith('{')) return JSON.parse(ref);
+        // Add full $ref path format if just class name provided
+        const refPath = ref.startsWith('#') ? ref : `#/components/schemas/${ref}`;
+        return { $ref: refPath };
+      });
     }
     if (classAnyOf.length > 0) {
-      schema.anyOf = classAnyOf.map(ref =>
-        ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref }
-      );
+      schema.anyOf = classAnyOf.map(ref => {
+        if (ref.startsWith('{')) return JSON.parse(ref);
+        const refPath = ref.startsWith('#') ? ref : `#/components/schemas/${ref}`;
+        return { $ref: refPath };
+      });
     }
     if (classOneOf.length > 0) {
-      schema.oneOf = classOneOf.map(ref =>
-        ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref }
-      );
+      schema.oneOf = classOneOf.map(ref => {
+        if (ref.startsWith('{')) return JSON.parse(ref);
+        const refPath = ref.startsWith('#') ? ref : `#/components/schemas/${ref}`;
+        return { $ref: refPath };
+      });
     }
 
     try {
@@ -672,20 +707,28 @@ function StudioLayoutContent({
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               This class must satisfy ALL of the referenced schemas (AND logic)
             </Typography>
-            <TextField
-              size="small"
-              fullWidth
-              placeholder="Enter class name or $ref (e.g., BaseClass or #/components/schemas/BaseClass)"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  const value = (e.target as HTMLInputElement).value.trim();
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              <TextField
+                select
+                size="small"
+                fullWidth
+                value=""
+                onChange={(e) => {
+                  const value = e.target.value;
                   if (value && !classAllOf.includes(value)) {
                     setClassAllOf([...classAllOf, value]);
-                    (e.target as HTMLInputElement).value = '';
                   }
-                }
-              }}
-            />
+                }}
+                SelectProps={{ native: true }}
+              >
+                <option value="">Select a class...</option>
+                {classes.filter(c => c.name !== className).map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))}
+              </TextField>
+            </Box>
             {classAllOf.length > 0 && (
               <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {classAllOf.map((ref, index) => (
@@ -694,7 +737,16 @@ function StudioLayoutContent({
                     label={ref}
                     size="small"
                     onDelete={() => setClassAllOf(classAllOf.filter((_, i) => i !== index))}
-                    sx={{ bgcolor: '#dbeafe' }}
+                    sx={{
+                      bgcolor: 'primary.light',
+                      color: 'primary.contrastText',
+                      '& .MuiChip-deleteIcon': {
+                        color: 'primary.contrastText',
+                        '&:hover': {
+                          color: 'primary.dark'
+                        }
+                      }
+                    }}
                   />
                 ))}
               </Box>
@@ -709,20 +761,28 @@ function StudioLayoutContent({
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               This class must satisfy AT LEAST ONE of the referenced schemas (OR logic)
             </Typography>
-            <TextField
-              size="small"
-              fullWidth
-              placeholder="Enter class name or $ref"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  const value = (e.target as HTMLInputElement).value.trim();
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              <TextField
+                select
+                size="small"
+                fullWidth
+                value=""
+                onChange={(e) => {
+                  const value = e.target.value;
                   if (value && !classAnyOf.includes(value)) {
                     setClassAnyOf([...classAnyOf, value]);
-                    (e.target as HTMLInputElement).value = '';
                   }
-                }
-              }}
-            />
+                }}
+                SelectProps={{ native: true }}
+              >
+                <option value="">Select a class...</option>
+                {classes.filter(c => c.name !== className).map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))}
+              </TextField>
+            </Box>
             {classAnyOf.length > 0 && (
               <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {classAnyOf.map((ref, index) => (
@@ -731,7 +791,16 @@ function StudioLayoutContent({
                     label={ref}
                     size="small"
                     onDelete={() => setClassAnyOf(classAnyOf.filter((_, i) => i !== index))}
-                    sx={{ bgcolor: '#fef3c7' }}
+                    sx={{
+                      bgcolor: 'warning.light',
+                      color: 'warning.contrastText',
+                      '& .MuiChip-deleteIcon': {
+                        color: 'warning.contrastText',
+                        '&:hover': {
+                          color: 'warning.dark'
+                        }
+                      }
+                    }}
                   />
                 ))}
               </Box>
@@ -746,20 +815,28 @@ function StudioLayoutContent({
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               This class must satisfy EXACTLY ONE of the referenced schemas (XOR logic)
             </Typography>
-            <TextField
-              size="small"
-              fullWidth
-              placeholder="Enter class name or $ref"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  const value = (e.target as HTMLInputElement).value.trim();
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              <TextField
+                select
+                size="small"
+                fullWidth
+                value=""
+                onChange={(e) => {
+                  const value = e.target.value;
                   if (value && !classOneOf.includes(value)) {
                     setClassOneOf([...classOneOf, value]);
-                    (e.target as HTMLInputElement).value = '';
                   }
-                }
-              }}
-            />
+                }}
+                SelectProps={{ native: true }}
+              >
+                <option value="">Select a class...</option>
+                {classes.filter(c => c.name !== className).map((cls) => (
+                  <option key={cls.id} value={cls.name}>
+                    {cls.name}
+                  </option>
+                ))}
+              </TextField>
+            </Box>
             {classOneOf.length > 0 && (
               <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {classOneOf.map((ref, index) => (
@@ -768,7 +845,16 @@ function StudioLayoutContent({
                     label={ref}
                     size="small"
                     onDelete={() => setClassOneOf(classOneOf.filter((_, i) => i !== index))}
-                    sx={{ bgcolor: '#fce7f3' }}
+                    sx={{
+                      bgcolor: 'secondary.light',
+                      color: 'secondary.contrastText',
+                      '& .MuiChip-deleteIcon': {
+                        color: 'secondary.contrastText',
+                        '&:hover': {
+                          color: 'secondary.dark'
+                        }
+                      }
+                    }}
                   />
                 ))}
               </Box>

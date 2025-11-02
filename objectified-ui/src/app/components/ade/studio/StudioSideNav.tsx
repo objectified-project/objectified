@@ -21,6 +21,7 @@ export interface ClassItem {
   id: string;
   name: string;
   description?: string;
+  schema?: any; // JSON Schema object stored in database
 }
 
 export interface PropertyItem {
