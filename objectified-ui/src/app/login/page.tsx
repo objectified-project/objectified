@@ -43,7 +43,7 @@ const Login = () => {
     } else {
       signIn('credentials', {
         payload: JSON.stringify(payload),
-        callbackUrl: '/ade',
+        callbackUrl: '/ade/studio',
         redirect: true,
       }).finally(() => setSignInEnabled(true));
     }

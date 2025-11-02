@@ -10,7 +10,6 @@ import { usePathname } from 'next/navigation';
 type NavItem = { label: string; href: string };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Home", href: "/ade" },
   { label: "Dashboard", href: "/ade/dashboard" },
   { label: "Studio", href: "/ade/studio" },
 ];
@@ -68,6 +67,8 @@ const TopHeader = () => {
         gap: 12,
         padding: "8px 12px",
         height: 48,
+        position: "relative",
+        zIndex: 2000,
       }}
     >
       {/* Left: Logo */}
@@ -155,7 +156,7 @@ const TopHeader = () => {
               minWidth: 160,
               borderRadius: 8,
               padding: 4,
-              zIndex: 50,
+              zIndex: 2001,
             }}
           >
             <Link href="/ade/dashboard/profile" role="menuitem" className="block px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300" style={{ textDecoration: "none" }} onClick={() => setOpen(false)}>
