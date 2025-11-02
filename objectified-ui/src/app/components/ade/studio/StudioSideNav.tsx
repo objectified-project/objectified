@@ -41,8 +41,6 @@ export interface PropertyItem {
   enum?: string[];
   default?: any;
   required?: boolean;
-  readOnly?: boolean;
-  writeOnly?: boolean;
 }
 
 export interface StudioSideNavCallbacks {
@@ -318,56 +316,108 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       : 'No properties match your search.'}
                   </Typography>
                 ) : (
-                  <List dense>
+                  <Box>
                     {filteredProperties.map((propertyItem) => (
-                      <ListItem
+                      <Box
                         key={propertyItem.id}
-                        disablePadding
-                        secondaryAction={
-                          <Box>
-                            <IconButton
-                              edge="end"
-                              size="small"
-                              disabled={!selectedProjectId}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                callbacks.onPropertyEdit?.(propertyItem);
-                              }}
-                              title={!selectedProjectId ? 'Select a project first' : 'Edit property'}
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              edge="end"
-                              size="small"
-                              disabled={!selectedProjectId}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                callbacks.onPropertyDelete?.(propertyItem.id);
-                              }}
-                              title={!selectedProjectId ? 'Select a project first' : 'Delete property'}
-                            >
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        }
+                        draggable={true}
+                        onDragStart={(e) => {
+                          // Set the property data as the drag payload
+                          e.dataTransfer.effectAllowed = 'copy';
+                          e.dataTransfer.setData('application/json', JSON.stringify({
+                            type: 'property',
+                            property: propertyItem
+                          }));
+                        }}
+                        onClick={() => handlePropertySelect(propertyItem)}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 2,
+                          py: 1.5,
+                          mb: 0.5,
+                          cursor: 'grab',
+                          backgroundColor: selectedPropertyId === propertyItem.id
+                            ? 'action.selected'
+                            : 'transparent',
+                          borderRadius: 1,
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            backgroundColor: selectedPropertyId === propertyItem.id
+                              ? 'action.selected'
+                              : 'action.hover',
+                          },
+                          '&:active': {
+                            cursor: 'grabbing',
+                          },
+                          border: '1px solid',
+                          borderColor: 'divider',
+                        }}
                       >
-                        <ListItemButton
-                          selected={selectedPropertyId === propertyItem.id}
-                          onClick={() => handlePropertySelect(propertyItem)}
-                        >
-                          <ListItemText
-                            primary={propertyItem.name}
-                            secondary={propertyItem.type || propertyItem.description}
-                            slotProps={{
-                              primary: { noWrap: true },
-                              secondary: { noWrap: true },
+                        {/* Property content */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 500,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
                             }}
-                          />
-                        </ListItemButton>
-                      </ListItem>
+                          >
+                            {propertyItem.name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'block',
+                            }}
+                          >
+                            {propertyItem.type || propertyItem.description}
+                          </Typography>
+                        </Box>
+
+                        {/* Action buttons */}
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <IconButton
+                            size="small"
+                            disabled={!selectedProjectId}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              callbacks.onPropertyEdit?.(propertyItem);
+                            }}
+                            title={!selectedProjectId ? 'Select a project first' : 'Edit property'}
+                            sx={{
+                              opacity: 0.7,
+                              '&:hover': { opacity: 1 }
+                            }}
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            disabled={!selectedProjectId}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              callbacks.onPropertyDelete?.(propertyItem.id);
+                            }}
+                            title={!selectedProjectId ? 'Select a project first' : 'Delete property'}
+                            sx={{
+                              opacity: 0.7,
+                              '&:hover': { opacity: 1 }
+                            }}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
                     ))}
-                  </List>
+                  </Box>
                 )}
               </Box>
 

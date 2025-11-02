@@ -3,7 +3,18 @@
 import "../../globals.css";
 import * as React from 'react';
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { StudioProvider, useStudio } from './StudioContext';
+
+// Dynamically import Monaco Editor with SSR disabled
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => (
+    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ color: '#666' }}>Loading editor...</div>
+    </div>
+  ),
+});
 import StudioSideNav, {
   ClassItem,
   PropertyItem,
@@ -29,6 +40,7 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
+import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -120,9 +132,11 @@ function StudioLayoutContent({
   // Dialog state for properties
   const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
   const [propertyDialogMode, setPropertyDialogMode] = useState<'add' | 'edit'>('add');
+  const [propertyViewMode, setPropertyViewMode] = useState<'form' | 'json'>('form');
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
   const [propertyName, setPropertyName] = useState('');
   const [propertyType, setPropertyType] = useState('string');
+  const [propertyIsArray, setPropertyIsArray] = useState(false);
   const [propertyRef, setPropertyRef] = useState('');
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyDescription, setPropertyDescription] = useState('');
@@ -139,8 +153,6 @@ function StudioLayoutContent({
   const [propertyEnumError, setPropertyEnumError] = useState('');
   const [propertyDefault, setPropertyDefault] = useState('');
   const [propertyRequired, setPropertyRequired] = useState(false);
-  const [propertyReadOnly, setPropertyReadOnly] = useState(false);
-  const [propertyWriteOnly, setPropertyWriteOnly] = useState(false);
   const [propertyError, setPropertyError] = useState('');
 
   // Delete confirmation dialog
@@ -248,8 +260,10 @@ function StudioLayoutContent({
       return;
     }
     setPropertyDialogMode('add');
+    setPropertyViewMode('form');
     setPropertyName('');
     setPropertyType('string');
+    setPropertyIsArray(false);
     setPropertyRef('');
     setPropertyTitle('');
     setPropertyDescription('');
@@ -266,8 +280,6 @@ function StudioLayoutContent({
     setPropertyEnumError('');
     setPropertyDefault('');
     setPropertyRequired(false);
-    setPropertyReadOnly(false);
-    setPropertyWriteOnly(false);
     setPropertyError('');
     setSelectedProperty(null);
     setPropertyDialogOpen(true);
@@ -279,13 +291,30 @@ function StudioLayoutContent({
       return;
     }
     setPropertyDialogMode('edit');
+    setPropertyViewMode('form');
     setSelectedProperty(propertyItem);
     setPropertyName(propertyItem.name);
 
+    // Check if property is an array type (has type: "array" and items field)
+    // Note: This assumes the property data structure stores items as a sub-object
+    const isArray = propertyItem.type === 'array';
+    setPropertyIsArray(isArray);
+
     // If property has $ref, set type to '$ref', otherwise use the type field
+    // If it's an array, we need to look at items.type or items.$ref
     if (propertyItem.$ref) {
       setPropertyType('$ref');
       setPropertyRef(propertyItem.$ref);
+    } else if (isArray && (propertyItem as any).items) {
+      // For array types, extract the items type
+      const items = (propertyItem as any).items;
+      if (items.$ref) {
+        setPropertyType('$ref');
+        setPropertyRef(items.$ref);
+      } else {
+        setPropertyType(items.type || 'string');
+        setPropertyRef('');
+      }
     } else {
       setPropertyType(propertyItem.type || 'string');
       setPropertyRef('');
@@ -306,8 +335,6 @@ function StudioLayoutContent({
     setPropertyEnumError('');
     setPropertyDefault(propertyItem.default?.toString() || '');
     setPropertyRequired(propertyItem.required || false);
-    setPropertyReadOnly(propertyItem.readOnly || false);
-    setPropertyWriteOnly(propertyItem.writeOnly || false);
     setPropertyError('');
     setPropertyDialogOpen(true);
   };
@@ -324,6 +351,68 @@ function StudioLayoutContent({
   const handlePropertySelect = (propertyItem: PropertyItem) => {
     console.log('Property selected:', propertyItem);
     // Handle property selection
+  };
+
+  // Helper function to build JSON Schema 2020-12 definition from current form state
+  const buildPropertyJsonSchema = () => {
+    const schema: any = {};
+
+    // Add title if provided
+    if (propertyTitle) {
+      schema.title = propertyTitle;
+    }
+
+    // Add description if provided
+    if (propertyDescription) {
+      schema.description = propertyDescription;
+    }
+
+    // Handle array checkbox - if checked, wrap the type in an items schema
+    if (propertyIsArray) {
+      schema.type = 'array';
+
+      // Array-specific validation
+      if (propertyMinItems) schema.minItems = parseInt(propertyMinItems);
+      if (propertyMaxItems) schema.maxItems = parseInt(propertyMaxItems);
+
+      // Build the items schema
+      const itemsSchema: any = {};
+
+      if (propertyType === '$ref') {
+        itemsSchema.$ref = propertyRef;
+      } else {
+        itemsSchema.type = propertyType;
+
+        // Add type-specific validations
+        if (propertyFormat) itemsSchema.format = propertyFormat;
+        if (propertyPattern) itemsSchema.pattern = propertyPattern;
+        if (propertyMinLength) itemsSchema.minLength = parseInt(propertyMinLength);
+        if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
+        if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
+        if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
+        if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
+        if (propertyDefault) itemsSchema.default = propertyDefault;
+      }
+
+      schema.items = itemsSchema;
+    } else {
+      // Not an array - direct type/validation
+      if (propertyType === '$ref') {
+        schema.$ref = propertyRef;
+      } else {
+        schema.type = propertyType;
+        if (propertyFormat) schema.format = propertyFormat;
+        if (propertyPattern) schema.pattern = propertyPattern;
+        if (propertyMinLength) schema.minLength = parseInt(propertyMinLength);
+        if (propertyMaxLength) schema.maxLength = parseInt(propertyMaxLength);
+        if (propertyMinimum) schema.minimum = parseFloat(propertyMinimum);
+        if (propertyMaximum) schema.maximum = parseFloat(propertyMaximum);
+        if (propertyEnum.length > 0) schema.enum = propertyEnum;
+        if (propertyDefault) schema.default = propertyDefault;
+      }
+    }
+
+    return schema;
   };
 
   const handlePropertyDialogSubmit = async () => {
@@ -346,8 +435,6 @@ function StudioLayoutContent({
     // Build the data object that will be stored in the JSONB column
     const dataObject: any = {
       required: propertyRequired,
-      readOnly: propertyReadOnly,
-      writeOnly: propertyWriteOnly,
     };
 
     // Add title to data object if provided
@@ -355,22 +442,49 @@ function StudioLayoutContent({
       dataObject.title = propertyTitle;
     }
 
-    // If type is $ref, use $ref field instead of type
-    if (propertyType === '$ref') {
-      dataObject.$ref = propertyRef;
-    } else {
-      // Otherwise use type and validation fields
-      dataObject.type = propertyType;
-      if (propertyFormat) dataObject.format = propertyFormat;
-      if (propertyPattern) dataObject.pattern = propertyPattern;
-      if (propertyMinLength) dataObject.minLength = parseInt(propertyMinLength);
-      if (propertyMaxLength) dataObject.maxLength = parseInt(propertyMaxLength);
-      if (propertyMinimum) dataObject.minimum = parseFloat(propertyMinimum);
-      if (propertyMaximum) dataObject.maximum = parseFloat(propertyMaximum);
+    // Handle array checkbox - if checked, wrap the type in an items schema
+    if (propertyIsArray) {
+      dataObject.type = 'array';
+
+      // Array-specific validation
       if (propertyMinItems) dataObject.minItems = parseInt(propertyMinItems);
       if (propertyMaxItems) dataObject.maxItems = parseInt(propertyMaxItems);
-      if (propertyEnum.length > 0) dataObject.enum = propertyEnum;
-      if (propertyDefault) dataObject.default = propertyDefault;
+
+      // Build the items schema based on the selected type
+      const itemsSchema: any = {};
+
+      if (propertyType === '$ref') {
+        itemsSchema.$ref = propertyRef;
+      } else {
+        itemsSchema.type = propertyType;
+
+        // Add type-specific validations to items schema
+        if (propertyFormat) itemsSchema.format = propertyFormat;
+        if (propertyPattern) itemsSchema.pattern = propertyPattern;
+        if (propertyMinLength) itemsSchema.minLength = parseInt(propertyMinLength);
+        if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
+        if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
+        if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
+        if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
+        if (propertyDefault) itemsSchema.default = propertyDefault;
+      }
+
+      dataObject.items = itemsSchema;
+    } else {
+      // Not an array - direct type/validation
+      if (propertyType === '$ref') {
+        dataObject.$ref = propertyRef;
+      } else {
+        dataObject.type = propertyType;
+        if (propertyFormat) dataObject.format = propertyFormat;
+        if (propertyPattern) dataObject.pattern = propertyPattern;
+        if (propertyMinLength) dataObject.minLength = parseInt(propertyMinLength);
+        if (propertyMaxLength) dataObject.maxLength = parseInt(propertyMaxLength);
+        if (propertyMinimum) dataObject.minimum = parseFloat(propertyMinimum);
+        if (propertyMaximum) dataObject.maximum = parseFloat(propertyMaximum);
+        if (propertyEnum.length > 0) dataObject.enum = propertyEnum;
+        if (propertyDefault) dataObject.default = propertyDefault;
+      }
     }
 
     try {
@@ -534,7 +648,27 @@ function StudioLayoutContent({
         }}
       >
         <DialogTitle>
-          {propertyDialogMode === 'add' ? 'Add Property' : 'Edit Property'}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{propertyDialogMode === 'add' ? 'Add Property' : 'Edit Property'}</span>
+            <Box sx={{ display: 'flex', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+              <Button
+                size="small"
+                variant={propertyViewMode === 'form' ? 'contained' : 'text'}
+                onClick={() => setPropertyViewMode('form')}
+                sx={{ borderRadius: 0, minWidth: 'auto', px: 2 }}
+              >
+                Form
+              </Button>
+              <Button
+                size="small"
+                variant={propertyViewMode === 'json' ? 'contained' : 'text'}
+                onClick={() => setPropertyViewMode('json')}
+                sx={{ borderRadius: 0, minWidth: 'auto', px: 2 }}
+              >
+                JSON
+              </Button>
+            </Box>
+          </Box>
         </DialogTitle>
         <DialogContent
           sx={{
@@ -549,8 +683,10 @@ function StudioLayoutContent({
             </Alert>
           )}
 
-          {/* Basic Information */}
-          <TextField
+          {propertyViewMode === 'form' ? (
+            <>
+              {/* Basic Information */}
+              <TextField
             autoFocus
             margin="dense"
             label="Property Name"
@@ -574,36 +710,50 @@ function StudioLayoutContent({
             sx={{ mb: 2 }}
           />
 
-          {/* Type Selector - includes $ref as an option */}
-          <TextField
-            select
-            margin="dense"
-            label="Type"
-            fullWidth
-            required
-            value={propertyType}
-            onChange={(e) => {
-              const newType = e.target.value;
-              setPropertyType(newType);
-              // Clear $ref when switching away from $ref type
-              if (newType !== '$ref') {
-                setPropertyRef('');
+          {/* Type Selector with Array Checkbox - inline layout */}
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', mb: 2 }}>
+            {/* Array Checkbox with dynamic label */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={propertyIsArray}
+                  onChange={(e) => setPropertyIsArray(e.target.checked)}
+                  disabled={propertyDialogMode === 'edit'}
+                />
               }
-            }}
-            SelectProps={{ native: true }}
-            disabled={propertyDialogMode === 'edit'}
-            helperText={propertyDialogMode === 'edit' ? 'Type cannot be changed after creation' : undefined}
-            sx={{ mb: 2 }}
-          >
-            <option value="string">string</option>
-            <option value="number">number</option>
-            <option value="integer">integer</option>
-            <option value="boolean">boolean</option>
-            <option value="object">object</option>
-            <option value="array">array</option>
-            <option value="null">null</option>
-            <option value="$ref">$ref (reference to class)</option>
-          </TextField>
+              label={'An array of ...'}
+              sx={{ mt: 1, whiteSpace: 'nowrap' }}
+            />
+
+            <TextField
+              select
+              margin="dense"
+              label="Type"
+              required
+              value={propertyType}
+              onChange={(e) => {
+                const newType = e.target.value;
+                setPropertyType(newType);
+                // Clear $ref when switching away from $ref type
+                if (newType !== '$ref') {
+                  setPropertyRef('');
+                }
+              }}
+              SelectProps={{ native: true }}
+              disabled={propertyDialogMode === 'edit'}
+              helperText={propertyDialogMode === 'edit' ? 'Type cannot be changed after creation' : undefined}
+              sx={{ flex: 1 }}
+            >
+              <option value="string">string</option>
+              <option value="number">number</option>
+              <option value="integer">integer</option>
+              <option value="boolean">boolean</option>
+              <option value="object">object</option>
+              <option value="null">null</option>
+              <option value="$ref">$ref (reference to class)</option>
+            </TextField>
+
+          </Box>
 
           {/* Schema Reference - only show when type is $ref */}
           {propertyType === '$ref' && (
@@ -645,6 +795,11 @@ function StudioLayoutContent({
           {/* String-specific fields */}
           {propertyType === 'string' && (
             <>
+              {propertyIsArray && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  These constraints apply to each string item in the array
+                </Typography>
+              )}
               <TextField
                 select
                 margin="dense"
@@ -717,7 +872,13 @@ function StudioLayoutContent({
 
           {/* Number/Integer-specific fields */}
           {(propertyType === 'number' || propertyType === 'integer') && (
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <>
+              {propertyIsArray && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  These constraints apply to each {propertyType} item in the array
+                </Typography>
+              )}
+              <div style={{ display: 'flex', gap: '16px' }}>
               <TextField
                 margin="dense"
                 label="Minimum"
@@ -738,10 +899,11 @@ function StudioLayoutContent({
                 sx={{ mb: 2 }}
               />
             </div>
+            </>
           )}
 
           {/* Array-specific fields */}
-          {propertyType === 'array' && (
+          {propertyIsArray && (
             <div style={{ display: 'flex', gap: '16px' }}>
               <TextField
                 margin="dense"
@@ -750,7 +912,7 @@ function StudioLayoutContent({
                 fullWidth
                 value={propertyMinItems}
                 onChange={(e) => setPropertyMinItems(e.target.value)}
-                helperText="Minimum number of items"
+                helperText="Minimum number of items in array"
                 sx={{ mb: 2 }}
               />
 
@@ -770,6 +932,11 @@ function StudioLayoutContent({
           {/* Enum values editor - only for string, number, and integer types */}
           {(propertyType === 'string' || propertyType === 'number' || propertyType === 'integer') && (
             <Box sx={{ mb: 2 }}>
+              {propertyIsArray && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  Enumeration applies to each item - each array element must be one of these values
+                </Typography>
+              )}
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                 <TextField
                   margin="dense"
@@ -891,8 +1058,8 @@ function StudioLayoutContent({
             </Box>
           )}
 
-          {/* Default value - applicable for string, number, integer, boolean, and array */}
-          {(propertyType === 'string' || propertyType === 'number' || propertyType === 'integer' || propertyType === 'boolean' || propertyType === 'array') && (
+          {/* Default value - applicable for string, number, integer, boolean */}
+          {!propertyIsArray && (propertyType === 'string' || propertyType === 'number' || propertyType === 'integer' || propertyType === 'boolean') && (
             <TextField
               margin="dense"
               label="Default Value"
@@ -900,12 +1067,20 @@ function StudioLayoutContent({
               fullWidth
               value={propertyDefault}
               onChange={(e) => setPropertyDefault(e.target.value)}
+              helperText="Default value for this property"
               sx={{ mb: 2 }}
             />
           )}
 
+          {/* Note about default values for arrays */}
+          {propertyIsArray && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              Note: Default values for arrays are not currently supported in this interface
+            </Typography>
+          )}
+
           {/* Boolean flags */}
-          <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
+          <Box sx={{ mt: 2 }}>
             <FormControlLabel
               control={
                 <Checkbox
@@ -913,29 +1088,64 @@ function StudioLayoutContent({
                   onChange={(e) => setPropertyRequired(e.target.checked)}
                 />
               }
-              label="Required"
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={propertyReadOnly}
-                  onChange={(e) => setPropertyReadOnly(e.target.checked)}
-                />
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <span>Required</span>
+                  <Typography variant="caption" color="text.secondary">
+                    - Must be present in the object
+                  </Typography>
+                </Box>
               }
-              label="Read Only"
             />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={propertyWriteOnly}
-                  onChange={(e) => setPropertyWriteOnly(e.target.checked)}
+          </Box>
+            </>
+          ) : (
+            /* JSON View */
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                JSON Schema 2020-12 Definition
+              </Typography>
+              <Box
+                sx={{
+                  flex: 1,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  minHeight: '300px',
+                }}
+              >
+                <Editor
+                  height="100%"
+                  defaultLanguage="json"
+                  value={JSON.stringify(buildPropertyJsonSchema(), null, 2)}
+                  theme="vs-light"
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    renderWhitespace: 'none',
+                    automaticLayout: true,
+                    wordWrap: 'on',
+                    folding: true,
+                    contextmenu: false,
+                    selectOnLineNumbers: true,
+                    roundedSelection: false,
+                    cursorStyle: 'line',
+                    scrollbar: {
+                      vertical: 'auto',
+                      horizontal: 'auto',
+                    },
+                  }}
                 />
-              }
-              label="Write Only"
-            />
-          </div>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5 }}>
+                This is the JSON Schema representation of your property definition. Switch back to Form view to make changes.
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPropertyDialogOpen(false)}>Cancel</Button>
