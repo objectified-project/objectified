@@ -37,8 +37,12 @@ export interface PropertyItem {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
+  exclusiveMinimum?: boolean;
+  exclusiveMaximum?: boolean;
+  multipleOf?: number;
   minItems?: number;
   maxItems?: number;
+  uniqueItems?: boolean;
   enum?: string[];
   default?: any;
   required?: boolean;

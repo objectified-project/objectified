@@ -157,8 +157,12 @@ function StudioLayoutContent({
   const [propertyMaxLength, setPropertyMaxLength] = useState('');
   const [propertyMinimum, setPropertyMinimum] = useState('');
   const [propertyMaximum, setPropertyMaximum] = useState('');
+  const [propertyExclusiveMinimum, setPropertyExclusiveMinimum] = useState(false);
+  const [propertyExclusiveMaximum, setPropertyExclusiveMaximum] = useState(false);
+  const [propertyMultipleOf, setPropertyMultipleOf] = useState('');
   const [propertyMinItems, setPropertyMinItems] = useState('');
   const [propertyMaxItems, setPropertyMaxItems] = useState('');
+  const [propertyUniqueItems, setPropertyUniqueItems] = useState(false);
   const [propertyEnum, setPropertyEnum] = useState<string[]>([]);
   const [propertyEnumInput, setPropertyEnumInput] = useState('');
   const [propertyEnumError, setPropertyEnumError] = useState('');
@@ -398,8 +402,12 @@ function StudioLayoutContent({
     setPropertyMaxLength(propertyItem.maxLength?.toString() || '');
     setPropertyMinimum(propertyItem.minimum?.toString() || '');
     setPropertyMaximum(propertyItem.maximum?.toString() || '');
+    setPropertyExclusiveMinimum(propertyItem.exclusiveMinimum || false);
+    setPropertyExclusiveMaximum(propertyItem.exclusiveMaximum || false);
+    setPropertyMultipleOf(propertyItem.multipleOf?.toString() || '');
     setPropertyMinItems(propertyItem.minItems?.toString() || '');
     setPropertyMaxItems(propertyItem.maxItems?.toString() || '');
+    setPropertyUniqueItems(propertyItem.uniqueItems || false);
     setPropertyEnum(propertyItem.enum || []);
     setPropertyEnumInput('');
     setPropertyEnumError('');
@@ -444,6 +452,7 @@ function StudioLayoutContent({
       // Array-specific validation
       if (propertyMinItems) schema.minItems = parseInt(propertyMinItems);
       if (propertyMaxItems) schema.maxItems = parseInt(propertyMaxItems);
+      if (propertyUniqueItems) schema.uniqueItems = true;
 
       // Build the items schema
       const itemsSchema: any = {};
@@ -460,6 +469,9 @@ function StudioLayoutContent({
         if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
         if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
         if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
+        if (propertyExclusiveMinimum) itemsSchema.exclusiveMinimum = parseFloat(propertyMinimum);
+        if (propertyExclusiveMaximum) itemsSchema.exclusiveMaximum = parseFloat(propertyMaximum);
+        if (propertyMultipleOf) itemsSchema.multipleOf = parseFloat(propertyMultipleOf);
         if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
         if (propertyDefault) itemsSchema.default = propertyDefault;
       }
@@ -477,6 +489,9 @@ function StudioLayoutContent({
         if (propertyMaxLength) schema.maxLength = parseInt(propertyMaxLength);
         if (propertyMinimum) schema.minimum = parseFloat(propertyMinimum);
         if (propertyMaximum) schema.maximum = parseFloat(propertyMaximum);
+        if (propertyExclusiveMinimum) schema.exclusiveMinimum = parseFloat(propertyMinimum);
+        if (propertyExclusiveMaximum) schema.exclusiveMaximum = parseFloat(propertyMaximum);
+        if (propertyMultipleOf) schema.multipleOf = parseFloat(propertyMultipleOf);
         if (propertyEnum.length > 0) schema.enum = propertyEnum;
         if (propertyDefault) schema.default = propertyDefault;
       }
@@ -1143,34 +1158,81 @@ function StudioLayoutContent({
                 sx={{ mb: 2 }}
               />
             </div>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={propertyExclusiveMinimum}
+                    onChange={(e) => setPropertyExclusiveMinimum(e.target.checked)}
+                    disabled={!propertyMinimum}
+                  />
+                }
+                label="Exclusive Minimum"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={propertyExclusiveMaximum}
+                    onChange={(e) => setPropertyExclusiveMaximum(e.target.checked)}
+                    disabled={!propertyMaximum}
+                  />
+                }
+                label="Exclusive Maximum"
+              />
+            </div>
+
+            <TextField
+              margin="dense"
+              label="Multiple Of"
+              type="number"
+              fullWidth
+              value={propertyMultipleOf}
+              onChange={(e) => setPropertyMultipleOf(e.target.value)}
+              helperText="Value must be a multiple of this number"
+              sx={{ mb: 2 }}
+            />
             </>
           )}
 
           {/* Array-specific fields */}
           {propertyIsArray && (
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <TextField
-                margin="dense"
-                label="Min Items"
-                type="number"
-                fullWidth
-                value={propertyMinItems}
-                onChange={(e) => setPropertyMinItems(e.target.value)}
-                helperText="Minimum number of items in array"
-                sx={{ mb: 2 }}
-              />
+            <>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <TextField
+                  margin="dense"
+                  label="Min Items"
+                  type="number"
+                  fullWidth
+                  value={propertyMinItems}
+                  onChange={(e) => setPropertyMinItems(e.target.value)}
+                  helperText="Minimum number of items in array"
+                  sx={{ mb: 2 }}
+                />
 
-              <TextField
-                margin="dense"
-                label="Max Items"
-                type="number"
-                fullWidth
-                value={propertyMaxItems}
-                onChange={(e) => setPropertyMaxItems(e.target.value)}
-                helperText="Maximum number of items"
+                <TextField
+                  margin="dense"
+                  label="Max Items"
+                  type="number"
+                  fullWidth
+                  value={propertyMaxItems}
+                  onChange={(e) => setPropertyMaxItems(e.target.value)}
+                  helperText="Maximum number of items"
+                  sx={{ mb: 2 }}
+                />
+              </div>
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={propertyUniqueItems}
+                    onChange={(e) => setPropertyUniqueItems(e.target.checked)}
+                  />
+                }
+                label="Unique Items (all array elements must be distinct)"
                 sx={{ mb: 2 }}
               />
-            </div>
+            </>
           )}
 
           {/* Enum values editor - only for string, number, and integer types */}
