@@ -15,6 +15,7 @@ type ClassNodeData = {
   description?: string;
   properties?: ClassProperty[];
   onPropertyDrop?: (classId: string, propertyData: any) => void;
+  onPropertyEdit?: (classId: string, classProperty: ClassProperty) => void;
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
 };
 
@@ -161,41 +162,76 @@ function ClassNode({ data, selected }: NodeProps) {
                     </div>
                   )}
                 </div>
-                {typedData.onPropertyDelete && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Remove "${prop.name}" from this class?`)) {
-                        typedData.onPropertyDelete!(typedData.id, prop.id);
-                      }
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '4px',
-                      color: '#6b7280',
-                      fontSize: '14px',
-                      lineHeight: 1,
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#fee2e2';
-                      e.currentTarget.style.color = '#dc2626';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = '#6b7280';
-                    }}
-                    title="Remove property from class"
-                  >
-                    ×
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: '2px' }}>
+                  {typedData.onPropertyEdit && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        typedData.onPropertyEdit!(typedData.id, prop);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        color: '#6b7280',
+                        fontSize: '12px',
+                        lineHeight: 1,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#dbeafe';
+                        e.currentTarget.style.color = '#2563eb';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#6b7280';
+                      }}
+                      title="Edit property in class"
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {typedData.onPropertyDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Remove "${prop.name}" from this class?`)) {
+                          typedData.onPropertyDelete!(typedData.id, prop.id);
+                        }
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        color: '#6b7280',
+                        fontSize: '14px',
+                        lineHeight: 1,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#fee2e2';
+                        e.currentTarget.style.color = '#dc2626';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = '#6b7280';
+                      }}
+                      title="Remove property from class"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
