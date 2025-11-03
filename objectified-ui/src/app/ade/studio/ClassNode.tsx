@@ -355,52 +355,41 @@ function ClassNode({ data, selected }: NodeProps) {
         )}
       </div>
 
-      {/* Bottom handles for composition relationships (allOf/anyOf/oneOf) */}
+      {/* Bottom handle for composition relationships (allOf/anyOf/oneOf) - single unified handle */}
       {typedData.schema && (() => {
         const schema = typeof typedData.schema === 'string' ? JSON.parse(typedData.schema) : typedData.schema;
-        const compositions: Array<{ type: string; index: number; ref: string }> = [];
+        const hasComposition =
+          (schema.allOf && Array.isArray(schema.allOf) && schema.allOf.some((item: any) => item.$ref)) ||
+          (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((item: any) => item.$ref)) ||
+          (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((item: any) => item.$ref));
 
-        // Collect all composition types
-        if (schema.allOf && Array.isArray(schema.allOf)) {
-          schema.allOf.forEach((item: any, index: number) => {
-            if (item.$ref) {
-              compositions.push({ type: 'allOf', index, ref: item.$ref });
-            }
-          });
-        }
-        if (schema.anyOf && Array.isArray(schema.anyOf)) {
-          schema.anyOf.forEach((item: any, index: number) => {
-            if (item.$ref) {
-              compositions.push({ type: 'anyOf', index, ref: item.$ref });
-            }
-          });
-        }
-        if (schema.oneOf && Array.isArray(schema.oneOf)) {
-          schema.oneOf.forEach((item: any, index: number) => {
-            if (item.$ref) {
-              compositions.push({ type: 'oneOf', index, ref: item.$ref });
-            }
-          });
-        }
+        // Determine the dominant composition type for handle color
+        let handleColor = '#6b7280'; // default gray
+        if (schema.allOf && schema.allOf.length > 0) handleColor = '#2563eb'; // blue for allOf
+        else if (schema.anyOf && schema.anyOf.length > 0) handleColor = '#ea580c'; // orange for anyOf
+        else if (schema.oneOf && schema.oneOf.length > 0) handleColor = '#9333ea'; // purple for oneOf
 
-        // Create handles for each composition
-        return compositions.map((comp, i) => (
+        // Create single unified handle for all compositions
+        return hasComposition ? (
           <Handle
-            key={`${comp.type}-${comp.index}`}
+            key="comp-bottom"
             type="source"
             position={Position.Bottom}
-            id={`comp-${comp.type}-${comp.index}`}
+            id="comp-bottom"
             style={{
-              left: `${30 + (i * 15)}%`,
-              background: comp.type === 'allOf' ? '#2563eb' : comp.type === 'anyOf' ? '#ea580c' : '#9333ea',
-              width: '10px',
-              height: '10px',
-              border: '2px solid white',
-              borderRadius: '50%'
+              left: '50%',
+              bottom: '-6px',
+              transform: 'translateX(-50%)',
+              background: handleColor,
+              width: '12px',
+              height: '12px',
+              border: '3px solid white',
+              borderRadius: '50%',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
             isConnectable={false}
           />
-        ));
+        ) : null;
       })()}
     </div>
   );

@@ -519,7 +519,7 @@ const StudioContent = () => {
       const schema = typeof cls.schema === 'string' ? JSON.parse(cls.schema) : cls.schema;
       if (!schema) return;
 
-      // allOf - Inheritance (solid line, blue)
+      // allOf - Inheritance (solid line, blue) with multiplicity indicator
       if (schema.allOf && Array.isArray(schema.allOf)) {
         schema.allOf.forEach((item: any, index: number) => {
           if (item.$ref) {
@@ -528,9 +528,9 @@ const StudioContent = () => {
               edges.push({
                 id: `allOf-${cls.id}-${refClassName}-${index}`,
                 source: cls.id,
-                sourceHandle: `comp-allOf-${index}`, // Use specific bottom handle
+                sourceHandle: 'comp-bottom', // Use single composition handle
                 target: classNameToId.get(refClassName)!,
-                type: 'step',
+                type: 'smoothstep',
                 animated: false,
                 label: 'allOf',
                 style: {
@@ -552,7 +552,9 @@ const StudioContent = () => {
                 labelBgStyle: {
                   fill: 'white',
                   fillOpacity: 0.95
-                }
+                },
+                // Add Z-index to layer multiple edges
+                zIndex: 10 + index
               });
             }
           }
@@ -568,9 +570,9 @@ const StudioContent = () => {
               edges.push({
                 id: `anyOf-${cls.id}-${refClassName}-${index}`,
                 source: cls.id,
-                sourceHandle: `comp-anyOf-${index}`, // Use specific bottom handle
+                sourceHandle: 'comp-bottom', // Use single composition handle
                 target: classNameToId.get(refClassName)!,
-                type: 'step',
+                type: 'smoothstep',
                 animated: false,
                 label: 'anyOf',
                 style: {
@@ -592,7 +594,8 @@ const StudioContent = () => {
                 labelBgStyle: {
                   fill: 'white',
                   fillOpacity: 0.95
-                }
+                },
+                zIndex: 10 + index
               });
             }
           }
@@ -608,9 +611,9 @@ const StudioContent = () => {
               edges.push({
                 id: `oneOf-${cls.id}-${refClassName}-${index}`,
                 source: cls.id,
-                sourceHandle: `comp-oneOf-${index}`, // Use specific bottom handle
+                sourceHandle: 'comp-bottom', // Use single composition handle
                 target: classNameToId.get(refClassName)!,
-                type: 'step',
+                type: 'smoothstep',
                 animated: false,
                 label: 'oneOf',
                 style: {
