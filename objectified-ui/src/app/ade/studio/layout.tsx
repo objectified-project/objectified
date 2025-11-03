@@ -41,6 +41,8 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
@@ -140,6 +142,7 @@ function StudioLayoutContent({
   const [classOneOf, setClassOneOf] = useState<string[]>([]);
   const [classDiscriminatorProperty, setClassDiscriminatorProperty] = useState('');
   const [classDiscriminatorUseAuto, setClassDiscriminatorUseAuto] = useState(true);
+  const [classAdditionalProperties, setClassAdditionalProperties] = useState<boolean | null>(null);
   const [classError, setClassError] = useState('');
 
   // Dialog state for properties
@@ -190,6 +193,7 @@ function StudioLayoutContent({
     setClassOneOf([]);
     setClassDiscriminatorProperty('');
     setClassDiscriminatorUseAuto(true);
+    setClassAdditionalProperties(null);
     setClassError('');
     setSelectedClass(null);
     setClassDialogOpen(true);
@@ -244,6 +248,13 @@ function StudioLayoutContent({
     } else {
       setClassDiscriminatorProperty('');
       setClassDiscriminatorUseAuto(true);
+    }
+
+    // Load additionalProperties if it exists
+    if (schema?.additionalProperties !== undefined) {
+      setClassAdditionalProperties(schema.additionalProperties);
+    } else {
+      setClassAdditionalProperties(null);
     }
 
     setClassError('');
@@ -329,6 +340,11 @@ function StudioLayoutContent({
           }
         }
       }
+    }
+
+    // Add additionalProperties if set (null means not specified, use default behavior)
+    if (classAdditionalProperties !== null) {
+      schema.additionalProperties = classAdditionalProperties;
     }
 
     try {
@@ -1743,6 +1759,67 @@ function StudioLayoutContent({
               )}
             </Box>
           )}
+
+          {/* Additional Properties Section */}
+          <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              Additional Properties
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              Controls whether properties not explicitly defined in the schema are allowed.
+            </Typography>
+
+            <RadioGroup
+              value={classAdditionalProperties === null ? 'default' : classAdditionalProperties === true ? 'allow' : 'disallow'}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'default') {
+                  setClassAdditionalProperties(null);
+                } else if (value === 'allow') {
+                  setClassAdditionalProperties(true);
+                } else if (value === 'disallow') {
+                  setClassAdditionalProperties(false);
+                }
+              }}
+            >
+              <FormControlLabel
+                value="default"
+                control={<Radio />}
+                label={
+                  <Box>
+                    <Typography variant="body2">Not specified (default behavior)</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Use JSON Schema default - typically allows additional properties
+                    </Typography>
+                  </Box>
+                }
+              />
+              <FormControlLabel
+                value="allow"
+                control={<Radio />}
+                label={
+                  <Box>
+                    <Typography variant="body2">Allow additional properties</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Explicitly allow properties beyond those defined in the schema
+                    </Typography>
+                  </Box>
+                }
+              />
+              <FormControlLabel
+                value="disallow"
+                control={<Radio />}
+                label={
+                  <Box>
+                    <Typography variant="body2">Disallow additional properties</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Only allow properties explicitly defined in the schema
+                    </Typography>
+                  </Box>
+                }
+              />
+            </RadioGroup>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setClassDialogOpen(false)}>Cancel</Button>
