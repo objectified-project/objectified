@@ -4,8 +4,9 @@ import { useCallback, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
-import { Copy, Download } from 'lucide-react';
+import { Copy, Download, RefreshCw } from 'lucide-react';
 import * as yaml from 'js-yaml';
+import jsf from 'json-schema-faker';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -95,6 +96,8 @@ const StudioContent = () => {
 
   // Class edit dialog state
   const [classEditDialogOpen, setClassEditDialogOpen] = useState(false);
+  const [classEditFormat, setClassEditFormat] = useState<'json' | 'yaml' | 'example'>('json');
+  const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [editingClassData, setEditingClassData] = useState<any>(null);
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
   const [editPropName, setEditPropName] = useState('');
@@ -1344,8 +1347,243 @@ const StudioContent = () => {
           }
         }}
       >
-        <DialogTitle>
-          Edit Class: {editingClassData?.name}
+        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6" component="span">
+                Edit Class: {editingClassData?.name}
+              </Typography>
+
+              {/* Format Toggle */}
+              <Box sx={{ display: 'flex', border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+                <Button
+                  size="small"
+                  onClick={() => setClassEditFormat('json')}
+                  sx={{
+                    minWidth: 60,
+                    borderRadius: 0,
+                    bgcolor: classEditFormat === 'json' ? 'primary.main' : 'transparent',
+                    color: classEditFormat === 'json' ? 'primary.contrastText' : 'text.primary',
+                    '&:hover': {
+                      bgcolor: classEditFormat === 'json' ? 'primary.dark' : 'action.hover',
+                    },
+                  }}
+                >
+                  JSON
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => setClassEditFormat('yaml')}
+                  sx={{
+                    minWidth: 60,
+                    borderRadius: 0,
+                    borderLeft: 1,
+                    borderColor: 'divider',
+                    bgcolor: classEditFormat === 'yaml' ? 'primary.main' : 'transparent',
+                    color: classEditFormat === 'yaml' ? 'primary.contrastText' : 'text.primary',
+                    '&:hover': {
+                      bgcolor: classEditFormat === 'yaml' ? 'primary.dark' : 'action.hover',
+                    },
+                  }}
+                >
+                  YAML
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => setClassEditFormat('example')}
+                  sx={{
+                    minWidth: 80,
+                    borderRadius: 0,
+                    borderLeft: 1,
+                    borderColor: 'divider',
+                    bgcolor: classEditFormat === 'example' ? 'primary.main' : 'transparent',
+                    color: classEditFormat === 'example' ? 'primary.contrastText' : 'text.primary',
+                    '&:hover': {
+                      bgcolor: classEditFormat === 'example' ? 'primary.dark' : 'action.hover',
+                    },
+                  }}
+                >
+                  EXAMPLE
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* Refresh button - only show when EXAMPLE is selected */}
+              {classEditFormat === 'example' && (
+                <Button
+                  size="small"
+                  startIcon={<RefreshCw size={16} />}
+                  onClick={() => {
+                    // Increment the refresh key to trigger regeneration
+                    setExampleRefreshKey(prev => prev + 1);
+                  }}
+                  variant="outlined"
+                  title="Generate new example"
+                >
+                  Refresh
+                </Button>
+              )}
+              <Button
+                size="small"
+                startIcon={<Copy size={16} />}
+                onClick={() => {
+                  if (!editingClassData) return;
+
+                  // Build the schema (reusing logic from editor)
+                  const buildSchema = () => {
+                    const schema = typeof editingClassData.schema === 'string'
+                      ? JSON.parse(editingClassData.schema)
+                      : (editingClassData.schema || {});
+
+                    const properties: any = {};
+                    const required: string[] = [];
+
+                    if (editingClassData.properties && editingClassData.properties.length > 0) {
+                      editingClassData.properties.forEach((prop: any) => {
+                        const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+                        properties[prop.name] = propData;
+                        if (propData.required) {
+                          required.push(prop.name);
+                        }
+                      });
+                    }
+
+                    return {
+                      openapi: '3.1.0',
+                      info: {
+                        title: `${editingClassData.name} Schema`,
+                        version: '1.0.0',
+                        description: 'OpenAPI 3.1.0 schema definition'
+                      },
+                      components: {
+                        schemas: {
+                          [editingClassData.name]: {
+                            type: 'object',
+                            description: editingClassData.description || undefined,
+                            ...schema,
+                            properties,
+                            required: required.length > 0 ? required : undefined
+                          }
+                        }
+                      }
+                    };
+                  };
+
+                  const schemaObj = buildSchema();
+
+                  let content: string;
+                  if (classEditFormat === 'example') {
+                    // Generate fake data from the class schema
+                    const classSchema = schemaObj.components.schemas[editingClassData.name];
+                    try {
+                      const fakeData = jsf.generate(classSchema);
+                      content = JSON.stringify(fakeData, null, 2);
+                    } catch (error) {
+                      console.error('Error generating fake data:', error);
+                      content = JSON.stringify({ error: 'Could not generate example data' }, null, 2);
+                    }
+                  } else {
+                    content = classEditFormat === 'json'
+                      ? JSON.stringify(schemaObj, null, 2)
+                      : yaml.dump(schemaObj, { lineWidth: -1, noRefs: true });
+                  }
+
+                  navigator.clipboard.writeText(content);
+                  alert(`${classEditFormat === 'example' ? 'Example data' : 'Schema'} copied to clipboard as ${classEditFormat.toUpperCase()}!`);
+                }}
+                variant="outlined"
+              >
+                Copy
+              </Button>
+              <Button
+                size="small"
+                startIcon={<Download size={16} />}
+                onClick={() => {
+                  if (!editingClassData) return;
+
+                  // Build the schema
+                  const buildSchema = () => {
+                    const schema = typeof editingClassData.schema === 'string'
+                      ? JSON.parse(editingClassData.schema)
+                      : (editingClassData.schema || {});
+
+                    const properties: any = {};
+                    const required: string[] = [];
+
+                    if (editingClassData.properties && editingClassData.properties.length > 0) {
+                      editingClassData.properties.forEach((prop: any) => {
+                        const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+                        properties[prop.name] = propData;
+                        if (propData.required) {
+                          required.push(prop.name);
+                        }
+                      });
+                    }
+
+                    return {
+                      openapi: '3.1.0',
+                      info: {
+                        title: `${editingClassData.name} Schema`,
+                        version: '1.0.0',
+                        description: 'OpenAPI 3.1.0 schema definition'
+                      },
+                      components: {
+                        schemas: {
+                          [editingClassData.name]: {
+                            type: 'object',
+                            description: editingClassData.description || undefined,
+                            ...schema,
+                            properties,
+                            required: required.length > 0 ? required : undefined
+                          }
+                        }
+                      }
+                    };
+                  };
+
+                  const schemaObj = buildSchema();
+
+                  let content: string;
+                  let filenameSuffix: string;
+                  if (classEditFormat === 'example') {
+                    // Generate fake data from the class schema
+                    const classSchema = schemaObj.components.schemas[editingClassData.name];
+                    try {
+                      const fakeData = jsf.generate(classSchema);
+                      content = JSON.stringify(fakeData, null, 2);
+                    } catch (error) {
+                      console.error('Error generating fake data:', error);
+                      content = JSON.stringify({ error: 'Could not generate example data' }, null, 2);
+                    }
+                    filenameSuffix = 'example';
+                  } else {
+                    content = classEditFormat === 'json'
+                      ? JSON.stringify(schemaObj, null, 2)
+                      : yaml.dump(schemaObj, { lineWidth: -1, noRefs: true });
+                    filenameSuffix = 'schema';
+                  }
+
+                  const mimeType = (classEditFormat === 'json' || classEditFormat === 'example') ? 'application/json' : 'text/yaml';
+                  const extension = (classEditFormat === 'json' || classEditFormat === 'example') ? 'json' : 'yaml';
+
+                  const blob = new Blob([content], { type: mimeType });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `${editingClassData.name.toLowerCase()}-${filenameSuffix}.${extension}`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}
+                variant="contained"
+              >
+                Export
+              </Button>
+            </Box>
+          </Box>
         </DialogTitle>
         <DialogContent sx={{ p: 0 }}>
           {editingClassData && (() => {
@@ -1481,13 +1719,42 @@ const StudioContent = () => {
               }
             };
 
-            const schemaJson = JSON.stringify(openApiDoc, null, 2);
+            let schemaContent: string;
+            let editorLanguage: string;
+
+            if (classEditFormat === 'example') {
+              // Generate fake data from the class schema
+              // exampleRefreshKey is used to trigger regeneration with different data
+              try {
+                // Reset faker to get different data each time
+                jsf.option({
+                  random: () => Math.random()
+                });
+
+                const fakeData = jsf.generate(classSchema);
+                schemaContent = JSON.stringify(fakeData, null, 2);
+                editorLanguage = 'json';
+              } catch (error) {
+                console.error('Error generating fake data:', error);
+                schemaContent = JSON.stringify({
+                  error: 'Could not generate example data',
+                  message: error instanceof Error ? error.message : String(error)
+                }, null, 2);
+                editorLanguage = 'json';
+              }
+            } else {
+              schemaContent = classEditFormat === 'json'
+                ? JSON.stringify(openApiDoc, null, 2)
+                : yaml.dump(openApiDoc, { lineWidth: -1, noRefs: true });
+              editorLanguage = classEditFormat;
+            }
 
             return (
               <Editor
+                key={classEditFormat === 'example' ? `example-${exampleRefreshKey}` : classEditFormat}
                 height="100%"
-                defaultLanguage="json"
-                value={schemaJson}
+                language={editorLanguage}
+                value={schemaContent}
                 theme="vs-dark"
                 options={{
                   readOnly: true,
