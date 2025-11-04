@@ -66,9 +66,9 @@ function ClassNode({ data, selected }: NodeProps) {
     if (propData.type === 'array') {
       if (propData.items?.$ref) {
         const refName = propData.items.$ref.split('/').pop();
-        return `array[]`;
+        return `${refName}[]`;
       }
-      return `${propData.items?.type || 'items'}[]`;
+      return `${propData.items?.type || 'any'}[]`;
     }
 
     if (propData.$ref) {
