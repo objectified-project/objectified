@@ -334,7 +334,8 @@ function ClassNode({ data, selected }: NodeProps) {
                       borderRadius: '50%',
                       position: 'absolute',
                       top: '50%',
-                      transform: 'translateY(-50%)'
+                      transform: 'translateY(-50%)',
+                      zIndex: 1000
                     }}
                     isConnectable={false}
                   />
