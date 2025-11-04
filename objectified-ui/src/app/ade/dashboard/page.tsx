@@ -121,7 +121,7 @@ const Dashboard = () => {
           { icon: <ClassIcon sx={{ color: '#06b6d4', mr: 1 }} />, label: 'Classes', value: stats.classes },
           { icon: <PropertyIcon sx={{ color: '#f59e0b', mr: 1 }} />, label: 'Properties', value: stats.properties },
         ].map((stat) => (
-          <Grid item xs={6} sm={4} md={2.4} key={stat.label}>
+          <Grid key={stat.label} {...({ item: true, xs: 6, sm: 4, md: 2 } as any)}>
             <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
               <CardContent>
                 {isLoading ? (
@@ -147,14 +147,14 @@ const Dashboard = () => {
 
       <Grid container spacing={3}>
         {/* Quick Actions */}
-        <Grid item xs={12} md={8}>
+        <Grid {...({ item: true, xs: 12, md: 8 } as any)}>
           <Paper elevation={0} sx={{ p: 3, border: 1, borderColor: 'divider' }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
               Quick Actions
             </Typography>
             <Grid container spacing={2}>
               {quickActions.map((action) => (
-                <Grid item xs={12} sm={6} key={action.title}>
+                <Grid key={action.title} {...({ item: true, xs: 12, sm: 6 } as any)}>
                   <Card
                     elevation={0}
                     sx={{
@@ -206,7 +206,7 @@ const Dashboard = () => {
         </Grid>
 
         {/* Recent Activity */}
-        <Grid item xs={12} md={4}>
+        <Grid {...({ item: true, xs: 12, md: 4 } as any)}>
           <Paper elevation={0} sx={{ p: 3, border: 1, borderColor: 'divider' }}>
             <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
               Recent Activity

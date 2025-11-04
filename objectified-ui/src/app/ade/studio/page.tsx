@@ -6,8 +6,8 @@ import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
 import { Copy, Download } from 'lucide-react';
 import * as yaml from 'js-yaml';
-import jsf from 'json-schema-faker';
-import ClassEditDialog from './ClassEditDialog';
+import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
+import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -31,15 +31,10 @@ import {
   getClassesForVersion,
   getPropertiesForClass,
   addPropertyToClass,
-  updateClassProperty,
   removePropertyFromClass
 } from '../../../../lib/db/helper';
 import ClassNode from './ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
@@ -88,9 +83,15 @@ const StudioContent = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [codeFormat, setCodeFormat] = useState<'json' | 'yaml'>('json');
 
+  // Sample OpenAPI spec - will be replaced with actual data from project/version
+  const [openApiSpec, setOpenApiSpec] = useState<string>('');
+
+  const currentTenantId = (session?.user as any)?.current_tenant_id;
+
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
+  const { fitView } = useReactFlow();
 
   // Class-property edit dialog state
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
@@ -99,22 +100,9 @@ const StudioContent = () => {
   const [classEditDialogOpen, setClassEditDialogOpen] = useState(false);
   const [editingClassData, setEditingClassData] = useState<any>(null);
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
-  const [editPropName, setEditPropName] = useState('');
-  const [editPropDescription, setEditPropDescription] = useState('');
-  const [editPropRequired, setEditPropRequired] = useState(false);
-  const [editPropDeprecated, setEditPropDeprecated] = useState(false);
-  const [editPropReadOnly, setEditPropReadOnly] = useState(false);
-  const [editPropWriteOnly, setEditPropWriteOnly] = useState(false);
-  const [editPropExample, setEditPropExample] = useState('');
-  const [editPropertyError, setEditPropertyError] = useState('');
+  // Note: dialog-specific form state moved to ClassPropertyEditDialog component
 
-  // Sample OpenAPI spec - will be replaced with actual data from project/version
-  const [openApiSpec, setOpenApiSpec] = useState<string>('');
-
-  const currentTenantId = (session?.user as any)?.current_tenant_id;
-  const { fitView } = useReactFlow();
-
-  // Helper function to build class schema
+  // Helper function to build class schema (used by OpenAPI generation)
   const buildClassSchema = useCallback((classData: any) => {
     const schema = typeof classData.schema === 'string'
       ? JSON.parse(classData.schema)
@@ -130,17 +118,17 @@ const StudioContent = () => {
 
         if (propData.required) {
           required.push(prop.name);
+          // remove required flag from property schema; it belongs on class required array
           delete propData.required;
         }
 
-        // If property data is not required, remove the field all together.
+        // If property data explicitly sets required=false, remove the field
         if (propData.required === false) {
           delete propData.required;
         }
 
         if (propData.description === null) {
           delete propData.description;
-
           if (propData.title) {
             propData.description = propData.title;
           }
@@ -148,7 +136,7 @@ const StudioContent = () => {
       });
     }
 
-    const classSchema = {
+    const classSchema: any = {
       type: 'object',
       description: classData.description || undefined,
       ...schema,
@@ -171,7 +159,7 @@ const StudioContent = () => {
     return classSchema;
   }, []);
 
-  // Generate complete OpenAPI 3.2.0 specification from classes
+  // Generate complete OpenAPI 3.1.0 specification from classes
   const generateOpenApiSpec = useCallback((classes: any[], projectName?: string, versionId?: string) => {
     const schemas: any = {};
 
@@ -194,6 +182,38 @@ const StudioContent = () => {
 
     return JSON.stringify(openApiDoc, null, 2);
   }, [buildClassSchema]);
+
+  // Helper to reload classes for current selectedVersionId (used after edits)
+  const reloadClasses = useCallback(async () => {
+    if (!selectedVersionId) return;
+
+    try {
+      const classesResult = await getClassesForVersion(selectedVersionId);
+      const classesData = JSON.parse(classesResult);
+
+      const classesWithProperties = await Promise.all(
+        classesData.map(async (cls: any) => {
+          const propsResult = await getPropertiesForClass(cls.id);
+          const properties = JSON.parse(propsResult);
+          return { ...cls, properties };
+        })
+      );
+
+      const newNodes = await classesToNodes(classesWithProperties);
+      const newEdges = createAllEdges(classesWithProperties);
+      const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
+      setNodes(layoutedNodes);
+      setEdges(newEdges);
+
+      // Regenerate OpenAPI spec
+      const currentProject = projects.find(p => p.id === selectedProjectId);
+      const currentVersion = versions.find(v => v.id === selectedVersionId);
+      const spec = generateOpenApiSpec(classesWithProperties, currentProject?.name, currentVersion?.version_id);
+      setOpenApiSpec(spec);
+    } catch (error) {
+      console.error('Failed to reload classes:', error);
+    }
+  }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec]);
 
   // Apply auto-layout to current nodes and edges
   const onLayout = useCallback((direction: LayoutDirection) => {
@@ -320,102 +340,8 @@ const StudioContent = () => {
 
     // Load the full property data from the class_properties record
     setEditingClassProperty(classProperty);
-    setEditPropName(classProperty.name || '');
-    setEditPropDescription(classProperty.description || '');
-
-    // Parse the data JSONB field which contains the full schema
-    const propData = typeof classProperty.data === 'string'
-      ? JSON.parse(classProperty.data)
-      : classProperty.data;
-
-    // Set OpenAPI 3.2.0 extension fields
-    setEditPropRequired(propData.required || false);
-    setEditPropDeprecated(propData.deprecated || false);
-    setEditPropReadOnly(propData.readOnly || false);
-    setEditPropWriteOnly(propData.writeOnly || false);
-    setEditPropExample(propData.example ? JSON.stringify(propData.example) : '');
-
-    setEditPropertyError('');
     setEditPropertyDialogOpen(true);
   }, []);
-
-  // Handle saving edited class property
-  const handleSaveEditedProperty = useCallback(async () => {
-    if (!editPropName.trim()) {
-      setEditPropertyError('Property name is required');
-      return;
-    }
-
-    if (!editingClassProperty) {
-      setEditPropertyError('No property selected for editing');
-      return;
-    }
-
-    try {
-      // Get the original property data and update it with new values
-      const originalData = typeof editingClassProperty.data === 'string'
-        ? JSON.parse(editingClassProperty.data)
-        : editingClassProperty.data;
-
-      // Build updated data with OpenAPI 3.2.0 extensions
-      const updatedData = {
-        ...originalData,
-        required: editPropRequired,
-        deprecated: editPropDeprecated,
-        readOnly: editPropReadOnly,
-        writeOnly: editPropWriteOnly,
-      };
-
-      // Add example if provided
-      if (editPropExample.trim()) {
-        try {
-          updatedData.example = JSON.parse(editPropExample);
-        } catch (e) {
-          // If not valid JSON, store as string
-          updatedData.example = editPropExample;
-        }
-      } else {
-        delete updatedData.example;
-      }
-
-      const result = await updateClassProperty(
-        editingClassProperty.id,
-        editPropName.trim(),
-        editPropDescription || null,
-        updatedData
-      );
-
-      const response = JSON.parse(result);
-      if (response.success) {
-        setEditPropertyDialogOpen(false);
-
-        // Reload classes to show updated properties
-        if (selectedVersionId) {
-          const classesResult = await getClassesForVersion(selectedVersionId);
-          const classesData = JSON.parse(classesResult);
-
-          const classesWithProperties = await Promise.all(
-            classesData.map(async (cls: any) => {
-              const propsResult = await getPropertiesForClass(cls.id);
-              const properties = JSON.parse(propsResult);
-              return { ...cls, properties };
-            })
-          );
-
-          const newNodes = await classesToNodes(classesWithProperties);
-          const newEdges = createAllEdges(classesWithProperties);
-          const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
-          setNodes(layoutedNodes);
-          setEdges(newEdges);
-        }
-      } else {
-        setEditPropertyError(response.error || 'Failed to update property');
-      }
-    } catch (error) {
-      console.error('Error updating class property:', error);
-      setEditPropertyError('An error occurred while updating the property');
-    }
-  }, [editingClassProperty, editPropName, editPropDescription, editPropRequired, editPropDeprecated, editPropReadOnly, editPropWriteOnly, editPropExample, selectedVersionId, layoutDirection, setNodes]);
 
   // Define custom node types
   const nodeTypes = {
@@ -1188,148 +1114,13 @@ const StudioContent = () => {
         )}
       </div>
 
-      {/* Class-Property Edit Dialog */}
-      <Dialog
+      {/* Class-Property Edit Dialog (moved to separate component) */}
+      <ClassPropertyEditDialog
         open={editPropertyDialogOpen}
         onClose={() => setEditPropertyDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Edit Property in Class
-        </DialogTitle>
-        <DialogContent>
-          {editPropertyError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {editPropertyError}
-            </Alert>
-          )}
-
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Property Name"
-            type="text"
-            fullWidth
-            required
-            value={editPropName}
-            onChange={(e) => setEditPropName(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-
-          <TextField
-            margin="dense"
-            label="Description"
-            type="text"
-            fullWidth
-            multiline
-            rows={2}
-            value={editPropDescription}
-            onChange={(e) => setEditPropDescription(e.target.value)}
-            helperText="Optional description for this property in this class"
-            sx={{ mb: 2 }}
-          />
-
-          <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-            OpenAPI 3.2.0 Extensions
-          </Typography>
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editPropRequired}
-                  onChange={(e) => setEditPropRequired(e.target.checked)}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <span>Required</span>
-                  <Typography variant="caption" color="text.secondary">
-                    - Must be present in the object
-                  </Typography>
-                </Box>
-              }
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editPropDeprecated}
-                  onChange={(e) => setEditPropDeprecated(e.target.checked)}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <span>Deprecated</span>
-                  <Typography variant="caption" color="text.secondary">
-                    - Should be transitioned out of usage
-                  </Typography>
-                </Box>
-              }
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editPropReadOnly}
-                  onChange={(e) => {
-                    setEditPropReadOnly(e.target.checked);
-                    if (e.target.checked) setEditPropWriteOnly(false);
-                  }}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <span>Read Only</span>
-                  <Typography variant="caption" color="text.secondary">
-                    - Only in responses (OpenAPI)
-                  </Typography>
-                </Box>
-              }
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={editPropWriteOnly}
-                  onChange={(e) => {
-                    setEditPropWriteOnly(e.target.checked);
-                    if (e.target.checked) setEditPropReadOnly(false);
-                  }}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <span>Write Only</span>
-                  <Typography variant="caption" color="text.secondary">
-                    - Only in requests (OpenAPI)
-                  </Typography>
-                </Box>
-              }
-            />
-          </Box>
-
-          <TextField
-            margin="dense"
-            label="Example Value"
-            type="text"
-            fullWidth
-            multiline
-            rows={2}
-            value={editPropExample}
-            onChange={(e) => setEditPropExample(e.target.value)}
-            helperText="Example value (JSON format)"
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditPropertyDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSaveEditedProperty} variant="contained">
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+        editingClassProperty={editingClassProperty}
+        onSaved={reloadClasses}
+      />
 
       {/* Class Edit Dialog */}
       <ClassEditDialog
