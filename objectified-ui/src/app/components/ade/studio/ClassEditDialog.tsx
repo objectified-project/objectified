@@ -157,13 +157,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes }: ClassEditDi
     }
   };
 
+  // Generate schema content - regenerate when exampleRefreshKey changes
   let schemaContent: string;
   let editorLanguage: string;
 
   if (classEditFormat === 'example') {
     try {
+      // Use exampleRefreshKey in random seed to force regeneration
       jsf.option({
-        random: () => Math.random()
+        random: () => {
+          // Mix in exampleRefreshKey to ensure different results on each refresh
+          const seed = Math.random() * (exampleRefreshKey + 1);
+          return seed - Math.floor(seed);
+        }
       });
 
       const fakeData = jsf.generate(classSchema);

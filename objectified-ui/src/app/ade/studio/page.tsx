@@ -33,7 +33,7 @@ import {
   addPropertyToClass,
   removePropertyFromClass
 } from '../../../../lib/db/helper';
-import ClassNode from './ClassNode';
+import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
