@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import { Copy, Download, RefreshCw } from 'lucide-react';
 import * as yaml from 'js-yaml';
 import jsf from 'json-schema-faker';
+import { generateClassOpenApiSpec } from '../../../utils/openapi';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -36,126 +37,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes }: ClassEditDi
 
   if (!editingClassData) return null;
 
-  // Helper function to extract class name from $ref
-  const extractClassNameFromRef = (ref: string): string | null => {
-    if (ref.includes('/')) {
-      const parts = ref.split('/');
-      return parts[parts.length - 1] || null;
-    }
-    return ref;
-  };
-
-  // Helper function to find all referenced class names
-  const findReferencedClasses = (obj: any, refs: Set<string>): void => {
-    if (!obj || typeof obj !== 'object') return;
-
-    if (obj.$ref && typeof obj.$ref === 'string') {
-      const className = extractClassNameFromRef(obj.$ref);
-      if (className) refs.add(className);
-    }
-
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        findReferencedClasses(obj[key], refs);
-      }
-    }
-  };
-
-  // Helper function to build schema for a class
-  const buildClassSchema = (classData: any) => {
-    const schema = typeof classData.schema === 'string'
-      ? JSON.parse(classData.schema)
-      : (classData.schema || {});
-
-    const properties: any = {};
-    const required: string[] = [];
-
-    if (classData.properties && classData.properties.length > 0) {
-      classData.properties.forEach((prop: any) => {
-        const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
-        properties[prop.name] = propData;
-
-        if (propData.required) {
-          required.push(prop.name);
-        }
-      });
-    }
-
-    const classSchema = {
-      type: 'object',
-      description: classData.description || undefined,
-      ...schema,
-      properties,
-      required: required.length > 0 ? required : undefined
-    };
-
-    // Remove undefined values
-    Object.keys(classSchema).forEach(key => {
-      if (classSchema[key] === undefined) {
-        delete classSchema[key];
-      }
-    });
-
-    return classSchema;
-  };
-
-  // Build the complete schema
-  const schema = typeof editingClassData.schema === 'string'
-    ? JSON.parse(editingClassData.schema)
-    : (editingClassData.schema || {});
-
-  const properties: any = {};
-  const required: string[] = [];
-  const referencedClasses = new Set<string>();
-
-  if (editingClassData.properties && editingClassData.properties.length > 0) {
-    editingClassData.properties.forEach((prop: any) => {
-      const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
-      properties[prop.name] = propData;
-      findReferencedClasses(propData, referencedClasses);
-
-      if (propData.required) {
-        required.push(prop.name);
-      }
-    });
-  }
-
-  findReferencedClasses(schema, referencedClasses);
-
-  const classSchema = buildClassSchema(editingClassData);
-
+  // Generate OpenAPI spec using the consolidated utility
   const allClasses = nodes.map(node => node.data).filter(data => data && data.name);
-
-  const referencedSchemas: any = {};
-  referencedClasses.forEach(className => {
-    if (className !== editingClassData.name) {
-      const referencedClassData = allClasses.find((cls: any) => cls.name === className);
-      if (referencedClassData) {
-        referencedSchemas[className] = buildClassSchema(referencedClassData);
-      } else {
-        referencedSchemas[className] = {
-          type: 'object',
-          description: `Referenced schema: ${className} (not loaded)`,
-          properties: {}
-        };
-      }
-    }
+  const openApiDoc = generateClassOpenApiSpec(editingClassData, allClasses, {
+    title: `${editingClassData.name} Schema`,
+    version: '1.0.0',
+    description: 'OpenAPI 3.1.0 schema definition'
   });
 
-  const openApiDoc = {
-    openapi: '3.1.0',
-    info: {
-      title: `${editingClassData.name} Schema`,
-      version: '1.0.0',
-      description: 'OpenAPI 3.1.0 schema definition'
-    },
-    components: {
-      schemas: {
-        [editingClassData.name]: classSchema,
-        ...referencedSchemas
-      }
-    }
-  };
+  // Get the class schema from the generated OpenAPI doc
+  const classSchema = openApiDoc.components.schemas[editingClassData.name];
 
   // Generate schema content - regenerate when exampleRefreshKey changes
   let schemaContent: string;

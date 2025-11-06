@@ -8,6 +8,7 @@ import { Copy, Download } from 'lucide-react';
 import * as yaml from 'js-yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
+import { generateOpenApiSpec } from '../../utils/openapi';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -35,13 +36,6 @@ import {
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Alert from '@mui/material/Alert';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -102,86 +96,6 @@ const StudioContent = () => {
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
   // Note: dialog-specific form state moved to ClassPropertyEditDialog component
 
-  // Helper function to build class schema (used by OpenAPI generation)
-  const buildClassSchema = useCallback((classData: any) => {
-    const schema = typeof classData.schema === 'string'
-      ? JSON.parse(classData.schema)
-      : (classData.schema || {});
-
-    const properties: any = {};
-    const required: string[] = [];
-
-    if (classData.properties && classData.properties.length > 0) {
-      classData.properties.forEach((prop: any) => {
-        const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
-        properties[prop.name] = propData;
-
-        if (propData.required) {
-          required.push(prop.name);
-          // remove required flag from property schema; it belongs on class required array
-          delete propData.required;
-        }
-
-        // If property data explicitly sets required=false, remove the field
-        if (propData.required === false) {
-          delete propData.required;
-        }
-
-        if (propData.description === null) {
-          delete propData.description;
-          if (propData.title) {
-            propData.description = propData.title;
-          }
-        }
-      });
-    }
-
-    const classSchema: any = {
-      type: 'object',
-      description: classData.description || undefined,
-      ...schema,
-      properties,
-      required: required.length > 0 ? required : undefined
-    };
-
-    // Delete class properties if properties is empty.
-    if (classSchema.properties && Object.keys(classSchema.properties).length === 0) {
-      delete classSchema.properties;
-    }
-
-    // Remove undefined values
-    Object.keys(classSchema).forEach(key => {
-      if (classSchema[key] === undefined) {
-        delete classSchema[key];
-      }
-    });
-
-    return classSchema;
-  }, []);
-
-  // Generate complete OpenAPI 3.1.0 specification from classes
-  const generateOpenApiSpec = useCallback((classes: any[], projectName?: string, versionId?: string) => {
-    const schemas: any = {};
-
-    // Build schema for each class
-    classes.forEach((cls) => {
-      schemas[cls.name] = buildClassSchema(cls);
-    });
-
-    const openApiDoc = {
-      openapi: '3.1.0',
-      info: {
-        title: projectName || 'API Schema',
-        version: versionId || '1.0.0',
-        description: 'Generated OpenAPI 3.1.0 specification from Objectified Studio'
-      },
-      components: {
-        schemas
-      }
-    };
-
-    return JSON.stringify(openApiDoc, null, 2);
-  }, [buildClassSchema]);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async () => {
@@ -208,7 +122,10 @@ const StudioContent = () => {
       // Regenerate OpenAPI spec
       const currentProject = projects.find(p => p.id === selectedProjectId);
       const currentVersion = versions.find(v => v.id === selectedVersionId);
-      const spec = generateOpenApiSpec(classesWithProperties, currentProject?.name, currentVersion?.version_id);
+      const spec = generateOpenApiSpec(classesWithProperties, {
+        projectName: currentProject?.name,
+        version: currentVersion?.version_id
+      });
       setOpenApiSpec(spec);
     } catch (error) {
       console.error('Failed to reload classes:', error);
@@ -650,7 +567,10 @@ const StudioContent = () => {
         // Generate OpenAPI specification
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
-        const spec = generateOpenApiSpec(classesWithProperties, currentProject?.name, currentVersion?.version_id);
+        const spec = generateOpenApiSpec(classesWithProperties, {
+          projectName: currentProject?.name,
+          version: currentVersion?.version_id
+        });
         setOpenApiSpec(spec);
 
         // Fit view after a short delay to ensure nodes are rendered

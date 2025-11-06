@@ -108,42 +108,42 @@ const Dashboard = () => {
           Welcome back, {userName}!
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Here's what's happening with your schemas today.
+          {/*Here's what's happening with your schemas today.*/}
         </Typography>
       </Box>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {[
-          { icon: <FolderIcon sx={{ color: '#3b82f6', mr: 1 }} />, label: 'Tenants', value: stats.tenants },
-          { icon: <FolderIcon sx={{ color: '#8b5cf6', mr: 1 }} />, label: 'Projects', value: stats.projects },
-          { icon: <VersionIcon sx={{ color: '#10b981', mr: 1 }} />, label: 'Versions', value: stats.versions },
-          { icon: <ClassIcon sx={{ color: '#06b6d4', mr: 1 }} />, label: 'Classes', value: stats.classes },
-          { icon: <PropertyIcon sx={{ color: '#f59e0b', mr: 1 }} />, label: 'Properties', value: stats.properties },
-        ].map((stat) => (
-          <Grid key={stat.label} {...({ item: true, xs: 6, sm: 4, md: 2 } as any)}>
-            <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
-              <CardContent>
-                {isLoading ? (
-                  <Skeleton variant="rectangular" height={80} />
-                ) : (
-                  <>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      {stat.icon}
-                      <Typography variant="caption" color="text.secondary">
-                        {stat.label}
-                      </Typography>
-                    </Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {stat.value}
-                    </Typography>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      {/*<Grid container spacing={3} sx={{ mb: 4 }}>*/}
+      {/*  {[*/}
+      {/*    { icon: <FolderIcon sx={{ color: '#3b82f6', mr: 1 }} />, label: 'Tenants', value: stats.tenants },*/}
+      {/*    { icon: <FolderIcon sx={{ color: '#8b5cf6', mr: 1 }} />, label: 'Projects', value: stats.projects },*/}
+      {/*    { icon: <VersionIcon sx={{ color: '#10b981', mr: 1 }} />, label: 'Versions', value: stats.versions },*/}
+      {/*    { icon: <ClassIcon sx={{ color: '#06b6d4', mr: 1 }} />, label: 'Classes', value: stats.classes },*/}
+      {/*    { icon: <PropertyIcon sx={{ color: '#f59e0b', mr: 1 }} />, label: 'Properties', value: stats.properties },*/}
+      {/*  ].map((stat) => (*/}
+      {/*    <Grid key={stat.label} {...({ item: true, xs: 6, sm: 4, md: 2 } as any)}>*/}
+      {/*      <Card elevation={0} sx={{ border: 1, borderColor: 'divider' }}>*/}
+      {/*        <CardContent>*/}
+      {/*          {isLoading ? (*/}
+      {/*            <Skeleton variant="rectangular" height={80} />*/}
+      {/*          ) : (*/}
+      {/*            <>*/}
+      {/*              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>*/}
+      {/*                {stat.icon}*/}
+      {/*                <Typography variant="caption" color="text.secondary">*/}
+      {/*                  {stat.label}*/}
+      {/*                </Typography>*/}
+      {/*              </Box>*/}
+      {/*              <Typography variant="h4" sx={{ fontWeight: 700 }}>*/}
+      {/*                {stat.value}*/}
+      {/*              </Typography>*/}
+      {/*            </>*/}
+      {/*          )}*/}
+      {/*        </CardContent>*/}
+      {/*      </Card>*/}
+      {/*    </Grid>*/}
+      {/*  ))}*/}
+      {/*</Grid>*/}
 
       <Grid container spacing={3}>
         {/* Quick Actions */}
@@ -206,41 +206,41 @@ const Dashboard = () => {
         </Grid>
 
         {/* Recent Activity */}
-        <Grid {...({ item: true, xs: 12, md: 4 } as any)}>
-          <Paper elevation={0} sx={{ p: 3, border: 1, borderColor: 'divider' }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-              Recent Activity
-            </Typography>
-            <List sx={{ py: 0 }}>
-              {recentActivity.map((item, index) => (
-                <Box key={index}>
-                  <ListItem sx={{ px: 0 }}>
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <ScheduleIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Typography variant="body2">
-                          <strong>{item.action}</strong> {item.name}
-                        </Typography>
-                      }
-                      secondary={item.time}
-                    />
-                  </ListItem>
-                  {index < recentActivity.length - 1 && <Divider />}
-                </Box>
-              ))}
-            </List>
-            <Button
-              fullWidth
-              variant="outlined"
-              sx={{ mt: 2 }}
-              endIcon={<ArrowForwardIcon />}
-            >
-              View All Activity
-            </Button>
-          </Paper>
-        </Grid>
+      {/*  <Grid {...({ item: true, xs: 12, md: 4 } as any)}>*/}
+      {/*    <Paper elevation={0} sx={{ p: 3, border: 1, borderColor: 'divider' }}>*/}
+      {/*      <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>*/}
+      {/*        Recent Activity*/}
+      {/*      </Typography>*/}
+      {/*      <List sx={{ py: 0 }}>*/}
+      {/*        {recentActivity.map((item, index) => (*/}
+      {/*          <Box key={index}>*/}
+      {/*            <ListItem sx={{ px: 0 }}>*/}
+      {/*              <ListItemIcon sx={{ minWidth: 36 }}>*/}
+      {/*                <ScheduleIcon sx={{ fontSize: 20, color: 'text.secondary' }} />*/}
+      {/*              </ListItemIcon>*/}
+      {/*              <ListItemText*/}
+      {/*                primary={*/}
+      {/*                  <Typography variant="body2">*/}
+      {/*                    <strong>{item.action}</strong> {item.name}*/}
+      {/*                  </Typography>*/}
+      {/*                }*/}
+      {/*                secondary={item.time}*/}
+      {/*              />*/}
+      {/*            </ListItem>*/}
+      {/*            {index < recentActivity.length - 1 && <Divider />}*/}
+      {/*          </Box>*/}
+      {/*        ))}*/}
+      {/*      </List>*/}
+      {/*      <Button*/}
+      {/*        fullWidth*/}
+      {/*        variant="outlined"*/}
+      {/*        sx={{ mt: 2 }}*/}
+      {/*        endIcon={<ArrowForwardIcon />}*/}
+      {/*      >*/}
+      {/*        View All Activity*/}
+      {/*      </Button>*/}
+      {/*    </Paper>*/}
+      {/*  </Grid>*/}
       </Grid>
 
       {/* No Tenant Warning */}
