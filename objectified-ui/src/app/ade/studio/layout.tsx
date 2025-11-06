@@ -257,6 +257,12 @@ function StudioLayoutContent({
       return;
     }
 
+    // Validate class name contains only A-Za-z0-9_
+    if (!/^[A-Za-z0-9_]+$/.test(className)) {
+      setClassError('Class name can only contain letters, numbers, and underscores');
+      return;
+    }
+
     if (!selectedVersionId) {
       setClassError('No version selected');
       return;
@@ -748,7 +754,12 @@ function StudioLayoutContent({
             fullWidth
             required
             value={className}
-            onChange={(e) => setClassName(e.target.value)}
+            onChange={(e) => {
+              // Only allow A-Za-z0-9_ characters
+              const filteredValue = e.target.value.replace(/[^A-Za-z0-9_]/g, '');
+              setClassName(filteredValue);
+            }}
+            helperText="Only letters, numbers, and underscores are allowed; recommend PascalCase class names."
             sx={{ mb: 2 }}
           />
 
