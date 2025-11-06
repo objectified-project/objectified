@@ -245,6 +245,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       return;
     }
 
+    // Validate property name contains only A-Za-z0-9_
+    if (!/^[A-Za-z0-9_]+$/.test(propertyName)) {
+      setPropertyError('Property name can only contain letters, numbers, and underscores');
+      return;
+    }
+
     if (propertyType === '$ref' && !propertyRef) {
       setPropertyError('Schema reference is required when type is $ref');
       return;
@@ -373,7 +379,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               fullWidth
               required
               value={propertyName}
-              onChange={(e) => setPropertyName(e.target.value)}
+              onChange={(e) => {
+                // Only allow A-Za-z0-9_ characters
+                const filteredValue = e.target.value.replace(/[^A-Za-z0-9_]/g, '');
+                setPropertyName(filteredValue);
+              }}
+              helperText="Only letters, numbers, and underscores are allowed. Suggest camelCase property names."
               sx={{ mb: 2 }}
             />
 
