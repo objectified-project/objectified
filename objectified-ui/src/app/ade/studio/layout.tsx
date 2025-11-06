@@ -63,7 +63,7 @@ function StudioLayoutContent({
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
   // Get selected project and version from context
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey } = useStudio();
 
   // State for classes and properties
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -130,7 +130,7 @@ function StudioLayoutContent({
     };
 
     loadClasses();
-  }, [selectedVersionId, refreshKey]);
+  }, [selectedVersionId, refreshKey, sidebarRefreshKey]);
 
   // Dialog state for classes
   const [classDialogOpen, setClassDialogOpen] = useState(false);

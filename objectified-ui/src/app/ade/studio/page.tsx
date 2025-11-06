@@ -32,7 +32,8 @@ import {
   getClassesForVersion,
   getPropertiesForClass,
   addPropertyToClass,
-  removePropertyFromClass
+  removePropertyFromClass,
+  deleteClass
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
@@ -66,7 +67,8 @@ const StudioContent = () => {
   const {
     setSelectedProjectId: setContextProjectId,
     setSelectedVersionId: setContextVersionId,
-    canvasRefreshKey
+    canvasRefreshKey,
+    triggerSidebarRefresh
   } = useStudio();
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -260,6 +262,31 @@ const StudioContent = () => {
     setEditPropertyDialogOpen(true);
   }, []);
 
+  // Handle class delete from canvas
+  const handleClassDelete = useCallback(async (classId: string, className: string) => {
+    if (!confirm(`Are you sure you want to delete "${className}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      console.log('Deleting class:', classId, className);
+      const result = await deleteClass(classId);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        // Reload classes to update the canvas
+        await reloadClasses();
+        // Trigger sidebar refresh to update the class list
+        triggerSidebarRefresh();
+      } else {
+        alert(response.error || 'Failed to delete class');
+      }
+    } catch (error) {
+      console.error('Error deleting class:', error);
+      alert('An error occurred while deleting the class');
+    }
+  }, [reloadClasses, triggerSidebarRefresh]);
+
   // Define custom node types
   const nodeTypes = {
     classNode: ClassNode,
@@ -283,7 +310,8 @@ const StudioContent = () => {
         onPropertyDrop: handlePropertyDrop,
         onPropertyEdit: handlePropertyEdit,
         onPropertyDelete: handlePropertyDelete,
-        onClassEdit: handleClassEdit
+        onClassEdit: handleClassEdit,
+        onClassDelete: handleClassDelete
       }
     }));
   };

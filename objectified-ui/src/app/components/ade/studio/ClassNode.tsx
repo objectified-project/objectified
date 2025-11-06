@@ -21,6 +21,7 @@ type ClassNodeData = {
   onPropertyEdit?: (classId: string, classProperty: ClassProperty) => void;
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
   onClassEdit?: (classData: any) => void;
+  onClassDelete?: (classId: string, className: string) => void;
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -163,6 +164,12 @@ function ClassNode({ data, selected }: NodeProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
+          }}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent node selection
+            if (typedData.onClassDelete) {
+              typedData.onClassDelete(typedData.id, typedData.name);
+            }
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
