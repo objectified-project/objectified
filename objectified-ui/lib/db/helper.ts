@@ -378,7 +378,52 @@ function bumpMinorVersion(version: string): string {
   return `${parsed.major}.${parsed.minor + 1}.0`;
 }
 
-export async function createVersion(projectId: string, creatorId: string, versionId: string | null, description: string, changeLog: string) {
+export async function copyClassesFromVersion(sourceVersionId: string, targetVersionId: string) {
+  try {
+    // Copy all classes from source version to target version
+    const result = await connectionPool.query(
+      `INSERT INTO odb.classes (version_id, name, description, schema, enabled)
+       SELECT $1, name, description, schema, enabled
+       FROM odb.classes
+       WHERE version_id = $2 AND deleted_at IS NULL
+       RETURNING id, name`,
+      [targetVersionId, sourceVersionId]
+    );
+
+    const copiedClasses = result.rows;
+
+    // For each copied class, copy its properties
+    for (const copiedClass of copiedClasses) {
+      // Find the original class by name in the source version
+      const originalClassResult = await connectionPool.query(
+        `SELECT id FROM odb.classes
+         WHERE version_id = $1 AND name = $2 AND deleted_at IS NULL`,
+        [sourceVersionId, copiedClass.name]
+      );
+
+      if (originalClassResult.rowCount > 0) {
+        const originalClassId = originalClassResult.rows[0].id;
+        const newClassId = copiedClass.id;
+
+        // Copy all class properties
+        await connectionPool.query(
+          `INSERT INTO odb.class_properties (class_id, property_id, name, description, data)
+           SELECT $1, property_id, name, description, data
+           FROM odb.class_properties
+           WHERE class_id = $2`,
+          [newClassId, originalClassId]
+        );
+      }
+    }
+
+    return JSON.stringify({ success: true, copiedCount: copiedClasses.length });
+  } catch (error: any) {
+    console.error('Error copying classes from version:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function createVersion(projectId: string, creatorId: string, versionId: string | null, description: string, changeLog: string, sourceVersionId?: string | null) {
   try {
     let finalVersionId = versionId;
 
@@ -400,7 +445,30 @@ export async function createVersion(projectId: string, creatorId: string, versio
       [projectId, creatorId, finalVersionId.trim(), description?.trim() || null, changeLog?.trim() || null]
     );
 
-    return JSON.stringify({ success: true, version: result.rows[0] });
+    const newVersion = result.rows[0];
+
+    // If a source version was provided, copy its classes and properties
+    if (sourceVersionId && sourceVersionId.trim().length > 0) {
+      const copyResult = await copyClassesFromVersion(sourceVersionId, newVersion.id);
+      const copyResponse = JSON.parse(copyResult);
+
+      if (!copyResponse.success) {
+        // If copy fails, still return success but include warning
+        return JSON.stringify({
+          success: true,
+          version: newVersion,
+          copyWarning: copyResponse.error
+        });
+      }
+
+      return JSON.stringify({
+        success: true,
+        version: newVersion,
+        copiedClasses: copyResponse.copiedCount
+      });
+    }
+
+    return JSON.stringify({ success: true, version: newVersion });
   } catch (error: any) {
     if (error.code === '23505') { // Unique constraint violation
       return JSON.stringify({ success: false, error: 'A version with this ID already exists for this project' });

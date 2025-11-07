@@ -63,6 +63,7 @@ const Versions = () => {
   const [description, setDescription] = useState('');
   const [changeLog, setChangeLog] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [sourceVersionId, setSourceVersionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -143,6 +144,7 @@ const Versions = () => {
     setDescription('');
     setChangeLog('');
     setEnabled(true);
+    setSourceVersionId('');
     setErrorMessage('');
     setShowCreateDialog(true);
   };
@@ -167,13 +169,21 @@ const Versions = () => {
         currentUserId,
         autoGenerate ? null : versionId,
         description,
-        changeLog
+        changeLog,
+        sourceVersionId || null
       );
       const response = JSON.parse(result);
 
       if (response.success) {
         setShowCreateDialog(false);
         await loadVersions();
+
+        // Show success message with copy info if applicable
+        if (response.copiedClasses > 0) {
+          alert(`Version created successfully! Copied ${response.copiedClasses} class(es) from source version.`);
+        } else if (response.copyWarning) {
+          alert(`Version created successfully, but encountered an issue copying classes: ${response.copyWarning}`);
+        }
       } else {
         setErrorMessage(response.error || 'Failed to create version');
       }
@@ -614,7 +624,53 @@ const Versions = () => {
               {errorMessage}
             </Alert>
           )}
+
+          {/* Copy From Version Field */}
           <FormControl fullWidth sx={{ mb: 2, mt: 1 }}>
+            <InputLabel>Copy From Version</InputLabel>
+            <Select
+              value={sourceVersionId}
+              label="Copy From Version"
+              onChange={(e) => setSourceVersionId(e.target.value)}
+              disabled={isLoading || versions.length === 0}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    bgcolor: 'var(--background)',
+                    color: 'var(--foreground)',
+                    '& .MuiMenuItem-root': {
+                      '&:hover': {
+                        backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        '&:hover': {
+                          backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                        },
+                      },
+                    },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>{versions.length === 0 ? 'No versions available' : 'Create blank version'}</em>
+              </MenuItem>
+              {versions.map((version) => (
+                <MenuItem key={version.id} value={version.id}>
+                  v{version.version_id} - {version.description || 'No description'}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {sourceVersionId && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Classes and their properties from the selected version will be copied to the new version.
+            </Alert>
+          )}
+
+          <FormControl fullWidth sx={{ mb: 2 }}>
             <InputLabel>Version Strategy</InputLabel>
             <Select
               value={autoGenerate ? 'auto' : 'manual'}
