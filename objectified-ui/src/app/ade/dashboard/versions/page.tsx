@@ -2,7 +2,8 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -22,8 +23,22 @@ import {
   updateVersion,
   deleteVersion,
   publishVersion,
-  unpublishVersion
+  unpublishVersion,
+  getClassesForVersion,
+  getPropertiesForClass
 } from '../../../../../lib/db/helper';
+import { generateOpenApiSpec } from '../../../utils/openapi';
+import * as yaml from 'js-yaml';
+
+// Dynamically import Monaco Editor with SSR disabled
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full flex items-center justify-center">
+      <div className="text-gray-500 dark:text-gray-400">Loading editor...</div>
+    </div>
+  ),
+});
 
 interface Project {
   id: string;
@@ -66,6 +81,13 @@ const Versions = () => {
   const [sourceVersionId, setSourceVersionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // OpenAPI Viewer state
+  const [showOpenApiDialog, setShowOpenApiDialog] = useState(false);
+  const [openApiSpec, setOpenApiSpec] = useState<string>('');
+  const [openApiFormat, setOpenApiFormat] = useState<'json' | 'yaml'>('json');
+  const [viewingVersion, setViewingVersion] = useState<Version | null>(null);
+  const [isLoadingSpec, setIsLoadingSpec] = useState(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
@@ -296,6 +318,55 @@ const Versions = () => {
       }
     } catch (error: any) {
       alert(error.message || 'An error occurred');
+    }
+  };
+
+  const handleViewOpenApi = async (version: Version) => {
+    setViewingVersion(version);
+    setShowOpenApiDialog(true);
+    setIsLoadingSpec(true);
+    setOpenApiFormat('json');
+
+    try {
+      // Load classes for this version
+      const classesResult = await getClassesForVersion(version.id);
+      const classesData = JSON.parse(classesResult);
+
+      // Load properties for each class
+      const classesWithProperties = await Promise.all(
+        classesData.map(async (cls: any) => {
+          const propsResult = await getPropertiesForClass(cls.id);
+          const properties = JSON.parse(propsResult);
+          return { ...cls, properties };
+        })
+      );
+
+      // Get the project name
+      const project = projects.find(p => p.id === version.project_id);
+
+      // Generate OpenAPI spec
+      const spec = generateOpenApiSpec(classesWithProperties, {
+        projectName: project?.name,
+        version: version.version_id,
+        description: version.description || undefined
+      });
+
+      setOpenApiSpec(spec);
+    } catch (error) {
+      console.error('Failed to generate OpenAPI spec:', error);
+      setOpenApiSpec(JSON.stringify({
+        openapi: '3.1.0',
+        info: {
+          title: 'Error Loading Spec',
+          version: version.version_id,
+          description: 'Failed to load classes for this version'
+        },
+        components: {
+          schemas: {}
+        }
+      }, null, 2));
+    } finally {
+      setIsLoadingSpec(false);
     }
   };
 
@@ -564,6 +635,14 @@ const Versions = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end gap-2">
+                      <div title="View OpenAPI Spec">
+                        <button
+                          onClick={() => handleViewOpenApi(version)}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
+                        >
+                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        </button>
+                      </div>
                       {!version.published ? (
                         <>
                           <div title="Edit version">
@@ -828,6 +907,128 @@ const Versions = () => {
           </Button>
           <Button onClick={handleEditSubmit} variant="contained" disabled={isLoading}>
             {isLoading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* OpenAPI Viewer Dialog */}
+      <Dialog
+        open={showOpenApiDialog}
+        onClose={() => setShowOpenApiDialog(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: {
+            height: '80vh',
+            maxHeight: '80vh',
+          }
+        }}
+      >
+        <DialogTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold">OpenAPI 3.1.0 Specification</div>
+              {viewingVersion && (
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {projects.find(p => p.id === viewingVersion.project_id)?.name} - v{viewingVersion.version_id}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                <button
+                  onClick={() => setOpenApiFormat('json')}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    openApiFormat === 'json'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  JSON
+                </button>
+                <button
+                  onClick={() => setOpenApiFormat('yaml')}
+                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                    openApiFormat === 'yaml'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  YAML
+                </button>
+              </div>
+            </div>
+          </div>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {isLoadingSpec ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-gray-500 dark:text-gray-400">Loading specification...</div>
+            </div>
+          ) : (
+            <div className="flex-1">
+              <Editor
+                height="100%"
+                language={openApiFormat}
+                value={(() => {
+                  if (!openApiSpec) {
+                    const emptySpec = {
+                      openapi: '3.1.0',
+                      info: {
+                        title: 'No classes defined',
+                        version: viewingVersion?.version_id || '1.0.0'
+                      },
+                      components: {
+                        schemas: {}
+                      }
+                    };
+                    return openApiFormat === 'json'
+                      ? JSON.stringify(emptySpec, null, 2)
+                      : yaml.dump(emptySpec, { lineWidth: -1, noRefs: true });
+                  }
+
+                  return openApiFormat === 'json'
+                    ? openApiSpec
+                    : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
+                })()}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: true },
+                  fontSize: 13,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  wrappingStrategy: 'advanced',
+                }}
+                theme="vs-dark"
+              />
+            </div>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowOpenApiDialog(false)}>
+            Close
+          </Button>
+          <Button
+            onClick={() => {
+              const content = openApiFormat === 'json'
+                ? openApiSpec
+                : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
+              const blob = new Blob([content], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `openapi-${viewingVersion?.version_id}.${openApiFormat}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }}
+            variant="contained"
+            disabled={isLoadingSpec}
+          >
+            Download
           </Button>
         </DialogActions>
       </Dialog>
