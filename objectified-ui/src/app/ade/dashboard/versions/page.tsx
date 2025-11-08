@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Dialog from '@mui/material/Dialog';
@@ -99,6 +99,12 @@ const Versions = () => {
   const [compareFormat, setCompareFormat] = useState<'json' | 'yaml'>('json');
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
   const [diffResult, setDiffResult] = useState<Change[]>([]);
+  const [diffViewMode, setDiffViewMode] = useState<'overlay' | 'side-by-side'>('overlay');
+
+  // Refs for synchronized scrolling
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const isSyncingScroll = useRef(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
@@ -456,6 +462,7 @@ const Versions = () => {
     setCompareSpec2('');
     setCompareFormat('json');
     setDiffResult([]);
+    setDiffViewMode('overlay');
   };
 
   const handleCompareFormatChange = (newFormat: 'json' | 'yaml') => {
@@ -469,6 +476,29 @@ const Versions = () => {
       const diff = diffLines(content1, content2);
       setDiffResult(diff);
     }
+  };
+
+  // Synchronized scroll handlers
+  const handleLeftScroll = () => {
+    if (isSyncingScroll.current || !leftPanelRef.current || !rightPanelRef.current) return;
+
+    isSyncingScroll.current = true;
+    rightPanelRef.current.scrollTop = leftPanelRef.current.scrollTop;
+
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false;
+    });
+  };
+
+  const handleRightScroll = () => {
+    if (isSyncingScroll.current || !leftPanelRef.current || !rightPanelRef.current) return;
+
+    isSyncingScroll.current = true;
+    leftPanelRef.current.scrollTop = rightPanelRef.current.scrollTop;
+
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false;
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -1165,7 +1195,33 @@ const Versions = () => {
               </div>
             </div>
             {diffResult.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {/* View Mode Toggle */}
+                <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                  <button
+                    onClick={() => setDiffViewMode('overlay')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      diffViewMode === 'overlay'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                    title="Unified diff view"
+                  >
+                    Overlay
+                  </button>
+                  <button
+                    onClick={() => setDiffViewMode('side-by-side')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                      diffViewMode === 'side-by-side'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                    title="Split view comparison"
+                  >
+                    Side-by-Side
+                  </button>
+                </div>
+                {/* Format Toggle */}
                 <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
                   <button
                     onClick={() => handleCompareFormatChange('json')}
@@ -1265,28 +1321,198 @@ const Versions = () => {
                   v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}
                 </div>
               </div>
-              <div className="border border-gray-300 dark:border-gray-600 rounded overflow-auto" style={{ height: 'calc(90vh - 250px)' }}>
-                <div className="font-mono text-xs">
-                  {diffResult.map((part, index) => (
-                    <div
-                      key={index}
-                      className={`px-3 py-1 ${
-                        part.added
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200 border-l-4 border-green-500'
-                          : part.removed
-                          ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200 border-l-4 border-red-500'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                      }`}
-                      style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                    >
-                      {part.added && <span className="font-semibold mr-2">+</span>}
-                      {part.removed && <span className="font-semibold mr-2">-</span>}
-                      {!part.added && !part.removed && <span className="mr-3 opacity-0">·</span>}
-                      {part.value}
-                    </div>
-                  ))}
+
+              {diffViewMode === 'overlay' ? (
+                // Overlay View - Unified Diff
+                <div className="border border-gray-300 dark:border-gray-600 rounded overflow-auto" style={{ height: 'calc(90vh - 250px)' }}>
+                  <div className="font-mono text-xs">
+                    {(() => {
+                      let lineNumber = 0;
+                      return diffResult.map((part, index) => {
+                        const lines = part.value.split('\n').slice(0, -1);
+                        return (
+                          <div key={index}>
+                            {lines.map((line, i) => {
+                              if (!part.removed) lineNumber++;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex ${
+                                    part.added
+                                      ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200 border-l-4 border-green-500'
+                                      : part.removed
+                                      ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200 border-l-4 border-red-500'
+                                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                                  }`}
+                                >
+                                  <div className={`w-12 flex-shrink-0 text-right pr-2 select-none border-r ${
+                                    part.added 
+                                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+                                      : part.removed
+                                      ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20'
+                                      : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+                                  }`}>
+                                    {!part.removed ? lineNumber : ''}
+                                  </div>
+                                  <div className="flex-1 px-3 py-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                    {part.added && <span className="font-semibold mr-2">+</span>}
+                                    {part.removed && <span className="font-semibold mr-2">-</span>}
+                                    {!part.added && !part.removed && <span className="mr-3 opacity-0">·</span>}
+                                    {line || '\u00A0'}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                // Side-by-Side View
+                <div className="border border-gray-300 dark:border-gray-600 rounded overflow-hidden" style={{ height: 'calc(90vh - 250px)' }}>
+                  <div className="grid grid-cols-2 h-full">
+                    {/* Left Side - Version 1 (Base) */}
+                    <div
+                      ref={leftPanelRef}
+                      onScroll={handleLeftScroll}
+                      className="border-r border-gray-300 dark:border-gray-600 overflow-auto"
+                    >
+                      <div className="sticky top-0 bg-blue-100 dark:bg-blue-900/30 px-3 py-2 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
+                        v{versions.find(v => v.id === compareVersion1Id)?.version_id} (Base)
+                      </div>
+                      <div className="font-mono text-xs">
+                        {(() => {
+                          let lineNumber = 0;
+                          return diffResult.map((part, index) => {
+                            if (part.added) {
+                              // Show empty placeholder for added lines (they don't exist in version 1)
+                              return (
+                                <div key={index}>
+                                  {part.value.split('\n').slice(0, -1).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex bg-gray-50 dark:bg-gray-900/30 text-gray-400 dark:text-gray-600"
+                                      style={{ minHeight: '1.5rem' }}
+                                    >
+                                      <div className="w-12 flex-shrink-0 text-right pr-2 select-none border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800/50">
+                                        &nbsp;
+                                      </div>
+                                      <div className="flex-1 px-3 py-1">&nbsp;</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+
+                            const lines = part.value.split('\n').slice(0, -1);
+                            return (
+                              <div key={index}>
+                                {lines.map((line, i) => {
+                                  lineNumber++;
+                                  return (
+                                    <div
+                                      key={i}
+                                      className={`flex ${
+                                        part.removed
+                                          ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200'
+                                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                                      }`}
+                                    >
+                                      <div className={`w-12 flex-shrink-0 text-right pr-2 select-none border-r ${
+                                        part.removed 
+                                          ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20'
+                                          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+                                      }`}>
+                                        {lineNumber}
+                                      </div>
+                                      <div className="flex-1 px-3 py-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                        {part.removed && <span className="font-semibold mr-2">-</span>}
+                                        {!part.removed && <span className="mr-3 opacity-0">·</span>}
+                                        {line || '\u00A0'}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Right Side - Version 2 (Compare To) */}
+                    <div
+                      ref={rightPanelRef}
+                      onScroll={handleRightScroll}
+                      className="overflow-auto"
+                    >
+                      <div className="sticky top-0 bg-green-100 dark:bg-green-900/30 px-3 py-2 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
+                        v{versions.find(v => v.id === compareVersion2Id)?.version_id} (Compare To)
+                      </div>
+                      <div className="font-mono text-xs">
+                        {(() => {
+                          let lineNumber = 0;
+                          return diffResult.map((part, index) => {
+                            if (part.removed) {
+                              // Show empty placeholder for removed lines (they don't exist in version 2)
+                              return (
+                                <div key={index}>
+                                  {part.value.split('\n').slice(0, -1).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex bg-gray-50 dark:bg-gray-900/30 text-gray-400 dark:text-gray-600"
+                                      style={{ minHeight: '1.5rem' }}
+                                    >
+                                      <div className="w-12 flex-shrink-0 text-right pr-2 select-none border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800/50">
+                                        &nbsp;
+                                      </div>
+                                      <div className="flex-1 px-3 py-1">&nbsp;</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            }
+
+                            const lines = part.value.split('\n').slice(0, -1);
+                            return (
+                              <div key={index}>
+                                {lines.map((line, i) => {
+                                  lineNumber++;
+                                  return (
+                                    <div
+                                      key={i}
+                                      className={`flex ${
+                                        part.added
+                                          ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200'
+                                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                                      }`}
+                                    >
+                                      <div className={`w-12 flex-shrink-0 text-right pr-2 select-none border-r ${
+                                        part.added 
+                                          ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+                                          : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+                                      }`}>
+                                        {lineNumber}
+                                      </div>
+                                      <div className="flex-1 px-3 py-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                                        {part.added && <span className="font-semibold mr-2">+</span>}
+                                        {!part.added && <span className="mr-3 opacity-0">·</span>}
+                                        {line || '\u00A0'}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
