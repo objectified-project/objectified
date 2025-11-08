@@ -1,0 +1,171 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sample E-commerce API",
+    "version": "1.0.0",
+    "description": "A sample e-commerce API with products, customers, and orders"
+  },
+  "components": {
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "description": "A product available for purchase",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the product"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Product description"
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Product price"
+          },
+          "category": {
+            "type": "string",
+            "description": "Product category"
+          },
+          "inStock": {
+            "type": "boolean",
+            "description": "Whether the product is in stock"
+          }
+        },
+        "required": ["id", "name", "price"]
+      },
+      "Customer": {
+        "type": "object",
+        "description": "A customer account",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the customer"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Customer email address"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "Customer first name"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Customer last name"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Customer phone number"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": ["id", "email", "firstName", "lastName"]
+      },
+      "Address": {
+        "type": "object",
+        "description": "A physical address",
+        "properties": {
+          "street": {
+            "type": "string",
+            "description": "Street address"
+          },
+          "city": {
+            "type": "string",
+            "description": "City name"
+          },
+          "state": {
+            "type": "string",
+            "description": "State or province"
+          },
+          "postalCode": {
+            "type": "string",
+            "description": "Postal or ZIP code"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country name"
+          }
+        },
+        "required": ["street", "city", "country"]
+      },
+      "Order": {
+        "type": "object",
+        "description": "A customer order",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the order"
+          },
+          "customerId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Customer who placed the order"
+          },
+          "orderDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the order was placed"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing", "shipped", "delivered", "cancelled"],
+            "description": "Current order status"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            },
+            "description": "Items in the order"
+          },
+          "total": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Total order amount"
+          }
+        },
+        "required": ["id", "customerId", "orderDate", "status", "total"]
+      },
+      "OrderItem": {
+        "type": "object",
+        "description": "An item within an order",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Product being ordered"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Quantity ordered"
+          },
+          "unitPrice": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Price per unit at time of order"
+          },
+          "subtotal": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Line item subtotal"
+          }
+        },
+        "required": ["productId", "quantity", "unitPrice", "subtotal"]
+      }
+    }
+  }
+}
+

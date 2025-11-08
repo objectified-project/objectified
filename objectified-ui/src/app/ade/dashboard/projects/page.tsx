@@ -10,7 +10,11 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Box from '@mui/material/Box';
 import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
+import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 
 interface Project {
   id: string;
@@ -31,6 +35,8 @@ const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [createTabValue, setCreateTabValue] = useState(0);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
@@ -75,7 +81,16 @@ const Projects = () => {
     setProjectSlug('');
     setProjectEnabled(true);
     setErrorMessage('');
+    setCreateTabValue(0);
     setShowCreateDialog(true);
+  };
+
+  const handleImportClick = () => {
+    setShowImportDialog(true);
+  };
+
+  const handleImportSuccess = async () => {
+    await loadProjects();
   };
 
   const handleCreateSubmit = async () => {
@@ -345,65 +360,105 @@ const Projects = () => {
       >
         <DialogTitle>Create New Project</DialogTitle>
         <DialogContent>
-          {errorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {errorMessage}
-            </Alert>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+            <Tabs value={createTabValue} onChange={(e, newValue) => setCreateTabValue(newValue)}>
+              <Tab label="From Scratch" />
+              <Tab label="From OpenAPI Import" />
+            </Tabs>
+          </Box>
+
+          {createTabValue === 0 && (
+            <Box>
+              {errorMessage && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {errorMessage}
+                </Alert>
+              )}
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Project Name"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={projectName}
+                onChange={(e) => {
+                  setProjectName(e.target.value);
+                  // Auto-generate slug from name if slug is empty or matches previous auto-generated value
+                  if (!projectSlug || projectSlug === generateSlug(projectName)) {
+                    setProjectSlug(generateSlug(e.target.value));
+                  }
+                }}
+                disabled={isLoading}
+                required
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                margin="dense"
+                label="Slug"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={projectSlug}
+                onChange={(e) => setProjectSlug(e.target.value.toLowerCase())}
+                disabled={isLoading}
+                required
+                helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                margin="dense"
+                label="Description"
+                type="text"
+                fullWidth
+                variant="outlined"
+                multiline
+                rows={4}
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                disabled={isLoading}
+              />
+            </Box>
           )}
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Project Name"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={projectName}
-            onChange={(e) => {
-              setProjectName(e.target.value);
-              // Auto-generate slug from name if slug is empty or matches previous auto-generated value
-              if (!projectSlug || projectSlug === generateSlug(projectName)) {
-                setProjectSlug(generateSlug(e.target.value));
-              }
-            }}
-            disabled={isLoading}
-            required
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="Slug"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={projectSlug}
-            onChange={(e) => setProjectSlug(e.target.value.toLowerCase())}
-            disabled={isLoading}
-            required
-            helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="Description"
-            type="text"
-            fullWidth
-            variant="outlined"
-            multiline
-            rows={4}
-            value={projectDescription}
-            onChange={(e) => setProjectDescription(e.target.value)}
-            disabled={isLoading}
-          />
+
+          {createTabValue === 1 && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <AlertCircle size={48} style={{ margin: '0 auto 16px', color: '#3b82f6' }} />
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                Import a project from an OpenAPI specification file. This will create a new project with classes and properties automatically.
+              </p>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setShowCreateDialog(false);
+                  handleImportClick();
+                }}
+              >
+                Start Import
+              </Button>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowCreateDialog(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleCreateSubmit} variant="contained" disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'Create Project'}
-          </Button>
+          {createTabValue === 0 && (
+            <Button onClick={handleCreateSubmit} variant="contained" disabled={isLoading}>
+              {isLoading ? 'Creating...' : 'Create Project'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
+
+      {/* OpenAPI Import Dialog */}
+      <OpenAPIImportDialog
+        open={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onSuccess={handleImportSuccess}
+        tenantId={currentTenantId}
+        userId={currentUserId}
+      />
 
       {/* Edit Project Dialog */}
       <Dialog

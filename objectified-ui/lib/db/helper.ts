@@ -880,3 +880,115 @@ export async function removePropertyFromClass(classPropertyId: string) {
   }
 }
 
+// OpenAPI Import Functions
+
+export async function importProjectFromOpenAPI(
+  tenantId: string,
+  creatorId: string,
+  projectName: string,
+  projectSlug: string,
+  projectDescription: string | null,
+  versionId: string,
+  versionDescription: string | null,
+  classes: any[]
+) {
+  const client = await connectionPool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Create the project
+    const projectResult = await client.query(
+      `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [tenantId, creatorId, projectName.trim(), projectDescription?.trim() || null, projectSlug.trim().toLowerCase()]
+    );
+
+    const project = projectResult.rows[0];
+
+    // 2. Create the version
+    const versionResult = await client.query(
+      `INSERT INTO odb.versions (project_id, creator_id, version_id, description)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [project.id, creatorId, versionId.trim(), versionDescription?.trim() || null]
+    );
+
+    const version = versionResult.rows[0];
+
+    // 3. Collect all unique properties across all classes
+    const propertyMap = new Map<string, string>(); // key -> property_id
+
+    for (const cls of classes) {
+      for (const prop of cls.properties) {
+        const key = JSON.stringify({ name: prop.name, data: prop.data });
+
+        if (!propertyMap.has(key)) {
+          // Create the property
+          const propResult = await client.query(
+            `INSERT INTO odb.properties (project_id, name, description, data)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (project_id, name) DO UPDATE SET data = EXCLUDED.data
+             RETURNING id`,
+            [project.id, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data)]
+          );
+
+          propertyMap.set(key, propResult.rows[0].id);
+        }
+      }
+    }
+
+    // 4. Create classes and link properties
+    for (const cls of classes) {
+      // Create the class
+      const classResult = await client.query(
+        `INSERT INTO odb.classes (version_id, name, description, schema)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [version.id, cls.name.trim(), cls.description?.trim() || null, JSON.stringify({ type: 'object' })]
+      );
+
+      const classId = classResult.rows[0].id;
+
+      // Link properties to the class
+      for (const prop of cls.properties) {
+        const key = JSON.stringify({ name: prop.name, data: prop.data });
+        const propertyId = propertyMap.get(key);
+
+        if (propertyId) {
+          await client.query(
+            `INSERT INTO odb.class_properties (class_id, property_id, name, description, data)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [classId, propertyId, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data)]
+          );
+        }
+      }
+    }
+
+    await client.query('COMMIT');
+
+    return JSON.stringify({
+      success: true,
+      project: project,
+      version: version
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error importing project from OpenAPI:', error);
+
+    if (error.code === '23505') {
+      if (error.constraint?.includes('slug')) {
+        return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
+      }
+      if (error.constraint?.includes('version_id')) {
+        return JSON.stringify({ success: false, error: 'A version with this ID already exists for this project' });
+      }
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  } finally {
+    client.release();
+  }
+}
+
