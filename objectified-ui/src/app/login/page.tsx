@@ -25,8 +25,8 @@ const SSOButton = ({ provider, icon, onClick }: { provider: string; icon: React.
 const Login = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [payload, setPayload] = useState<any>({
-    email: 'admin@objectified.dev',
-    password: '1234',
+    email: '',
+    password: '',
   });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -164,17 +164,17 @@ const Login = () => {
           </form>
 
           {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">OR</span>
-            </div>
-          </div>
+          {/*<div className="relative my-6">*/}
+          {/*  <div className="absolute inset-0 flex items-center">*/}
+          {/*    <div className="w-full border-t border-gray-300"></div>*/}
+          {/*  </div>*/}
+          {/*  <div className="relative flex justify-center text-sm">*/}
+          {/*    <span className="px-2 bg-white text-gray-500">OR</span>*/}
+          {/*  </div>*/}
+          {/*</div>*/}
 
           {/* SSO Buttons */}
-          <div className="space-y-3">
+          {/*<div className="space-y-3">*/}
             {/*<SSOButton*/}
             {/*  provider="Google"*/}
             {/*  icon={*/}
@@ -200,11 +200,11 @@ const Login = () => {
             {/*  onClick={() => handleSSOLogin('Google')}*/}
             {/*/>*/}
 
-            <SSOButton
-              provider="GitHub"
-              icon={<Github size={18} className="text-gray-700" />}
-              onClick={() => handleSSOLogin('GitHub')}
-            />
+            {/*<SSOButton*/}
+            {/*  provider="GitHub"*/}
+            {/*  icon={<Github size={18} className="text-gray-700" />}*/}
+            {/*  onClick={() => handleSSOLogin('GitHub')}*/}
+            {/*/>*/}
 
             {/*<SSOButton*/}
             {/*  provider="GitLab"*/}
@@ -234,7 +234,7 @@ const Login = () => {
             {/*  }*/}
             {/*  onClick={() => handleSSOLogin('Microsoft')}*/}
             {/*/>*/}
-          </div>
+          {/*</div>*/}
 
           {/* Toggle Sign Up/Sign In */}
           <div className="mt-6 text-center">
