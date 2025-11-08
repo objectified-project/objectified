@@ -11,6 +11,8 @@ interface StudioContextType {
   triggerCanvasRefresh: () => void;
   sidebarRefreshKey: number;
   triggerSidebarRefresh: () => void;
+  isReadOnly: boolean;
+  setIsReadOnly: (value: boolean) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -20,6 +22,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState<number>(0);
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState<number>(0);
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -38,7 +41,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       canvasRefreshKey,
       triggerCanvasRefresh,
       sidebarRefreshKey,
-      triggerSidebarRefresh
+      triggerSidebarRefresh,
+      isReadOnly,
+      setIsReadOnly
     }}>
       {children}
     </StudioContext.Provider>

@@ -63,7 +63,7 @@ function StudioLayoutContent({
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
   // Get selected project and version from context
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly } = useStudio();
 
   // State for classes and properties
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -161,6 +161,10 @@ function StudioLayoutContent({
       alert('Please select a version from the canvas first');
       return;
     }
+    if (isReadOnly) {
+      alert('Cannot add classes to a published version. Please select an unpublished version to make changes.');
+      return;
+    }
     setClassDialogMode('add');
     setClassName('');
     setClassDescription('');
@@ -178,6 +182,10 @@ function StudioLayoutContent({
   const handleClassEdit = (classItem: ClassItem) => {
     if (!selectedVersionId) {
       alert('Please select a version from the canvas first');
+      return;
+    }
+    if (isReadOnly) {
+      alert('Cannot edit classes in a published version. Please select an unpublished version to make changes.');
       return;
     }
     setClassDialogMode('edit');
@@ -240,6 +248,10 @@ function StudioLayoutContent({
   const handleClassDelete = (classId: string) => {
     if (!selectedVersionId) {
       alert('Please select a version from the canvas first');
+      return;
+    }
+    if (isReadOnly) {
+      alert('Cannot delete classes from a published version. Please select an unpublished version to make changes.');
       return;
     }
     setDeleteTarget({ type: 'class', id: classId });
@@ -370,6 +382,10 @@ function StudioLayoutContent({
       alert('Please select a project from the canvas first');
       return;
     }
+    if (isReadOnly) {
+      alert('Cannot add properties to a published version. Please select an unpublished version to make changes.');
+      return;
+    }
     setPropertyDialogMode('add');
     setSelectedProperty(null);
     setPropertyDialogOpen(true);
@@ -380,6 +396,10 @@ function StudioLayoutContent({
       alert('Please select a project from the canvas first');
       return;
     }
+    if (isReadOnly) {
+      alert('Cannot edit properties in a published version. Please select an unpublished version to make changes.');
+      return;
+    }
     setPropertyDialogMode('edit');
     setSelectedProperty(propertyItem);
     setPropertyDialogOpen(true);
@@ -388,6 +408,10 @@ function StudioLayoutContent({
   const handlePropertyDelete = (propertyId: string) => {
     if (!selectedProjectId) {
       alert('Please select a project from the canvas first');
+      return;
+    }
+    if (isReadOnly) {
+      alert('Cannot delete properties from a published version. Please select an unpublished version to make changes.');
       return;
     }
     setDeleteTarget({ type: 'property', id: propertyId });
@@ -497,6 +521,7 @@ function StudioLayoutContent({
           refreshKey={refreshKey}
           selectedProjectId={selectedProjectId}
           selectedVersionId={selectedVersionId}
+          isReadOnly={isReadOnly}
         />
       )}
 

@@ -69,6 +69,7 @@ interface StudioSideNavProps {
   refreshKey?: number; // Used to trigger refresh from parent
   selectedProjectId?: string | null; // Currently selected project from canvas
   selectedVersionId?: string | null; // Currently selected version from canvas
+  isReadOnly?: boolean; // Whether the current version is published (read-only)
 }
 
 const StudioSideNav: React.FC<StudioSideNavProps> = ({
@@ -78,6 +79,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   refreshKey = 0,
   selectedProjectId = null,
   selectedVersionId = null,
+  isReadOnly = false,
 }) => {
   const [currentTab, setCurrentTab] = useState<'classes' | 'properties'>('classes');
   const [classesSearchQuery, setClassesSearchQuery] = useState('');
@@ -228,24 +230,24 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                             <IconButton
                               edge="end"
                               size="small"
-                              disabled={!selectedVersionId}
+                              disabled={!selectedVersionId || isReadOnly}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 callbacks.onClassEdit?.(classItem);
                               }}
-                              title={!selectedVersionId ? 'Select a version first' : 'Edit class'}
+                              title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Edit class'}
                             >
                               <Edit fontSize="small" />
                             </IconButton>
                             <IconButton
                               edge="end"
                               size="small"
-                              disabled={!selectedVersionId}
+                              disabled={!selectedVersionId || isReadOnly}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 callbacks.onClassDelete?.(classItem.id);
                               }}
-                              title={!selectedVersionId ? 'Select a version first' : 'Delete class'}
+                              title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Delete class'}
                             >
                               <Delete fontSize="small" />
                             </IconButton>
@@ -277,9 +279,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   color="primary"
                   size="small"
                   onClick={() => callbacks.onClassAdd?.()}
-                  disabled={!selectedVersionId}
+                  disabled={!selectedVersionId || isReadOnly}
                   aria-label="Add class"
-                  title={!selectedVersionId ? 'Select a version first' : 'Add class'}
+                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Add class'}
                 >
                   <Add />
                 </Fab>
@@ -391,12 +393,12 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton
                             size="small"
-                            disabled={!selectedProjectId}
+                            disabled={!selectedProjectId || isReadOnly}
                             onClick={(e) => {
                               e.stopPropagation();
                               callbacks.onPropertyEdit?.(propertyItem);
                             }}
-                            title={!selectedProjectId ? 'Select a project first' : 'Edit property'}
+                            title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Edit property'}
                             sx={{
                               opacity: 0.7,
                               '&:hover': { opacity: 1 }
@@ -406,12 +408,12 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                           </IconButton>
                           <IconButton
                             size="small"
-                            disabled={!selectedProjectId}
+                            disabled={!selectedProjectId || isReadOnly}
                             onClick={(e) => {
                               e.stopPropagation();
                               callbacks.onPropertyDelete?.(propertyItem.id);
                             }}
-                            title={!selectedProjectId ? 'Select a project first' : 'Delete property'}
+                            title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Delete property'}
                             sx={{
                               opacity: 0.7,
                               '&:hover': { opacity: 1 }
@@ -432,9 +434,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   color="primary"
                   size="small"
                   onClick={() => callbacks.onPropertyAdd?.()}
-                  disabled={!selectedProjectId}
+                  disabled={!selectedProjectId || isReadOnly}
                   aria-label="Add property"
-                  title={!selectedProjectId ? 'Select a project first' : 'Add property'}
+                  title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Add property'}
                 >
                   <Add />
                 </Fab>

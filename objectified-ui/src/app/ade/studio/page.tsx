@@ -58,6 +58,7 @@ interface Version {
   id: string;
   version_id: string;
   description: string;
+  published: boolean;
 }
 
 type ViewMode = 'canvas' | 'code';
@@ -68,7 +69,9 @@ const StudioContent = () => {
     setSelectedProjectId: setContextProjectId,
     setSelectedVersionId: setContextVersionId,
     canvasRefreshKey,
-    triggerSidebarRefresh
+    triggerSidebarRefresh,
+    isReadOnly,
+    setIsReadOnly
   } = useStudio();
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -311,7 +314,8 @@ const StudioContent = () => {
         onPropertyEdit: handlePropertyEdit,
         onPropertyDelete: handlePropertyDelete,
         onClassEdit: handleClassEdit,
-        onClassDelete: handleClassDelete
+        onClassDelete: handleClassDelete,
+        isReadOnly: isReadOnly
       }
     }));
   };
@@ -656,7 +660,12 @@ const StudioContent = () => {
   };
 
   const handleVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedVersionId(e.target.value);
+    const versionId = e.target.value;
+    setSelectedVersionId(versionId);
+
+    // Update read-only status based on whether version is published
+    const version = versions.find(v => v.id === versionId);
+    setIsReadOnly(version?.published || false);
   };
 
   const onConnect = useCallback(
@@ -756,7 +765,7 @@ const StudioContent = () => {
               <option value="">Select version...</option>
               {versions.map((version) => (
                 <option key={version.id} value={version.id}>
-                  {version.version_id} - {version.description}
+                  {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
                 </option>
               ))}
             </select>
@@ -867,6 +876,18 @@ const StudioContent = () => {
               className="dark:bg-gray-800 dark:border-gray-700"
               maskColor="rgb(0, 0, 0, 0.1)"
             />
+
+            {/* Read Only Indicator */}
+            {isReadOnly && (
+              <Panel position="top-left" className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 rounded-lg shadow-lg px-3 py-1.5 border border-yellow-300 dark:border-yellow-700">
+                <div className="flex items-center gap-1.5">
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-xs font-semibold">Read Only</span>
+                </div>
+              </Panel>
+            )}
 
             {/* Layout Control Panel */}
             <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">

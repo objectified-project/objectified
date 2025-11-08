@@ -523,7 +523,7 @@ const Versions = () => {
                           label="Published"
                           color="success"
                           size="small"
-                          icon={<CheckCircle style={{ fontSize: 16 }} />}
+                          icon={<CheckCircle style={{ fontSize: 16 }} size={16}/>}
                         />
                       ) : (
                         <Chip
@@ -658,7 +658,7 @@ const Versions = () => {
               </MenuItem>
               {versions.map((version) => (
                 <MenuItem key={version.id} value={version.id}>
-                  v{version.version_id} - {version.description || 'No description'}
+                  {version.published ? '🔒 ' : ''}v{version.version_id} - {version.description || 'No description'}
                 </MenuItem>
               ))}
             </Select>

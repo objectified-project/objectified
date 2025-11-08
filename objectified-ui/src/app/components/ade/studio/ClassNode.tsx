@@ -22,6 +22,7 @@ type ClassNodeData = {
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
   onClassEdit?: (classData: any) => void;
   onClassDelete?: (classId: string, className: string) => void;
+  isReadOnly?: boolean;
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -44,6 +45,11 @@ function ClassNode({ data, selected }: NodeProps) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
+
+    // Don't allow drops in read-only mode
+    if (typedData.isReadOnly) {
+      return;
+    }
 
     try {
       const data = e.dataTransfer.getData('application/json');
@@ -88,6 +94,12 @@ function ClassNode({ data, selected }: NodeProps) {
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Don't allow editing in read-only mode
+    if (typedData.isReadOnly) {
+      return;
+    }
+
     if (typedData.onClassEdit) {
       typedData.onClassEdit({
         id: typedData.id,
@@ -150,37 +162,39 @@ function ClassNode({ data, selected }: NodeProps) {
         }}>
           {typedData.name}
         </div>
-        <button
-          style={{
-            background: 'rgba(255, 255, 255, 0.2)',
-            border: 'none',
-            borderRadius: '3px',
-            padding: '4px 6px',
-            cursor: 'pointer',
-            color: 'white',
-            fontSize: '14px',
-            lineHeight: 1,
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent node selection
-            if (typedData.onClassDelete) {
-              typedData.onClassDelete(typedData.id, typedData.name);
-            }
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-          }}
-          title="Delete class"
-        >
-          <Trash2 size={14} />
-        </button>
+        {!typedData.isReadOnly && (
+          <button
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              border: 'none',
+              borderRadius: '3px',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              color: 'white',
+              fontSize: '14px',
+              lineHeight: 1,
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent node selection
+              if (typedData.onClassDelete) {
+                typedData.onClassDelete(typedData.id, typedData.name);
+              }
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+            }}
+            title="Delete class"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
       {/* Description */}
@@ -255,76 +269,78 @@ function ClassNode({ data, selected }: NodeProps) {
                 </div>
 
                 {/* Action buttons */}
-                <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
-                  {typedData.onPropertyEdit && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        typedData.onPropertyEdit!(typedData.id, prop);
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '2px',
-                        color: '#9ca3af',
-                        fontSize: '11px',
-                        lineHeight: 1,
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#dbeafe';
-                        e.currentTarget.style.color = '#2563eb';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#9ca3af';
-                      }}
-                      title="Edit property"
-                    >
-                      <Edit size={11} />
-                    </button>
-                  )}
-                  {typedData.onPropertyDelete && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Remove "${prop.name}" from this class?`)) {
-                          typedData.onPropertyDelete!(typedData.id, prop.id);
-                        }
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '2px',
-                        color: '#9ca3af',
-                        fontSize: '13px',
-                        lineHeight: 1,
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#fee2e2';
-                        e.currentTarget.style.color = '#dc2626';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                        e.currentTarget.style.color = '#9ca3af';
-                      }}
-                      title="Remove property from class"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
+                {!typedData.isReadOnly && (
+                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
+                    {typedData.onPropertyEdit && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          typedData.onPropertyEdit!(typedData.id, prop);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '2px',
+                          color: '#9ca3af',
+                          fontSize: '11px',
+                          lineHeight: 1,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#dbeafe';
+                          e.currentTarget.style.color = '#2563eb';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#9ca3af';
+                        }}
+                        title="Edit property"
+                      >
+                        <Edit size={11} />
+                      </button>
+                    )}
+                    {typedData.onPropertyDelete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Remove "${prop.name}" from this class?`)) {
+                            typedData.onPropertyDelete!(typedData.id, prop.id);
+                          }
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '2px',
+                          color: '#9ca3af',
+                          fontSize: '13px',
+                          lineHeight: 1,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#fee2e2';
+                          e.currentTarget.style.color = '#dc2626';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#9ca3af';
+                        }}
+                        title="Remove property from class"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {/* Handle for $ref properties */}
                 {propertyHasRef && (
