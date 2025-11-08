@@ -1,11 +1,11 @@
 import dagre from 'dagre';
-import { Node, Edge } from '@xyflow/react';
-
-// Default node dimensions
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 100;
+import type { Node, Edge } from '@xyflow/react';
 
 export type LayoutDirection = 'TB' | 'BT' | 'LR' | 'RL';
+
+// Default node dimensions
+const NODE_WIDTH = 280;
+const NODE_HEIGHT = 180;
 
 export interface LayoutOptions {
   direction?: LayoutDirection;
@@ -17,9 +17,9 @@ export interface LayoutOptions {
 }
 
 /**
- * Applies Dagre layout algorithm to position nodes automatically
- * @param nodes - Array of React Flow nodes
- * @param edges - Array of React Flow edges
+ * Layout nodes and edges using Dagre
+ * @param nodes - Array of nodes to layout
+ * @param edges - Array of edges connecting the nodes
  * @param options - Layout configuration options
  * @returns Array of nodes with updated positions
  */
@@ -32,9 +32,9 @@ export function getLayoutedElements(
     direction = 'TB',
     nodeWidth = NODE_WIDTH,
     nodeHeight = NODE_HEIGHT,
-    rankSeparation = 150,    // Increased from 100 (vertical spacing between ranks)
-    nodeSeparation = 120,    // Increased from 80 (horizontal spacing between nodes)
-    edgeSeparation = 20,     // Increased from 10 (spacing between edges)
+    rankSeparation = 250,    // Increased from 150 for better vertical spacing
+    nodeSeparation = 150,    // Increased from 120 for better horizontal spacing
+    edgeSeparation = 30,     // Increased from 20 for better edge spacing
   } = options;
 
   // Create a new directed graph
