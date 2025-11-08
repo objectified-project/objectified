@@ -1,0 +1,163 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Test OpenAPI with Unsupported Schemas",
+    "version": "1.0.0",
+    "description": "Test file demonstrating unsupported class warnings with automatic suggestions for fixes"
+  },
+  "components": {
+    "schemas": {
+      "ValidProduct": {
+        "type": "object",
+        "description": "A valid product schema (SUPPORTED)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Product name"
+          },
+          "price": {
+            "type": "number",
+            "format": "decimal",
+            "description": "Product price"
+          }
+        },
+        "required": ["id", "name", "price"]
+      },
+      "InvalidProductWithInlineAddress": {
+        "type": "object",
+        "description": "Product with inline address object (NOT SUPPORTED)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "warehouse": {
+            "type": "object",
+            "description": "Inline warehouse object - NOT SUPPORTED",
+            "properties": {
+              "street": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "InvalidProductWithInlineArrayItems": {
+        "type": "object",
+        "description": "Product with inline array items (NOT SUPPORTED)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "variants": {
+            "type": "array",
+            "description": "Array with inline object items - NOT SUPPORTED",
+            "items": {
+              "type": "object",
+              "properties": {
+                "size": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ValidCustomer": {
+        "type": "object",
+        "description": "A valid customer schema with proper references (SUPPORTED)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": ["id", "email"]
+      },
+      "Address": {
+        "type": "object",
+        "description": "A valid address schema (SUPPORTED)",
+        "properties": {
+          "street": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          }
+        },
+        "required": ["street", "city", "country"]
+      },
+      "InvalidOrderWithMissingRef": {
+        "type": "object",
+        "description": "Order with reference to non-existent schema (NOT SUPPORTED)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/NonExistentCustomer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NonExistentOrderItem"
+            }
+          }
+        }
+      },
+      "InvalidMixedProblems": {
+        "type": "object",
+        "description": "Schema with both inline objects AND missing refs (NOT SUPPORTED)",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "relatedEntity": {
+            "$ref": "#/components/schemas/DoesNotExist"
+          }
+        }
+      }
+    }
+  }
+}
+

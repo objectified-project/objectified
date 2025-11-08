@@ -32,9 +32,10 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   tenantId,
   userId
 }) => {
-  const [step, setStep] = useState<'upload' | 'review' | 'details'>('upload');
+  const [step, setStep] = useState<'upload' | 'review' | 'summary' | 'details'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [classes, setClasses] = useState<ParsedClass[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [projectName, setProjectName] = useState('');
   const [projectSlug, setProjectSlug] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
@@ -59,6 +60,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     setStep('upload');
     setFile(null);
     setClasses([]);
+    setWarnings([]);
     setProjectName('');
     setProjectSlug('');
     setProjectDescription('');
@@ -68,6 +70,34 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     setIsLoading(false);
     setIsDragging(false);
     setOpenAPIInfo(null);
+  };
+
+  const calculateImportStats = () => {
+    const supportedClasses = classes.filter(c => c.isSupported);
+    const selectedClasses = supportedClasses.filter(c => c.selected);
+
+    // Count unique properties by creating a signature (name + type)
+    const propertyMap = new Map<string, number>(); // signature -> count
+
+    selectedClasses.forEach(cls => {
+      cls.properties.forEach(prop => {
+        const signature = JSON.stringify({ name: prop.name, data: prop.data });
+        propertyMap.set(signature, (propertyMap.get(signature) || 0) + 1);
+      });
+    });
+
+    const totalProperties = propertyMap.size;
+    const sharedProperties = Array.from(propertyMap.values()).filter(count => count > 1).length;
+    const uniqueProperties = totalProperties - sharedProperties;
+
+    return {
+      totalClasses: selectedClasses.length,
+      supportedClasses: supportedClasses.length,
+      unsupportedClasses: classes.filter(c => !c.isSupported).length,
+      totalProperties,
+      uniqueProperties,
+      sharedProperties
+    };
   };
 
   const handleFileSelect = async (selectedFile: File) => {
@@ -91,6 +121,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
       }
 
       setClasses(parseResult.classes);
+      setWarnings(parseResult.warnings || []);
       setOpenAPIInfo({
         title: parseResult.title,
         version: parseResult.version,
@@ -147,6 +178,13 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
   const toggleClassSelection = (index: number) => {
     const updatedClasses = [...classes];
+    const cls = updatedClasses[index];
+
+    // Don't allow selecting unsupported classes
+    if (!cls.isSupported) {
+      return;
+    }
+
     updatedClasses[index].selected = !updatedClasses[index].selected;
     setClasses(updatedClasses);
   };
@@ -234,7 +272,8 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>
         {step === 'upload' && 'Import from OpenAPI Specification'}
-        {step === 'review' && 'Review Classes to Import'}
+        {step === 'review' && 'Select Classes to Import'}
+        {step === 'summary' && 'Review Import Summary'}
         {step === 'details' && 'Project Details'}
       </DialogTitle>
 
@@ -309,25 +348,23 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
         {step === 'review' && (
           <Box>
             {openAPIInfo && (
-              <Box sx={{ mb: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  OpenAPI Specification Info
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  OpenAPI Specification
                 </Typography>
-                {openAPIInfo.title && (
-                  <Typography variant="body2">
-                    <strong>Title:</strong> {openAPIInfo.title}
-                  </Typography>
-                )}
-                {openAPIInfo.version && (
-                  <Typography variant="body2">
-                    <strong>Version:</strong> {openAPIInfo.version}
+                <Typography variant="body2">
+                  <strong>{openAPIInfo.title}</strong> {openAPIInfo.version && `v${openAPIInfo.version}`}
+                </Typography>
+                {openAPIInfo.description && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    {openAPIInfo.description}
                   </Typography>
                 )}
               </Box>
             )}
 
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Select the classes you want to import. Classes with inline object properties are not supported and have been filtered out.
+              Select the classes you want to import. Unsupported classes (shown in gray below) cannot be imported.
             </Typography>
 
             <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
@@ -338,9 +375,10 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                     mb: 2,
                     p: 2,
                     border: 1,
-                    borderColor: cls.selected ? 'primary.main' : 'grey.300',
+                    borderColor: !cls.isSupported ? 'error.main' : (cls.selected ? 'primary.main' : 'grey.300'),
                     borderRadius: 1,
-                    backgroundColor: cls.selected ? 'action.selected' : 'background.paper'
+                    backgroundColor: !cls.isSupported ? 'grey.100' : (cls.selected ? 'action.selected' : 'background.paper'),
+                    opacity: !cls.isSupported ? 0.6 : 1
                   }}
                 >
                   <FormControlLabel
@@ -348,13 +386,24 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                       <Checkbox
                         checked={cls.selected}
                         onChange={() => toggleClassSelection(index)}
+                        disabled={!cls.isSupported}
                       />
                     }
                     label={
                       <Box>
-                        <Typography variant="subtitle1" fontWeight="bold">
-                          {cls.name}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="subtitle1" fontWeight="bold" color={!cls.isSupported ? 'text.disabled' : 'text.primary'}>
+                            {cls.name}
+                          </Typography>
+                          {!cls.isSupported && (
+                            <Chip
+                              label="Not Supported"
+                              size="small"
+                              color="error"
+                              sx={{ height: 20 }}
+                            />
+                          )}
+                        </Box>
                         {cls.description && (
                           <Typography variant="body2" color="text.secondary">
                             {cls.description}
@@ -363,6 +412,45 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                       </Box>
                     }
                   />
+
+                  {cls.warnings.length > 0 && (
+                    <Box sx={{ mt: 1, ml: 4, p: 1.5, bgcolor: 'warning.lighter', borderRadius: 1 }}>
+                      {cls.warnings.map((warning, wIdx) => {
+                        // Split warning into main message and suggestions
+                        const parts = warning.split('\n\n💡 Suggested fix:\n');
+                        const mainMessage = parts[0];
+                        const suggestions = parts[1];
+
+                        return (
+                          <Box key={wIdx} sx={{ mb: wIdx < cls.warnings.length - 1 ? 1.5 : 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'start', gap: 0.5, mb: suggestions ? 1 : 0 }}>
+                              <AlertCircle size={14} style={{ marginTop: 2, flexShrink: 0, color: '#f59e0b' }} />
+                              <Typography variant="caption" color="warning.dark">
+                                {mainMessage}
+                              </Typography>
+                            </Box>
+                            {suggestions && (
+                              <Box sx={{ ml: 2.5, mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 0.5, borderLeft: '2px solid #3b82f6' }}>
+                                <Typography variant="caption" color="primary.dark" fontWeight="bold" sx={{ display: 'block', mb: 0.5 }}>
+                                  💡 Suggested fix:
+                                </Typography>
+                                <Box component="pre" sx={{
+                                  m: 0,
+                                  fontFamily: 'monospace',
+                                  fontSize: '0.7rem',
+                                  color: 'text.secondary',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
+                                }}>
+                                  {suggestions}
+                                </Box>
+                              </Box>
+                            )}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
 
                   <Box sx={{ mt: 1, ml: 4 }}>
                     <Typography variant="caption" color="text.secondary">
@@ -390,12 +478,130 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               ))}
             </Box>
 
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'info.lighter', borderRadius: 1 }}>
-              <Typography variant="body2" color="info.dark">
-                <AlertCircle size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                Properties with identical names and types will be reused across classes.
-              </Typography>
-            </Box>
+          </Box>
+        )}
+
+        {/* Summary Step */}
+        {step === 'summary' && (
+          <Box>
+            {(() => {
+              const stats = calculateImportStats();
+              const selectedClasses = classes.filter(c => c.isSupported && c.selected);
+
+              return (
+                <>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Review the summary of what will be imported from your OpenAPI specification.
+                  </Typography>
+
+                  {/* Main Statistics Card */}
+                  <Box sx={{ mb: 3, p: 3, bgcolor: 'success.lighter', borderRadius: 2, border: '1px solid', borderColor: 'success.light' }}>
+                    <Typography variant="h6" fontWeight="bold" color="success.dark" gutterBottom>
+                      📊 Import Summary
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                          Classes to Import
+                        </Typography>
+                        <Typography variant="h4" color="success.dark">
+                          {stats.totalClasses}
+                        </Typography>
+                        {stats.unsupportedClasses > 0 && (
+                          <Typography variant="caption" color="text.secondary">
+                            ({stats.supportedClasses} available, {stats.unsupportedClasses} unsupported)
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                          Total Properties
+                        </Typography>
+                        <Typography variant="h4" color="success.dark">
+                          {stats.totalProperties}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ({stats.uniqueProperties} unique, {stats.sharedProperties} shared)
+                        </Typography>
+                      </Box>
+                    </Box>
+                    {stats.sharedProperties > 0 && (
+                      <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'success.main' }}>
+                        <Typography variant="body2" color="success.dark">
+                          💡 <strong>{stats.sharedProperties}</strong> propert{stats.sharedProperties !== 1 ? 'ies' : 'y'} will be reused across multiple classes, reducing duplication and maintaining consistency.
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+
+                  {/* Selected Classes List */}
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                      Selected Classes ({selectedClasses.length})
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                      {selectedClasses.map((cls, idx) => (
+                        <Chip
+                          key={idx}
+                          label={`${cls.name} (${cls.properties.length})`}
+                          color="primary"
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+
+                  {/* Warnings Section */}
+                  {warnings.length > 0 && (
+                    <Alert severity="warning">
+                      <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                        ⚠️ {warnings.length} class{warnings.length !== 1 ? 'es' : ''} cannot be imported
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        The following classes have issues that prevent them from being imported:
+                      </Typography>
+                      <Box sx={{ maxHeight: 150, overflowY: 'auto', mt: 1 }}>
+                        {warnings.map((warning, idx) => {
+                          const className = warning.split(':')[0];
+                          const reason = warning.substring(warning.indexOf(':') + 1).trim();
+                          const shortReason = reason.split('.')[0] + '.';
+
+                          return (
+                            <Box key={idx} sx={{
+                              mb: 1,
+                              p: 1,
+                              bgcolor: 'background.paper',
+                              borderRadius: 1,
+                              borderLeft: '3px solid',
+                              borderLeftColor: 'warning.main'
+                            }}>
+                              <Typography variant="body2" fontWeight="bold" color="text.primary">
+                                {className}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {shortReason}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    </Alert>
+                  )}
+
+                  {/* OpenAPI Info */}
+                  {openAPIInfo && (
+                    <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Source Specification
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold">
+                        {openAPIInfo.title} {openAPIInfo.version && `v${openAPIInfo.version}`}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              );
+            })()}
           </Box>
         )}
 
@@ -511,7 +717,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               Back
             </Button>
             <Button
-              onClick={handleReviewNext}
+              onClick={() => setStep('summary')}
               variant="contained"
               disabled={classes.filter(c => c.selected).length === 0 || isLoading}
             >
@@ -520,9 +726,24 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
           </>
         )}
 
-        {step === 'details' && (
+        {step === 'summary' && (
           <>
             <Button onClick={() => setStep('review')} disabled={isLoading}>
+              Back
+            </Button>
+            <Button
+              onClick={() => setStep('details')}
+              variant="contained"
+              disabled={isLoading}
+            >
+              Continue to Project Details
+            </Button>
+          </>
+        )}
+
+        {step === 'details' && (
+          <>
+            <Button onClick={() => setStep('summary')} disabled={isLoading}>
               Back
             </Button>
             <Button
