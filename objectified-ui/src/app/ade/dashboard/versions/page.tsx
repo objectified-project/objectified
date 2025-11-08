@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -29,6 +29,7 @@ import {
 } from '../../../../../lib/db/helper';
 import { generateOpenApiSpec } from '../../../utils/openapi';
 import * as yaml from 'js-yaml';
+import { diffLines, Change } from 'diff';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -88,6 +89,16 @@ const Versions = () => {
   const [openApiFormat, setOpenApiFormat] = useState<'json' | 'yaml'>('json');
   const [viewingVersion, setViewingVersion] = useState<Version | null>(null);
   const [isLoadingSpec, setIsLoadingSpec] = useState(false);
+
+  // Version Comparison state
+  const [showCompareDialog, setShowCompareDialog] = useState(false);
+  const [compareVersion1Id, setCompareVersion1Id] = useState<string>('');
+  const [compareVersion2Id, setCompareVersion2Id] = useState<string>('');
+  const [compareSpec1, setCompareSpec1] = useState<string>('');
+  const [compareSpec2, setCompareSpec2] = useState<string>('');
+  const [compareFormat, setCompareFormat] = useState<'json' | 'yaml'>('json');
+  const [isLoadingComparison, setIsLoadingComparison] = useState(false);
+  const [diffResult, setDiffResult] = useState<Change[]>([]);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
@@ -370,6 +381,96 @@ const Versions = () => {
     }
   };
 
+  const loadVersionSpec = async (versionId: string): Promise<string> => {
+    const version = versions.find(v => v.id === versionId);
+    if (!version) {
+      throw new Error('Version not found');
+    }
+
+    // Load classes for this version
+    const classesResult = await getClassesForVersion(version.id);
+    const classesData = JSON.parse(classesResult);
+
+    // Load properties for each class
+    const classesWithProperties = await Promise.all(
+      classesData.map(async (cls: any) => {
+        const propsResult = await getPropertiesForClass(cls.id);
+        const properties = JSON.parse(propsResult);
+        return { ...cls, properties };
+      })
+    );
+
+    // Get the project name
+    const project = projects.find(p => p.id === version.project_id);
+
+    // Generate OpenAPI spec
+    return generateOpenApiSpec(classesWithProperties, {
+      projectName: project?.name,
+      version: version.version_id,
+      description: version.description || undefined
+    });
+  };
+
+  const handleCompareVersions = async () => {
+    if (!compareVersion1Id || !compareVersion2Id) {
+      alert('Please select two versions to compare');
+      return;
+    }
+
+    if (compareVersion1Id === compareVersion2Id) {
+      alert('Please select two different versions to compare');
+      return;
+    }
+
+    setIsLoadingComparison(true);
+
+    try {
+      // Load both specs
+      const [spec1, spec2] = await Promise.all([
+        loadVersionSpec(compareVersion1Id),
+        loadVersionSpec(compareVersion2Id)
+      ]);
+
+      setCompareSpec1(spec1);
+      setCompareSpec2(spec2);
+
+      // Calculate diff
+      const content1 = compareFormat === 'json' ? spec1 : yaml.dump(JSON.parse(spec1), { lineWidth: -1, noRefs: true });
+      const content2 = compareFormat === 'json' ? spec2 : yaml.dump(JSON.parse(spec2), { lineWidth: -1, noRefs: true });
+
+      const diff = diffLines(content1, content2);
+      setDiffResult(diff);
+    } catch (error) {
+      console.error('Failed to compare versions:', error);
+      alert('Failed to load version specifications for comparison');
+    } finally {
+      setIsLoadingComparison(false);
+    }
+  };
+
+  const handleCompareDialogOpen = () => {
+    setShowCompareDialog(true);
+    setCompareVersion1Id('');
+    setCompareVersion2Id('');
+    setCompareSpec1('');
+    setCompareSpec2('');
+    setCompareFormat('json');
+    setDiffResult([]);
+  };
+
+  const handleCompareFormatChange = (newFormat: 'json' | 'yaml') => {
+    setCompareFormat(newFormat);
+
+    // Recalculate diff if specs are loaded
+    if (compareSpec1 && compareSpec2) {
+      const content1 = newFormat === 'json' ? compareSpec1 : yaml.dump(JSON.parse(compareSpec1), { lineWidth: -1, noRefs: true });
+      const content2 = newFormat === 'json' ? compareSpec2 : yaml.dump(JSON.parse(compareSpec2), { lineWidth: -1, noRefs: true });
+
+      const diff = diffLines(content1, content2);
+      setDiffResult(diff);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -509,6 +610,15 @@ const Versions = () => {
               ))}
             </Select>
           </FormControl>
+          <button
+            onClick={handleCompareDialogOpen}
+            disabled={!selectedProjectId || versions.length < 2}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg cursor-pointer transition-colors disabled:cursor-not-allowed"
+            title={versions.length < 2 ? 'Need at least 2 versions to compare' : 'Compare two versions'}
+          >
+            <Copy className="h-5 w-5" />
+            Compare
+          </button>
           <button
             onClick={handleCreateClick}
             disabled={!selectedProjectId}
@@ -1029,6 +1139,171 @@ const Versions = () => {
             disabled={isLoadingSpec}
           >
             Download
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Version Comparison Dialog */}
+      <Dialog
+        open={showCompareDialog}
+        onClose={() => setShowCompareDialog(false)}
+        maxWidth="xl"
+        fullWidth
+        PaperProps={{
+          sx: {
+            height: '90vh',
+            maxHeight: '90vh',
+          }
+        }}
+      >
+        <DialogTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold">Compare Version Schemas</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                View differences between two version specifications
+              </div>
+            </div>
+            {diffResult.length > 0 && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                  <button
+                    onClick={() => handleCompareFormatChange('json')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      compareFormat === 'json'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    JSON
+                  </button>
+                  <button
+                    onClick={() => handleCompareFormatChange('yaml')}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                      compareFormat === 'yaml'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    YAML
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogTitle>
+        <DialogContent>
+          {diffResult.length === 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormControl fullWidth>
+                  <InputLabel>Version 1 (Base)</InputLabel>
+                  <Select
+                    value={compareVersion1Id}
+                    label="Version 1 (Base)"
+                    onChange={(e) => setCompareVersion1Id(e.target.value)}
+                    disabled={isLoadingComparison}
+                  >
+                    <MenuItem value="">
+                      <em>Select version...</em>
+                    </MenuItem>
+                    {versions.map((version) => (
+                      <MenuItem key={version.id} value={version.id}>
+                        {version.published ? '🔒 ' : ''}v{version.version_id} - {version.description || 'No description'}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>Version 2 (Compare To)</InputLabel>
+                  <Select
+                    value={compareVersion2Id}
+                    label="Version 2 (Compare To)"
+                    onChange={(e) => setCompareVersion2Id(e.target.value)}
+                    disabled={isLoadingComparison}
+                  >
+                    <MenuItem value="">
+                      <em>Select version...</em>
+                    </MenuItem>
+                    {versions.map((version) => (
+                      <MenuItem key={version.id} value={version.id}>
+                        {version.published ? '🔒 ' : ''}v{version.version_id} - {version.description || 'No description'}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+              <div className="flex justify-center py-8">
+                <Button
+                  onClick={handleCompareVersions}
+                  variant="contained"
+                  disabled={!compareVersion1Id || !compareVersion2Id || isLoadingComparison}
+                  size="large"
+                >
+                  {isLoadingComparison ? 'Loading...' : 'Compare Versions'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full">
+              <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-red-200 dark:bg-red-900 border border-red-400 dark:border-red-600"></div>
+                    <span>Removed</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-green-200 dark:bg-green-900 border border-green-400 dark:border-green-600"></div>
+                    <span>Added</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600"></div>
+                    <span>Unchanged</span>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}
+                </div>
+              </div>
+              <div className="border border-gray-300 dark:border-gray-600 rounded overflow-auto" style={{ height: 'calc(90vh - 250px)' }}>
+                <div className="font-mono text-xs">
+                  {diffResult.map((part, index) => (
+                    <div
+                      key={index}
+                      className={`px-3 py-1 ${
+                        part.added
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200 border-l-4 border-green-500'
+                          : part.removed
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200 border-l-4 border-red-500'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                      }`}
+                      style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                    >
+                      {part.added && <span className="font-semibold mr-2">+</span>}
+                      {part.removed && <span className="font-semibold mr-2">-</span>}
+                      {!part.added && !part.removed && <span className="mr-3 opacity-0">·</span>}
+                      {part.value}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {diffResult.length > 0 && (
+            <Button
+              onClick={() => {
+                setDiffResult([]);
+                setCompareSpec1('');
+                setCompareSpec2('');
+              }}
+            >
+              Compare Different Versions
+            </Button>
+          )}
+          <Button onClick={() => setShowCompareDialog(false)}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

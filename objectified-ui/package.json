@@ -21,6 +21,7 @@
     "@xyflow/react": "^12.9.2",
     "bcrypt": "^6.0.0",
     "dagre": "^0.8.5",
+    "diff": "^8.0.2",
     "js-yaml": "^4.1.0",
     "json-schema-faker": "^0.5.9",
     "lucide-react": "^0.548.0",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6",
+    "@types/diff": "^7.0.2",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/pg": "^8",
