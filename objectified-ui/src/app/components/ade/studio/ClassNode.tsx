@@ -127,7 +127,8 @@ function ClassNode({ data, selected }: NodeProps) {
           ? '0 2px 8px rgba(91, 104, 234, 0.2)'
           : '0 1px 3px rgba(0, 0, 0, 0.08)',
         transition: 'all 0.2s ease',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        cursor: 'pointer'
       }}
     >
       {/* Target handle at the top */}
