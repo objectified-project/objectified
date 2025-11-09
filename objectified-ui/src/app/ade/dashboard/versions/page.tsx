@@ -209,7 +209,8 @@ const Versions = () => {
         autoGenerate ? null : versionId,
         description,
         changeLog,
-        sourceVersionId || null
+        sourceVersionId || null,
+        autoGenerate ? bumpStrategy : undefined
       );
       const response = JSON.parse(result);
 

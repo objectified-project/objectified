@@ -378,6 +378,13 @@ function bumpMinorVersion(version: string): string {
   return `${parsed.major}.${parsed.minor + 1}.0`;
 }
 
+function bumpPatchVersion(version: string): string {
+  const parsed = parseSemanticVersion(version);
+  if (!parsed) return '0.1.0';
+
+  return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
+}
+
 export async function copyClassesFromVersion(sourceVersionId: string, targetVersionId: string) {
   try {
     // Copy all classes from source version to target version
@@ -423,14 +430,21 @@ export async function copyClassesFromVersion(sourceVersionId: string, targetVers
   }
 }
 
-export async function createVersion(projectId: string, creatorId: string, versionId: string | null, description: string, changeLog: string, sourceVersionId?: string | null) {
+export async function createVersion(projectId: string, creatorId: string, versionId: string | null, description: string, changeLog: string, sourceVersionId?: string | null, bumpStrategy?: 'patch' | 'minor') {
   try {
     let finalVersionId = versionId;
 
     // If no version ID provided, auto-generate by bumping the latest version
     if (!finalVersionId || finalVersionId.trim().length === 0) {
       const latestVersion = await getLatestVersionForProject(projectId);
-      finalVersionId = latestVersion ? bumpMinorVersion(latestVersion) : '0.1.0';
+      if (latestVersion) {
+        // Use the provided bump strategy, default to 'patch' if not specified
+        finalVersionId = (bumpStrategy === 'minor')
+          ? bumpMinorVersion(latestVersion)
+          : bumpPatchVersion(latestVersion);
+      } else {
+        finalVersionId = '0.1.0';
+      }
     }
 
     // Validate semantic versioning format
