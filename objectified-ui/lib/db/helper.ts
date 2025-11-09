@@ -536,6 +536,59 @@ export async function unpublishVersion(versionRecordId: string) {
   }
 }
 
+export async function getPublishedVersionsForTenant(tenantId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT 
+        v.id,
+        v.version_id,
+        v.description,
+        v.visibility,
+        v.published_at,
+        v.created_at,
+        p.id as project_id,
+        p.name as project_name,
+        p.slug as project_slug,
+        t.id as tenant_id,
+        t.name as tenant_name,
+        t.slug as tenant_slug,
+        u.name as creator_name,
+        u.email as creator_email
+       FROM odb.versions v
+       JOIN odb.projects p ON v.project_id = p.id
+       JOIN odb.tenants t ON p.tenant_id = t.id
+       LEFT JOIN odb.users u ON v.creator_id = u.id
+       WHERE p.tenant_id = $1 
+         AND v.published = true 
+         AND v.deleted_at IS NULL
+         AND p.deleted_at IS NULL
+         AND t.deleted_at IS NULL
+       ORDER BY v.published_at DESC, v.created_at DESC`,
+      [tenantId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching published versions:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function updateVersionVisibility(versionRecordId: string, visibility: 'public' | 'private') {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.versions 
+       SET visibility = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND deleted_at IS NULL AND published = true`,
+      [visibility, versionRecordId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 export async function deleteVersion(versionRecordId: string) {
   try {
     // Soft delete - set deleted_at timestamp
