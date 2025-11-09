@@ -2,11 +2,13 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, Lock, Globe, Copy, ExternalLink, Info } from 'lucide-react';
+import { Eye, Lock, Globe, Copy, ExternalLink, Info, Search } from 'lucide-react';
 import { getPublishedVersionsForTenant, updateVersionVisibility } from '../../../../../lib/db/helper';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
 
 interface PublishedVersion {
   id: string;
@@ -31,6 +33,7 @@ const PublishedVersions = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [changingVisibility, setChangingVisibility] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
@@ -121,6 +124,19 @@ const PublishedVersions = () => {
     });
   };
 
+  // Filter versions based on search query
+  const filteredVersions = versions.filter(version => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    return (
+      version.project_name.toLowerCase().includes(query) ||
+      version.version_id.toLowerCase().includes(query) ||
+      version.description?.toLowerCase().includes(query) ||
+      version.tenant_name.toLowerCase().includes(query)
+    );
+  });
+
   if (!currentTenantId) {
     return (
       <div className="p-6">
@@ -172,6 +188,27 @@ const PublishedVersions = () => {
         </div>
       </div>
 
+      {/* Search/Filter Field */}
+      <div className="mb-4">
+        <TextField
+          fullWidth
+          size="small"
+          placeholder="Search by project name, version, or description..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                </InputAdornment>
+              ),
+            },
+          }}
+          className="bg-white dark:bg-gray-800"
+        />
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-gray-500 dark:text-gray-400">Loading published versions...</div>
@@ -184,6 +221,16 @@ const PublishedVersions = () => {
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-center max-w-md">
             You don't have any published versions yet. Publish a version to make it available via API.
+          </p>
+        </div>
+      ) : filteredVersions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+          <Search className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            No Matching Versions
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 text-center max-w-md">
+            No published versions match your search query. Try a different search term.
           </p>
         </div>
       ) : (
@@ -210,7 +257,7 @@ const PublishedVersions = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {versions.map((version) => (
+                {filteredVersions.map((version) => (
                   <tr key={version.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
@@ -300,7 +347,12 @@ const PublishedVersions = () => {
 
       {versions.length > 0 && (
         <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-          Showing {versions.length} published {versions.length === 1 ? 'version' : 'versions'}
+          Showing {filteredVersions.length} of {versions.length} published {versions.length === 1 ? 'version' : 'versions'}
+          {searchQuery && filteredVersions.length < versions.length && (
+            <span className="ml-2 text-blue-600 dark:text-blue-400">
+              (filtered by search)
+            </span>
+          )}
         </div>
       )}
     </div>

@@ -148,6 +148,35 @@ All elements fully support dark mode:
 - No direct SQL injection risk (parameterized queries)
 - Tenant isolation maintained (visibility is per-version)
 
+## Search/Filter Feature
+
+Added ability to filter published versions by:
+- Project name
+- Version ID
+- Description
+- Tenant name (if multiple tenants)
+
+### Implementation Details
+
+**Search Field:**
+- Positioned below the informational banner
+- Full-width TextField with search icon
+- Real-time filtering as user types
+- Placeholder: "Search by project name, version, or description..."
+- Styled for both light and dark modes
+
+**Filter Logic:**
+- Case-insensitive search
+- Matches any part of the searchable fields
+- Shows "No Matching Versions" state when no results
+- Maintains original data (non-destructive filter)
+
+**User Feedback:**
+- Count display shows: "Showing X of Y published versions"
+- "(filtered by search)" indicator when filter is active
+- Empty state with Search icon when no matches found
+- Search field clears easily (standard TextField behavior)
+
 ## Future Enhancements
 
 1. **Bulk Visibility Toggle**: Select multiple versions and change visibility at once
@@ -156,6 +185,8 @@ All elements fully support dark mode:
 4. **Visibility Rules**: Set default visibility for new publications
 5. **Audit Log**: Record all visibility changes for compliance
 6. **API Endpoint**: Allow visibility changes via API (with authentication)
+7. **Advanced Filters**: Filter by visibility type (public/private), date range, or creator
+8. **Save Filter Presets**: Save commonly used filter combinations
 
 ## Testing Checklist
 
