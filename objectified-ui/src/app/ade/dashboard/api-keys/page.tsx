@@ -266,7 +266,7 @@ const ApiKeys = () => {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Key Prefix:</span>
-                        <span className="ml-2 font-mono bg-gray-100 px-2 py-1 rounded">
+                        <span className="ml-2 font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-900 dark:text-gray-100">
                           {apiKey.key_prefix}
                         </span>
                       </div>
