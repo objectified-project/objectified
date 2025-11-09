@@ -171,10 +171,26 @@ const ApiKeys = () => {
 
   if (!currentTenantId) {
     return (
-      <div className="p-8">
-        <Alert severity="warning">
-          Please select a tenant to manage API keys.
-        </Alert>
+      <div className="p-6">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
+            <div>
+              <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                No Tenant Selected
+              </h2>
+              <p className="text-yellow-800 dark:text-yellow-200 mb-3">
+                Please select a tenant before managing API Keys. API Keys are associated with a specific tenant.
+              </p>
+              <a
+                href="/ade/dashboard/tenants"
+                className="inline-block px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Go to Tenants
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
