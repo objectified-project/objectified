@@ -397,12 +397,12 @@ const ApiKeys = () => {
             <strong>Important:</strong> This is the only time you'll see this API key. Please copy it now and store it securely.
           </Alert>
 
-          <Box className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <Box className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
             <Typography variant="body2" color="text.secondary" className="mb-2">
               Your API Key:
             </Typography>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-white p-3 rounded border border-gray-300 font-mono text-sm break-all">
+              <code className="flex-1 bg-white dark:bg-gray-900 p-3 rounded border border-gray-300 dark:border-gray-600 font-mono text-sm break-all text-gray-900 dark:text-gray-100">
                 {generatedApiKey}
               </code>
               <Tooltip title={copiedKey ? 'Copied!' : 'Copy to clipboard'}>
