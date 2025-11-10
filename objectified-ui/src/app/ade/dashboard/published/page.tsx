@@ -67,9 +67,9 @@ const PublishedVersions = () => {
   };
 
   const getFullAccessUrl = (version: PublishedVersion): string => {
-    // Get the current origin (protocol + host)
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/api/${getAccessUrl(version)}`;
+    // Use REST_API_BASE_URL from environment, fallback to localhost
+    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
+    return `${restApiBaseUrl}/${getAccessUrl(version)}`;
   };
 
   const handleCopyUrl = async (version: PublishedVersion) => {
