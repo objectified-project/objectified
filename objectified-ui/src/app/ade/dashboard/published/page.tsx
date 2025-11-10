@@ -91,6 +91,15 @@ const PublishedVersions = () => {
   const handleToggleVisibility = async (version: PublishedVersion) => {
     const newVisibility = version.visibility === 'public' ? 'private' : 'public';
 
+    // Show confirmation dialog with appropriate message
+    const confirmMessage = newVisibility === 'public'
+      ? `Change visibility to PUBLIC?\n\nThis will result in making the OpenAPI Specification public without requiring access via an API Key.`
+      : `Change visibility to PRIVATE?\n\nThis will result in restricting access to the specification by requiring an API Key that matches your tenancy.`;
+
+    if (!confirm(confirmMessage)) {
+      return; // User cancelled
+    }
+
     try {
       setChangingVisibility(version.id);
       const result = await updateVersionVisibility(version.id, newVisibility);
