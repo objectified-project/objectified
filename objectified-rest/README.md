@@ -53,9 +53,11 @@ Returns the health status of the service and database connection.
 
 ## Installation
 
-1. **Install Python dependencies:**
+### Option 1: Using uv (Recommended)
+
+1. **Install uv (if not already installed):**
    ```bash
-   pip install -r requirements.txt
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
 2. **Configure environment:**
@@ -70,16 +72,38 @@ Returns the health status of the service and database connection.
    RELOAD=True
    ```
 
+3. **Sync dependencies:**
+   ```bash
+   uv sync
+   ```
+
+### Option 2: Using pip
+
+1. **Install Python dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment:** (same as above)
+
 ## Running the Server
 
-### Development Mode (with auto-reload):
+### Using uv (Recommended):
 ```bash
-cd src
-python run.py
+# Simple command to run the server
+uv run -m app
+
+# Or use the helper script
+./run.sh
 ```
 
-### Production Mode:
+### Using Python directly:
 ```bash
+# Development Mode (with auto-reload)
+cd src
+python run.py
+
+# Production Mode
 cd src
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
