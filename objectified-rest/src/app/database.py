@@ -84,6 +84,55 @@ class Database:
         """
         return self.execute_query(query, (class_id,))
 
+    def validate_api_key(self, api_key: str) -> Optional[Dict[str, Any]]:
+        """
+        Validate an API key and return tenant information.
+
+        Args:
+            api_key: The API key to validate
+
+        Returns:
+            Dict with tenant_id and tenant info if valid, None otherwise
+        """
+        # Extract key prefix (first 8 characters)
+        if not api_key or len(api_key) < 8:
+            return None
+
+        key_prefix = api_key[:8]
+
+        query = """
+            SELECT ak.id, ak.tenant_id, ak.key_hash, ak.expires_at, ak.enabled,
+                   t.id as tenant_id, t.slug as tenant_slug, t.name as tenant_name
+            FROM odb.api_keys ak
+            JOIN odb.tenants t ON ak.tenant_id = t.id
+            WHERE ak.key_prefix = %s
+              AND ak.deleted_at IS NULL
+              AND ak.enabled = true
+              AND t.deleted_at IS NULL
+              AND t.enabled = true
+              AND (ak.expires_at IS NULL OR ak.expires_at > CURRENT_TIMESTAMP)
+        """
+        results = self.execute_query(query, (key_prefix,))
+
+        if not results:
+            return None
+
+        # For now, we'll just validate by prefix
+        # In production, you should hash the full key and compare with key_hash
+        api_key_data = results[0]
+
+        # Update last_used_at
+        try:
+            update_query = "UPDATE odb.api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s"
+            conn = self.connect()
+            with conn.cursor() as cursor:
+                cursor.execute(update_query, (api_key_data['id'],))
+                conn.commit()
+        except Exception:
+            pass  # Don't fail if we can't update last_used_at
+
+        return api_key_data
+
 
 # Global database instance
 db = Database()

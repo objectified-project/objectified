@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Header
 from fastapi.responses import JSONResponse
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import yaml
 import json
 
@@ -28,6 +28,48 @@ async def shutdown_event():
     db.close()
 
 
+def validate_private_access(version: Dict[str, Any], tenant_slug: str, api_key: Optional[str]) -> None:
+    """
+    Validate access to a private version.
+
+    Args:
+        version: The version data from database
+        tenant_slug: The requested tenant slug
+        api_key: The API key from request headers (if provided)
+
+    Raises:
+        HTTPException: If access is denied
+    """
+    # Public versions don't require API key
+    if version['visibility'] == 'public':
+        return
+
+    # Private versions require API key
+    if not api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="API key required for private versions",
+            headers={"WWW-Authenticate": "API-Key"}
+        )
+
+    # Validate the API key
+    api_key_data = db.validate_api_key(api_key)
+
+    if not api_key_data:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired API key",
+            headers={"WWW-Authenticate": "API-Key"}
+        )
+
+    # Check if the API key's tenant matches the requested tenant
+    if api_key_data['tenant_slug'] != tenant_slug:
+        raise HTTPException(
+            status_code=401,
+            detail="API key does not have access to this tenant"
+        )
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""
@@ -45,7 +87,8 @@ async def root():
 async def get_version_openapi_spec(
     tenant_slug: str,
     project_slug: str,
-    version_slug: str
+    version_slug: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> JSONResponse:
     """
     Get the complete OpenAPI specification for all classes in a version.
@@ -54,6 +97,7 @@ async def get_version_openapi_spec(
         tenant_slug: The tenant slug
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
+        x_api_key: Optional API key for private versions
 
     Returns:
         OpenAPI 3.1.0 specification in JSON format
@@ -74,11 +118,8 @@ async def get_version_openapi_spec(
             detail="This version is not published"
         )
 
-    # Check visibility - if private, would need API key validation here
-    # For now, we'll allow access but you can add API key check for private versions
-    if version['visibility'] == 'private':
-        # TODO: Add API key validation here
-        pass
+    # Validate access for private versions
+    validate_private_access(version, tenant_slug, x_api_key)
 
     # Get all classes for this version
     classes = db.get_classes_for_version(version['id'])
@@ -107,7 +148,8 @@ async def get_class_openapi_json(
     tenant_slug: str,
     project_slug: str,
     version_slug: str,
-    class_name: str
+    class_name: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> JSONResponse:
     """
     Get the OpenAPI specification for a single class in JSON format.
@@ -117,6 +159,7 @@ async def get_class_openapi_json(
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
         class_name: The name of the class
+        x_api_key: Optional API key for private versions
 
     Returns:
         OpenAPI 3.1.0 specification for the class in JSON format
@@ -137,10 +180,8 @@ async def get_class_openapi_json(
             detail="This version is not published"
         )
 
-    # Check visibility
-    if version['visibility'] == 'private':
-        # TODO: Add API key validation here
-        pass
+    # Validate access for private versions
+    validate_private_access(version, tenant_slug, x_api_key)
 
     # Get the specific class
     class_data = db.get_class_by_name(version['id'], class_name)
@@ -171,7 +212,8 @@ async def get_class_openapi_yaml(
     tenant_slug: str,
     project_slug: str,
     version_slug: str,
-    class_name: str
+    class_name: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> Response:
     """
     Get the OpenAPI specification for a single class in YAML format.
@@ -181,6 +223,7 @@ async def get_class_openapi_yaml(
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
         class_name: The name of the class
+        x_api_key: Optional API key for private versions
 
     Returns:
         OpenAPI 3.1.0 specification for the class in YAML format
@@ -201,10 +244,8 @@ async def get_class_openapi_yaml(
             detail="This version is not published"
         )
 
-    # Check visibility
-    if version['visibility'] == 'private':
-        # TODO: Add API key validation here
-        pass
+    # Validate access for private versions
+    validate_private_access(version, tenant_slug, x_api_key)
 
     # Get the specific class
     class_data = db.get_class_by_name(version['id'], class_name)
