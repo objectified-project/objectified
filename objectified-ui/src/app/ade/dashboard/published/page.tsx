@@ -181,20 +181,6 @@ const PublishedVersions = () => {
         <p className="text-gray-600 dark:text-gray-400 mb-4">
           View all published and locked versions with their access URLs and visibility settings.
         </p>
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="text-blue-900 dark:text-blue-100 font-medium mb-1">
-                Visibility Settings
-              </p>
-              <p className="text-blue-800 dark:text-blue-200">
-                <span className="font-semibold">Public versions</span> are globally visible and can be accessed without authentication.
-                <span className="font-semibold ml-2">Private versions</span> require an API Key to view.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Search/Filter Field */}
