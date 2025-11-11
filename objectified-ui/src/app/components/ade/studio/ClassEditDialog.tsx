@@ -29,9 +29,10 @@ interface ClassEditDialogProps {
   onClose: () => void;
   editingClassData: any;
   nodes: any[];
+  isReadOnly?: boolean;
 }
 
-const ClassEditDialog = ({ open, onClose, editingClassData, nodes }: ClassEditDialogProps) => {
+const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false }: ClassEditDialogProps) => {
   const [classEditFormat, setClassEditFormat] = useState<'json' | 'yaml' | 'example'>('json');
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
 
@@ -156,8 +157,24 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes }: ClassEditDi
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6" component="span">
-              Edit Class: {editingClassData.name}
+              {isReadOnly ? 'View Class: ' : 'Edit Class: '}{editingClassData.name}
             </Typography>
+            {isReadOnly && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#000',
+                  bgcolor: '#fbbf24',
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 1,
+                  fontWeight: 600,
+                  fontSize: '0.75rem'
+                }}
+              >
+                Read Only
+              </Typography>
+            )}
 
             {/* Format Toggle */}
             <Box sx={{ display: 'flex', border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>

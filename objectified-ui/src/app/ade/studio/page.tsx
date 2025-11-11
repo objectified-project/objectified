@@ -261,12 +261,8 @@ const StudioContent = () => {
 
   // Handle class edit (double-click on node)
   const handleClassEdit = useCallback(async (classData: any) => {
-    // Prevent edits in read-only mode
-    if (isReadOnly) {
-      return;
-    }
-
-    console.log('Editing class:', classData);
+    // Allow viewing in read-only mode - the dialog will handle read-only restrictions
+    console.log(isReadOnly ? 'Viewing class:' : 'Editing class:', classData);
     setEditingClassData(classData);
     setClassEditDialogOpen(true);
   }, [isReadOnly]);
@@ -878,7 +874,7 @@ const StudioContent = () => {
             fitView
             attributionPosition="bottom-left"
             className="dark:bg-gray-900"
-            nodesDraggable={!isReadOnly}
+            nodesDraggable={true}
             nodesConnectable={!isReadOnly}
             elementsSelectable={true}
             nodesFocusable={true}
@@ -1131,6 +1127,7 @@ const StudioContent = () => {
         onClose={() => setClassEditDialogOpen(false)}
         editingClassData={editingClassData}
         nodes={nodes}
+        isReadOnly={isReadOnly}
       />
     </div>
   );

@@ -95,11 +95,8 @@ function ClassNode({ data, selected }: NodeProps) {
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Don't allow editing in read-only mode
-    if (typedData.isReadOnly) {
-      return;
-    }
-
+    // Allow viewing in read-only mode by opening the edit dialog
+    // The dialog itself will handle read-only restrictions
     if (typedData.onClassEdit) {
       typedData.onClassEdit({
         id: typedData.id,
