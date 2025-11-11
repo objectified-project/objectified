@@ -6,9 +6,11 @@ A FastAPI-based REST service that exposes OpenAPI specifications for classes sto
 
 - **Version Specifications**: Get complete OpenAPI specs for all classes in a version
 - **Class Specifications**: Get individual class specs in JSON or YAML format
+- **Content Negotiation**: Automatic format detection via HTTP Accept headers (RFC 7231)
 - **Pydantic Models**: Type-safe request/response handling
 - **PostgreSQL Integration**: Direct database access to Objectified data
 - **Format Support**: JSON and YAML output formats
+- **API Key Authentication**: Support for public and private version access control
 
 ## API Endpoints
 
@@ -23,27 +25,35 @@ Returns the complete OpenAPI 3.1.0 specification for all classes in the specifie
 curl http://localhost:8000/v1/acme-corp/customer-api/1.0.0
 ```
 
-### Get Class Specification (JSON)
+### Get Class Specification
 ```
-GET /v1/{tenant-slug}/{project-slug}/{version-slug}/{class-name}.json
+GET /v1/{tenant-slug}/{project-slug}/{version-slug}/{class-name}
 ```
-Returns the OpenAPI 3.1.0 specification for a single class in JSON format.
+Returns the OpenAPI 3.1.0 specification for a single class. The response format (JSON or YAML) is determined by the `Accept` HTTP header.
 
-**Example:**
+**Examples:**
+
+**JSON format (default):**
 ```bash
-curl http://localhost:8000/v1/acme-corp/customer-api/1.0.0/Customer.json
+curl http://localhost:8000/v1/acme-corp/customer-api/1.0.0/Customer
+# or explicitly request JSON
+curl -H "Accept: application/json" \
+  http://localhost:8000/v1/acme-corp/customer-api/1.0.0/Customer
 ```
 
-### Get Class Specification (YAML)
-```
-GET /v1/{tenant-slug}/{project-slug}/{version-slug}/{class-name}.yaml
-```
-Returns the OpenAPI 3.1.0 specification for a single class in YAML format.
-
-**Example:**
+**YAML format:**
 ```bash
-curl http://localhost:8000/v1/acme-corp/customer-api/1.0.0/Customer.yaml
+curl -H "Accept: application/yaml" \
+  http://localhost:8000/v1/acme-corp/customer-api/1.0.0/Customer
 ```
+
+**Supported Accept headers for YAML:**
+- `application/yaml`
+- `application/x-yaml`
+- `text/yaml`
+- `text/x-yaml`
+
+> **Note**: See [CONTENT_NEGOTIATION.md](./CONTENT_NEGOTIATION.md) for detailed information on content negotiation.
 
 ### Health Check
 ```
