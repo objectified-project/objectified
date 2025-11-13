@@ -161,14 +161,14 @@ const StudioContent = () => {
   }, [nodes, edges, setNodes, fitView]);
 
   // Handle property drop on class
-  const handlePropertyDrop = useCallback(async (classId: string, propertyData: any) => {
+  const handlePropertyDrop = useCallback(async (classId: string, propertyData: any, parentId?: string | null) => {
     // Prevent edits in read-only mode
     if (isReadOnly) {
       return;
     }
 
     try {
-      console.log('Property dropped on class:', classId, propertyData);
+      console.log('Property dropped on class:', classId, propertyData, 'parentId:', parentId);
 
       // Add property to class in database
       const result = await addPropertyToClass(
@@ -192,7 +192,8 @@ const StudioContent = () => {
           enum: propertyData.enum,
           default: propertyData.default,
           required: propertyData.required
-        }
+        },
+        parentId || null
       );
 
       const response = JSON.parse(result);

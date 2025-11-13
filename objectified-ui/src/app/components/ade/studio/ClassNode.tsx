@@ -1,6 +1,6 @@
-import { memo, useState } from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 
 // Define custom node data type for classes
 type ClassProperty = {
@@ -9,6 +9,7 @@ type ClassProperty = {
   type?: string;
   description?: string;
   data?: any; // JSONB data containing the property schema
+  parent_id?: string | null; // Parent property ID for nested properties
 };
 
 type ClassNodeData = {
@@ -17,7 +18,7 @@ type ClassNodeData = {
   description?: string;
   properties?: ClassProperty[];
   schema?: any; // Schema containing allOf/anyOf/oneOf
-  onPropertyDrop?: (classId: string, propertyData: any) => void;
+  onPropertyDrop?: (classId: string, propertyData: any, parentId?: string | null) => void;
   onPropertyEdit?: (classId: string, classProperty: ClassProperty) => void;
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
   onClassEdit?: (classData: any) => void;
@@ -28,6 +29,8 @@ type ClassNodeData = {
 function ClassNode({ data, selected }: NodeProps) {
   const typedData = data as ClassNodeData;
   const [isDragOver, setIsDragOver] = useState(false);
+  const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
+  const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -56,12 +59,57 @@ function ClassNode({ data, selected }: NodeProps) {
       if (data) {
         const dropData = JSON.parse(data);
         if (dropData.type === 'property' && typedData.onPropertyDrop) {
-          typedData.onPropertyDrop(typedData.id, dropData.property);
+          typedData.onPropertyDrop(typedData.id, dropData.property, null);
         }
       }
     } catch (error) {
       console.error('Error handling property drop:', error);
     }
+  };
+
+  const handlePropertyDragOver = (e: React.DragEvent, propertyId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPropertyId(propertyId);
+  };
+
+  const handlePropertyDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPropertyId(null);
+  };
+
+  const handlePropertyDrop = (e: React.DragEvent, parentPropertyId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPropertyId(null);
+
+    // Don't allow drops in read-only mode
+    if (typedData.isReadOnly) {
+      return;
+    }
+
+    try {
+      const data = e.dataTransfer.getData('application/json');
+      if (data) {
+        const dropData = JSON.parse(data);
+        if (dropData.type === 'property' && typedData.onPropertyDrop) {
+          typedData.onPropertyDrop(typedData.id, dropData.property, parentPropertyId);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling nested property drop:', error);
+    }
+  };
+
+  const togglePropertyExpansion = (propertyId: string) => {
+    const newExpanded = new Set(expandedProperties);
+    if (newExpanded.has(propertyId)) {
+      newExpanded.delete(propertyId);
+    } else {
+      newExpanded.add(propertyId);
+    }
+    setExpandedProperties(newExpanded);
   };
 
   // Extract type from property data
@@ -90,6 +138,34 @@ function ClassNode({ data, selected }: NodeProps) {
     if (!prop.data) return false;
     const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
     return !!(propData?.$ref || (propData?.type === 'array' && propData?.items?.$ref));
+  };
+
+  // Check if property is of type object (can have nested properties)
+  const isObjectType = (prop: ClassProperty): boolean => {
+    if (!prop.data) return false;
+    const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+    return propData.type === 'object' && !propData.$ref;
+  };
+
+  // Build hierarchical property structure
+  const buildPropertyHierarchy = (): { topLevel: ClassProperty[], childMap: Map<string, ClassProperty[]> } => {
+    if (!typedData.properties) {
+      return { topLevel: [], childMap: new Map() };
+    }
+
+    const topLevel = typedData.properties.filter(p => !p.parent_id);
+    const childMap = new Map<string, ClassProperty[]>();
+
+    typedData.properties.forEach(prop => {
+      if (prop.parent_id) {
+        if (!childMap.has(prop.parent_id)) {
+          childMap.set(prop.parent_id, []);
+        }
+        childMap.get(prop.parent_id)!.push(prop);
+      }
+    });
+
+    return { topLevel, childMap };
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -227,143 +303,206 @@ function ClassNode({ data, selected }: NodeProps) {
       {/* Properties list */}
       <div style={{ padding: '0' }}>
         {typedData.properties && typedData.properties.length > 0 ? (
-          typedData.properties.map((prop, index) => {
-            const propertyHasRef = hasRef(prop);
+          (() => {
+            const { topLevel, childMap } = buildPropertyHierarchy();
+            let globalIndex = 0;
 
-            return (
-              <div
-                key={prop.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto 50px auto',
-                  alignItems: 'center',
-                  padding: '6px 4px 6px 12px',
-                  borderBottom: index < typedData.properties!.length - 1 ? '1px solid #e5e7eb' : 'none',
-                  background: index % 2 === 0 ? 'white' : '#fafafa',
-                  position: 'relative',
-                  gap: '8px'
-                }}
-              >
-                {/* Property name */}
-                <div style={{
-                  fontWeight: 400,
-                  color: '#111827',
-                  fontSize: '12px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {prop.name}
-                </div>
+            const renderProperty = (prop: ClassProperty, depth: number = 0): React.JSX.Element[] => {
+              const propertyHasRef = hasRef(prop);
+              const isObject = isObjectType(prop);
+              const children = childMap.get(prop.id) || [];
+              const hasChildren = children.length > 0;
+              const isExpanded = expandedProperties.has(prop.id);
+              const isDraggedOver = dragOverPropertyId === prop.id;
+              const currentIndex = globalIndex++;
 
-                {/* Type */}
-                <div style={{
-                  fontSize: '11px',
-                  color: '#6b7280',
-                  fontFamily: 'monospace',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {getPropertyType(prop)}
-                </div>
+              const elements: React.JSX.Element[] = [];
 
-                {/* Action buttons */}
-                {!typedData.isReadOnly && (
-                  <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
-                    {typedData.onPropertyEdit && (
+              // Render the property itself
+              elements.push(
+                <div
+                  key={prop.id}
+                  onDragOver={isObject && !typedData.isReadOnly ? (e) => handlePropertyDragOver(e, prop.id) : undefined}
+                  onDragLeave={isObject && !typedData.isReadOnly ? handlePropertyDragLeave : undefined}
+                  onDrop={isObject && !typedData.isReadOnly ? (e) => handlePropertyDrop(e, prop.id) : undefined}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '20px 1fr auto 50px auto',
+                    alignItems: 'center',
+                    padding: '6px 4px 6px 12px',
+                    paddingLeft: `${12 + depth * 16}px`,
+                    borderBottom: '1px solid #e5e7eb',
+                    background: isDraggedOver ? '#d1fae5' : (currentIndex % 2 === 0 ? 'white' : '#fafafa'),
+                    position: 'relative',
+                    gap: '4px',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  {/* Expand/collapse chevron for object types */}
+                  <div style={{ width: '16px', display: 'flex', alignItems: 'center' }}>
+                    {isObject && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          typedData.onPropertyEdit!(typedData.id, prop);
+                          togglePropertyExpansion(prop.id);
                         }}
                         style={{
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          padding: '2px',
+                          padding: '0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          borderRadius: '2px',
-                          color: '#9ca3af',
-                          fontSize: '11px',
-                          lineHeight: 1,
-                          transition: 'all 0.2s'
+                          color: '#6b7280',
+                          transition: 'color 0.2s'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#dbeafe';
-                          e.currentTarget.style.color = '#2563eb';
+                          e.currentTarget.style.color = '#111827';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                          e.currentTarget.style.color = '#9ca3af';
+                          e.currentTarget.style.color = '#6b7280';
                         }}
-                        title="Edit property"
+                        title={isExpanded ? 'Collapse' : 'Expand'}
                       >
-                        <Edit size={11} />
-                      </button>
-                    )}
-                    {typedData.onPropertyDelete && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Remove "${prop.name}" from this class?`)) {
-                            typedData.onPropertyDelete!(typedData.id, prop.id);
-                          }
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: '2px',
-                          color: '#9ca3af',
-                          fontSize: '13px',
-                          lineHeight: 1,
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#fee2e2';
-                          e.currentTarget.style.color = '#dc2626';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent';
-                          e.currentTarget.style.color = '#9ca3af';
-                        }}
-                        title="Remove property from class"
-                      >
-                        <Trash2 size={12} />
+                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </button>
                     )}
                   </div>
-                )}
 
-                {/* Handle for $ref properties */}
-                {propertyHasRef && (
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={`prop-${prop.id}`}
-                    style={{
-                      right: '-6px',
-                      background: '#5b68ea',
-                      width: '10px',
-                      height: '10px',
-                      border: '2px solid white',
-                      borderRadius: '50%',
-                      position: 'absolute',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 1000
-                    }}
-                    isConnectable={false}
-                  />
-                )}
-              </div>
-            );
-          })
+                  {/* Property name */}
+                  <div style={{
+                    fontWeight: depth > 0 ? 400 : 500,
+                    color: '#111827',
+                    fontSize: '12px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {prop.name}
+                    {hasChildren && <span style={{ color: '#6b7280', marginLeft: '4px' }}>({children.length})</span>}
+                  </div>
+
+                  {/* Type */}
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#6b7280',
+                    fontFamily: 'monospace',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {getPropertyType(prop)}
+                  </div>
+
+                  {/* Action buttons */}
+                  {!typedData.isReadOnly && (
+                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
+                      {typedData.onPropertyEdit && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            typedData.onPropertyEdit!(typedData.id, prop);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '2px',
+                            color: '#9ca3af',
+                            fontSize: '11px',
+                            lineHeight: 1,
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#dbeafe';
+                            e.currentTarget.style.color = '#2563eb';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#9ca3af';
+                          }}
+                          title="Edit property"
+                        >
+                          <Edit size={11} />
+                        </button>
+                      )}
+                      {typedData.onPropertyDelete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Remove "${prop.name}" from this class?`)) {
+                              typedData.onPropertyDelete!(typedData.id, prop.id);
+                            }
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '2px',
+                            color: '#9ca3af',
+                            fontSize: '13px',
+                            lineHeight: 1,
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fee2e2';
+                            e.currentTarget.style.color = '#dc2626';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#9ca3af';
+                          }}
+                          title="Remove property from class"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Handle for $ref properties */}
+                  {propertyHasRef && (
+                    <Handle
+                      type="source"
+                      position={Position.Right}
+                      id={`prop-${prop.id}`}
+                      style={{
+                        right: '-6px',
+                        background: '#5b68ea',
+                        width: '10px',
+                        height: '10px',
+                        border: '2px solid white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        zIndex: 1000
+                      }}
+                      isConnectable={false}
+                    />
+                  )}
+                </div>
+              );
+
+              // Render children if expanded
+              if (isObject && isExpanded && hasChildren) {
+                children.forEach((child: ClassProperty) => {
+                  elements.push(...renderProperty(child, depth + 1));
+                });
+              }
+
+              return elements;
+            };
+
+            return topLevel.flatMap((prop: ClassProperty) => renderProperty(prop));
+          })()
         ) : (
           <div style={{
             padding: '12px',

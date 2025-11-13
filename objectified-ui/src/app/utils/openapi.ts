@@ -41,6 +41,60 @@ export function findReferencedClasses(obj: any, refs: Set<string>): void {
 }
 
 /**
+ * Builds property schema with nested children for object types
+ * @param prop - The property to build schema for
+ * @param allProperties - All properties to find children
+ * @returns Property schema object with nested properties if applicable
+ */
+function buildPropertySchema(prop: any, allProperties: any[]): any {
+  const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : { ...prop.data };
+
+  // Clean up description handling
+  if (propData.description === null) {
+    delete propData.description;
+    if (propData.title) {
+      propData.description = propData.title;
+    }
+  }
+
+  // If this property has type "object" and no $ref, check for nested properties
+  if (propData.type === 'object' && !propData.$ref) {
+    // Find all child properties
+    const children = allProperties.filter((p: any) => p.parent_id === prop.id);
+
+    if (children.length > 0) {
+      // Build nested properties object
+      const nestedProperties: any = {};
+      const nestedRequired: string[] = [];
+
+      children.forEach((child: any) => {
+        const childSchema = buildPropertySchema(child, allProperties);
+
+        // Handle required flag for nested properties
+        if (childSchema.required) {
+          nestedRequired.push(child.name);
+          delete childSchema.required;
+        }
+        if (childSchema.required === false) {
+          delete childSchema.required;
+        }
+
+        nestedProperties[child.name] = childSchema;
+      });
+
+      // Add nested properties to the object schema
+      propData.properties = nestedProperties;
+
+      if (nestedRequired.length > 0) {
+        propData.required = nestedRequired;
+      }
+    }
+  }
+
+  return propData;
+}
+
+/**
  * Builds a JSON Schema from a class definition and its properties
  * @param classData - The class data including name, description, schema, and properties array
  * @returns A JSON Schema object representing the class
@@ -54,29 +108,24 @@ export function buildClassSchema(classData: any): any {
   const required: string[] = [];
 
   if (classData.properties && classData.properties.length > 0) {
-    classData.properties.forEach((prop: any) => {
-      const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : { ...prop.data };
+    // Only process top-level properties (those without parent_id)
+    const topLevelProperties = classData.properties.filter((prop: any) => !prop.parent_id);
+
+    topLevelProperties.forEach((prop: any) => {
+      const propSchema = buildPropertySchema(prop, classData.properties);
 
       // Handle required flag - it belongs in the class schema's required array, not the property
-      if (propData.required) {
+      if (propSchema.required) {
         required.push(prop.name);
-        delete propData.required;
+        delete propSchema.required;
       }
 
       // If property data explicitly sets required=false, remove the field
-      if (propData.required === false) {
-        delete propData.required;
+      if (propSchema.required === false) {
+        delete propSchema.required;
       }
 
-      // Clean up description handling
-      if (propData.description === null) {
-        delete propData.description;
-        if (propData.title) {
-          propData.description = propData.title;
-        }
-      }
-
-      properties[prop.name] = propData;
+      properties[prop.name] = propSchema;
     });
   }
 
