@@ -146,6 +146,20 @@ function ClassNode({ data, selected }: NodeProps) {
     setExpandedProperties(newExpanded);
   };
 
+  // Check if a property is a descendant of the dragged-over property
+  const isDescendantOfDraggedProperty = (propertyId: string, draggedParentId: string | null): boolean => {
+    if (!draggedParentId || !typedData.properties) return false;
+
+    let currentProp = typedData.properties.find(p => p.id === propertyId);
+    while (currentProp && currentProp.parent_id) {
+      if (currentProp.parent_id === draggedParentId) {
+        return true;
+      }
+      currentProp = typedData.properties.find(p => p.id === currentProp!.parent_id);
+    }
+    return false;
+  };
+
   // Extract type from property data
   const getPropertyType = (prop: ClassProperty): string => {
     if (!prop.data) return prop.type || 'object';
@@ -305,34 +319,27 @@ function ClassNode({ data, selected }: NodeProps) {
         )}
       </div>
 
-      {/* Description */}
-      {typedData.description && (
-        <div style={{
-          padding: '8px 12px',
-          fontSize: '11px',
-          color: '#9ca3af',
-          lineHeight: '1.4',
-          background: '#fafafa',
-          borderBottom: '1px solid #e5e7eb'
-        }}>
-          {typedData.description}
-        </div>
-      )}
-
-      {/* Drop zone hint when dragging */}
-      {dragTarget === 'node' && (
-        <div style={{
-          padding: '8px 16px',
-          background: '#d1fae5',
-          fontSize: '12px',
-          color: '#065f46',
-          textAlign: 'center',
-          fontWeight: 500,
-          borderBottom: '1px solid #10b981'
-        }}>
-          Drop property here
-        </div>
-      )}
+      {/* Description / Drop zone area - fixed height with ellipsis overflow */}
+      <div style={{
+        padding: '8px 12px',
+        fontSize: '11px',
+        color: dragTarget === 'node' ? '#065f46' : '#9ca3af',
+        lineHeight: '1.4',
+        background: dragTarget === 'node' ? '#d1fae5' : '#fafafa',
+        borderBottom: dragTarget === 'node' ? '1px solid #10b981' : '1px solid #e5e7eb',
+        textAlign: dragTarget === 'node' ? 'center' : 'left',
+        fontWeight: dragTarget === 'node' ? 500 : 'normal',
+        height: '31.2px', // Fixed height: 11px font × 1.4 line-height + 16px padding
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: dragTarget === 'node' ? 'center' : 'flex-start',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        transition: 'all 0.15s ease'
+      }}>
+        {dragTarget === 'node' ? 'Drop property here' : (typedData.description || '\u00A0')}
+      </div>
 
       {/* Properties list */}
       <div style={{ padding: '0' }}>
@@ -348,6 +355,8 @@ function ClassNode({ data, selected }: NodeProps) {
               const hasChildren = children.length > 0;
               const isExpanded = expandedProperties.has(prop.id);
               const isDraggedOver = dragOverPropertyId === prop.id;
+              const isChildOfDraggedOver = isDescendantOfDraggedProperty(prop.id, dragOverPropertyId);
+              const isInDropZone = isDraggedOver || isChildOfDraggedOver;
               const currentIndex = globalIndex++;
 
               const elements: React.JSX.Element[] = [];
@@ -366,7 +375,7 @@ function ClassNode({ data, selected }: NodeProps) {
                     padding: '6px 4px 6px 12px',
                     paddingLeft: `${12 + depth * 16}px`,
                     borderBottom: '1px solid #e5e7eb',
-                    background: isDraggedOver ? '#d1fae5' : (currentIndex % 2 === 0 ? 'white' : '#fafafa'),
+                    background: isInDropZone ? '#d1fae5' : (currentIndex % 2 === 0 ? 'white' : '#fafafa'),
                     position: 'relative',
                     gap: '4px',
                     transition: 'background 0.2s'
