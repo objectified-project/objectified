@@ -75,12 +75,12 @@ class Database:
     def get_properties_for_class(self, class_id: str) -> List[Dict[str, Any]]:
         """Get all properties for a specific class."""
         query = """
-            SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data,
+            SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
                    p.id as property_source_id, p.name as property_source_name
             FROM odb.class_properties cp
             LEFT JOIN odb.properties p ON cp.property_id = p.id
             WHERE cp.class_id = %s
-            ORDER BY cp.name ASC
+            ORDER BY cp.parent_id NULLS FIRST, cp.name ASC
         """
         return self.execute_query(query, (class_id,))
 
