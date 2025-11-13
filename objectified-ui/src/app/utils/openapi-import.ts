@@ -11,6 +11,7 @@ export interface ParsedProperty {
   name: string;
   data: any;
   description?: string;
+  children?: ParsedProperty[]; // For nested properties
 }
 
 export interface ParsedClass {
@@ -30,63 +31,6 @@ export interface OpenAPIParseResult {
   version?: string;
   title?: string;
   description?: string;
-}
-
-interface InlineObjectInfo {
-  propertyName: string;
-  isArray: boolean;
-  suggestedClassName: string;
-}
-
-/**
- * Generates a suggested class name for an inline object property
- */
-function generateSuggestedClassName(parentClassName: string, propertyName: string): string {
-  // Capitalize first letter of property name
-  const capitalizedProp = propertyName.charAt(0).toUpperCase() + propertyName.slice(1);
-
-  // Remove 's' suffix if property is plural (common pattern)
-  const singularProp = capitalizedProp.endsWith('s') && capitalizedProp.length > 2
-    ? capitalizedProp.slice(0, -1)
-    : capitalizedProp;
-
-  return `${parentClassName}${singularProp}`;
-}
-
-/**
- * Checks if a schema has inline object properties (not supported)
- * Returns detailed information about inline objects with suggested class names
- */
-function findInlineObjectProperties(schema: any, className: string): InlineObjectInfo[] {
-  const inlineObjects: InlineObjectInfo[] = [];
-
-  if (!schema.properties) return inlineObjects;
-
-  for (const propName in schema.properties) {
-    const prop = schema.properties[propName];
-
-    // Check if property is an object type with inline properties
-    if (prop.type === 'object' && prop.properties) {
-      inlineObjects.push({
-        propertyName: propName,
-        isArray: false,
-        suggestedClassName: generateSuggestedClassName(className, propName)
-      });
-    }
-
-    // Check arrays of objects with inline properties
-    if (prop.type === 'array' && prop.items) {
-      if (prop.items.type === 'object' && prop.items.properties) {
-        inlineObjects.push({
-          propertyName: propName,
-          isArray: true,
-          suggestedClassName: generateSuggestedClassName(className, propName)
-        });
-      }
-    }
-  }
-
-  return inlineObjects;
 }
 
 /**
@@ -130,7 +74,7 @@ function findUnresolvedReferences(schema: any, allSchemaNames: Set<string>): str
 }
 
 /**
- * Converts an OpenAPI schema property to a property data object
+ * Converts an OpenAPI schema property to a property data object with nested children
  */
 function convertSchemaProperty(propName: string, propSchema: any, required: string[] = []): ParsedProperty {
   const data: any = { ...propSchema };
@@ -144,11 +88,51 @@ function convertSchemaProperty(propName: string, propSchema: any, required: stri
     data.required = true;
   }
 
-  return {
+  const result: ParsedProperty = {
     name: propName,
     data,
     description
   };
+
+  // Handle inline object properties with nested properties
+  if (propSchema.type === 'object' && propSchema.properties) {
+    const nestedRequired = propSchema.required || [];
+    const children: ParsedProperty[] = [];
+
+    // Remove properties and required from data (they'll be stored as children)
+    delete data.properties;
+    delete data.required;
+
+    // Recursively convert nested properties
+    for (const childName in propSchema.properties) {
+      const childSchema = propSchema.properties[childName];
+      children.push(convertSchemaProperty(childName, childSchema, nestedRequired));
+    }
+
+    result.children = children;
+  }
+
+  // Handle arrays of objects with inline properties
+  if (propSchema.type === 'array' && propSchema.items?.type === 'object' && propSchema.items.properties) {
+    const nestedRequired = propSchema.items.required || [];
+    const children: ParsedProperty[] = [];
+
+    // Remove properties and required from items in data
+    const items = { ...propSchema.items };
+    delete items.properties;
+    delete items.required;
+    data.items = items;
+
+    // Recursively convert nested properties from items
+    for (const childName in propSchema.items.properties) {
+      const childSchema = propSchema.items.properties[childName];
+      children.push(convertSchemaProperty(childName, childSchema, nestedRequired));
+    }
+
+    result.children = children;
+  }
+
+  return result;
 }
 
 /**
@@ -199,25 +183,6 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       const warnings: string[] = [];
       let isSupported = true;
 
-      // Check for inline object properties
-      const inlineObjects = findInlineObjectProperties(schema, schemaName);
-      if (inlineObjects.length > 0) {
-        const propList = inlineObjects.map(obj =>
-          obj.isArray ? `${obj.propertyName}[]` : obj.propertyName
-        ).join(', ');
-
-        const suggestions = inlineObjects.map(obj => {
-          const refPath = `$ref: "#/components/schemas/${obj.suggestedClassName}"`;
-          return `  • Extract "${obj.propertyName}" → Create "${obj.suggestedClassName}" class and use ${refPath}`;
-        }).join('\n');
-
-        warnings.push(
-          `Contains inline object properties: ${propList}. ` +
-          `These properties have nested object structures that are not supported.\n\n` +
-          `💡 Suggested fix:\n${suggestions}`
-        );
-        isSupported = false;
-      }
 
       // Check for unresolved $ref references
       const unresolvedRefs = findUnresolvedReferences(schema, allSchemaNames);
@@ -262,7 +227,7 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
         success: false,
         classes: [],
         warnings: globalWarnings,
-        error: 'No supported schemas found to import. All schemas have inline object properties or unresolved references.'
+        error: 'No supported schemas found to import. All schemas have unresolved references.'
       };
     }
 
@@ -312,24 +277,4 @@ export function validateImportedClasses(classes: ParsedClass[]): { valid: boolea
   };
 }
 
-/**
- * Finds or creates properties across multiple classes, reusing identical properties
- */
-export function consolidateProperties(classes: ParsedClass[]): Map<string, ParsedProperty> {
-  const propertyMap = new Map<string, ParsedProperty>();
-
-  for (const cls of classes) {
-    if (!cls.selected) continue;
-
-    for (const prop of cls.properties) {
-      const key = JSON.stringify({ name: prop.name, data: prop.data });
-
-      if (!propertyMap.has(key)) {
-        propertyMap.set(key, prop);
-      }
-    }
-  }
-
-  return propertyMap;
-}
 

@@ -984,11 +984,24 @@ export async function importProjectFromOpenAPI(
 
     const version = versionResult.rows[0];
 
-    // 3. Collect all unique properties across all classes
+    // 3. Helper function to collect all properties recursively (including nested children)
+    const collectAllProperties = (properties: any[]): any[] => {
+      const allProps: any[] = [];
+      for (const prop of properties) {
+        allProps.push(prop);
+        if (prop.children && prop.children.length > 0) {
+          allProps.push(...collectAllProperties(prop.children));
+        }
+      }
+      return allProps;
+    };
+
+    // Collect all unique properties across all classes (including nested)
     const propertyMap = new Map<string, string>(); // key -> property_id
 
     for (const cls of classes) {
-      for (const prop of cls.properties) {
+      const allProperties = collectAllProperties(cls.properties);
+      for (const prop of allProperties) {
         const key = JSON.stringify({ name: prop.name, data: prop.data });
 
         if (!propertyMap.has(key)) {
@@ -1006,7 +1019,32 @@ export async function importProjectFromOpenAPI(
       }
     }
 
-    // 4. Create classes and link properties
+    // 4. Helper function to link properties recursively with parent-child relationships
+    const linkProperties = async (classId: string, properties: any[], parentClassPropertyId: string | null = null) => {
+      for (const prop of properties) {
+        const key = JSON.stringify({ name: prop.name, data: prop.data });
+        const propertyId = propertyMap.get(key);
+
+        if (propertyId) {
+          // Insert the class property
+          const classPropertyResult = await client.query(
+            `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id`,
+            [classId, propertyId, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data), parentClassPropertyId]
+          );
+
+          const classPropertyId = classPropertyResult.rows[0].id;
+
+          // Recursively link child properties if they exist
+          if (prop.children && prop.children.length > 0) {
+            await linkProperties(classId, prop.children, classPropertyId);
+          }
+        }
+      }
+    };
+
+    // Create classes and link properties with hierarchy
     for (const cls of classes) {
       // Create the class
       const classResult = await client.query(
@@ -1018,19 +1056,8 @@ export async function importProjectFromOpenAPI(
 
       const classId = classResult.rows[0].id;
 
-      // Link properties to the class
-      for (const prop of cls.properties) {
-        const key = JSON.stringify({ name: prop.name, data: prop.data });
-        const propertyId = propertyMap.get(key);
-
-        if (propertyId) {
-          await client.query(
-            `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [classId, propertyId, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data), null]
-          );
-        }
-      }
+      // Link properties to the class (this will recursively handle children)
+      await linkProperties(classId, cls.properties, null);
     }
 
     await client.query('COMMIT');
