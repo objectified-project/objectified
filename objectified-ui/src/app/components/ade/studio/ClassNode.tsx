@@ -28,26 +28,38 @@ type ClassNodeData = {
 
 function ClassNode({ data, selected }: NodeProps) {
   const typedData = data as ClassNodeData;
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(true);
+    // Only set drag over for node if we're not already over a property
+    if (dragTarget !== 'property') {
+      setDragTarget('node');
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+
+    // Only clear drag state if we're actually leaving the node completely
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    const currentTarget = e.currentTarget as HTMLElement;
+
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setDragTarget(null);
+      setDragOverPropertyId(null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+    setDragTarget(null);
+    setDragOverPropertyId(null);
 
     // Don't allow drops in read-only mode
     if (typedData.isReadOnly) {
@@ -67,21 +79,43 @@ function ClassNode({ data, selected }: NodeProps) {
     }
   };
 
-  const handlePropertyDragOver = (e: React.DragEvent, propertyId: string) => {
+  const handlePropertyDragOver = (e: React.DragEvent, propertyId: string, isObject: boolean) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragOverPropertyId(propertyId);
+    if (isObject) {
+      // Only set property-specific state for object types that can accept drops
+      setDragTarget('property');
+      setDragOverPropertyId(propertyId);
+    } else {
+      // For non-object properties, maintain node-level drag state
+      setDragTarget('node');
+      setDragOverPropertyId(null);
+    }
   };
 
-  const handlePropertyDragLeave = (e: React.DragEvent) => {
+  const handlePropertyDragLeave = (e: React.DragEvent, propertyId: string, isObject: boolean) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragOverPropertyId(null);
+
+    if (isObject) {
+      // Only clear the drag over state if we're leaving the specific property
+      const relatedTarget = e.relatedTarget as HTMLElement;
+      const currentTarget = e.currentTarget as HTMLElement;
+
+      // If we're moving to another element within the node, don't clear completely
+      if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+        setDragOverPropertyId(null);
+        // Reset to node-level drag if still within the node
+        setDragTarget('node');
+      }
+    }
+    // For non-object properties, do nothing - maintain parent state
   };
 
   const handlePropertyDrop = (e: React.DragEvent, parentPropertyId: string) => {
     e.preventDefault();
     e.stopPropagation();
+    setDragTarget(null);
     setDragOverPropertyId(null);
 
     // Don't allow drops in read-only mode
@@ -192,7 +226,7 @@ function ClassNode({ data, selected }: NodeProps) {
       onDoubleClick={handleDoubleClick}
       style={{
         borderRadius: '4px',
-        border: `1px solid ${isDragOver ? '#10b981' : selected ? '#5b68ea' : '#d1d5db'}`,
+        border: `1px solid ${dragTarget === 'node' ? '#10b981' : selected ? '#5b68ea' : '#d1d5db'}`,
         background: 'white',
         minWidth: '240px',
         maxWidth: '380px',
@@ -225,7 +259,7 @@ function ClassNode({ data, selected }: NodeProps) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: isDragOver ? '2px solid #10b981' : 'none'
+        borderBottom: dragTarget === 'node' ? '2px solid #10b981' : 'none'
       }}>
         <div style={{
           fontSize: '14px',
@@ -286,7 +320,7 @@ function ClassNode({ data, selected }: NodeProps) {
       )}
 
       {/* Drop zone hint when dragging */}
-      {isDragOver && (
+      {dragTarget === 'node' && (
         <div style={{
           padding: '8px 16px',
           background: '#d1fae5',
@@ -322,8 +356,8 @@ function ClassNode({ data, selected }: NodeProps) {
               elements.push(
                 <div
                   key={prop.id}
-                  onDragOver={isObject && !typedData.isReadOnly ? (e) => handlePropertyDragOver(e, prop.id) : undefined}
-                  onDragLeave={isObject && !typedData.isReadOnly ? handlePropertyDragLeave : undefined}
+                  onDragOver={!typedData.isReadOnly ? (e) => handlePropertyDragOver(e, prop.id, isObject) : undefined}
+                  onDragLeave={!typedData.isReadOnly ? (e) => handlePropertyDragLeave(e, prop.id, isObject) : undefined}
                   onDrop={isObject && !typedData.isReadOnly ? (e) => handlePropertyDrop(e, prop.id) : undefined}
                   style={{
                     display: 'grid',
