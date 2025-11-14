@@ -1124,6 +1124,21 @@ export async function importProjectFromOpenAPI(
   }
 }
 
+export async function getApiKeysForTenant(tenantId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT * FROM odb.api_keys 
+       WHERE tenant_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [tenantId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    return JSON.stringify([]);
+  }
+}
+
 export async function createApiKey(tenantId: string, name: string, description: string, expiresInDays: number | null) {
   try {
     if (!name || name.trim().length === 0) {
