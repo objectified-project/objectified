@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Content Management API
+  title: Inline 1 Array Content Management API
   version: 1.0.0
   description: API for managing articles and assets with nested object properties
 

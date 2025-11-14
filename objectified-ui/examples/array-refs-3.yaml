@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Development Workspace API
+  title: Array Refs 3 Development Workspace API
   version: 1.0.0
   description: API for managing development workspaces with arrays of referenced schemas
 

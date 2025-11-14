@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Project Management API
+  title: Inline 3 Array Project Management API
   version: 1.0.0
   description: API for managing projects, tasks, and team collaboration with nested structures
 

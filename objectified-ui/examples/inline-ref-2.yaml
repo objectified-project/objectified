@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: E-commerce Order Management API
+  title: Inline Ref 2 E-commerce Order Management API
   version: 1.0.0
   description: API for managing e-commerce orders with inline properties referencing schemas
 

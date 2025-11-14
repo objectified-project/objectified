@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Application Deployment API
+  title: Inline 2 Application Deployment API
   version: 1.0.0
   description: API for managing application deployments with nested configuration properties
 

@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Application Release Management API
+  title: Array Refs 2 Application Release Management API
   version: 1.0.0
   description: API for managing application releases with arrays of referenced schemas
 

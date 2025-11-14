@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Cloud Infrastructure Orchestration API
+  title: Inline Ref 3 Cloud Infrastructure Orchestration API
   version: 1.0.0
   description: API for managing cloud infrastructure resources with inline properties referencing schemas
 

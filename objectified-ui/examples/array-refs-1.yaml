@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Project Management API
+  title: Array Refs 1 Project Management API
   version: 1.0.0
   description: API for managing projects with arrays of referenced schemas
 

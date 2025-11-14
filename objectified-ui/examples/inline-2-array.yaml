@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: E-Commerce Platform API
+  title: Inline 2 Array E-Commerce Platform API
   version: 1.0.0
   description: API for managing products and orders with complex nested structures
 

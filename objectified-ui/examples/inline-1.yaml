@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: User Profile API
+  title: Inline 1 User Profile API
   version: 1.0.0
   description: API for managing user profiles with nested object properties
 
