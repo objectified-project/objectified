@@ -1,14 +1,8 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import {useRouter} from "next/navigation";
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default function Home() {
-  const router = useRouter();
-
-  router.push('/login');
-
-  return (
-    <>
-    </>
-  );
+  redirect('/login');
 }
