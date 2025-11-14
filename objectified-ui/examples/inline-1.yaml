@@ -1,0 +1,307 @@
+openapi: 3.1.0
+info:
+  title: User Profile API
+  version: 1.0.0
+  description: API for managing user profiles with nested object properties
+
+servers:
+  - url: https://api.userprofile.com/v1
+
+paths:
+  /users/{userId}:
+    get:
+      summary: Get user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    put:
+      summary: Update user profile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfile'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /configurations:
+    get:
+      summary: Get system configuration
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemConfiguration'
+
+components:
+  schemas:
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        personalInfo:
+          type: object
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+            dateOfBirth:
+              type: string
+              format: date
+            bio:
+              type: string
+        contactDetails:
+          type: object
+          properties:
+            phone:
+              type: object
+              properties:
+                primary:
+                  type: string
+                secondary:
+                  type: string
+                countryCode:
+                  type: string
+            address:
+              type: object
+              properties:
+                street:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: string
+                zipCode:
+                  type: string
+                country:
+                  type: string
+                coordinates:
+                  type: object
+                  properties:
+                    latitude:
+                      type: number
+                    longitude:
+                      type: number
+                    accuracy:
+                      type: number
+        preferences:
+          type: object
+          properties:
+            notifications:
+              type: object
+              properties:
+                email:
+                  type: boolean
+                sms:
+                  type: boolean
+                push:
+                  type: boolean
+                frequency:
+                  type: object
+                  properties:
+                    immediate:
+                      type: boolean
+                    daily:
+                      type: boolean
+                    weekly:
+                      type: boolean
+            privacy:
+              type: object
+              properties:
+                profileVisibility:
+                  type: string
+                  enum: [public, friends, private]
+                showEmail:
+                  type: boolean
+                showPhone:
+                  type: boolean
+                dataSharing:
+                  type: object
+                  properties:
+                    analytics:
+                      type: boolean
+                    thirdParty:
+                      type: boolean
+            theme:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [light, dark, auto]
+                colorScheme:
+                  type: object
+                  properties:
+                    primary:
+                      type: string
+                    secondary:
+                      type: string
+                    accent:
+                      type: string
+                fontSize:
+                  type: string
+                  enum: [small, medium, large]
+        security:
+          type: object
+          properties:
+            twoFactor:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                method:
+                  type: string
+                  enum: [sms, email, authenticator]
+                backupCodes:
+                  type: object
+                  properties:
+                    generated:
+                      type: boolean
+                    remaining:
+                      type: integer
+            passwordPolicy:
+              type: object
+              properties:
+                lastChanged:
+                  type: string
+                  format: date-time
+                expiresAt:
+                  type: string
+                  format: date-time
+                requireChange:
+                  type: boolean
+            sessions:
+              type: object
+              properties:
+                current:
+                  type: object
+                  properties:
+                    sessionId:
+                      type: string
+                    deviceInfo:
+                      type: object
+                      properties:
+                        browser:
+                          type: string
+                        os:
+                          type: string
+                        ipAddress:
+                          type: string
+                    startedAt:
+                      type: string
+                      format: date-time
+
+    SystemConfiguration:
+      type: object
+      properties:
+        applicationSettings:
+          type: object
+          properties:
+            maintenanceMode:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                scheduledStart:
+                  type: string
+                  format: date-time
+                estimatedDuration:
+                  type: integer
+                message:
+                  type: string
+            features:
+              type: object
+              properties:
+                newUserRegistration:
+                  type: boolean
+                socialLogin:
+                  type: boolean
+                apiAccess:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    rateLimit:
+                      type: object
+                      properties:
+                        requestsPerMinute:
+                          type: integer
+                        requestsPerHour:
+                          type: integer
+        integrations:
+          type: object
+          properties:
+            payment:
+              type: object
+              properties:
+                provider:
+                  type: string
+                credentials:
+                  type: object
+                  properties:
+                    publicKey:
+                      type: string
+                    merchantId:
+                      type: string
+                settings:
+                  type: object
+                  properties:
+                    currency:
+                      type: string
+                    acceptedMethods:
+                      type: string
+            email:
+              type: object
+              properties:
+                provider:
+                  type: string
+                smtp:
+                  type: object
+                  properties:
+                    host:
+                      type: string
+                    port:
+                      type: integer
+                    encryption:
+                      type: string
+                      enum: [tls, ssl, none]
+                templates:
+                  type: object
+                  properties:
+                    welcome:
+                      type: string
+                    passwordReset:
+                      type: string
+                    notification:
+                      type: string

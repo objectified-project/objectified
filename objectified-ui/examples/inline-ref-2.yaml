@@ -1,0 +1,579 @@
+openapi: 3.1.0
+info:
+  title: E-commerce Order Management API
+  version: 1.0.0
+  description: API for managing e-commerce orders with inline properties referencing schemas
+
+servers:
+  - url: https://api.ecommerce.com/v1
+
+paths:
+  /orders/{orderId}:
+    get:
+      summary: Get order details
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+    patch:
+      summary: Update order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+      responses:
+        '200':
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /stores/{storeId}/config:
+    get:
+      summary: Get store configuration
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoreConfiguration'
+
+components:
+  schemas:
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderNumber:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+        customer:
+          type: object
+          properties:
+            id:
+              type: string
+            profile:
+              $ref: '#/components/schemas/CustomerProfile'
+            loyalty:
+              type: object
+              properties:
+                tier:
+                  type: string
+                  enum: [bronze, silver, gold, platinum]
+                points:
+                  $ref: '#/components/schemas/LoyaltyPoints'
+        payment:
+          type: object
+          properties:
+            method:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [credit-card, debit-card, paypal, crypto]
+                details:
+                  $ref: '#/components/schemas/PaymentMethod'
+            transaction:
+              type: object
+              properties:
+                id:
+                  type: string
+                status:
+                  type: string
+                  enum: [pending, authorized, captured, failed, refunded]
+                processor:
+                  $ref: '#/components/schemas/PaymentProcessor'
+            billing:
+              type: object
+              properties:
+                address:
+                  $ref: '#/components/schemas/Address'
+                invoice:
+                  $ref: '#/components/schemas/Invoice'
+        shipping:
+          type: object
+          properties:
+            address:
+              $ref: '#/components/schemas/Address'
+            method:
+              type: object
+              properties:
+                carrier:
+                  type: string
+                service:
+                  type: string
+                  enum: [standard, express, overnight, international]
+                tracking:
+                  $ref: '#/components/schemas/TrackingInfo'
+            delivery:
+              type: object
+              properties:
+                estimatedDate:
+                  type: string
+                  format: date
+                instructions:
+                  type: string
+                preferences:
+                  $ref: '#/components/schemas/DeliveryPreferences'
+        pricing:
+          type: object
+          properties:
+            subtotal:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+            discounts:
+              type: object
+              properties:
+                promotional:
+                  $ref: '#/components/schemas/Discount'
+                coupon:
+                  $ref: '#/components/schemas/Coupon'
+            taxes:
+              type: object
+              properties:
+                calculation:
+                  $ref: '#/components/schemas/TaxCalculation'
+                breakdown:
+                  $ref: '#/components/schemas/TaxBreakdown'
+            total:
+              type: object
+              properties:
+                amount:
+                  type: number
+                currency:
+                  type: string
+        fulfillment:
+          type: object
+          properties:
+            warehouse:
+              type: object
+              properties:
+                id:
+                  type: string
+                location:
+                  $ref: '#/components/schemas/WarehouseLocation'
+            picking:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [queued, in-progress, completed]
+                assignment:
+                  $ref: '#/components/schemas/PickingAssignment'
+            packing:
+              type: object
+              properties:
+                materials:
+                  $ref: '#/components/schemas/PackagingMaterials'
+                dimensions:
+                  $ref: '#/components/schemas/PackageDimensions'
+
+    StoreConfiguration:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        business:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [b2c, b2b, marketplace]
+            legal:
+              $ref: '#/components/schemas/BusinessLegal'
+            hours:
+              type: object
+              properties:
+                timezone:
+                  type: string
+                schedule:
+                  $ref: '#/components/schemas/OperatingHours'
+        catalog:
+          type: object
+          properties:
+            categories:
+              type: object
+              properties:
+                structure:
+                  type: string
+                  enum: [hierarchical, flat, tagged]
+                taxonomy:
+                  $ref: '#/components/schemas/CategoryTaxonomy'
+            inventory:
+              type: object
+              properties:
+                management:
+                  $ref: '#/components/schemas/InventoryManagement'
+                alerts:
+                  type: object
+                  properties:
+                    lowStock:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        threshold:
+                          type: integer
+                        notification:
+                          $ref: '#/components/schemas/AlertNotification'
+        checkout:
+          type: object
+          properties:
+            flow:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [single-page, multi-step]
+                guestCheckout:
+                  type: boolean
+                validation:
+                  $ref: '#/components/schemas/CheckoutValidation'
+            payment:
+              type: object
+              properties:
+                processors:
+                  type: object
+                  properties:
+                    primary:
+                      $ref: '#/components/schemas/PaymentProcessor'
+                    fallback:
+                      $ref: '#/components/schemas/PaymentProcessor'
+                security:
+                  $ref: '#/components/schemas/PaymentSecurity'
+        marketing:
+          type: object
+          properties:
+            analytics:
+              type: object
+              properties:
+                tracking:
+                  $ref: '#/components/schemas/AnalyticsTracking'
+                attribution:
+                  $ref: '#/components/schemas/AttributionModel'
+            email:
+              type: object
+              properties:
+                campaigns:
+                  type: object
+                  properties:
+                    provider:
+                      $ref: '#/components/schemas/EmailProvider'
+                    automation:
+                      $ref: '#/components/schemas/EmailAutomation'
+
+    CustomerProfile:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+
+    LoyaltyPoints:
+      type: object
+      properties:
+        current:
+          type: integer
+        lifetime:
+          type: integer
+        expirationDate:
+          type: string
+          format: date
+
+    PaymentMethod:
+      type: object
+      properties:
+        last4:
+          type: string
+        brand:
+          type: string
+        expiryMonth:
+          type: integer
+        expiryYear:
+          type: integer
+
+    PaymentProcessor:
+      type: object
+      properties:
+        name:
+          type: string
+        merchantId:
+          type: string
+        apiVersion:
+          type: string
+
+    Address:
+      type: object
+      properties:
+        line1:
+          type: string
+        line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    Invoice:
+      type: object
+      properties:
+        number:
+          type: string
+        date:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+
+    TrackingInfo:
+      type: object
+      properties:
+        number:
+          type: string
+        url:
+          type: string
+          format: uri
+        lastUpdate:
+          type: string
+          format: date-time
+
+    DeliveryPreferences:
+      type: object
+      properties:
+        leaveAtDoor:
+          type: boolean
+        signatureRequired:
+          type: boolean
+        preferredTimeWindow:
+          type: string
+
+    Discount:
+      type: object
+      properties:
+        code:
+          type: string
+        amount:
+          type: number
+        type:
+          type: string
+          enum: [percentage, fixed]
+
+    Coupon:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        value:
+          type: number
+
+    TaxCalculation:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [origin, destination]
+        rate:
+          type: number
+
+    TaxBreakdown:
+      type: object
+      properties:
+        federal:
+          type: number
+        state:
+          type: number
+        local:
+          type: number
+
+    WarehouseLocation:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        code:
+          type: string
+
+    PickingAssignment:
+      type: object
+      properties:
+        workerId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        priority:
+          type: integer
+
+    PackagingMaterials:
+      type: object
+      properties:
+        boxType:
+          type: string
+        fillMaterial:
+          type: string
+        tape:
+          type: boolean
+
+    PackageDimensions:
+      type: object
+      properties:
+        length:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        weight:
+          type: number
+
+    BusinessLegal:
+      type: object
+      properties:
+        registeredName:
+          type: string
+        taxId:
+          type: string
+        license:
+          type: string
+
+    OperatingHours:
+      type: object
+      properties:
+        monday:
+          type: string
+        tuesday:
+          type: string
+        wednesday:
+          type: string
+
+    CategoryTaxonomy:
+      type: object
+      properties:
+        version:
+          type: string
+        rootCategory:
+          type: string
+
+    InventoryManagement:
+      type: object
+      properties:
+        trackingMethod:
+          type: string
+          enum: [fifo, lifo, weighted-average]
+        reorderPoint:
+          type: integer
+
+    AlertNotification:
+      type: object
+      properties:
+        email:
+          type: boolean
+        sms:
+          type: boolean
+        recipients:
+          type: string
+
+    CheckoutValidation:
+      type: object
+      properties:
+        addressVerification:
+          type: boolean
+        cvvRequired:
+          type: boolean
+        zipCodeMatch:
+          type: boolean
+
+    PaymentSecurity:
+      type: object
+      properties:
+        pciCompliant:
+          type: boolean
+        fraudDetection:
+          type: boolean
+        tokenization:
+          type: boolean
+
+    AnalyticsTracking:
+      type: object
+      properties:
+        googleAnalyticsId:
+          type: string
+        facebookPixelId:
+          type: string
+
+    AttributionModel:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [first-click, last-click, linear, time-decay]
+        lookbackWindow:
+          type: integer
+
+    EmailProvider:
+      type: object
+      properties:
+        service:
+          type: string
+        apiKey:
+          type: string
+
+    EmailAutomation:
+      type: object
+      properties:
+        abandonedCart:
+          type: boolean
+        orderConfirmation:
+          type: boolean
+        welcomeSeries:
+          type: boolean

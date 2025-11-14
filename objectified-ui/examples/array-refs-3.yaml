@@ -1,0 +1,1089 @@
+openapi: 3.1.0
+info:
+  title: Development Workspace API
+  version: 1.0.0
+  description: API for managing development workspaces with arrays of referenced schemas
+
+servers:
+  - url: https://api.devworkspace.com/v1
+
+paths:
+  /workspaces/{workspaceId}:
+    get:
+      summary: Get workspace details
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+    patch:
+      summary: Update workspace
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Workspace'
+      responses:
+        '200':
+          description: Workspace updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+
+  /monorepos/{monorepoId}:
+    get:
+      summary: Get monorepo configuration
+      parameters:
+        - name: monorepoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monorepo'
+
+components:
+  schemas:
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        repositories:
+          type: object
+          properties:
+            javascript:
+              type: array
+              items:
+                $ref: '#/components/schemas/JavaScriptRepository'
+            typescript:
+              type: array
+              items:
+                $ref: '#/components/schemas/TypeScriptRepository'
+            python:
+              type: array
+              items:
+                $ref: '#/components/schemas/PythonRepository'
+        packages:
+          type: object
+          properties:
+            npm:
+              type: object
+              properties:
+                installed:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/NpmPackage'
+                outdated:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/NpmPackage'
+            yarn:
+              type: object
+              properties:
+                workspaces:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/YarnWorkspace'
+                plugins:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/YarnPlugin'
+            pip:
+              type: object
+              properties:
+                packages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PipPackage'
+                virtualenvs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/VirtualEnvironment'
+        databases:
+          type: object
+          properties:
+            sql:
+              type: object
+              properties:
+                connections:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SqlConnection'
+                schemas:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SqlSchema'
+                queries:
+                  type: object
+                  properties:
+                    saved:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/SavedQuery'
+                    history:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/QueryHistory'
+        frontend:
+          type: object
+          properties:
+            react:
+              type: object
+              properties:
+                projects:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ReactProject'
+                components:
+                  type: object
+                  properties:
+                    shared:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ReactComponent'
+                    pages:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ReactPage'
+                hooks:
+                  type: object
+                  properties:
+                    custom:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/CustomHook'
+                    builtin:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/BuiltInHook'
+        tooling:
+          type: object
+          properties:
+            javascript:
+              type: object
+              properties:
+                linters:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptLinter'
+                formatters:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptFormatter'
+                bundlers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptBundler'
+            typescript:
+              type: object
+              properties:
+                configs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TypeScriptConfig'
+                declarations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TypeScriptDeclaration'
+            python:
+              type: object
+              properties:
+                linters:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PythonLinter'
+                formatters:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PythonFormatter'
+                typeCheckers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PythonTypeChecker'
+        testing:
+          type: object
+          properties:
+            javascript:
+              type: object
+              properties:
+                frameworks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptTestFramework'
+                suites:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptTestSuite'
+            typescript:
+              type: object
+              properties:
+                frameworks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TypeScriptTestFramework'
+                suites:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TypeScriptTestSuite'
+            python:
+              type: object
+              properties:
+                frameworks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PythonTestFramework'
+                suites:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PythonTestSuite'
+            sql:
+              type: array
+              items:
+                $ref: '#/components/schemas/SqlTestCase'
+
+    Monorepo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        structure:
+          type: object
+          properties:
+            workspaces:
+              type: object
+              properties:
+                npm:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/NpmWorkspace'
+                yarn:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/YarnWorkspace'
+            packages:
+              type: object
+              properties:
+                javascript:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptPackage'
+                typescript:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TypeScriptPackage'
+                python:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PythonPackage'
+        dependencies:
+          type: object
+          properties:
+            shared:
+              type: object
+              properties:
+                npm:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SharedNpmDependency'
+                pip:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SharedPipDependency'
+            conflicts:
+              type: array
+              items:
+                $ref: '#/components/schemas/DependencyConflict'
+        scripts:
+          type: object
+          properties:
+            npm:
+              type: array
+              items:
+                $ref: '#/components/schemas/NpmScript'
+            yarn:
+              type: array
+              items:
+                $ref: '#/components/schemas/YarnScript'
+            python:
+              type: array
+              items:
+                $ref: '#/components/schemas/PythonScript'
+        build:
+          type: object
+          properties:
+            pipelines:
+              type: array
+              items:
+                $ref: '#/components/schemas/BuildPipeline'
+            artifacts:
+              type: object
+              properties:
+                javascript:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/JavaScriptArtifact'
+                typescript:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TypeScriptArtifact'
+
+    JavaScriptRepository:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/JavaScriptModule'
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/NpmPackage'
+
+    TypeScriptRepository:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        compilerOptions:
+          type: object
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeScriptModule'
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeDefinition'
+
+    PythonRepository:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PythonModule'
+        requirements:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipPackage'
+
+    NpmPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+
+    YarnWorkspace:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        scripts:
+          type: array
+          items:
+            $ref: '#/components/schemas/YarnScript'
+
+    YarnPlugin:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        enabled:
+          type: boolean
+
+    PipPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        extras:
+          type: array
+          items:
+            type: string
+
+    VirtualEnvironment:
+      type: object
+      properties:
+        name:
+          type: string
+        pythonVersion:
+          type: string
+        packages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipPackage'
+
+    SqlConnection:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [postgresql, mysql, sqlite, mssql]
+        host:
+          type: string
+        port:
+          type: integer
+        database:
+          type: string
+
+    SqlSchema:
+      type: object
+      properties:
+        name:
+          type: string
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlTable'
+        views:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlView'
+        procedures:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlProcedure'
+
+    SavedQuery:
+      type: object
+      properties:
+        name:
+          type: string
+        sql:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    QueryHistory:
+      type: object
+      properties:
+        sql:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        duration:
+          type: integer
+
+    ReactProject:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReactComponent'
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReactRoute'
+
+    ReactComponent:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [functional, class]
+        props:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComponentProp'
+        hooks:
+          type: array
+          items:
+            type: string
+
+    ReactPage:
+      type: object
+      properties:
+        name:
+          type: string
+        route:
+          type: string
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReactComponent'
+
+    CustomHook:
+      type: object
+      properties:
+        name:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+
+    BuiltInHook:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [useState, useEffect, useContext, useReducer, useMemo, useCallback]
+        usage:
+          type: integer
+
+    JavaScriptLinter:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [eslint, jshint]
+        configFile:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/LinterRule'
+
+    JavaScriptFormatter:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [prettier, standard]
+        configFile:
+          type: string
+
+    JavaScriptBundler:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [webpack, rollup, vite, parcel]
+        configFile:
+          type: string
+        plugins:
+          type: array
+          items:
+            $ref: '#/components/schemas/BundlerPlugin'
+
+    TypeScriptConfig:
+      type: object
+      properties:
+        path:
+          type: string
+        compilerOptions:
+          type: object
+        extends:
+          type: string
+        includes:
+          type: array
+          items:
+            type: string
+
+    TypeScriptDeclaration:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        exports:
+          type: array
+          items:
+            type: string
+
+    PythonLinter:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [pylint, flake8, ruff]
+        configFile:
+          type: string
+
+    PythonFormatter:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [black, autopep8, yapf]
+        configFile:
+          type: string
+
+    PythonTypeChecker:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [mypy, pyright, pyre]
+        configFile:
+          type: string
+
+    JavaScriptTestFramework:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [jest, mocha, jasmine]
+        configFile:
+          type: string
+
+    JavaScriptTestSuite:
+      type: object
+      properties:
+        name:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestFile'
+
+    TypeScriptTestFramework:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [jest, vitest]
+        configFile:
+          type: string
+        coverage:
+          type: object
+
+    TypeScriptTestSuite:
+      type: object
+      properties:
+        name:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestFile'
+
+    PythonTestFramework:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [pytest, unittest, nose]
+        configFile:
+          type: string
+
+    PythonTestSuite:
+      type: object
+      properties:
+        name:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestFile'
+
+    SqlTestCase:
+      type: object
+      properties:
+        name:
+          type: string
+        setup:
+          type: string
+        query:
+          type: string
+        expected:
+          type: object
+
+    NpmWorkspace:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/NpmPackage'
+
+    JavaScriptPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        entry:
+          type: string
+        exports:
+          type: array
+          items:
+            type: string
+
+    TypeScriptPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        types:
+          type: string
+        declarations:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeScriptDeclaration'
+
+    PythonPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PythonModule'
+
+    SharedNpmDependency:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        usedBy:
+          type: array
+          items:
+            type: string
+
+    SharedPipDependency:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        usedBy:
+          type: array
+          items:
+            type: string
+
+    DependencyConflict:
+      type: object
+      properties:
+        package:
+          type: string
+        versions:
+          type: array
+          items:
+            type: string
+
+    NpmScript:
+      type: object
+      properties:
+        name:
+          type: string
+        command:
+          type: string
+        dependencies:
+          type: array
+          items:
+            type: string
+
+    YarnScript:
+      type: object
+      properties:
+        name:
+          type: string
+        command:
+          type: string
+        workspace:
+          type: string
+
+    PythonScript:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        entryPoint:
+          type: string
+
+    BuildPipeline:
+      type: object
+      properties:
+        name:
+          type: string
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuildStage'
+
+    JavaScriptArtifact:
+      type: object
+      properties:
+        name:
+          type: string
+        bundle:
+          type: string
+        size:
+          type: integer
+
+    TypeScriptArtifact:
+      type: object
+      properties:
+        name:
+          type: string
+        declarations:
+          type: string
+        bundle:
+          type: string
+
+    JavaScriptModule:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        exports:
+          type: array
+          items:
+            type: string
+
+    TypeScriptModule:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        interfaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeScriptInterface'
+
+    TypeDefinition:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+
+    PythonModule:
+      type: object
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        classes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PythonClass'
+
+    SqlTable:
+      type: object
+      properties:
+        name:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlColumn'
+
+    SqlView:
+      type: object
+      properties:
+        name:
+          type: string
+        definition:
+          type: string
+
+    SqlProcedure:
+      type: object
+      properties:
+        name:
+          type: string
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/SqlParameter'
+
+    ReactRoute:
+      type: object
+      properties:
+        path:
+          type: string
+        component:
+          type: string
+
+    ComponentProp:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        required:
+          type: boolean
+
+    LinterRule:
+      type: object
+      properties:
+        name:
+          type: string
+        severity:
+          type: string
+          enum: [error, warning, off]
+
+    BundlerPlugin:
+      type: object
+      properties:
+        name:
+          type: string
+        options:
+          type: object
+
+    TestFile:
+      type: object
+      properties:
+        path:
+          type: string
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestCase'
+
+    BuildStage:
+      type: object
+      properties:
+        name:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+
+    TypeScriptInterface:
+      type: object
+      properties:
+        name:
+          type: string
+        properties:
+          type: array
+          items:
+            $ref: '#/components/schemas/InterfaceProperty'
+
+    PythonClass:
+      type: object
+      properties:
+        name:
+          type: string
+        methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/PythonMethod'
+
+    SqlColumn:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        nullable:
+          type: boolean
+
+    SqlParameter:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        direction:
+          type: string
+          enum: [IN, OUT, INOUT]
+
+    TestCase:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [passed, failed, skipped]
+
+    InterfaceProperty:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        optional:
+          type: boolean
+
+    PythonMethod:
+      type: object
+      properties:
+        name:
+          type: string
+        parameters:
+          type: array
+          items:
+            type: string
+        returnType:
+          type: string

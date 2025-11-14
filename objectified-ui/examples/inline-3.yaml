@@ -1,0 +1,433 @@
+openapi: 3.1.0
+info:
+  title: Media Processing API
+  version: 1.0.0
+  description: API for managing media processing jobs with nested configuration properties
+
+servers:
+  - url: https://api.mediaprocessor.com/v1
+
+paths:
+  /jobs/{jobId}:
+    get:
+      summary: Get media processing job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJob'
+    patch:
+      summary: Update job configuration
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessingJob'
+      responses:
+        '200':
+          description: Job updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJob'
+
+  /pipelines/{pipelineId}:
+    get:
+      summary: Get processing pipeline configuration
+      parameters:
+        - name: pipelineId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingPipeline'
+
+components:
+  schemas:
+    ProcessingJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        source:
+          type: object
+          properties:
+            location:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [url, s3, local]
+                path:
+                  type: string
+                credentials:
+                  type: object
+                  properties:
+                    accessKeyId:
+                      type: string
+                    secretAccessKeyRef:
+                      type: string
+                    sessionToken:
+                      type: string
+            metadata:
+              type: object
+              properties:
+                format:
+                  type: string
+                duration:
+                  type: number
+                size:
+                  type: object
+                  properties:
+                    bytes:
+                      type: integer
+                    unit:
+                      type: string
+                dimensions:
+                  type: object
+                  properties:
+                    width:
+                      type: integer
+                    height:
+                      type: integer
+                    aspectRatio:
+                      type: object
+                      properties:
+                        numerator:
+                          type: integer
+                        denominator:
+                          type: integer
+        video:
+          type: object
+          properties:
+            codec:
+              type: object
+              properties:
+                name:
+                  type: string
+                  enum: [h264, h265, vp9, av1]
+                profile:
+                  type: string
+                level:
+                  type: string
+                bitrate:
+                  type: object
+                  properties:
+                    target:
+                      type: integer
+                    minimum:
+                      type: integer
+                    maximum:
+                      type: integer
+                    mode:
+                      type: string
+                      enum: [constant, variable, constrained]
+            resolution:
+              type: object
+              properties:
+                output:
+                  type: object
+                  properties:
+                    width:
+                      type: integer
+                    height:
+                      type: integer
+                scaling:
+                  type: object
+                  properties:
+                    algorithm:
+                      type: string
+                      enum: [lanczos, bicubic, bilinear]
+                    preserveAspectRatio:
+                      type: boolean
+                    padding:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        color:
+                          type: string
+            framerate:
+              type: object
+              properties:
+                target:
+                  type: number
+                conversion:
+                  type: object
+                  properties:
+                    method:
+                      type: string
+                      enum: [duplicate, interpolate, blend]
+                    smoothing:
+                      type: boolean
+        audio:
+          type: object
+          properties:
+            codec:
+              type: object
+              properties:
+                name:
+                  type: string
+                  enum: [aac, opus, mp3, vorbis]
+                bitrate:
+                  type: integer
+                sampleRate:
+                  type: integer
+                channels:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                    layout:
+                      type: string
+                      enum: [mono, stereo, surround]
+            processing:
+              type: object
+              properties:
+                normalization:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    targetLevel:
+                      type: number
+                    algorithm:
+                      type: string
+                      enum: [peak, loudness, rms]
+                filters:
+                  type: object
+                  properties:
+                    noise:
+                      type: object
+                      properties:
+                        reduction:
+                          type: boolean
+                        threshold:
+                          type: number
+                    equalizer:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        preset:
+                          type: string
+        output:
+          type: object
+          properties:
+            destination:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [s3, cdn, local]
+                path:
+                  type: string
+                credentials:
+                  type: object
+                  properties:
+                    accessKeyIdRef:
+                      type: string
+                    secretAccessKeyRef:
+                      type: string
+            format:
+              type: object
+              properties:
+                container:
+                  type: string
+                  enum: [mp4, webm, mkv, avi]
+                optimization:
+                  type: object
+                  properties:
+                    fastStart:
+                      type: boolean
+                    streaming:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        format:
+                          type: string
+                          enum: [hls, dash, smooth]
+                        segmentDuration:
+                          type: integer
+            quality:
+              type: object
+              properties:
+                preset:
+                  type: string
+                  enum: [web, mobile, hd, uhd]
+                compression:
+                  type: object
+                  properties:
+                    level:
+                      type: integer
+                    twoPass:
+                      type: boolean
+
+    ProcessingPipeline:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        configuration:
+          type: object
+          properties:
+            execution:
+              type: object
+              properties:
+                parallel:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    maxWorkers:
+                      type: integer
+                    distribution:
+                      type: object
+                      properties:
+                        strategy:
+                          type: string
+                          enum: [round-robin, least-busy, weighted]
+                        affinity:
+                          type: boolean
+                timeout:
+                  type: object
+                  properties:
+                    processing:
+                      type: integer
+                    idle:
+                      type: integer
+                    unit:
+                      type: string
+                      enum: [seconds, minutes]
+                retry:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    maxAttempts:
+                      type: integer
+                    backoff:
+                      type: object
+                      properties:
+                        strategy:
+                          type: string
+                          enum: [exponential, linear, fixed]
+                        initialDelay:
+                          type: integer
+                        multiplier:
+                          type: number
+            storage:
+              type: object
+              properties:
+                temporary:
+                  type: object
+                  properties:
+                    location:
+                      type: string
+                    retention:
+                      type: object
+                      properties:
+                        duration:
+                          type: integer
+                        unit:
+                          type: string
+                          enum: [hours, days]
+                        cleanup:
+                          type: object
+                          properties:
+                            automatic:
+                              type: boolean
+                            schedule:
+                              type: string
+                cache:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    provider:
+                      type: string
+                      enum: [redis, memcached]
+                    configuration:
+                      type: object
+                      properties:
+                        host:
+                          type: string
+                        port:
+                          type: integer
+                        ttl:
+                          type: integer
+                        eviction:
+                          type: object
+                          properties:
+                            policy:
+                              type: string
+                              enum: [lru, lfu, fifo]
+            notifications:
+              type: object
+              properties:
+                completion:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    webhook:
+                      type: object
+                      properties:
+                        url:
+                          type: string
+                          format: uri
+                        authentication:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              enum: [bearer, basic, hmac]
+                            secretRef:
+                              type: string
+                        retry:
+                          type: object
+                          properties:
+                            enabled:
+                              type: boolean
+                            maxAttempts:
+                              type: integer
+                error:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    email:
+                      type: object
+                      properties:
+                        recipients:
+                          type: string
+                        includeStackTrace:
+                          type: boolean

@@ -1,0 +1,337 @@
+openapi: 3.1.0
+info:
+  title: Package Registry API
+  version: 1.0.0
+  description: API for managing package registries with inline properties referencing other schemas
+
+servers:
+  - url: https://api.packageregistry.com/v1
+
+paths:
+  /packages/{packageId}:
+    get:
+      summary: Get package details
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+    put:
+      summary: Update package
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Package'
+      responses:
+        '200':
+          description: Package updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+
+  /projects/{projectId}:
+    get:
+      summary: Get project configuration
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+components:
+  schemas:
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        registry:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
+            type:
+              type: string
+              enum: [npm, pypi, yarn]
+            authentication:
+              $ref: '#/components/schemas/Authentication'
+        dependencies:
+          type: object
+          properties:
+            production:
+              type: object
+              properties:
+                required:
+                  $ref: '#/components/schemas/DependencyList'
+                optional:
+                  $ref: '#/components/schemas/DependencyList'
+            development:
+              $ref: '#/components/schemas/DependencyList'
+        build:
+          type: object
+          properties:
+            typescript:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                config:
+                  $ref: '#/components/schemas/TypeScriptConfig'
+            bundler:
+              type: object
+              properties:
+                tool:
+                  type: string
+                  enum: [webpack, rollup, vite]
+                settings:
+                  $ref: '#/components/schemas/BundlerSettings'
+        distribution:
+          type: object
+          properties:
+            cdn:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                provider:
+                  $ref: '#/components/schemas/CDNProvider'
+            publishing:
+              type: object
+              properties:
+                repository:
+                  type: string
+                access:
+                  $ref: '#/components/schemas/AccessControl'
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        framework:
+          type: object
+          properties:
+            frontend:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [react, vue, angular]
+                version:
+                  type: string
+                configuration:
+                  $ref: '#/components/schemas/FrameworkConfig'
+            backend:
+              type: object
+              properties:
+                runtime:
+                  type: string
+                  enum: [node, python]
+                server:
+                  $ref: '#/components/schemas/ServerConfig'
+        database:
+          type: object
+          properties:
+            connection:
+              type: object
+              properties:
+                primary:
+                  $ref: '#/components/schemas/DatabaseConnection'
+                readonly:
+                  $ref: '#/components/schemas/DatabaseConnection'
+            migrations:
+              type: object
+              properties:
+                tool:
+                  type: string
+                  enum: [knex, sequelize, alembic]
+                settings:
+                  $ref: '#/components/schemas/MigrationSettings'
+        deployment:
+          type: object
+          properties:
+            pipeline:
+              type: object
+              properties:
+                ci:
+                  $ref: '#/components/schemas/CIConfig'
+                cd:
+                  $ref: '#/components/schemas/CDConfig'
+            environment:
+              type: object
+              properties:
+                staging:
+                  type: object
+                  properties:
+                    variables:
+                      $ref: '#/components/schemas/EnvironmentVariables'
+                    secrets:
+                      $ref: '#/components/schemas/SecretsConfig'
+                production:
+                  type: object
+                  properties:
+                    variables:
+                      $ref: '#/components/schemas/EnvironmentVariables'
+                    secrets:
+                      $ref: '#/components/schemas/SecretsConfig'
+
+    Authentication:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [token, basic, oauth]
+        tokenRef:
+          type: string
+        expiration:
+          type: integer
+
+    DependencyList:
+      type: object
+      additionalProperties:
+        type: string
+
+    TypeScriptConfig:
+      type: object
+      properties:
+        target:
+          type: string
+          enum: [es5, es2015, es2020, esnext]
+        module:
+          type: string
+        strict:
+          type: boolean
+
+    BundlerSettings:
+      type: object
+      properties:
+        minify:
+          type: boolean
+        sourceMaps:
+          type: boolean
+        splitChunks:
+          type: boolean
+
+    CDNProvider:
+      type: object
+      properties:
+        name:
+          type: string
+        apiKey:
+          type: string
+        zone:
+          type: string
+
+    AccessControl:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [public, restricted, private]
+        allowedUsers:
+          type: string
+
+    FrameworkConfig:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [development, production]
+        hotReload:
+          type: boolean
+
+    ServerConfig:
+      type: object
+      properties:
+        port:
+          type: integer
+        host:
+          type: string
+        cors:
+          type: boolean
+
+    DatabaseConnection:
+      type: object
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        database:
+          type: string
+        ssl:
+          type: boolean
+
+    MigrationSettings:
+      type: object
+      properties:
+        directory:
+          type: string
+        tableName:
+          type: string
+        autoRun:
+          type: boolean
+
+    CIConfig:
+      type: object
+      properties:
+        provider:
+          type: string
+        branch:
+          type: string
+        triggers:
+          type: string
+
+    CDConfig:
+      type: object
+      properties:
+        strategy:
+          type: string
+          enum: [blue-green, rolling, canary]
+        automated:
+          type: boolean
+
+    EnvironmentVariables:
+      type: object
+      additionalProperties:
+        type: string
+
+    SecretsConfig:
+      type: object
+      properties:
+        provider:
+          type: string
+        vaultPath:
+          type: string

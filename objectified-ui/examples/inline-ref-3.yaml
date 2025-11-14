@@ -1,0 +1,809 @@
+openapi: 3.1.0
+info:
+  title: Cloud Infrastructure Orchestration API
+  version: 1.0.0
+  description: API for managing cloud infrastructure resources with inline properties referencing schemas
+
+servers:
+  - url: https://api.cloudorchestrator.com/v1
+
+paths:
+  /workloads/{workloadId}:
+    get:
+      summary: Get workload configuration
+      parameters:
+        - name: workloadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workload'
+    patch:
+      summary: Update workload configuration
+      parameters:
+        - name: workloadId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Workload'
+      responses:
+        '200':
+          description: Workload updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workload'
+
+  /clusters/{clusterId}:
+    get:
+      summary: Get cluster configuration
+      parameters:
+        - name: clusterId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cluster'
+
+components:
+  schemas:
+    Workload:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [web-app, api-service, background-job, data-pipeline]
+        runtime:
+          type: object
+          properties:
+            language:
+              type: object
+              properties:
+                name:
+                  type: string
+                  enum: [typescript, javascript, python]
+                version:
+                  type: string
+                runtime:
+                  $ref: '#/components/schemas/RuntimeEnvironment'
+            packageManager:
+              type: object
+              properties:
+                tool:
+                  type: string
+                  enum: [npm, yarn, pip]
+                configuration:
+                  $ref: '#/components/schemas/PackageManagerConfig'
+            buildTool:
+              type: object
+              properties:
+                name:
+                  type: string
+                  enum: [webpack, vite, rollup]
+                settings:
+                  $ref: '#/components/schemas/BuildToolSettings'
+        application:
+          type: object
+          properties:
+            frontend:
+              type: object
+              properties:
+                framework:
+                  type: string
+                  enum: [react, vue, angular]
+                version:
+                  type: string
+                config:
+                  $ref: '#/components/schemas/FrontendConfig'
+                bundling:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    optimization:
+                      $ref: '#/components/schemas/BundleOptimization'
+            backend:
+              type: object
+              properties:
+                framework:
+                  type: string
+                server:
+                  $ref: '#/components/schemas/ServerConfiguration'
+                middleware:
+                  type: object
+                  properties:
+                    cors:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        config:
+                          $ref: '#/components/schemas/CorsConfig'
+                    rateLimit:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        rules:
+                          $ref: '#/components/schemas/RateLimitRules'
+        database:
+          type: object
+          properties:
+            primary:
+              type: object
+              properties:
+                engine:
+                  type: string
+                  enum: [postgresql, mysql, mongodb, sql-server]
+                connection:
+                  $ref: '#/components/schemas/DatabaseConnection'
+                pooling:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    config:
+                      $ref: '#/components/schemas/ConnectionPoolConfig'
+            cache:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [redis, memcached]
+                connection:
+                  $ref: '#/components/schemas/CacheConnection'
+                strategy:
+                  type: object
+                  properties:
+                    ttl:
+                      type: integer
+                    eviction:
+                      $ref: '#/components/schemas/EvictionPolicy'
+            migrations:
+              type: object
+              properties:
+                tool:
+                  type: string
+                  enum: [knex, sequelize, alembic, flyway]
+                settings:
+                  $ref: '#/components/schemas/MigrationSettings'
+                automation:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    strategy:
+                      $ref: '#/components/schemas/MigrationStrategy'
+        compute:
+          type: object
+          properties:
+            container:
+              type: object
+              properties:
+                image:
+                  type: string
+                registry:
+                  $ref: '#/components/schemas/ContainerRegistry'
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      $ref: '#/components/schemas/ResourceRequirements'
+                    limits:
+                      $ref: '#/components/schemas/ResourceRequirements'
+                healthCheck:
+                  type: object
+                  properties:
+                    liveness:
+                      $ref: '#/components/schemas/HealthCheckConfig'
+                    readiness:
+                      $ref: '#/components/schemas/HealthCheckConfig'
+            scaling:
+              type: object
+              properties:
+                horizontal:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    config:
+                      $ref: '#/components/schemas/HorizontalScalingConfig'
+                    triggers:
+                      type: object
+                      properties:
+                        cpu:
+                          type: object
+                          properties:
+                            enabled:
+                              type: boolean
+                            threshold:
+                              $ref: '#/components/schemas/MetricThreshold'
+                        memory:
+                          type: object
+                          properties:
+                            enabled:
+                              type: boolean
+                            threshold:
+                              $ref: '#/components/schemas/MetricThreshold'
+        networking:
+          type: object
+          properties:
+            ingress:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                controller:
+                  $ref: '#/components/schemas/IngressController'
+                tls:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    certificate:
+                      $ref: '#/components/schemas/TlsCertificate'
+            service:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [ClusterIP, NodePort, LoadBalancer]
+                ports:
+                  $ref: '#/components/schemas/ServicePorts'
+                discovery:
+                  type: object
+                  properties:
+                    dns:
+                      type: boolean
+                    serviceAccount:
+                      $ref: '#/components/schemas/ServiceAccount'
+        observability:
+          type: object
+          properties:
+            logging:
+              type: object
+              properties:
+                level:
+                  type: string
+                  enum: [debug, info, warn, error]
+                aggregation:
+                  $ref: '#/components/schemas/LogAggregation'
+                retention:
+                  type: object
+                  properties:
+                    duration:
+                      type: integer
+                    policy:
+                      $ref: '#/components/schemas/RetentionPolicy'
+            metrics:
+              type: object
+              properties:
+                collector:
+                  $ref: '#/components/schemas/MetricsCollector'
+                exporters:
+                  type: object
+                  properties:
+                    prometheus:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        endpoint:
+                          type: string
+                        scrapeConfig:
+                          $ref: '#/components/schemas/ScrapeConfig'
+            tracing:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                backend:
+                  $ref: '#/components/schemas/TracingBackend'
+                sampling:
+                  type: object
+                  properties:
+                    rate:
+                      type: number
+                    strategy:
+                      $ref: '#/components/schemas/SamplingStrategy'
+
+    Cluster:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: object
+          properties:
+            cloud:
+              type: string
+              enum: [aws, azure, gcp, on-premise]
+            region:
+              type: string
+            credentials:
+              $ref: '#/components/schemas/CloudCredentials'
+        orchestration:
+          type: object
+          properties:
+            platform:
+              type: string
+              enum: [kubernetes, docker-swarm, nomad]
+            version:
+              type: string
+            configuration:
+              type: object
+              properties:
+                apiServer:
+                  $ref: '#/components/schemas/ApiServerConfig'
+                scheduler:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    config:
+                      $ref: '#/components/schemas/SchedulerConfig'
+        nodePool:
+          type: object
+          properties:
+            default:
+              type: object
+              properties:
+                instanceType:
+                  type: string
+                count:
+                  type: integer
+                autoscaling:
+                  $ref: '#/components/schemas/NodeAutoscaling'
+            specialized:
+              type: object
+              properties:
+                gpu:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    instanceType:
+                      type: string
+                    configuration:
+                      $ref: '#/components/schemas/GpuConfig'
+        storage:
+          type: object
+          properties:
+            classes:
+              type: object
+              properties:
+                standard:
+                  $ref: '#/components/schemas/StorageClass'
+                ssd:
+                  $ref: '#/components/schemas/StorageClass'
+            persistence:
+              type: object
+              properties:
+                volumeSnapshots:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    policy:
+                      $ref: '#/components/schemas/SnapshotPolicy'
+        security:
+          type: object
+          properties:
+            rbac:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                roles:
+                  $ref: '#/components/schemas/RbacRoles'
+            networkPolicies:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                defaultDeny:
+                  type: boolean
+                rules:
+                  $ref: '#/components/schemas/NetworkPolicyRules'
+            secrets:
+              type: object
+              properties:
+                encryption:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    provider:
+                      $ref: '#/components/schemas/EncryptionProvider'
+
+    RuntimeEnvironment:
+      type: object
+      properties:
+        nodeVersion:
+          type: string
+        pythonVersion:
+          type: string
+        environmentVariables:
+          type: object
+          additionalProperties:
+            type: string
+
+    PackageManagerConfig:
+      type: object
+      properties:
+        registry:
+          type: string
+          format: uri
+        cacheDirectory:
+          type: string
+        lockfileEnabled:
+          type: boolean
+
+    BuildToolSettings:
+      type: object
+      properties:
+        outputDirectory:
+          type: string
+        sourceMap:
+          type: boolean
+        minification:
+          type: boolean
+
+    FrontendConfig:
+      type: object
+      properties:
+        publicPath:
+          type: string
+        assetsDirectory:
+          type: string
+        devServerPort:
+          type: integer
+
+    BundleOptimization:
+      type: object
+      properties:
+        codesplitting:
+          type: boolean
+        treeShaking:
+          type: boolean
+        compression:
+          type: string
+          enum: [gzip, brotli, none]
+
+    ServerConfiguration:
+      type: object
+      properties:
+        port:
+          type: integer
+        host:
+          type: string
+        protocol:
+          type: string
+          enum: [http, https]
+
+    CorsConfig:
+      type: object
+      properties:
+        origins:
+          type: string
+        methods:
+          type: string
+        credentials:
+          type: boolean
+
+    RateLimitRules:
+      type: object
+      properties:
+        windowMs:
+          type: integer
+        maxRequests:
+          type: integer
+        strategy:
+          type: string
+          enum: [fixed-window, sliding-window]
+
+    DatabaseConnection:
+      type: object
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        database:
+          type: string
+        ssl:
+          type: boolean
+
+    ConnectionPoolConfig:
+      type: object
+      properties:
+        min:
+          type: integer
+        max:
+          type: integer
+        idleTimeoutMillis:
+          type: integer
+
+    CacheConnection:
+      type: object
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        password:
+          type: string
+
+    EvictionPolicy:
+      type: object
+      properties:
+        algorithm:
+          type: string
+          enum: [lru, lfu, fifo]
+        maxSize:
+          type: integer
+
+    MigrationSettings:
+      type: object
+      properties:
+        directory:
+          type: string
+        tableName:
+          type: string
+        schemaName:
+          type: string
+
+    MigrationStrategy:
+      type: object
+      properties:
+        onStartup:
+          type: boolean
+        validateBeforeRun:
+          type: boolean
+
+    ContainerRegistry:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        username:
+          type: string
+        passwordRef:
+          type: string
+
+    ResourceRequirements:
+      type: object
+      properties:
+        cpu:
+          type: string
+        memory:
+          type: string
+
+    HealthCheckConfig:
+      type: object
+      properties:
+        path:
+          type: string
+        port:
+          type: integer
+        initialDelaySeconds:
+          type: integer
+        periodSeconds:
+          type: integer
+
+    HorizontalScalingConfig:
+      type: object
+      properties:
+        minReplicas:
+          type: integer
+        maxReplicas:
+          type: integer
+        targetUtilization:
+          type: integer
+
+    MetricThreshold:
+      type: object
+      properties:
+        value:
+          type: number
+        operator:
+          type: string
+          enum: [greater-than, less-than, equals]
+
+    IngressController:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [nginx, traefik, haproxy]
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+
+    TlsCertificate:
+      type: object
+      properties:
+        secretName:
+          type: string
+        issuer:
+          type: string
+
+    ServicePorts:
+      type: object
+      properties:
+        http:
+          type: integer
+        https:
+          type: integer
+
+    ServiceAccount:
+      type: object
+      properties:
+        name:
+          type: string
+        automountToken:
+          type: boolean
+
+    LogAggregation:
+      type: object
+      properties:
+        backend:
+          type: string
+          enum: [elasticsearch, loki, cloudwatch]
+        endpoint:
+          type: string
+          format: uri
+
+    RetentionPolicy:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [time-based, size-based]
+        value:
+          type: integer
+
+    MetricsCollector:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [prometheus, datadog, new-relic]
+        interval:
+          type: integer
+
+    ScrapeConfig:
+      type: object
+      properties:
+        interval:
+          type: string
+        timeout:
+          type: string
+
+    TracingBackend:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [jaeger, zipkin, datadog]
+        endpoint:
+          type: string
+          format: uri
+
+    SamplingStrategy:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [probabilistic, rate-limiting, adaptive]
+        config:
+          type: object
+
+    CloudCredentials:
+      type: object
+      properties:
+        accessKeyId:
+          type: string
+        secretAccessKey:
+          type: string
+        region:
+          type: string
+
+    ApiServerConfig:
+      type: object
+      properties:
+        address:
+          type: string
+        port:
+          type: integer
+        tlsEnabled:
+          type: boolean
+
+    SchedulerConfig:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        bindAddress:
+          type: string
+
+    NodeAutoscaling:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        minNodes:
+          type: integer
+        maxNodes:
+          type: integer
+
+    GpuConfig:
+      type: object
+      properties:
+        driver:
+          type: string
+        count:
+          type: integer
+
+    StorageClass:
+      type: object
+      properties:
+        provisioner:
+          type: string
+        reclaimPolicy:
+          type: string
+          enum: [Retain, Delete]
+
+    SnapshotPolicy:
+      type: object
+      properties:
+        schedule:
+          type: string
+        retention:
+          type: integer
+
+    RbacRoles:
+      type: object
+      additionalProperties:
+        type: object
+
+    NetworkPolicyRules:
+      type: object
+      additionalProperties:
+        type: object
+
+    EncryptionProvider:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [kms, vault]
+        keyId:
+          type: string

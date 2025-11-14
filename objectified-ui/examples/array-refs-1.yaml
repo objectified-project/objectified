@@ -1,0 +1,569 @@
+openapi: 3.1.0
+info:
+  title: Project Management API
+  version: 1.0.0
+  description: API for managing projects with arrays of referenced schemas
+
+servers:
+  - url: https://api.projectmanager.com/v1
+
+paths:
+  /projects/{projectId}:
+    get:
+      summary: Get project details
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+    patch:
+      summary: Update project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+  /teams/{teamId}:
+    get:
+      summary: Get team details
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+components:
+  schemas:
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Milestone'
+        repositories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Repository'
+        dependencies:
+          type: object
+          properties:
+            npm:
+              type: array
+              items:
+                $ref: '#/components/schemas/NpmPackage'
+            python:
+              type: array
+              items:
+                $ref: '#/components/schemas/PythonPackage'
+        technology:
+          type: object
+          properties:
+            frameworks:
+              type: array
+              items:
+                $ref: '#/components/schemas/Framework'
+            languages:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProgrammingLanguage'
+            databases:
+              type: array
+              items:
+                $ref: '#/components/schemas/Database'
+        deployments:
+          type: object
+          properties:
+            environments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Environment'
+            pipelines:
+              type: array
+              items:
+                $ref: '#/components/schemas/Pipeline'
+        documentation:
+          type: object
+          properties:
+            guides:
+              type: array
+              items:
+                $ref: '#/components/schemas/DocumentationGuide'
+            apiSpecs:
+              type: array
+              items:
+                $ref: '#/components/schemas/ApiSpecification'
+
+    Team:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+        permissions:
+          type: object
+          properties:
+            roles:
+              type: array
+              items:
+                $ref: '#/components/schemas/Role'
+            accessPolicies:
+              type: array
+              items:
+                $ref: '#/components/schemas/AccessPolicy'
+        resources:
+          type: object
+          properties:
+            cloudAccounts:
+              type: array
+              items:
+                $ref: '#/components/schemas/CloudAccount'
+            serviceAccounts:
+              type: array
+              items:
+                $ref: '#/components/schemas/ServiceAccount'
+
+    TeamMember:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/Skill'
+
+    Milestone:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        dueDate:
+          type: string
+          format: date
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        deliverables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deliverable'
+
+    Repository:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        branches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Branch'
+        webhooks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Webhook'
+
+    NpmPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        registry:
+          type: string
+
+    PythonPackage:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        source:
+          type: string
+          enum: [pypi, private]
+
+    Framework:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [react, express, fastapi]
+        version:
+          type: string
+        plugins:
+          type: array
+          items:
+            $ref: '#/components/schemas/Plugin'
+
+    ProgrammingLanguage:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [typescript, javascript, python]
+        version:
+          type: string
+        compilerOptions:
+          type: object
+
+    Database:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [postgresql, mysql, mongodb]
+        version:
+          type: string
+        migrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Migration'
+        backups:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupConfig'
+
+    Environment:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [development, staging, production]
+        variables:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvironmentVariable'
+        secrets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Secret'
+
+    Pipeline:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelineStage'
+        triggers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trigger'
+
+    DocumentationGuide:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentationSection'
+
+    ApiSpecification:
+      type: object
+      properties:
+        id:
+          type: string
+        format:
+          type: string
+          enum: [openapi, graphql]
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Endpoint'
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    AccessPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+        resource:
+          type: string
+        actions:
+          type: array
+          items:
+            type: string
+
+    CloudAccount:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+          enum: [aws, azure, gcp]
+        credentials:
+          type: object
+
+    ServiceAccount:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        keyId:
+          type: string
+
+    Skill:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: string
+          enum: [beginner, intermediate, advanced, expert]
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [todo, in-progress, completed]
+        assignees:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+
+    Deliverable:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+
+    Branch:
+      type: object
+      properties:
+        name:
+          type: string
+        protected:
+          type: boolean
+        commits:
+          type: array
+          items:
+            $ref: '#/components/schemas/Commit'
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+
+    Plugin:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        enabled:
+          type: boolean
+
+    Migration:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        applied:
+          type: boolean
+
+    BackupConfig:
+      type: object
+      properties:
+        schedule:
+          type: string
+        retention:
+          type: integer
+        location:
+          type: string
+
+    EnvironmentVariable:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+
+    Secret:
+      type: object
+      properties:
+        key:
+          type: string
+        vaultPath:
+          type: string
+
+    PipelineStage:
+      type: object
+      properties:
+        name:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelineStep'
+
+    Trigger:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [push, pull-request, schedule]
+        conditions:
+          type: object
+
+    DocumentationSection:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+
+    Endpoint:
+      type: object
+      properties:
+        path:
+          type: string
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE]
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Parameter'
+
+    Commit:
+      type: object
+      properties:
+        hash:
+          type: string
+        message:
+          type: string
+        author:
+          type: string
+
+    PipelineStep:
+      type: object
+      properties:
+        name:
+          type: string
+        command:
+          type: string
+        artifacts:
+          type: array
+          items:
+            type: string
+
+    Parameter:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        required:
+          type: boolean
