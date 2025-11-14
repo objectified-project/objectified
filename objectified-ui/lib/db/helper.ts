@@ -961,6 +961,27 @@ export async function importProjectFromOpenAPI(
 ) {
   const client = await connectionPool.connect();
 
+  // Helper: deep sort object keys for stable equality checks
+  const sortKeysDeep = (value: any): any => {
+    if (Array.isArray(value)) {
+      return value.map(sortKeysDeep);
+    }
+    if (value && typeof value === 'object') {
+      const sorted: any = {};
+      Object.keys(value).sort().forEach((k) => {
+        const v = (value as any)[k];
+        if (v !== undefined) {
+          sorted[k] = sortKeysDeep(v);
+        }
+      });
+      return sorted;
+    }
+    return value;
+  };
+
+  // Helper: stable stringify for equality comparison
+  const stableStringify = (obj: any) => JSON.stringify(sortKeysDeep(obj));
+
   try {
     await client.query('BEGIN');
 
@@ -971,7 +992,6 @@ export async function importProjectFromOpenAPI(
        RETURNING *`,
       [tenantId, creatorId, projectName.trim(), projectDescription?.trim() || null, projectSlug.trim().toLowerCase()]
     );
-
     const project = projectResult.rows[0];
 
     // 2. Create the version
@@ -981,126 +1001,126 @@ export async function importProjectFromOpenAPI(
        RETURNING *`,
       [project.id, creatorId, versionId.trim(), versionDescription?.trim() || null]
     );
-
     const version = versionResult.rows[0];
 
-    // 3. Helper function to collect all properties recursively (including nested children)
-    const collectAllProperties = (properties: any[]): any[] => {
-      const allProps: any[] = [];
-      for (const prop of properties) {
-        allProps.push(prop);
+    // 3. Collect and validate properties across all classes (including nested children)
+    type PropertyInfo = { name: string; data: any; description?: string; _className?: string };
+    const allPropsFlat: PropertyInfo[] = [];
+
+    const collectAllProperties = (properties: any[], className: string) => {
+      for (const prop of properties || []) {
+        allPropsFlat.push({ name: prop.name, data: prop.data, description: prop.description, _className: className });
         if (prop.children && prop.children.length > 0) {
-          allProps.push(...collectAllProperties(prop.children));
+          collectAllProperties(prop.children, className);
         }
       }
-      return allProps;
     };
 
-    // Collect all unique properties across all classes (including nested)
-    const propertyMap = new Map<string, string>(); // key -> property_id
-
     for (const cls of classes) {
-      const allProperties = collectAllProperties(cls.properties);
-      for (const prop of allProperties) {
-        const key = JSON.stringify({ name: prop.name, data: prop.data });
+      collectAllProperties(cls.properties || [], cls.name);
+    }
 
-        if (!propertyMap.has(key)) {
-          // Create the property
-          const propResult = await client.query(
-            `INSERT INTO odb.properties (project_id, name, description, data)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (project_id, name) DO UPDATE SET data = EXCLUDED.data
-             RETURNING id`,
-            [project.id, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data)]
-          );
+    // Validate: Properties with same name must have identical data within the project
+    const nameToDataSig = new Map<string, string>();
+    const nameToExamples = new Map<string, Array<{ className: string; dataSig: string }>>();
 
-          propertyMap.set(key, propResult.rows[0].id);
-        }
+    for (const p of allPropsFlat) {
+      const sig = stableStringify(p.data);
+      if (!nameToDataSig.has(p.name)) {
+        nameToDataSig.set(p.name, sig);
+        nameToExamples.set(p.name, [{ className: p._className || '', dataSig: sig }]);
+      } else if (nameToDataSig.get(p.name) !== sig) {
+        // Conflict detected: same property name with different schemas
+        const examples = nameToExamples.get(p.name) || [];
+        examples.push({ className: p._className || '', dataSig: sig });
+        nameToExamples.set(p.name, examples);
       }
     }
 
-    // 4. Helper function to link properties recursively with parent-child relationships
+    // If any conflicts exist, abort with a helpful error
+    const conflicts: string[] = [];
+    for (const [propName, examples] of nameToExamples.entries()) {
+      const uniqueSigs = new Set(examples.map(e => e.dataSig));
+      if (uniqueSigs.size > 1) {
+        const byClass = examples.map(e => e.className).join(', ');
+        conflicts.push(`Property name conflict for "${propName}": appears with different schemas in classes: ${byClass}`);
+      }
+    }
+
+    if (conflicts.length > 0) {
+      await client.query('ROLLBACK');
+      return JSON.stringify({ success: false, error: conflicts.join(' | ') });
+    }
+
+    // 4. Create project-level properties (deduplicated by name)
+    const propertyIdByName = new Map<string, string>();
+    for (const [propName, dataSig] of nameToDataSig.entries()) {
+      // Pick a description from first occurrence if any
+      const first = allPropsFlat.find(p => p.name === propName);
+      const parsedData = JSON.parse(dataSig);
+      const insert = await client.query(
+        `INSERT INTO odb.properties (project_id, name, description, data)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [project.id, propName.trim(), first?.description?.trim() || null, JSON.stringify(parsedData)]
+      );
+      propertyIdByName.set(propName, insert.rows[0].id);
+    }
+
+    // 5. Create classes and link properties recursively (supporting nested children)
     const linkProperties = async (classId: string, properties: any[], parentClassPropertyId: string | null = null) => {
-      for (const prop of properties) {
-        const key = JSON.stringify({ name: prop.name, data: prop.data });
-        const propertyId = propertyMap.get(key);
+      for (const prop of properties || []) {
+        const propertyId = propertyIdByName.get(prop.name);
+        if (!propertyId) continue; // safety
 
-        if (propertyId) {
-          // Insert the class property
-          const classPropertyResult = await client.query(
-            `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id`,
-            [classId, propertyId, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data), parentClassPropertyId]
-          );
+        const classPropRes = await client.query(
+          `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
+          [classId, propertyId, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data), parentClassPropertyId]
+        );
+        const newParentId = classPropRes.rows[0].id;
 
-          const classPropertyId = classPropertyResult.rows[0].id;
-
-          // Recursively link child properties if they exist
-          if (prop.children && prop.children.length > 0) {
-            await linkProperties(classId, prop.children, classPropertyId);
-          }
+        if (prop.children && prop.children.length > 0) {
+          await linkProperties(classId, prop.children, newParentId);
         }
       }
     };
 
-    // Create classes and link properties with hierarchy
     for (const cls of classes) {
-      // Create the class
       const classResult = await client.query(
         `INSERT INTO odb.classes (version_id, name, description, schema)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
         [version.id, cls.name.trim(), cls.description?.trim() || null, JSON.stringify({ type: 'object' })]
       );
-
       const classId = classResult.rows[0].id;
-
-      // Link properties to the class (this will recursively handle children)
-      await linkProperties(classId, cls.properties, null);
+      await linkProperties(classId, cls.properties || [], null);
     }
 
     await client.query('COMMIT');
-
-    return JSON.stringify({
-      success: true,
-      project: project,
-      version: version
-    });
+    return JSON.stringify({ success: true, projectId: project.id, versionId: version.id });
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Error importing project from OpenAPI:', error);
+    try { await client.query('ROLLBACK'); } catch {}
 
-    if (error.code === '23505') {
-      if (error.constraint?.includes('slug')) {
+    // Surface user-friendly unique constraint violations
+    if (error && error.code === '23505') {
+      // Determine which unique constraint likely failed
+      const msg = (error.detail || error.message || '').toLowerCase();
+      if (msg.includes('projects') && msg.includes('slug')) {
         return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
       }
-      if (error.constraint?.includes('version_id')) {
+      if (msg.includes('versions') && msg.includes('version_id')) {
         return JSON.stringify({ success: false, error: 'A version with this ID already exists for this project' });
+      }
+      if (msg.includes('properties') && msg.includes('project_id') && msg.includes('name')) {
+        return JSON.stringify({ success: false, error: 'A property with this name already exists in this project' });
       }
     }
 
-    return JSON.stringify({ success: false, error: error.message });
+    return JSON.stringify({ success: false, error: error?.message || 'Failed to import project from OpenAPI' });
   } finally {
     client.release();
-  }
-}
-
-// API Key Management Functions
-
-export async function getApiKeysForTenant(tenantId: string) {
-  try {
-    const result = await connectionPool.query(
-      `SELECT id, tenant_id, name, description, key_prefix, last_used_at, expires_at, enabled, created_at, updated_at
-       FROM odb.api_keys
-       WHERE tenant_id = $1 AND deleted_at IS NULL
-       ORDER BY created_at DESC`,
-      [tenantId]
-    );
-
-    return JSON.stringify(result.rows);
-  } catch (error: any) {
-    return JSON.stringify([]);
   }
 }
 

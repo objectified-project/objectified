@@ -189,6 +189,9 @@ const StudioContent = () => {
           maximum: propertyData.maximum,
           minItems: propertyData.minItems,
           maxItems: propertyData.maxItems,
+          uniqueItems: propertyData.uniqueItems,
+          // Preserve array item schema when present (e.g., items: { type: 'object' } or $ref)
+          items: propertyData.items,
           enum: propertyData.enum,
           default: propertyData.default,
           required: propertyData.required

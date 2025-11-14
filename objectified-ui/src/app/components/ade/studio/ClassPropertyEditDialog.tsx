@@ -113,9 +113,11 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     setEditPropWriteOnly(!!propData.writeOnly);
     setEditPropExample(propData.example ? JSON.stringify(propData.example) : '');
 
-    // Handle additionalProperties - only relevant for object types
-    if (propData.hasOwnProperty('additionalProperties')) {
-      setEditPropAdditionalProperties(propData.additionalProperties === false ? 'false' : 'true');
+    // Handle additionalProperties - relevant for direct object or array items object
+    const isArrayInlineObject = propData.type === 'array' && propData.items && propData.items.type === 'object' && !propData.items.$ref;
+    const additionalPropsSource = isArrayInlineObject ? propData.items : propData;
+    if (additionalPropsSource.hasOwnProperty('additionalProperties')) {
+      setEditPropAdditionalProperties(additionalPropsSource.additionalProperties === false ? 'false' : 'true');
     } else {
       setEditPropAdditionalProperties('default');
     }
@@ -173,16 +175,6 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         writeOnly: editPropWriteOnly,
       };
 
-      // Handle additionalProperties field
-      if (editPropAdditionalProperties === 'true') {
-        updatedData.additionalProperties = true;
-      } else if (editPropAdditionalProperties === 'false') {
-        updatedData.additionalProperties = false;
-      } else {
-        // 'default' - remove the field to use JSON Schema default behavior
-        delete updatedData.additionalProperties;
-      }
-
       if (editPropExample.trim()) {
         try {
           updatedData.example = JSON.parse(editPropExample);
@@ -196,6 +188,16 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       // Determine where to apply constraints (array items vs direct)
       const isArray = updatedData.type === 'array';
       const targetSchema = isArray ? (updatedData.items || {}) : updatedData;
+
+      // Handle additionalProperties field (apply to direct object or array items object)
+      const isArrayInlineObject = isArray && targetSchema && targetSchema.type === 'object' && !targetSchema.$ref;
+      if (editPropAdditionalProperties === 'true') {
+        targetSchema.additionalProperties = true;
+      } else if (editPropAdditionalProperties === 'false') {
+        targetSchema.additionalProperties = false;
+      } else {
+        delete targetSchema.additionalProperties;
+      }
 
       // String constraints
       if (editPropMinLength) targetSchema.minLength = parseInt(editPropMinLength);
@@ -270,6 +272,8 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       // Update items if it's an array
       if (isArray) {
         updatedData.items = targetSchema;
+        // Ensure additionalProperties isn't left on the array level
+        delete updatedData.additionalProperties;
       }
 
       const result = await updateClassProperty(
@@ -406,14 +410,15 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
           />
         </Box>
 
-        {/* Show additionalProperties control only for object types */}
+        {/* Show additionalProperties control for object types or arrays with inline object items */}
         {editingClassProperty && (() => {
           const propData = typeof editingClassProperty.data === 'string'
             ? JSON.parse(editingClassProperty.data)
             : (editingClassProperty.data || {});
-          const isObjectType = propData.type === 'object' && !propData.$ref;
+          const isDirectObject = propData.type === 'object' && !propData.$ref;
+          const isArrayInlineObject = propData.type === 'array' && propData.items && propData.items.type === 'object' && !propData.items.$ref;
 
-          if (isObjectType) {
+          if (isDirectObject || isArrayInlineObject) {
             return (
               <>
                 <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
@@ -724,4 +729,3 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     </Dialog>
   );
 }
-

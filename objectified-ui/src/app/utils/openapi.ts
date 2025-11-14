@@ -91,6 +91,41 @@ function buildPropertySchema(prop: any, allProperties: any[]): any {
     }
   }
 
+  // If this property is an array of inline objects, ensure items is present and nest children under items
+  if (propData.type === 'array') {
+    const children = allProperties.filter((p: any) => p.parent_id === prop.id);
+
+    // If children exist but items is missing, infer items as an inline object
+    if (children.length > 0 && !propData.items) {
+      propData.items = { type: 'object' };
+    }
+
+    if (propData.items && !propData.items.$ref && (propData.items.type === 'object' || children.length > 0)) {
+      const nestedProperties: any = {};
+      const nestedRequired: string[] = [];
+
+      children.forEach((child: any) => {
+        const childSchema = buildPropertySchema(child, allProperties);
+        if (childSchema.required) {
+          nestedRequired.push(child.name);
+          delete childSchema.required;
+        }
+        if (childSchema.required === false) {
+          delete childSchema.required;
+        }
+        nestedProperties[child.name] = childSchema;
+      });
+
+      // Ensure items is an object and attach nested properties
+      propData.items = { ...(propData.items || {}), type: 'object', properties: nestedProperties };
+      if (nestedRequired.length > 0) {
+        propData.items.required = nestedRequired;
+      } else if (propData.items.required !== undefined) {
+        delete propData.items.required;
+      }
+    }
+  }
+
   return propData;
 }
 
@@ -254,4 +289,3 @@ export function generateClassOpenApiSpec(
     }
   };
 }
-
