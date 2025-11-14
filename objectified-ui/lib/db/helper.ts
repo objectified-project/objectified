@@ -2,6 +2,7 @@
 
 const connectionPool = require('./db');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 export async function getUserByEmail(emailAddress: string) {
   return await connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
@@ -982,10 +983,61 @@ export async function importProjectFromOpenAPI(
   // Helper: stable stringify for equality comparison
   const stableStringify = (obj: any) => JSON.stringify(sortKeysDeep(obj));
 
+  // Helper: remove class-specific flags from root property data (e.g., required)
+  const sanitizeRootPropertyData = (data: any): any => {
+    if (!data || typeof data !== 'object') return data;
+    const clone = JSON.parse(JSON.stringify(data));
+    if (typeof clone.required === 'boolean') delete clone.required; // class-level concern only
+    return clone;
+  };
+
+  const extractRefName = (ref: string | undefined): string | null => {
+    if (!ref) return null;
+    const parts = ref.split('/');
+    return parts[parts.length - 1] || null;
+  };
+
+  // Produce a compact alphanumeric type code
+  const typeCodeFor = (data: any): string => {
+    if (!data || typeof data !== 'object') return 'X';
+    if (data.$ref) {
+      const refName = extractRefName(data.$ref) || 'Ref';
+      return 'R' + refName.replace(/[^A-Za-z0-9]/g, '').slice(0, 20);
+    }
+    const t = data.type;
+    if (t === 'array') {
+      const items = data.items || {};
+      if (items.$ref) {
+        const refName = extractRefName(items.$ref) || 'Ref';
+        return 'A' + refName.replace(/[^A-Za-z0-9]/g, '').slice(0, 20);
+      }
+      if (items.type) {
+        return 'A' + String(items.type).replace(/[^A-Za-z0-9]/g, '').slice(0, 20).toUpperCase();
+      }
+      return 'A';
+    }
+    if (t) {
+      const map: Record<string,string> = {
+        string: 'S', integer: 'I', number: 'N', boolean: 'B', object: 'O'
+      };
+      return map[t] || String(t).replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toUpperCase() || 'X';
+    }
+    if (data.oneOf) return 'ONEOF';
+    if (data.anyOf) return 'ANYOF';
+    if (data.allOf) return 'ALLOF';
+    return 'SCHEMA';
+  };
+
+  const shortHash = (s: string) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 8).toUpperCase();
+  const sanitizeBase = (name: string): string => {
+    const cleaned = name.replace(/[^A-Za-z0-9]/g, '');
+    return cleaned.length > 0 ? cleaned : 'Property';
+  };
+
   try {
     await client.query('BEGIN');
 
-    // 1. Create the project
+    // 1. Create project
     const projectResult = await client.query(
       `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug)
        VALUES ($1, $2, $3, $4, $5)
@@ -994,7 +1046,7 @@ export async function importProjectFromOpenAPI(
     );
     const project = projectResult.rows[0];
 
-    // 2. Create the version
+    // 2. Create version
     const versionResult = await client.query(
       `INSERT INTO odb.versions (project_id, creator_id, version_id, description)
        VALUES ($1, $2, $3, $4)
@@ -1003,99 +1055,116 @@ export async function importProjectFromOpenAPI(
     );
     const version = versionResult.rows[0];
 
-    // 3. Collect and validate properties across all classes (including nested children)
+    // 3. Flatten properties (include nested)
     type PropertyInfo = { name: string; data: any; description?: string; _className?: string };
     const allPropsFlat: PropertyInfo[] = [];
-
-    const collectAllProperties = (properties: any[], className: string) => {
-      for (const prop of properties || []) {
-        allPropsFlat.push({ name: prop.name, data: prop.data, description: prop.description, _className: className });
-        if (prop.children && prop.children.length > 0) {
-          collectAllProperties(prop.children, className);
-        }
+    const collectAll = (props: any[], className: string) => {
+      for (const p of props || []) {
+        allPropsFlat.push({ name: p.name, data: p.data, description: p.description, _className: className });
+        if (p.children && p.children.length) collectAll(p.children, className);
       }
     };
+    for (const cls of classes) collectAll(cls.properties || [], cls.name);
 
-    for (const cls of classes) {
-      collectAllProperties(cls.properties || [], cls.name);
-    }
-
-    // Validate: Properties with same name must have identical data within the project
-    const nameToDataSig = new Map<string, string>();
-    const nameToExamples = new Map<string, Array<{ className: string; dataSig: string }>>();
+    // Group signatures per original base name
+    interface SigRecord { canonical: any; sig: string; typeCode: string; original: PropertyInfo; }
+    const baseToSigRecords = new Map<string, SigRecord[]>();
 
     for (const p of allPropsFlat) {
-      const sig = stableStringify(p.data);
-      if (!nameToDataSig.has(p.name)) {
-        nameToDataSig.set(p.name, sig);
-        nameToExamples.set(p.name, [{ className: p._className || '', dataSig: sig }]);
-      } else if (nameToDataSig.get(p.name) !== sig) {
-        // Conflict detected: same property name with different schemas
-        const examples = nameToExamples.get(p.name) || [];
-        examples.push({ className: p._className || '', dataSig: sig });
-        nameToExamples.set(p.name, examples);
+      const canonical = sanitizeRootPropertyData(p.data);
+      const sig = stableStringify(canonical);
+      const typeCode = typeCodeFor(canonical);
+      const arr = baseToSigRecords.get(p.name) || [];
+      // Avoid storing duplicate identical signature records (same schema reused across classes)
+      if (!arr.some(r => r.sig === sig)) {
+        arr.push({ canonical, sig, typeCode, original: p });
+      }
+      baseToSigRecords.set(p.name, arr);
+    }
+
+    // 4. Decide project-level property names (alphanumeric only)
+    const projectNameToData = new Map<string, { canonical: any; description?: string }>();
+    const signatureToProjectName = new Map<string, string>(); // sig -> project name
+
+    for (const [baseName, records] of baseToSigRecords.entries()) {
+      const multi = records.length > 1;
+      const baseSanitized = sanitizeBase(baseName); // sanitized base for naming
+
+      for (const rec of records) {
+        let projectPropName: string;
+        if (!multi) {
+          // Single signature group: prefer base sanitized
+            projectPropName = baseSanitized;
+            // Collision fallback: if name already taken by different signature, decorate
+            if (projectNameToData.has(projectPropName)) {
+              const existingSig = Array.from(signatureToProjectName.entries()).find(([s,n]) => n === projectPropName)?.[0];
+              if (existingSig && existingSig !== rec.sig) {
+                projectPropName = `${baseSanitized}${rec.typeCode}${shortHash(rec.sig)}`.slice(0,255);
+              }
+            }
+        } else {
+          // Multiple distinct signatures: decorate with type code + hash
+          projectPropName = `${baseSanitized}${rec.typeCode}${shortHash(rec.sig)}`;
+          if (projectPropName.length > 255) projectPropName = projectPropName.slice(0,255);
+        }
+
+        // Ensure only alphanumeric (sanitization might have left non-alnum from typeCode/hash but both are alnum already)
+        projectPropName = projectPropName.replace(/[^A-Za-z0-9]/g, '');
+
+        if (!projectNameToData.has(projectPropName)) {
+          projectNameToData.set(projectPropName, { canonical: rec.canonical, description: rec.original.description });
+          signatureToProjectName.set(rec.sig, projectPropName);
+        } else {
+          // If identical signature but different candidate name (rare), reuse existing mapping
+          const existingName = signatureToProjectName.get(rec.sig);
+          if (!existingName) signatureToProjectName.set(rec.sig, projectPropName);
+        }
       }
     }
 
-    // If any conflicts exist, abort with a helpful error
-    const conflicts: string[] = [];
-    for (const [propName, examples] of nameToExamples.entries()) {
-      const uniqueSigs = new Set(examples.map(e => e.dataSig));
-      if (uniqueSigs.size > 1) {
-        const byClass = examples.map(e => e.className).join(', ');
-        conflicts.push(`Property name conflict for "${propName}": appears with different schemas in classes: ${byClass}`);
-      }
-    }
-
-    if (conflicts.length > 0) {
-      await client.query('ROLLBACK');
-      return JSON.stringify({ success: false, error: conflicts.join(' | ') });
-    }
-
-    // 4. Create project-level properties (deduplicated by name)
-    const propertyIdByName = new Map<string, string>();
-    for (const [propName, dataSig] of nameToDataSig.entries()) {
-      // Pick a description from first occurrence if any
-      const first = allPropsFlat.find(p => p.name === propName);
-      const parsedData = JSON.parse(dataSig);
-      const insert = await client.query(
+    // 5. Insert project-level properties (reuse by computed alphanumeric name)
+    const propertyIdByProjectName = new Map<string, string>();
+    for (const [propName, payload] of projectNameToData.entries()) {
+      const insertRes = await client.query(
         `INSERT INTO odb.properties (project_id, name, description, data)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
-        [project.id, propName.trim(), first?.description?.trim() || null, JSON.stringify(parsedData)]
+        [project.id, propName, payload.description?.trim() || null, JSON.stringify(payload.canonical)]
       );
-      propertyIdByName.set(propName, insert.rows[0].id);
+      propertyIdByProjectName.set(propName, insertRes.rows[0].id);
     }
 
-    // 5. Create classes and link properties recursively (supporting nested children)
-    const linkProperties = async (classId: string, properties: any[], parentClassPropertyId: string | null = null) => {
-      for (const prop of properties || []) {
-        const propertyId = propertyIdByName.get(prop.name);
-        if (!propertyId) continue; // safety
+    // 6. Create classes and link properties (preserve original class property names)
+    const linkProperties = async (classId: string, props: any[], parentId: string | null = null) => {
+      for (const p of props || []) {
+        const canonical = sanitizeRootPropertyData(p.data);
+        const sig = stableStringify(canonical);
+        const projectName = signatureToProjectName.get(sig);
+        if (!projectName) continue; // safety
+        const propertyId = propertyIdByProjectName.get(projectName);
+        if (!propertyId) continue;
 
         const classPropRes = await client.query(
           `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id`,
-          [classId, propertyId, prop.name.trim(), prop.description?.trim() || null, JSON.stringify(prop.data), parentClassPropertyId]
+          [classId, propertyId, p.name.trim(), p.description?.trim() || null, JSON.stringify(p.data), parentId]
         );
-        const newParentId = classPropRes.rows[0].id;
 
-        if (prop.children && prop.children.length > 0) {
-          await linkProperties(classId, prop.children, newParentId);
+        if (p.children && p.children.length) {
+          await linkProperties(classId, p.children, classPropRes.rows[0].id);
         }
       }
     };
 
     for (const cls of classes) {
-      const classResult = await client.query(
+      const classRes = await client.query(
         `INSERT INTO odb.classes (version_id, name, description, schema)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
         [version.id, cls.name.trim(), cls.description?.trim() || null, JSON.stringify({ type: 'object' })]
       );
-      const classId = classResult.rows[0].id;
-      await linkProperties(classId, cls.properties || [], null);
+      await linkProperties(classRes.rows[0].id, cls.properties || [], null);
     }
 
     await client.query('COMMIT');
@@ -1103,9 +1172,7 @@ export async function importProjectFromOpenAPI(
   } catch (error: any) {
     try { await client.query('ROLLBACK'); } catch {}
 
-    // Surface user-friendly unique constraint violations
     if (error && error.code === '23505') {
-      // Determine which unique constraint likely failed
       const msg = (error.detail || error.message || '').toLowerCase();
       if (msg.includes('projects') && msg.includes('slug')) {
         return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
@@ -1146,7 +1213,6 @@ export async function createApiKey(tenantId: string, name: string, description: 
     }
 
     // Generate a random API key
-    const crypto = require('crypto');
     const apiKey = 'sk_' + crypto.randomBytes(32).toString('hex');
     const keyPrefix = apiKey.substring(0, 12) + '...';
 
