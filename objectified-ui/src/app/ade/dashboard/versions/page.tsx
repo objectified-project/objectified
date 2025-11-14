@@ -554,7 +554,7 @@ const Versions = () => {
             <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
             <div>
               <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                No Projects Available
+                No Versions Available
               </h2>
               <p className="text-yellow-800 dark:text-yellow-200 mb-3">
                 Please create a project before managing versions. Versions belong to specific projects.
