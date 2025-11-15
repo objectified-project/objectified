@@ -283,12 +283,22 @@ const Versions = () => {
   };
 
   const handlePublish = async (versionRecordId: string) => {
+    const ver = versions.find(v => v.id === versionRecordId);
+    if (!ver) {
+      alert('Version not found');
+      return;
+    }
+    if (ver.creator_id !== currentUserId) {
+      alert('Only the version owner can publish this version');
+      return;
+    }
+
     if (!confirm('Are you sure you want to publish this version? Once published, it cannot be edited (but can be unpublished or deleted).')) {
       return;
     }
 
     try {
-      const result = await publishVersion(versionRecordId);
+      const result = await publishVersion(versionRecordId, currentUserId);
       const response = JSON.parse(result);
 
       if (response.success) {
@@ -787,14 +797,16 @@ const Versions = () => {
                               <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             </button>
                           </div>
-                          <div title="Publish version (freeze)">
-                            <button
-                              onClick={() => handlePublish(version.id)}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                            >
-                              <Lock className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            </button>
-                          </div>
+                          {version.creator_id === currentUserId && (
+                            <div title="Publish version (freeze)">
+                              <button
+                                onClick={() => handlePublish(version.id)}
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
+                              >
+                                <Lock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                              </button>
+                            </div>
+                          )}
                         </>
                       ) : (
                         <div title="Unpublish version">

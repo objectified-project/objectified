@@ -521,14 +521,18 @@ export async function updateVersion(versionRecordId: string, description: string
   }
 }
 
-export async function publishVersion(versionRecordId: string) {
+export async function publishVersion(versionRecordId: string, userId: string) {
   try {
-    await connectionPool.query(
+    const result = await connectionPool.query(
       `UPDATE odb.versions 
        SET published = true, published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND deleted_at IS NULL`,
-      [versionRecordId]
+       WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL`,
+      [versionRecordId, userId]
     );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Only the version owner can publish this version' });
+    }
 
     return JSON.stringify({ success: true });
   } catch (error: any) {
