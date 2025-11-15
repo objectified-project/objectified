@@ -52,7 +52,7 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 });
 
 // Dynamically import Swagger UI with SSR disabled
-const SwaggerUI = dynamic(() => import('swagger-ui-react'), {
+const SwaggerUI = dynamic(() => import('swagger-ui-react').then(mod => mod.default || mod), {
   ssr: false,
   loading: () => (
     <div className="h-full flex items-center justify-center">
@@ -97,6 +97,7 @@ const StudioContent = () => {
 
   // Sample OpenAPI spec - will be replaced with actual data from project/version
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
+  const [swaggerKey, setSwaggerKey] = useState<number>(0); // Counter to force SwaggerUI re-render
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
@@ -820,6 +821,7 @@ const StudioContent = () => {
           version: currentVersion?.version_id
         });
         setOpenApiSpec(spec);
+        setSwaggerKey(prev => prev + 1); // Force SwaggerUI to remount
 
         // Fit view after a short delay to ensure nodes are rendered
         setTimeout(() => {
@@ -839,6 +841,44 @@ const StudioContent = () => {
 
     loadClasses();
   }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyEdit, handlePropertyDelete, handleClassEdit, generateOpenApiSpec, projects, versions, isReadOnly]);
+
+  // Regenerate OpenAPI spec when switching to code or swagger views
+  useEffect(() => {
+    const regenerateSpec = async () => {
+      if ((viewMode === 'code' || viewMode === 'swagger') && selectedVersionId) {
+        try {
+          // Reload classes from database to get latest state
+          const result = await getClassesForVersion(selectedVersionId);
+          const classesData = JSON.parse(result);
+
+          // Load properties for each class
+          const classesWithProperties = await Promise.all(
+            classesData.map(async (cls: any) => {
+              const propsResult = await getPropertiesForClass(cls.id);
+              const properties = JSON.parse(propsResult);
+              return { ...cls, properties };
+            })
+          );
+
+          // Generate fresh OpenAPI specification
+          const currentProject = projects.find(p => p.id === selectedProjectId);
+          const currentVersion = versions.find(v => v.id === selectedVersionId);
+          const spec = generateOpenApiSpec(classesWithProperties, {
+            projectName: currentProject?.name,
+            version: currentVersion?.version_id
+          });
+          setOpenApiSpec(spec);
+          setSwaggerKey(prev => prev + 1); // Force SwaggerUI to remount
+
+          console.log('Regenerated OpenAPI spec for view mode:', viewMode);
+        } catch (error) {
+          console.error('Failed to regenerate OpenAPI spec:', error);
+        }
+      }
+    };
+
+    regenerateSpec();
+  }, [viewMode, selectedVersionId, selectedProjectId, projects, versions]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -1444,6 +1484,7 @@ const StudioContent = () => {
             <div className="flex-1 overflow-auto">
               {openApiSpec ? (
                 <SwaggerUI
+                  key={swaggerKey} // Force re-render when spec changes by incrementing counter
                   spec={JSON.parse(openApiSpec)}
                   docExpansion="list"
                   defaultModelsExpandDepth={1}
