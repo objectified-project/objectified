@@ -935,8 +935,8 @@ export async function updateClassProperty(classPropertyId: string, name: string,
 
     const result = await connectionPool.query(
       `UPDATE odb.class_properties
-       SET name = $1, description = $2, data = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND deleted_at IS NULL
+       SET name = $1, description = $2, data = $3
+       WHERE id = $4
        RETURNING id, class_id, property_id, name, description, data, parent_id`,
       [name.trim(), description, JSON.stringify(data), classPropertyId]
     );
