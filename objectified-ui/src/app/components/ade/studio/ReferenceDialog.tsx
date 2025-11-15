@@ -12,6 +12,11 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormHelperText from '@mui/material/FormHelperText';
 
 export interface ClassItem {
   id: string;
@@ -196,24 +201,25 @@ export const ReferenceDialog: React.FC<ReferenceDialogProps> = ({
           </Box>
         )}
 
-        <TextField
-          select
-          margin="dense"
-          label="Target Class (Optional)"
-          fullWidth
-          value={targetClassId}
-          onChange={(e) => setTargetClassId(e.target.value)}
-          SelectProps={{ native: true }}
-          helperText="Select a class to reference, or leave empty to set later via canvas connections"
-          sx={{ mb: 2 }}
-        >
-          <option value="">No target (set later)</option>
-          {classes.map((cls) => (
-            <option key={cls.id} value={cls.id}>
-              {cls.name}
-            </option>
-          ))}
-        </TextField>
+        <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
+          <InputLabel id="target-class-label">Target Class (Optional)</InputLabel>
+          <Select
+            labelId="target-class-label"
+            label="Target Class (Optional)"
+            value={targetClassId}
+            onChange={(e) => setTargetClassId(e.target.value)}
+          >
+            <MenuItem value="">
+              <em>No target (set later)</em>
+            </MenuItem>
+            {classes.map((cls) => (
+              <MenuItem key={cls.id} value={cls.id}>
+                {cls.name}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormHelperText>Select a class to reference, or leave empty to set later via canvas connections</FormHelperText>
+        </FormControl>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={isSubmitting}>Cancel</Button>
