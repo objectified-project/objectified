@@ -25,7 +25,8 @@ import {
   publishVersion,
   unpublishVersion,
   getClassesForVersion,
-  getPropertiesForClass
+  getPropertiesForClass,
+  getTenantsAdministratedByUser
 } from '../../../../../lib/db/helper';
 import { generateOpenApiSpec } from '../../../utils/openapi';
 import * as yaml from 'js-yaml';
@@ -108,6 +109,33 @@ const Versions = () => {
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
+  const isAdmin = Boolean((session?.user as any)?.is_tenant_admin);
+  const [effectiveIsAdmin, setEffectiveIsAdmin] = useState<boolean>(isAdmin);
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolveAdmin = async () => {
+      try {
+        // Prefer session flag if available
+        if (isAdmin) {
+          if (!cancelled) setEffectiveIsAdmin(true);
+          return;
+        }
+        if (!currentUserId || !currentTenantId) {
+          if (!cancelled) setEffectiveIsAdmin(false);
+          return;
+        }
+        const res = await getTenantsAdministratedByUser(currentUserId);
+        const rows = JSON.parse(res) as Array<{ tenant_id: string }>;
+        const isAdminForTenant = rows.some(r => r.tenant_id === currentTenantId);
+        if (!cancelled) setEffectiveIsAdmin(isAdminForTenant);
+      } catch {
+        if (!cancelled) setEffectiveIsAdmin(false);
+      }
+    };
+    resolveAdmin();
+    return () => { cancelled = true; };
+  }, [isAdmin, currentUserId, currentTenantId]);
 
   useEffect(() => {
     if (currentTenantId) {
@@ -288,8 +316,8 @@ const Versions = () => {
       alert('Version not found');
       return;
     }
-    if (ver.creator_id !== currentUserId) {
-      alert('Only the version owner can publish this version');
+    if (ver.creator_id !== currentUserId && !effectiveIsAdmin) {
+      alert('Only the version owner or a tenant administrator can publish this version');
       return;
     }
 
@@ -312,12 +340,22 @@ const Versions = () => {
   };
 
   const handleUnpublish = async (versionRecordId: string) => {
+    const ver = versions.find(v => v.id === versionRecordId);
+    if (!ver) {
+      alert('Version not found');
+      return;
+    }
+    if (ver.creator_id !== currentUserId && !effectiveIsAdmin) {
+      alert('Only the version owner or a tenant administrator can unpublish this version');
+      return;
+    }
+
     if (!confirm('Are you sure you want to unpublish this version? It will become editable again.')) {
       return;
     }
 
     try {
-      const result = await unpublishVersion(versionRecordId);
+      const result = await unpublishVersion(versionRecordId, currentUserId);
       const response = JSON.parse(result);
 
       if (response.success) {
@@ -797,7 +835,7 @@ const Versions = () => {
                               <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             </button>
                           </div>
-                          {version.creator_id === currentUserId && (
+                          {(!version.published && (version.creator_id === currentUserId || effectiveIsAdmin)) && (
                             <div title="Publish version (freeze)">
                               <button
                                 onClick={() => handlePublish(version.id)}

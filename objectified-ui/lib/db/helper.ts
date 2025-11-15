@@ -524,14 +524,25 @@ export async function updateVersion(versionRecordId: string, description: string
 export async function publishVersion(versionRecordId: string, userId: string) {
   try {
     const result = await connectionPool.query(
-      `UPDATE odb.versions 
+      `UPDATE odb.versions v
        SET published = true, published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL`,
+       WHERE v.id = $1
+         AND v.deleted_at IS NULL
+         AND (
+           v.creator_id = $2
+           OR EXISTS (
+             SELECT 1
+             FROM odb.projects p
+             JOIN odb.tenant_administrators ta ON ta.tenant_id = p.tenant_id
+             WHERE p.id = v.project_id
+               AND ta.user_id = $2
+           )
+         )`,
       [versionRecordId, userId]
     );
 
     if (result.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'Only the version owner can publish this version' });
+      return JSON.stringify({ success: false, error: 'Only the version owner or a tenant administrator can publish this version' });
     }
 
     return JSON.stringify({ success: true });
@@ -540,14 +551,29 @@ export async function publishVersion(versionRecordId: string, userId: string) {
   }
 }
 
-export async function unpublishVersion(versionRecordId: string) {
+export async function unpublishVersion(versionRecordId: string, userId: string) {
   try {
-    await connectionPool.query(
-      `UPDATE odb.versions 
+    const result = await connectionPool.query(
+      `UPDATE odb.versions v
        SET published = false, published_at = NULL, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND deleted_at IS NULL`,
-      [versionRecordId]
+       WHERE v.id = $1
+         AND v.deleted_at IS NULL
+         AND (
+           v.creator_id = $2
+           OR EXISTS (
+             SELECT 1
+             FROM odb.projects p
+             JOIN odb.tenant_administrators ta ON ta.tenant_id = p.tenant_id
+             WHERE p.id = v.project_id
+               AND ta.user_id = $2
+           )
+         )`,
+      [versionRecordId, userId]
     );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Only the version owner or a tenant administrator can unpublish this version' });
+    }
 
     return JSON.stringify({ success: true });
   } catch (error: any) {
