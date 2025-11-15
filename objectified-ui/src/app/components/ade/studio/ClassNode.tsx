@@ -351,7 +351,7 @@ function ClassNode({ data, selected }: NodeProps) {
                   </div>
 
                   <div style={{ fontWeight: depth > 0 ? 400 : 500, color: '#111827', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.name}
+                    {p.data.required && '* '} {p.name}
                     {children.length > 0 && <span style={{ color: '#6b7280', marginLeft: 4 }}>({children.length})</span>}
                   </div>
 
