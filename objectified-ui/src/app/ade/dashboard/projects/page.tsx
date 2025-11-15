@@ -267,8 +267,7 @@ const Projects = () => {
             No Projects Yet
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Get started by creating your first project<br/>
-            using the "New Project" button above
+            Get started by creating your first project using the "New Project" button above
           </p>
         </div>
       ) : (

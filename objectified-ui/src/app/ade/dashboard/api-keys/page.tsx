@@ -217,18 +217,15 @@ const ApiKeys = () => {
       {/* API Keys List */}
       <div className="space-y-4">
         {apiKeys.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Key size={48} className="mx-auto mb-4 text-gray-400" />
-              <Typography variant="h6" gutterBottom>
-                No API Keys Yet
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Create your first API key to access your tenant data via REST API<br/>
-                using the "Create API Key" button above
-              </Typography>
-            </CardContent>
-          </Card>
+          <div className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center">
+            <Key className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              No API Keys Yet
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Create your first API key to access your tenant data via REST API using the "Create API Key" button above
+            </p>
+          </div>
         ) : (
           apiKeys.map((apiKey) => (
             <Card key={apiKey.id} className={isExpired(apiKey.expires_at) ? 'border-red-200' : ''}>

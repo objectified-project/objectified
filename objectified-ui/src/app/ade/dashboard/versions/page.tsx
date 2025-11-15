@@ -668,8 +668,7 @@ const Versions = () => {
             No Versions Yet
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Get started by creating your first version<br/>
-            using the "New Version" button above
+            Get started by creating your first version using the "New Version" button above
           </p>
         </div>
       ) : (
