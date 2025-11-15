@@ -119,6 +119,10 @@ const StudioContent = () => {
   const [referenceTargetClassId, setReferenceTargetClassId] = useState<string>('');
 
 
+  // Canvas loading state
+  const [isLoadingCanvas, setIsLoadingCanvas] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async () => {
     if (!selectedVersionId) return;
@@ -156,14 +160,22 @@ const StudioContent = () => {
 
   // Apply auto-layout to current nodes and edges
   const onLayout = useCallback((direction: LayoutDirection) => {
-    const layoutedNodes = getLayoutedElements(nodes, edges, { direction });
-    setNodes(layoutedNodes);
-    setLayoutDirection(direction);
+    setIsLoadingCanvas(true);
+    setLoadingMessage('Applying layout...');
 
-    // Fit view after layout with a small delay to ensure layout is applied
+    // Use setTimeout to allow the loading state to render before heavy computation
     setTimeout(() => {
-      fitView({ padding: 0.2, duration: 400 });
-    }, 10);
+      const layoutedNodes = getLayoutedElements(nodes, edges, { direction });
+      setNodes(layoutedNodes);
+      setLayoutDirection(direction);
+
+      // Fit view after layout with a small delay to ensure layout is applied
+      setTimeout(() => {
+        fitView({ padding: 0.2, duration: 400 });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+      }, 10);
+    }, 50);
   }, [nodes, edges, setNodes, fitView]);
 
   // Handle property drop on class
@@ -770,6 +782,9 @@ const StudioContent = () => {
         return;
       }
 
+      setIsLoadingCanvas(true);
+      setLoadingMessage('Loading classes...');
+
       try {
         const result = await getClassesForVersion(selectedVersionId);
         const classesData = JSON.parse(result);
@@ -816,6 +831,9 @@ const StudioContent = () => {
         console.error('Failed to load classes:', error);
         setNodes([]);
         setEdges([]);
+      } finally {
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
       }
     };
 
@@ -963,6 +981,17 @@ const StudioContent = () => {
 
   return (
     <div className="flex flex-col h-full">
+      <style jsx>{`
+        @keyframes slide {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(400%);
+          }
+        }
+      `}</style>
+
       {/* Header with Project and Version Selectors */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2" style={{ position: 'relative', zIndex: 1000 }}>
         <div className="flex items-center gap-3">
@@ -1076,24 +1105,50 @@ const StudioContent = () => {
           </div>
         ) : viewMode === 'canvas' ? (
           // React Flow Canvas View
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onEdgeClick={onEdgeClick}
-            fitView
-            attributionPosition="bottom-left"
-            className="dark:bg-gray-900"
-            nodesDraggable={true}
-            nodesConnectable={!isReadOnly}
-            elementsSelectable={true}
-            nodesFocusable={true}
-            edgesFocusable={true}
-          >
+          <>
+            {/* Loading Progress Bar */}
+            {isLoadingCanvas && (
+              <div className="absolute top-0 left-0 right-0 z-50">
+                <div className="bg-blue-600 h-1 animate-pulse" style={{
+                  animation: 'progress 1.5s ease-in-out infinite'
+                }}>
+                  <div className="bg-blue-400 h-full" style={{
+                    width: '40%',
+                    animation: 'slide 1.5s ease-in-out infinite'
+                  }}></div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 shadow-lg px-4 py-2 text-center border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {loadingMessage || 'Loading...'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
+              fitView
+              attributionPosition="bottom-left"
+              className="dark:bg-gray-900"
+              nodesDraggable={true}
+              nodesConnectable={!isReadOnly}
+              elementsSelectable={true}
+              nodesFocusable={true}
+              edgesFocusable={true}
+            >
             <Background
               variant={BackgroundVariant.Dots}
               gap={12}
@@ -1126,7 +1181,7 @@ const StudioContent = () => {
               <Panel position="top-left" className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 rounded-lg shadow-lg px-3 py-1.5 border border-yellow-300 dark:border-yellow-700">
                 <div className="flex items-center gap-1.5">
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 002 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                   </svg>
                   <span className="text-xs font-semibold">Read Only</span>
                 </div>
@@ -1199,6 +1254,7 @@ const StudioContent = () => {
               </div>
             </Panel>
           </ReactFlow>
+          </>
         ) : viewMode === 'code' ? (
           // Monaco Editor Code View - OpenAPI 3.1.0 Specification
           <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
