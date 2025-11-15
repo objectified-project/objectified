@@ -25,6 +25,7 @@ class PropertySchema(BaseModel):
     data: Optional[Dict[str, Any]] = None
     property_source_id: Optional[str] = None
     property_source_name: Optional[str] = None
+    parent_id: Optional[str] = None  # New: nested properties support
 
     class Config:
         from_attributes = True
@@ -50,4 +51,3 @@ class OpenAPIResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
