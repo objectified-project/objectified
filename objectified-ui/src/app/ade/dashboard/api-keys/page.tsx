@@ -223,18 +223,10 @@ const ApiKeys = () => {
               <Typography variant="h6" gutterBottom>
                 No API Keys Yet
               </Typography>
-              <Typography variant="body2" color="text.secondary" className="mb-4">
-                Create your first API key to access your tenant data via REST API
+              <Typography variant="body2" color="text.secondary">
+                Create your first API key to access your tenant data via REST API<br/>
+                using the "Create API Key" button above
               </Typography>
-              <Box sx={{ mt: '20px' }}>
-                <Button
-                  variant="contained"
-                  startIcon={<Plus size={20} />}
-                  onClick={handleCreateApiKey}
-                >
-                  Create API Key
-                </Button>
-              </Box>
             </CardContent>
           </Card>
         ) : (

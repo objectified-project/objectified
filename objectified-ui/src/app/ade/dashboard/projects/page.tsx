@@ -266,16 +266,10 @@ const Projects = () => {
           <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
             No Projects Yet
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Get started by creating your first project
+          <p className="text-gray-600 dark:text-gray-400">
+            Get started by creating your first project<br/>
+            using the "New Project" button above
           </p>
-          <button
-            onClick={handleCreateClick}
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg cursor-pointer transition-colors"
-          >
-            <Plus className="h-5 w-5" />
-            Create Project
-          </button>
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">

@@ -215,7 +215,8 @@ const PublishedVersions = () => {
             No Published Versions
           </h2>
           <p className="text-gray-600 dark:text-gray-400 text-center max-w-md">
-            You don't have any published versions yet. Publish a version to make it available via API.
+            You don't have any published versions yet.<br/>
+            Publish a version to make it available via API.
           </p>
         </div>
       ) : filteredVersions.length === 0 ? (
