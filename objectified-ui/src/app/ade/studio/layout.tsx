@@ -276,10 +276,9 @@ function StudioLayoutContent({
     }
 
     // Build schema object with composition keywords
+    // Note: properties and required are NOT stored here - they are managed in class_properties table
     const schema: any = {
-      type: 'object',
-      properties: {},
-      required: []
+      type: 'object'
     };
 
     // Add composition arrays if they have values

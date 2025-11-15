@@ -33,6 +33,25 @@ done
 
 ## Recent Updates
 
+### NULL property_id Support for References (2025-11-14)
+
+Modified the `class_properties` table to allow NULL values for `property_id`, enabling reference properties to exist without linking to the property library. This supports the new drag-and-drop reference creation workflow.
+
+**Key Changes:**
+- Removed NOT NULL constraint from `property_id` column
+- Added check constraint to validate NULL property_id entries contain `$ref`
+- Updated documentation for property_id column
+- Enables references as class-specific relationships
+
+**Migration:**
+```bash
+psql -U kenji -d kenji -f scripts/20251114-191956.sql
+```
+
+**Documentation:**
+- [Migration Documentation](MIGRATION_20251114_NULL_PROPERTY_ID.md)
+- [Reference Drag-Drop Implementation](../../objectified-ui/docs/REFERENCE_DRAG_DROP_IMPLEMENTATION.md)
+
 ### Nested Properties (2025-11-12)
 
 Added support for hierarchical property structures by introducing a `parent_id` column to the `class_properties` table. This allows properties of type "object" to contain inline child properties.

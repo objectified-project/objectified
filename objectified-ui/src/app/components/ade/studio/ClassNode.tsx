@@ -382,26 +382,27 @@ function ClassNode({ data, selected }: NodeProps) {
                     </div>
                   )}
 
-                  {/* Property reference handle: connectable to assign or reassign $ref */}
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={`prop-${p.id}`}
-                    style={{
-                      right: '-6px',
-                      background: hasRef(p) ? '#5b68ea' : '#9ca3af',
-                      width: '10px',
-                      height: '10px',
-                      border: '2px solid white',
-                      borderRadius: '50%',
-                      position: 'absolute',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 1000,
-                      opacity: hasRef(p) ? 1 : 0.8
-                    }}
-                    isConnectable={!typedData.isReadOnly}
-                  />
+                  {/* Property reference handle: only show for properties with $ref */}
+                  {hasRef(p) && (
+                    <Handle
+                      type="source"
+                      position={Position.Right}
+                      id={`prop-${p.id}`}
+                      style={{
+                        right: '-6px',
+                        background: '#5b68ea',
+                        width: '10px',
+                        height: '10px',
+                        border: '2px solid white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        zIndex: 1000
+                      }}
+                      isConnectable={!typedData.isReadOnly}
+                    />
+                  )}
                 </div>
               );
 

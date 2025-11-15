@@ -139,6 +139,10 @@ export function buildClassSchema(classData: any): any {
     ? JSON.parse(classData.schema)
     : (classData.schema || {});
 
+  // Remove properties and required from schema to prevent overwriting
+  // We build these from the class_properties table instead
+  const { properties: _schemaProperties, required: _schemaRequired, ...schemaWithoutProperties } = schema;
+
   const properties: any = {};
   const required: string[] = [];
 
@@ -167,7 +171,7 @@ export function buildClassSchema(classData: any): any {
   const classSchema: any = {
     type: 'object',
     description: classData.description || undefined,
-    ...schema,
+    ...schemaWithoutProperties,
     properties,
     required: required.length > 0 ? required : undefined
   };

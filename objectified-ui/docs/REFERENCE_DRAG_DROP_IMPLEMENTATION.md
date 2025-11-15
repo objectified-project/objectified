@@ -136,7 +136,33 @@ const classesToNodes = async (classes: any[]): Promise<Node[]> => {
 - Optional target class selection (dropdown of available classes)
 - If no target selected, creates placeholder that can be connected later via canvas handles
 
-### 5. Database: Support NULL property_id
+### 5. Database Migration: Allow NULL property_id
+**File:** `/objectified-db/scripts/20251114-191956.sql`
+
+The database schema was updated to support NULL values for `property_id` in the `class_properties` table:
+
+```sql
+-- Remove NOT NULL constraint from property_id column
+ALTER TABLE odb.class_properties
+ALTER COLUMN property_id DROP NOT NULL;
+
+-- Add check constraint to ensure NULL property_id entries are references
+ALTER TABLE odb.class_properties
+ADD CONSTRAINT class_properties_null_property_id_is_reference
+CHECK (
+    property_id IS NOT NULL 
+    OR data::jsonb ? '$ref' 
+    OR (data::jsonb->>'type' = 'array' AND data::jsonb->'items' ? '$ref')
+);
+```
+
+**To apply this migration:**
+```bash
+cd /home/kenji/Development/objectified/objectified-db
+psql -U kenji -d kenji -f scripts/20251114-191956.sql
+```
+
+### 6. Code: Support NULL property_id
 **File:** `lib/db/helper.ts`
 
 ```typescript
@@ -152,7 +178,7 @@ export async function addPropertyToClass(
 }
 ```
 
-### 6. OpenAPI Import: Skip References in Property Library
+### 7. OpenAPI Import: Skip References in Property Library
 **File:** `lib/db/helper.ts`
 
 ```typescript
