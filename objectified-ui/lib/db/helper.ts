@@ -853,7 +853,7 @@ export async function getPropertiesForClass(classId: string) {
   }
 }
 
-export async function addPropertyToClass(classId: string, propertyId: string, name: string, description: string | null, data: any, parentId: string | null = null) {
+export async function addPropertyToClass(classId: string, propertyId: string | null, name: string, description: string | null, data: any, parentId: string | null = null) {
   try {
     if (!name || name.trim().length === 0) {
       return JSON.stringify({ success: false, error: 'Property name is required' });
@@ -905,8 +905,8 @@ export async function updateClassProperty(classPropertyId: string, name: string,
 
     const result = await connectionPool.query(
       `UPDATE odb.class_properties
-       SET name = $1, description = $2, data = $3
-       WHERE id = $4
+       SET name = $1, description = $2, data = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 AND deleted_at IS NULL
        RETURNING id, class_id, property_id, name, description, data, parent_id`,
       [name.trim(), description, JSON.stringify(data), classPropertyId]
     );
@@ -1066,11 +1066,22 @@ export async function importProjectFromOpenAPI(
     };
     for (const cls of classes) collectAll(cls.properties || [], cls.name);
 
-    // Group signatures per original base name
+    // Helper: check if property data is a reference ($ref at root or items.$ref for arrays)
+    const isReference = (data: any): boolean => {
+      if (!data || typeof data !== 'object') return false;
+      if (data.$ref) return true;
+      if (data.type === 'array' && data.items?.$ref) return true;
+      return false;
+    };
+
+    // Group signatures per original base name (exclude references - they won't go into property library)
     interface SigRecord { canonical: any; sig: string; typeCode: string; original: PropertyInfo; }
     const baseToSigRecords = new Map<string, SigRecord[]>();
 
     for (const p of allPropsFlat) {
+      // Skip references - they will be created directly as class properties
+      if (isReference(p.data)) continue;
+
       const canonical = sanitizeRootPropertyData(p.data);
       const sig = stableStringify(canonical);
       const typeCode = typeCodeFor(canonical);
@@ -1137,12 +1148,23 @@ export async function importProjectFromOpenAPI(
     // 6. Create classes and link properties (preserve original class property names)
     const linkProperties = async (classId: string, props: any[], parentId: string | null = null) => {
       for (const p of props || []) {
-        const canonical = sanitizeRootPropertyData(p.data);
-        const sig = stableStringify(canonical);
-        const projectName = signatureToProjectName.get(sig);
-        if (!projectName) continue; // safety
-        const propertyId = propertyIdByProjectName.get(projectName);
-        if (!propertyId) continue;
+        let propertyId: string | null = null;
+
+        // Check if this is a reference property
+        if (isReference(p.data)) {
+          // References are created directly as class properties without a property_id
+          // They are class-specific relationships, not reusable properties
+          propertyId = null;
+        } else {
+          // Non-reference properties use the property library
+          const canonical = sanitizeRootPropertyData(p.data);
+          const sig = stableStringify(canonical);
+          const projectName = signatureToProjectName.get(sig);
+          if (!projectName) continue; // safety
+          const pid = propertyIdByProjectName.get(projectName);
+          if (!pid) continue;
+          propertyId = pid;
+        }
 
         const classPropRes = await client.query(
           `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
@@ -1334,6 +1356,60 @@ export async function validateApiKey(apiKey: string) {
 
     return JSON.stringify({ success: false, error: 'Invalid API key' });
   } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateClassPropertyRef(classPropertyId: string, targetClassId: string) {
+  try {
+    // Load current class property data and owning class
+    const cpRes = await connectionPool.query(
+      `SELECT cp.id, cp.class_id, cp.data
+       FROM odb.class_properties cp
+       WHERE cp.id = $1`,
+      [classPropertyId]
+    );
+    if (cpRes.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Class property not found' });
+    }
+
+    const classId = cpRes.rows[0].class_id;
+    const rawData = cpRes.rows[0].data;
+    const data = typeof rawData === 'string' ? JSON.parse(rawData) : (rawData || {});
+
+    // Load target class name for $ref construction
+    const clsRes = await connectionPool.query(
+      `SELECT name FROM odb.classes WHERE id = $1 AND deleted_at IS NULL`,
+      [targetClassId]
+    );
+    if (clsRes.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Target class not found' });
+    }
+    const targetClassName = clsRes.rows[0].name;
+    const refPath = `#/components/schemas/${targetClassName}`;
+
+    // Update $ref depending on array vs non-array
+    if (data && data.type === 'array') {
+      const items = data.items && typeof data.items === 'object' ? { ...data.items } : {};
+      // Assign items.$ref and remove conflicting items.type
+      items.$ref = refPath;
+      if (items.type) delete items.type;
+      data.items = items;
+    } else {
+      // Assign direct $ref and remove conflicting type
+      data.$ref = refPath;
+      if (data.type) delete data.type;
+      // If had inline properties for object, keep them as-is; UI may still allow.
+    }
+
+    await connectionPool.query(
+      `UPDATE odb.class_properties SET data = $1 WHERE id = $2`,
+      [JSON.stringify(data), classPropertyId]
+    );
+
+    return JSON.stringify({ success: true, classId });
+  } catch (error: any) {
+    console.error('Error updating class property $ref:', error);
     return JSON.stringify({ success: false, error: error.message });
   }
 }

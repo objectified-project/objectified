@@ -23,6 +23,7 @@ type ClassNodeData = {
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
   onClassEdit?: (classData: any) => void;
   onClassDelete?: (classId: string, className: string) => void;
+  onCreateReference?: (classOrCompositeId: string) => void;
   isReadOnly?: boolean;
 };
 
@@ -133,6 +134,9 @@ function ClassNode({ data, selected }: NodeProps) {
         const dropData = JSON.parse(raw);
         if (dropData.type === 'property' && typedData.onPropertyDrop) {
           typedData.onPropertyDrop(typedData.id, dropData.property, null);
+        } else if (dropData.type === 'new-reference' && typedData.onCreateReference) {
+          // Create reference at top-level on this class
+          typedData.onCreateReference(typedData.id);
         }
       }
     } catch (err) {
@@ -178,6 +182,9 @@ function ClassNode({ data, selected }: NodeProps) {
         const dropData = JSON.parse(raw);
         if (dropData.type === 'property' && typedData.onPropertyDrop) {
           typedData.onPropertyDrop(typedData.id, dropData.property, parentPropertyId);
+        } else if (dropData.type === 'new-reference' && typedData.onCreateReference) {
+          // Create nested reference under the given parent property (object container)
+          typedData.onCreateReference(`${typedData.id}|${parentPropertyId}`);
         }
       }
     } catch (err) {
@@ -375,15 +382,26 @@ function ClassNode({ data, selected }: NodeProps) {
                     </div>
                   )}
 
-                  {hasRef(p) && (
-                    <Handle
-                      type="source"
-                      position={Position.Right}
-                      id={`prop-${p.id}`}
-                      style={{ right: '-6px', background: '#5b68ea', width: '10px', height: '10px', border: '2px solid white', borderRadius: '50%', position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 1000 }}
-                      isConnectable={false}
-                    />
-                  )}
+                  {/* Property reference handle: connectable to assign or reassign $ref */}
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={`prop-${p.id}`}
+                    style={{
+                      right: '-6px',
+                      background: hasRef(p) ? '#5b68ea' : '#9ca3af',
+                      width: '10px',
+                      height: '10px',
+                      border: '2px solid white',
+                      borderRadius: '50%',
+                      position: 'absolute',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      zIndex: 1000,
+                      opacity: hasRef(p) ? 1 : 0.8
+                    }}
+                    isConnectable={!typedData.isReadOnly}
+                  />
                 </div>
               );
 
@@ -405,16 +423,16 @@ function ClassNode({ data, selected }: NodeProps) {
 
       {/* Bottom handle for composition relationships */}
       {typedData.schema && (() => {
-        const schema = typeof typedData.schema === 'string' ? JSON.parse(typedData.schema) : typedData.schema;
+        const schema = typeof (typedData.schema as any) === 'string' ? JSON.parse(typedData.schema as any) : (typedData.schema as any);
         const hasComposition =
-          (schema.allOf && Array.isArray(schema.allOf) && schema.allOf.some((it: any) => it.$ref)) ||
-          (schema.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((it: any) => it.$ref)) ||
-          (schema.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((it: any) => it.$ref));
+          (schema?.allOf && Array.isArray(schema.allOf) && schema.allOf.some((it: any) => it.$ref)) ||
+          (schema?.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((it: any) => it.$ref)) ||
+          (schema?.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((it: any) => it.$ref));
 
         let handleColor = '#6b7280';
-        if (schema.allOf && schema.allOf.length > 0) handleColor = '#2563eb';
-        else if (schema.anyOf && schema.anyOf.length > 0) handleColor = '#ea580c';
-        else if (schema.oneOf && schema.oneOf.length > 0) handleColor = '#9333ea';
+        if (schema?.allOf && schema.allOf.length > 0) handleColor = '#2563eb';
+        else if (schema?.anyOf && schema.anyOf.length > 0) handleColor = '#ea580c';
+        else if (schema?.oneOf && schema.oneOf.length > 0) handleColor = '#9333ea';
 
         return hasComposition ? (
           <Handle

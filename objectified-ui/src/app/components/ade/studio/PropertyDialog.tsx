@@ -54,19 +54,11 @@ export interface PropertyItem {
   required?: boolean;
 }
 
-export interface ClassItem {
-  id: string;
-  name: string;
-  description?: string;
-  schema?: any;
-}
-
 interface PropertyDialogProps {
   open: boolean;
   onClose: () => void;
   mode: 'add' | 'edit';
   property: PropertyItem | null;
-  classes: ClassItem[];
   onSubmit: (propertyData: {
     name: string;
     description: string | null;
@@ -79,14 +71,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
   onClose,
   mode,
   property,
-  classes,
   onSubmit,
 }) => {
   const [viewMode, setViewMode] = useState<'form' | 'json'>('form');
   const [propertyName, setPropertyName] = useState('');
   const [propertyType, setPropertyType] = useState('string');
   const [propertyIsArray, setPropertyIsArray] = useState(false);
-  const [propertyRef, setPropertyRef] = useState('');
   const [propertyTitle, setPropertyTitle] = useState('');
   const [propertyDescription, setPropertyDescription] = useState('');
   const [propertyFormat, setPropertyFormat] = useState('');
@@ -119,21 +109,20 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       setPropertyIsArray(isArray);
 
       // Determine the actual type
-      if (property.$ref) {
-        setPropertyType('$ref');
-        setPropertyRef(property.$ref);
-      } else if (isArray && (property as any).items) {
+      // Note: Actual $ref values (class references) are managed via canvas connections
+      if (isArray && (property as any).items) {
         const items = (property as any).items;
         if (items.$ref) {
+          // Has a $ref - this is a reference type
           setPropertyType('$ref');
-          setPropertyRef(items.$ref);
         } else {
           setPropertyType(items.type || 'string');
-          setPropertyRef('');
         }
+      } else if (property.$ref) {
+        // Has a direct $ref - this is a reference type
+        setPropertyType('$ref');
       } else {
         setPropertyType(property.type || 'string');
-        setPropertyRef('');
       }
 
       setPropertyTitle(property.title || '');
@@ -162,7 +151,6 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       setPropertyName('');
       setPropertyType('string');
       setPropertyIsArray(false);
-      setPropertyRef('');
       setPropertyTitle('');
       setPropertyDescription('');
       setPropertyFormat('');
@@ -199,41 +187,35 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       if (propertyMaxItems) schema.maxItems = parseInt(propertyMaxItems);
       if (propertyUniqueItems) schema.uniqueItems = true;
 
-      const itemsSchema: any = {};
-      if (propertyType === '$ref') {
-        itemsSchema.$ref = propertyRef;
-      } else {
-        itemsSchema.type = propertyType;
-        if (propertyFormat) itemsSchema.format = propertyFormat;
-        if (propertyPattern) itemsSchema.pattern = propertyPattern;
-        if (propertyMinLength) itemsSchema.minLength = parseInt(propertyMinLength);
-        if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
-        if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
-        if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
-        if (propertyExclusiveMinimum) itemsSchema.exclusiveMinimum = parseFloat(propertyMinimum);
-        if (propertyExclusiveMaximum) itemsSchema.exclusiveMaximum = parseFloat(propertyMaximum);
-        if (propertyMultipleOf) itemsSchema.multipleOf = parseFloat(propertyMultipleOf);
-        if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
-        if (propertyDefault) itemsSchema.default = propertyDefault;
-      }
+      const itemsSchema: any = {
+        type: propertyType
+      };
+      if (propertyFormat) itemsSchema.format = propertyFormat;
+      if (propertyPattern) itemsSchema.pattern = propertyPattern;
+      if (propertyMinLength) itemsSchema.minLength = parseInt(propertyMinLength);
+      if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
+      if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
+      if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
+      if (propertyExclusiveMinimum) itemsSchema.exclusiveMinimum = parseFloat(propertyMinimum);
+      if (propertyExclusiveMaximum) itemsSchema.exclusiveMaximum = parseFloat(propertyMaximum);
+      if (propertyMultipleOf) itemsSchema.multipleOf = parseFloat(propertyMultipleOf);
+      if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
+      if (propertyDefault) itemsSchema.default = propertyDefault;
+
       schema.items = itemsSchema;
     } else {
-      if (propertyType === '$ref') {
-        schema.$ref = propertyRef;
-      } else {
-        schema.type = propertyType;
-        if (propertyFormat) schema.format = propertyFormat;
-        if (propertyPattern) schema.pattern = propertyPattern;
-        if (propertyMinLength) schema.minLength = parseInt(propertyMinLength);
-        if (propertyMaxLength) schema.maxLength = parseInt(propertyMaxLength);
-        if (propertyMinimum) schema.minimum = parseFloat(propertyMinimum);
-        if (propertyMaximum) schema.maximum = parseFloat(propertyMaximum);
-        if (propertyExclusiveMinimum) schema.exclusiveMinimum = parseFloat(propertyMinimum);
-        if (propertyExclusiveMaximum) schema.exclusiveMaximum = parseFloat(propertyMaximum);
-        if (propertyMultipleOf) schema.multipleOf = parseFloat(propertyMultipleOf);
-        if (propertyEnum.length > 0) schema.enum = propertyEnum;
-        if (propertyDefault) schema.default = propertyDefault;
-      }
+      schema.type = propertyType;
+      if (propertyFormat) schema.format = propertyFormat;
+      if (propertyPattern) schema.pattern = propertyPattern;
+      if (propertyMinLength) schema.minLength = parseInt(propertyMinLength);
+      if (propertyMaxLength) schema.maxLength = parseInt(propertyMaxLength);
+      if (propertyMinimum) schema.minimum = parseFloat(propertyMinimum);
+      if (propertyMaximum) schema.maximum = parseFloat(propertyMaximum);
+      if (propertyExclusiveMinimum) schema.exclusiveMinimum = parseFloat(propertyMinimum);
+      if (propertyExclusiveMaximum) schema.exclusiveMaximum = parseFloat(propertyMaximum);
+      if (propertyMultipleOf) schema.multipleOf = parseFloat(propertyMultipleOf);
+      if (propertyEnum.length > 0) schema.enum = propertyEnum;
+      if (propertyDefault) schema.default = propertyDefault;
     }
 
     return schema;
@@ -248,11 +230,6 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
     // Validate property name contains only A-Za-z0-9_
     if (!/^[A-Za-z0-9_]+$/.test(propertyName)) {
       setPropertyError('Property name can only contain letters, numbers, and underscores');
-      return;
-    }
-
-    if (propertyType === '$ref' && !propertyRef) {
-      setPropertyError('Schema reference is required when type is $ref');
       return;
     }
 
@@ -271,35 +248,29 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         if (propertyMinItems) dataObject.minItems = parseInt(propertyMinItems);
         if (propertyMaxItems) dataObject.maxItems = parseInt(propertyMaxItems);
 
-        const itemsSchema: any = {};
-        if (propertyType === '$ref') {
-          itemsSchema.$ref = propertyRef;
-        } else {
-          itemsSchema.type = propertyType;
-          if (propertyFormat) itemsSchema.format = propertyFormat;
-          if (propertyPattern) itemsSchema.pattern = propertyPattern;
-          if (propertyMinLength) itemsSchema.minLength = parseInt(propertyMinLength);
-          if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
-          if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
-          if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
-          if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
-          if (propertyDefault) itemsSchema.default = propertyDefault;
-        }
+        const itemsSchema: any = {
+          type: propertyType
+        };
+        if (propertyFormat) itemsSchema.format = propertyFormat;
+        if (propertyPattern) itemsSchema.pattern = propertyPattern;
+        if (propertyMinLength) itemsSchema.minLength = parseInt(propertyMinLength);
+        if (propertyMaxLength) itemsSchema.maxLength = parseInt(propertyMaxLength);
+        if (propertyMinimum) itemsSchema.minimum = parseFloat(propertyMinimum);
+        if (propertyMaximum) itemsSchema.maximum = parseFloat(propertyMaximum);
+        if (propertyEnum.length > 0) itemsSchema.enum = propertyEnum;
+        if (propertyDefault) itemsSchema.default = propertyDefault;
+
         dataObject.items = itemsSchema;
       } else {
-        if (propertyType === '$ref') {
-          dataObject.$ref = propertyRef;
-        } else {
-          dataObject.type = propertyType;
-          if (propertyFormat) dataObject.format = propertyFormat;
-          if (propertyPattern) dataObject.pattern = propertyPattern;
-          if (propertyMinLength) dataObject.minLength = parseInt(propertyMinLength);
-          if (propertyMaxLength) dataObject.maxLength = parseInt(propertyMaxLength);
-          if (propertyMinimum) dataObject.minimum = parseFloat(propertyMinimum);
-          if (propertyMaximum) dataObject.maximum = parseFloat(propertyMaximum);
-          if (propertyEnum.length > 0) dataObject.enum = propertyEnum;
-          if (propertyDefault) dataObject.default = propertyDefault;
-        }
+        dataObject.type = propertyType;
+        if (propertyFormat) dataObject.format = propertyFormat;
+        if (propertyPattern) dataObject.pattern = propertyPattern;
+        if (propertyMinLength) dataObject.minLength = parseInt(propertyMinLength);
+        if (propertyMaxLength) dataObject.maxLength = parseInt(propertyMaxLength);
+        if (propertyMinimum) dataObject.minimum = parseFloat(propertyMinimum);
+        if (propertyMaximum) dataObject.maximum = parseFloat(propertyMaximum);
+        if (propertyEnum.length > 0) dataObject.enum = propertyEnum;
+        if (propertyDefault) dataObject.default = propertyDefault;
       }
 
       await onSubmit({
@@ -423,13 +394,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 onChange={(e) => {
                   const newType = e.target.value;
                   setPropertyType(newType);
-                  if (newType !== '$ref') {
-                    setPropertyRef('');
-                  }
                 }}
                 SelectProps={{ native: true }}
                 disabled={mode === 'edit'}
-                helperText={mode === 'edit' ? 'Type cannot be changed after creation' : undefined}
+                helperText={mode === 'edit' ? 'Type cannot be changed after creation' : '$ref is a placeholder for class references set via canvas connections'}
                 sx={{ flex: 1 }}
               >
                 <option value="string">string</option>
@@ -438,34 +406,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 <option value="boolean">boolean</option>
                 <option value="object">object</option>
                 <option value="null">null</option>
-                <option value="$ref">$ref (reference to class)</option>
+                <option value="$ref">$ref (class reference placeholder)</option>
               </TextField>
             </Box>
 
-            {/* Schema Reference */}
-            {propertyType === '$ref' && (
-              <TextField
-                select
-                margin="dense"
-                label="Schema Reference"
-                fullWidth
-                required
-                value={propertyRef}
-                onChange={(e) => setPropertyRef(e.target.value)}
-                SelectProps={{ native: true }}
-                InputLabelProps={{ shrink: true }}
-                disabled={mode === 'edit'}
-                helperText={mode === 'edit' ? 'Schema reference cannot be changed after creation' : 'Select a class to reference as this property\'s schema'}
-                sx={{ mb: 2 }}
-              >
-                <option value="">Select a class...</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={`#/components/schemas/${cls.name}`}>
-                    {cls.name}
-                  </option>
-                ))}
-              </TextField>
-            )}
 
             <TextField
               margin="dense"

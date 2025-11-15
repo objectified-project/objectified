@@ -16,6 +16,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
 import { Search, Add, Edit, Delete } from '@mui/icons-material';
+import { getPropertiesForClass } from '../../../../../lib/db/helper';
 
 export interface ClassItem {
   id: string;
@@ -70,6 +71,8 @@ interface StudioSideNavProps {
   selectedProjectId?: string | null; // Currently selected project from canvas
   selectedVersionId?: string | null; // Currently selected version from canvas
   isReadOnly?: boolean; // Whether the current version is published (read-only)
+  // classWarnings?: Record<string, boolean>; // removed, computed locally
+  [key: string]: any; // allow future, non-breaking props from parent
 }
 
 const StudioSideNav: React.FC<StudioSideNavProps> = ({
@@ -86,6 +89,41 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   const [propertiesSearchQuery, setPropertiesSearchQuery] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [classWarnings, setClassWarnings] = useState<Record<string, boolean>>({});
+
+  // Compute dangling $ref warnings when classes change
+  React.useEffect(() => {
+    const computeWarnings = async () => {
+      if (!selectedVersionId || classes.length === 0) {
+        setClassWarnings({});
+        return;
+      }
+      const nameSet = new Set(classes.map((c) => c.name));
+      const warnings: Record<string, boolean> = {};
+      for (const cls of classes) {
+        try {
+          const res = await getPropertiesForClass(cls.id);
+          const props = JSON.parse(res);
+          let hasDangling = false;
+          for (const p of props) {
+            const d = typeof p.data === 'string' ? JSON.parse(p.data) : p.data;
+            if (!d) continue;
+            const ref = d.$ref || (d.type === 'array' && d.items?.$ref);
+            if (ref) {
+              const parts = String(ref).split('/');
+              const refName = parts[parts.length - 1] || String(ref);
+              if (!nameSet.has(refName)) { hasDangling = true; break; }
+            }
+          }
+          warnings[cls.id] = hasDangling;
+        } catch (e) {
+          warnings[cls.id] = false;
+        }
+      }
+      setClassWarnings(warnings);
+    };
+    computeWarnings();
+  }, [classes, selectedVersionId, refreshKey]);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: 'classes' | 'properties') => {
     setCurrentTab(newValue);
@@ -259,7 +297,14 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                           onClick={() => handleClassSelect(classItem)}
                         >
                           <ListItemText
-                            primary={classItem.name}
+                            primary={
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{classItem.name}</span>
+                                {classWarnings[classItem.id] && (
+                                  <span title="This class has properties referencing missing classes" style={{ color: '#b91c1c', fontSize: 12 }}>⚠️</span>
+                                )}
+                              </span>
+                            }
                             secondary={classItem.description}
                             slotProps={{
                               primary: { noWrap: true },
@@ -309,6 +354,32 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   }}
                 />
               </Box>
+
+              {/* New Reference draggable */}
+              {!isReadOnly && (
+                <Box sx={{ px: 2, pb: 1 }}>
+                  <Box
+                    role="button"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'copy';
+                      e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-reference' }));
+                    }}
+                    sx={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      px: 2, py: 1.5, mb: 1,
+                      borderRadius: 1,
+                      border: '1px dashed', borderColor: 'success.light',
+                      bgcolor: 'success.light', color: 'success.contrastText',
+                      cursor: 'grab',
+                    }}
+                    title="Drag to create a new reference on a class or inside an object"
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>New Reference</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>drag onto class or object</Typography>
+                  </Box>
+                </Box>
+              )}
 
               {/* Properties List */}
               <Box sx={{ flex: 1, overflow: 'auto' }}>

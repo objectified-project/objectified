@@ -8,6 +8,7 @@ import { Copy, Download } from 'lucide-react';
 import * as yaml from 'js-yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
+import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
 import { generateOpenApiSpec } from '../../utils/openapi';
 import {
   ReactFlow,
@@ -34,7 +35,8 @@ import {
   getPropertiesForClass,
   addPropertyToClass,
   removePropertyFromClass,
-  deleteClass
+  deleteClass,
+  updateClassPropertyRef
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
@@ -111,6 +113,10 @@ const StudioContent = () => {
   const [editingClassData, setEditingClassData] = useState<any>(null);
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
   // Note: dialog-specific form state moved to ClassPropertyEditDialog component
+
+  // Reference dialog state
+  const [referenceDialogOpen, setReferenceDialogOpen] = useState(false);
+  const [referenceTargetClassId, setReferenceTargetClassId] = useState<string>('');
 
 
   // Helper to reload classes for current selectedVersionId (used after edits)
@@ -274,6 +280,80 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, layoutDirection, setNodes, isReadOnly]);
 
+  // Handle reference creation submission
+  const handleReferenceSubmit = useCallback(async (referenceData: {
+    name: string;
+    description: string | null;
+    isArray: boolean;
+    targetClassId: string | null;
+    minItems?: number;
+    maxItems?: number;
+    uniqueItems?: boolean;
+  }) => {
+    if (!referenceTargetClassId) return;
+
+    try {
+      console.log('Creating reference:', referenceData);
+
+      // Build the data object for the reference
+      const data: any = {};
+
+      if (referenceData.isArray) {
+        data.type = 'array';
+        if (referenceData.minItems) data.minItems = referenceData.minItems;
+        if (referenceData.maxItems) data.maxItems = referenceData.maxItems;
+        if (referenceData.uniqueItems) data.uniqueItems = referenceData.uniqueItems;
+
+        // Set items.$ref if target class is specified
+        if (referenceData.targetClassId) {
+          const targetClass = nodes.find(n => n.id === referenceData.targetClassId);
+          if (targetClass) {
+            const targetClassName = (targetClass.data as any).name;
+            data.items = { $ref: `#/components/schemas/${targetClassName}` };
+          }
+        } else {
+          // Empty items placeholder - user can connect later
+          data.items = {};
+        }
+      } else {
+        // Set direct $ref if target class is specified
+        if (referenceData.targetClassId) {
+          const targetClass = nodes.find(n => n.id === referenceData.targetClassId);
+          if (targetClass) {
+            const targetClassName = (targetClass.data as any).name;
+            data.$ref = `#/components/schemas/${targetClassName}`;
+          }
+        }
+        // If no target, leave data empty - it's a placeholder reference
+      }
+
+      const parentId: string | null = (window as any).__refParentId || null;
+      (window as any).__refParentId = null;
+
+      // Add reference property to class (property_id is null since this is not from the property library)
+      const result = await addPropertyToClass(
+        referenceTargetClassId,
+        null as any, // No property_id - direct class property
+        referenceData.name,
+        referenceData.description,
+        data,
+        parentId // Parent can be null for top-level or specific for nested
+      );
+
+      const response = JSON.parse(result);
+      if (response.success) {
+        await reloadClasses();
+        triggerSidebarRefresh();
+        setReferenceDialogOpen(false);
+      } else {
+        alert(response.error || 'Failed to create reference');
+      }
+    } catch (error) {
+      console.error('Error creating reference:', error);
+      throw error;
+    }
+  }, [referenceTargetClassId, nodes, reloadClasses, triggerSidebarRefresh]);
+
   // Handle class edit (double-click on node)
   const handleClassEdit = useCallback(async (classData: any) => {
     // Allow viewing in read-only mode - the dialog will handle read-only restrictions
@@ -294,6 +374,20 @@ const StudioContent = () => {
     // Load the full property data from the class_properties record
     setEditingClassProperty(classProperty);
     setEditPropertyDialogOpen(true);
+  }, [isReadOnly]);
+
+  // Handle create reference on class
+  const handleCreateReference = useCallback((classOrCompositeId: string) => {
+    if (isReadOnly) {
+      return;
+    }
+
+    // Support nested context: "classId|parentPropertyId" when dropped on an object container
+    const [classId, parentId] = classOrCompositeId.split('|');
+    setReferenceTargetClassId(classId);
+    // Temporarily stash parentId in a data-* attribute on body, or lift to state if preferred
+    (window as any).__refParentId = parentId || null;
+    setReferenceDialogOpen(true);
   }, [isReadOnly]);
 
   // Handle class delete from canvas
@@ -351,6 +445,7 @@ const StudioContent = () => {
         onPropertyDelete: handlePropertyDelete,
         onClassEdit: handleClassEdit,
         onClassDelete: handleClassDelete,
+        onCreateReference: handleCreateReference,
         isReadOnly: isReadOnly
       }
     }));
@@ -569,6 +664,23 @@ const StudioContent = () => {
     return [...propertyEdges, ...compositionEdges];
   };
 
+  // Helper to flag dangling $refs (referencing a class name that doesn't exist)
+  const hasDanglingRefs = (classes: any[]): boolean => {
+    const classNames = new Set(classes.map((c) => c.name));
+    for (const cls of classes) {
+      for (const prop of cls.properties || []) {
+        const d = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+        if (!d) continue;
+        const ref = d.$ref || (d.type === 'array' && d.items?.$ref);
+        if (ref) {
+          const refName = extractClassNameFromRef(ref);
+          if (refName && !classNames.has(refName)) return true;
+        }
+      }
+    }
+    return false;
+  };
+
   // Load projects on mount
   useEffect(() => {
     if (currentTenantId) {
@@ -709,8 +821,33 @@ const StudioContent = () => {
   };
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    async (params: Connection) => {
+      // If sourceHandle is a property handle (prop-<class_property_id>) and target is a class node,
+      // update the $ref of that class property to point to the target class
+      try {
+        if (params.sourceHandle && params.source && params.target) {
+          const sourceHandle = String(params.sourceHandle);
+          if (sourceHandle.startsWith('prop-')) {
+            const classPropertyId = sourceHandle.replace('prop-', '');
+            const targetClassId = String(params.target);
+            const res = await updateClassPropertyRef(classPropertyId, targetClassId);
+            const resp = JSON.parse(res);
+            if (!resp.success) {
+              alert(resp.error || 'Failed to update property reference');
+            } else {
+              await reloadClasses();
+              triggerSidebarRefresh();
+            }
+            return;
+          }
+        }
+        // Default behavior for other connections (e.g., composition edges if we enable manual linking)
+        setEdges((eds) => addEdge(params, eds));
+      } catch (e) {
+        console.error('onConnect failed:', e);
+      }
+    },
+    [setEdges, reloadClasses, triggerSidebarRefresh]
   );
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
@@ -943,6 +1080,19 @@ const StudioContent = () => {
                 </div>
               </Panel>
             )}
+
+            {/* Dangling $ref warning */}
+            {(() => {
+              const warn = hasDanglingRefs(nodes.map(n => ({ id: n.id, name: (n.data as any)?.name, properties: (n.data as any)?.properties })));
+              return warn ? (
+                <Panel position="top-left" className="mt-8 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg shadow-lg px-3 py-1.5 border border-red-300 dark:border-red-700">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd"/></svg>
+                    <span className="text-xs font-semibold">One or more properties reference missing classes. Click a property handle and connect it to a class to fix.</span>
+                  </div>
+                </Panel>
+              ) : null;
+            })()}
 
             {/* Layout Control Panel */}
             <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
@@ -1232,6 +1382,18 @@ const StudioContent = () => {
         onClose={() => setEditPropertyDialogOpen(false)}
         editingClassProperty={editingClassProperty}
         onSaved={reloadClasses}
+      />
+
+      {/* Reference Dialog */}
+      <ReferenceDialog
+        open={referenceDialogOpen}
+        onClose={() => setReferenceDialogOpen(false)}
+        classes={nodes.map(n => ({
+          id: n.id,
+          name: (n.data as any).name,
+          description: (n.data as any).description
+        }))}
+        onSubmit={handleReferenceSubmit}
       />
 
       {/* Class Edit Dialog */}

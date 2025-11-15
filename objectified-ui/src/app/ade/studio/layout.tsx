@@ -31,6 +31,7 @@ import {
   createClass,
   updateClass,
   deleteClass,
+  getPropertiesForClass,
 } from '../../../../lib/db/helper';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -45,14 +46,8 @@ import Checkbox from '@mui/material/Checkbox';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
 import Chip from '@mui/material/Chip';
-import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 
 function StudioLayoutContent({
   children,
@@ -752,7 +747,6 @@ function StudioLayoutContent({
         onClose={() => setPropertyDialogOpen(false)}
         mode={propertyDialogMode}
         property={selectedProperty}
-        classes={classes}
         onSubmit={handlePropertySubmit}
       />
 
