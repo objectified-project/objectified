@@ -16,6 +16,7 @@ import Chip from '@mui/material/Chip';
 import { Upload, FileJson, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { parseOpenAPISpec, validateImportedClasses, ParsedClass } from '../../../utils/openapi-import';
 import { importProjectFromOpenAPI } from '../../../../../lib/db/helper';
+import { filterSlugInput, generateSlug } from '../../../utils/slug';
 
 interface OpenAPIImportDialogProps {
   open: boolean;
@@ -46,15 +47,6 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [openAPIInfo, setOpenAPIInfo] = useState<any>(null);
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  };
 
   const resetDialog = () => {
     setStep('upload');
@@ -638,7 +630,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               fullWidth
               variant="outlined"
               value={projectSlug}
-              onChange={(e) => setProjectSlug(e.target.value.toLowerCase())}
+              onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
               disabled={isLoading}
               required
               helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"

@@ -16,6 +16,7 @@ import Box from '@mui/material/Box';
 import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
+import { filterSlugInput, generateSlug } from '../../../utils/slug';
 
 interface Project {
   id: string;
@@ -409,7 +410,7 @@ const Projects = () => {
                 fullWidth
                 variant="outlined"
                 value={projectSlug}
-                onChange={(e) => setProjectSlug(e.target.value.toLowerCase())}
+                onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
                 disabled={isLoading}
                 required
                 helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
@@ -503,7 +504,7 @@ const Projects = () => {
             fullWidth
             variant="outlined"
             value={projectSlug}
-            onChange={(e) => setProjectSlug(e.target.value.toLowerCase())}
+            onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
             disabled={isLoading}
             required
             helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
