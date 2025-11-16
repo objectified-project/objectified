@@ -128,9 +128,14 @@ const StudioContent = () => {
   const reloadClasses = useCallback(async () => {
     if (!selectedVersionId) return;
 
+    setIsLoadingCanvas(true);
+    setLoadingMessage('Refreshing canvas...');
+
     try {
       const classesResult = await getClassesForVersion(selectedVersionId);
       const classesData = JSON.parse(classesResult);
+
+      setLoadingMessage('Reloading properties...');
 
       const classesWithProperties = await Promise.all(
         classesData.map(async (cls: any) => {
@@ -140,11 +145,15 @@ const StudioContent = () => {
         })
       );
 
+      setLoadingMessage('Updating nodes and edges...');
+
       const newNodes = await classesToNodes(classesWithProperties);
       const newEdges = createAllEdges(classesWithProperties);
       const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
       setNodes(layoutedNodes);
       setEdges(newEdges);
+
+      setLoadingMessage('Regenerating OpenAPI specification...');
 
       // Regenerate OpenAPI spec
       const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -156,6 +165,9 @@ const StudioContent = () => {
       setOpenApiSpec(spec);
     } catch (error) {
       console.error('Failed to reload classes:', error);
+    } finally {
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
     }
   }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec, isReadOnly]);
 
@@ -222,8 +234,13 @@ const StudioContent = () => {
       if (response.success) {
         // Reload classes to show updated properties
         if (selectedVersionId) {
+          setIsLoadingCanvas(true);
+          setLoadingMessage('Property added, updating canvas...');
+
           const classesResult = await getClassesForVersion(selectedVersionId);
           const classesData = JSON.parse(classesResult);
+
+          setLoadingMessage('Reloading properties...');
 
           // Load properties for each class
           const classesWithProperties = await Promise.all(
@@ -234,11 +251,16 @@ const StudioContent = () => {
             })
           );
 
+          setLoadingMessage('Updating canvas layout...');
+
           const newNodes = await classesToNodes(classesWithProperties);
           const newEdges = createAllEdges(classesWithProperties);
           const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
           setNodes(layoutedNodes);
           setEdges(newEdges);
+
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
         }
       } else {
         alert(response.error || 'Failed to add property to class');
@@ -266,8 +288,13 @@ const StudioContent = () => {
       if (response.success) {
         // Reload classes to show updated properties
         if (selectedVersionId) {
+          setIsLoadingCanvas(true);
+          setLoadingMessage('Property removed, updating canvas...');
+
           const classesResult = await getClassesForVersion(selectedVersionId);
           const classesData = JSON.parse(classesResult);
+
+          setLoadingMessage('Reloading properties...');
 
           // Load properties for each class
           const classesWithProperties = await Promise.all(
@@ -278,11 +305,16 @@ const StudioContent = () => {
             })
           );
 
+          setLoadingMessage('Updating canvas layout...');
+
           const newNodes = await classesToNodes(classesWithProperties);
           const newEdges = createAllEdges(classesWithProperties);
           const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
           setNodes(layoutedNodes);
           setEdges(newEdges);
+
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
         }
       } else {
         alert(response.error || 'Failed to remove property from class');
@@ -784,11 +816,13 @@ const StudioContent = () => {
       }
 
       setIsLoadingCanvas(true);
-      setLoadingMessage('Loading classes...');
+      setLoadingMessage('Loading classes from database...');
 
       try {
         const result = await getClassesForVersion(selectedVersionId);
         const classesData = JSON.parse(result);
+
+        setLoadingMessage(`Loading properties for ${classesData.length} class${classesData.length !== 1 ? 'es' : ''}...`);
 
         // Load properties for each class
         const classesWithProperties = await Promise.all(
@@ -799,11 +833,17 @@ const StudioContent = () => {
           })
         );
 
+        setLoadingMessage('Creating canvas nodes...');
+
         // Convert classes to React Flow nodes
         const newNodes = await classesToNodes(classesWithProperties);
 
+        setLoadingMessage('Creating relationship edges...');
+
         // Create edges for both property $ref and composition relationships
         const newEdges = createAllEdges(classesWithProperties);
+
+        setLoadingMessage('Applying auto-layout...');
 
         // Apply auto-layout
         const layoutedNodes = getLayoutedElements(newNodes, newEdges, {
@@ -812,6 +852,8 @@ const StudioContent = () => {
 
         setNodes(layoutedNodes);
         setEdges(newEdges);
+
+        setLoadingMessage('Generating OpenAPI specification...');
 
         // Generate OpenAPI specification
         const currentProject = projects.find(p => p.id === selectedProjectId);
@@ -822,6 +864,8 @@ const StudioContent = () => {
         });
         setOpenApiSpec(spec);
         setSwaggerKey(prev => prev + 1); // Force SwaggerUI to remount
+
+        setLoadingMessage('Fitting view to canvas...');
 
         // Fit view after a short delay to ensure nodes are rendered
         setTimeout(() => {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Added a visual loading progress bar that displays when the canvas is loading classes from the database or when auto-layout is being applied. This provides clear feedback to users during potentially time-consuming operations.
+Added a visual loading progress bar that displays when the canvas is loading classes from the database or when auto-layout is being applied. This provides clear, descriptive feedback to users during potentially time-consuming operations by showing the specific stage of the loading process.
 
 ## Implementation
 
@@ -18,11 +18,54 @@ const [loadingMessage, setLoadingMessage] = useState('');
 ### 2. Loading States
 
 #### Initial Canvas Load
-When a version is selected and classes are being loaded:
+When a version is selected and classes are being loaded, the progress bar shows descriptive messages for each stage:
+
 ```typescript
 setIsLoadingCanvas(true);
-setLoadingMessage('Loading classes...');
-// ... load classes, properties, create nodes/edges ...
+setLoadingMessage('Loading classes from database...');
+// Fetch classes
+setLoadingMessage('Loading properties for X classes...');
+// Fetch properties for each class
+setLoadingMessage('Creating canvas nodes...');
+// Convert classes to React Flow nodes
+setLoadingMessage('Creating relationship edges...');
+// Create edges for references and relationships
+setLoadingMessage('Applying auto-layout...');
+// Apply layout algorithm
+setLoadingMessage('Generating OpenAPI specification...');
+// Generate OpenAPI spec
+setLoadingMessage('Fitting view to canvas...');
+// Fit view and complete
+setIsLoadingCanvas(false);
+setLoadingMessage('');
+```
+
+#### Property Operations
+When adding or removing properties from a class:
+```typescript
+setIsLoadingCanvas(true);
+setLoadingMessage('Property added/removed, updating canvas...');
+// Update database
+setLoadingMessage('Reloading properties...');
+// Fetch updated properties
+setLoadingMessage('Updating canvas layout...');
+// Regenerate nodes and edges
+setIsLoadingCanvas(false);
+setLoadingMessage('');
+```
+
+#### Canvas Refresh
+When reloading the canvas after edits:
+```typescript
+setIsLoadingCanvas(true);
+setLoadingMessage('Refreshing canvas...');
+// Reload classes
+setLoadingMessage('Reloading properties...');
+// Fetch properties
+setLoadingMessage('Updating nodes and edges...');
+// Regenerate canvas elements
+setLoadingMessage('Regenerating OpenAPI specification...');
+// Update spec
 setIsLoadingCanvas(false);
 setLoadingMessage('');
 ```
@@ -37,7 +80,37 @@ setIsLoadingCanvas(false);
 setLoadingMessage('');
 ```
 
-### 3. Progress Bar UI
+### 3. Loading Stages and Messages
+
+The progress bar displays descriptive messages that inform users exactly what operation is being performed:
+
+| Stage | Message | Description |
+|-------|---------|-------------|
+| **Initial Load** | | |
+| 1 | "Loading classes from database..." | Fetching class definitions from the database |
+| 2 | "Loading properties for X classes..." | Fetching properties for each class (shows count) |
+| 3 | "Creating canvas nodes..." | Converting class data to React Flow nodes |
+| 4 | "Creating relationship edges..." | Building edges for references and compositions |
+| 5 | "Applying auto-layout..." | Running layout algorithm to position nodes |
+| 6 | "Generating OpenAPI specification..." | Creating OpenAPI spec from class data |
+| 7 | "Fitting view to canvas..." | Adjusting viewport to show all nodes |
+| **Property Add** | | |
+| 1 | "Property added, updating canvas..." | Property added to database |
+| 2 | "Reloading properties..." | Fetching updated property data |
+| 3 | "Updating canvas layout..." | Regenerating nodes, edges, and layout |
+| **Property Remove** | | |
+| 1 | "Property removed, updating canvas..." | Property removed from database |
+| 2 | "Reloading properties..." | Fetching updated property data |
+| 3 | "Updating canvas layout..." | Regenerating nodes, edges, and layout |
+| **Canvas Refresh** | | |
+| 1 | "Refreshing canvas..." | Starting canvas reload |
+| 2 | "Reloading properties..." | Fetching property data |
+| 3 | "Updating nodes and edges..." | Regenerating canvas elements |
+| 4 | "Regenerating OpenAPI specification..." | Updating OpenAPI spec |
+| **Layout Change** | | |
+| 1 | "Applying layout..." | Computing new layout direction |
+
+### 4. Progress Bar UI
 
 The progress bar appears at the top of the canvas as an overlay:
 
@@ -65,7 +138,7 @@ The progress bar appears at the top of the canvas as an overlay:
 )}
 ```
 
-### 4. Animation
+### 5. Animation
 
 Added custom CSS keyframe animation for the sliding progress effect:
 
