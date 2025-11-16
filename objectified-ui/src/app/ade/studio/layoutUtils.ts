@@ -32,8 +32,8 @@ export function getLayoutedElements(
     direction = 'TB',
     nodeWidth = NODE_WIDTH,
     nodeHeight = NODE_HEIGHT,
-    rankSeparation = 250,    // Increased from 150 for better vertical spacing
-    nodeSeparation = 150,    // Increased from 120 for better horizontal spacing
+    rankSeparation = 100,    // Increased from 150 for better vertical spacing
+    nodeSeparation = 100,    // Increased from 120 for better horizontal spacing
     edgeSeparation = 30,     // Increased from 20 for better edge spacing
   } = options;
 
@@ -51,9 +51,10 @@ export function getLayoutedElements(
 
   // Add nodes to the graph
   nodes.forEach((node) => {
+    console.log('[layoutUtils] Node', node.measured);
     dagreGraph.setNode(node.id, {
-      width: nodeWidth,
-      height: nodeHeight,
+      width: node.measured?.width ?? nodeWidth,
+      height: node.measured?.height ?? nodeHeight,
     });
   });
 
@@ -71,8 +72,8 @@ export function getLayoutedElements(
 
     // Dagre positions nodes from center, React Flow from top-left
     // So we need to adjust the position
-    const x = nodeWithPosition.x - nodeWidth / 2;
-    const y = nodeWithPosition.y - nodeHeight / 2;
+    const x = nodeWithPosition.x - (node.measured?.width ?? nodeWidth) / 2;
+    const y = nodeWithPosition.y - (node.measured?.height ?? nodeHeight) / 2;
 
     return {
       ...node,
