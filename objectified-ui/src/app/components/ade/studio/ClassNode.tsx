@@ -25,6 +25,8 @@ type ClassNodeData = {
   onClassDelete?: (classId: string, className: string) => void;
   onCreateReference?: (classOrCompositeId: string) => void;
   isReadOnly?: boolean;
+  expandedProperties?: Set<string>; // Global expanded properties state
+  onTogglePropertyExpansion?: (propertyId: string) => void; // Callback to toggle property expansion
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -32,12 +34,21 @@ function ClassNode({ data, selected }: NodeProps) {
 
   const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
-  const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
+  const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
+
+  // Use global expanded state if provided, otherwise use local state
+  const expandedProperties = typedData.expandedProperties || localExpandedProperties;
 
   const togglePropertyExpansion = (propertyId: string) => {
-    const next = new Set(expandedProperties);
-    if (next.has(propertyId)) next.delete(propertyId); else next.add(propertyId);
-    setExpandedProperties(next);
+    if (typedData.onTogglePropertyExpansion) {
+      // Use global handler if provided
+      typedData.onTogglePropertyExpansion(propertyId);
+    } else {
+      // Fall back to local state
+      const next = new Set(localExpandedProperties);
+      if (next.has(propertyId)) next.delete(propertyId); else next.add(propertyId);
+      setLocalExpandedProperties(next);
+    }
   };
 
   // Build hierarchical property structure

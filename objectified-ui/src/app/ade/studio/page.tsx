@@ -119,10 +119,42 @@ const StudioContent = () => {
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false);
   const [referenceTargetClassId, setReferenceTargetClassId] = useState<string>('');
 
+  // Global expanded properties state for expand/collapse all
+  const [globalExpandedProperties, setGlobalExpandedProperties] = useState<Set<string>>(new Set());
 
   // Canvas loading state
   const [isLoadingCanvas, setIsLoadingCanvas] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+
+  // Handle toggling property expansion
+  const handleTogglePropertyExpansion = useCallback((propertyId: string) => {
+    setGlobalExpandedProperties((prev) => {
+      const next = new Set(prev);
+      if (next.has(propertyId)) {
+        next.delete(propertyId);
+      } else {
+        next.add(propertyId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Handle expand all properties
+  const handleExpandAll = useCallback(() => {
+    const allPropertyIds = new Set<string>();
+    nodes.forEach((node) => {
+      const properties = (node.data as any)?.properties || [];
+      properties.forEach((prop: any) => {
+        allPropertyIds.add(prop.id);
+      });
+    });
+    setGlobalExpandedProperties(allPropertyIds);
+  }, [nodes]);
+
+  // Handle collapse all properties
+  const handleCollapseAll = useCallback(() => {
+    setGlobalExpandedProperties(new Set());
+  }, []);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async () => {
@@ -169,7 +201,7 @@ const StudioContent = () => {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec, isReadOnly]);
+  }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
 
   // Apply auto-layout to current nodes and edges
   const onLayout = useCallback((direction: LayoutDirection) => {
@@ -269,7 +301,7 @@ const StudioContent = () => {
       console.error('Error adding property to class:', error);
       alert('An error occurred while adding the property');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, isReadOnly]);
+  }, [selectedVersionId, layoutDirection, setNodes, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
 
   // Handle property deletion from class
   const handlePropertyDelete = useCallback(async (classId: string, classPropertyId: string) => {
@@ -323,7 +355,7 @@ const StudioContent = () => {
       console.error('Error removing property from class:', error);
       alert('An error occurred while removing the property');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, isReadOnly]);
+  }, [selectedVersionId, layoutDirection, setNodes, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
 
   // Handle reference creation submission
   const handleReferenceSubmit = useCallback(async (referenceData: {
@@ -491,7 +523,9 @@ const StudioContent = () => {
         onClassEdit: handleClassEdit,
         onClassDelete: handleClassDelete,
         onCreateReference: handleCreateReference,
-        isReadOnly: isReadOnly
+        isReadOnly: isReadOnly,
+        expandedProperties: globalExpandedProperties,
+        onTogglePropertyExpansion: handleTogglePropertyExpansion
       }
     }));
   };
@@ -884,7 +918,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyEdit, handlePropertyDelete, handleClassEdit, generateOpenApiSpec, projects, versions, isReadOnly]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyEdit, handlePropertyDelete, handleClassEdit, generateOpenApiSpec, projects, versions, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
 
   // Regenerate OpenAPI spec when switching to code or swagger views
   useEffect(() => {
@@ -1272,11 +1306,40 @@ const StudioContent = () => {
               </Panel>
             )}
 
+            {/* Expand/Collapse All Controls */}
+            <Panel
+              position="top-left"
+              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 ${isReadOnly ? 'mt-12' : ''}`}
+            >
+              <div className="flex gap-1 p-1">
+                <button
+                  onClick={handleExpandAll}
+                  className="px-2 py-1 text-xs font-medium rounded transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1"
+                  title="Expand all properties"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <span>Expand All</span>
+                </button>
+                <button
+                  onClick={handleCollapseAll}
+                  className="px-2 py-1 text-xs font-medium rounded transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1"
+                  title="Collapse all properties"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span>Collapse All</span>
+                </button>
+              </div>
+            </Panel>
+
             {/* Dangling $ref warning */}
             {(() => {
               const warn = hasDanglingRefs(nodes.map(n => ({ id: n.id, name: (n.data as any)?.name, properties: (n.data as any)?.properties })));
               return warn ? (
-                <Panel position="top-left" className="mt-8 bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg shadow-lg px-3 py-1.5 border border-red-300 dark:border-red-700">
+                <Panel position="top-left" className={`bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg shadow-lg px-3 py-1.5 border border-red-300 dark:border-red-700 ${isReadOnly ? 'mt-[7.5rem]' : 'mt-[4.5rem]'}`}>
                   <div className="flex items-center gap-1.5">
                     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd"/></svg>
                     <span className="text-xs font-semibold">One or more properties reference missing classes. Click a property handle and connect it to a class to fix.</span>
