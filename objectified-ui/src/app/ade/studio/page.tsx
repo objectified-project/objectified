@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
@@ -126,6 +126,15 @@ const StudioContent = () => {
   const [isLoadingCanvas, setIsLoadingCanvas] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
+  // Create stable refs for callbacks to prevent unnecessary re-renders
+  const handlePropertyDropRef = useRef<any>(null);
+  const handlePropertyEditRef = useRef<any>(null);
+  const handlePropertyDeleteRef = useRef<any>(null);
+  const handleClassEditRef = useRef<any>(null);
+  const handleClassDeleteRef = useRef<any>(null);
+  const handleCreateReferenceRef = useRef<any>(null);
+  const handleTogglePropertyExpansionRef = useRef<any>(null);
+
   // Handle toggling property expansion
   const handleTogglePropertyExpansion = useCallback((propertyId: string) => {
     setGlobalExpandedProperties((prev) => {
@@ -138,6 +147,9 @@ const StudioContent = () => {
       return next;
     });
   }, []);
+
+  // Keep ref updated
+  handleTogglePropertyExpansionRef.current = handleTogglePropertyExpansion;
 
   // Handle expand all properties
   const handleExpandAll = useCallback(() => {
@@ -157,7 +169,7 @@ const StudioContent = () => {
   }, []);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
-  const reloadClasses = useCallback(async () => {
+  const reloadClasses = useCallback(async (applyLayout = false) => {
     if (!selectedVersionId) return;
 
     setIsLoadingCanvas(true);
@@ -179,11 +191,29 @@ const StudioContent = () => {
 
       setLoadingMessage('Updating nodes and edges...');
 
-      const newNodes = await classesToNodes(classesWithProperties);
-      const newEdges = createAllEdges(classesWithProperties);
-      const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
-      setNodes(layoutedNodes);
-      setEdges(newEdges);
+      let finalNodes: Node[];
+      if (applyLayout) {
+        // Apply auto-layout for class add/delete
+        const newNodes = await classesToNodes(classesWithProperties);
+        const newEdges = createAllEdges(classesWithProperties);
+        finalNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
+        setEdges(newEdges);
+      } else {
+        // Preserve existing node positions when reloading (no auto-layout)
+        const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
+        const newNodes = await classesToNodes(classesWithProperties);
+        // Restore positions from existing nodes
+        newNodes.forEach(node => {
+          const existingPos = existingPositions.get(node.id);
+          if (existingPos) {
+            node.position = existingPos;
+          }
+        });
+        finalNodes = newNodes;
+        const newEdges = createAllEdges(classesWithProperties);
+        setEdges(newEdges);
+      }
+      setNodes(finalNodes);
 
       setLoadingMessage('Regenerating OpenAPI specification...');
 
@@ -201,7 +231,7 @@ const StudioContent = () => {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
+  }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec, nodes]);
 
   // Apply auto-layout to current nodes and edges
   const onLayout = useCallback((direction: LayoutDirection) => {
@@ -283,12 +313,20 @@ const StudioContent = () => {
             })
           );
 
-          setLoadingMessage('Updating canvas layout...');
+          setLoadingMessage('Updating canvas...');
 
+          // Preserve existing node positions when updating properties (no auto-layout)
+          const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
           const newNodes = await classesToNodes(classesWithProperties);
+          // Restore positions from existing nodes
+          newNodes.forEach(node => {
+            const existingPos = existingPositions.get(node.id);
+            if (existingPos) {
+              node.position = existingPos;
+            }
+          });
           const newEdges = createAllEdges(classesWithProperties);
-          const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
-          setNodes(layoutedNodes);
+          setNodes(newNodes);
           setEdges(newEdges);
 
           setIsLoadingCanvas(false);
@@ -301,7 +339,10 @@ const StudioContent = () => {
       console.error('Error adding property to class:', error);
       alert('An error occurred while adding the property');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
+  }, [selectedVersionId, setNodes, nodes, isReadOnly]);
+
+  // Keep ref updated
+  handlePropertyDropRef.current = handlePropertyDrop;
 
   // Handle property deletion from class
   const handlePropertyDelete = useCallback(async (classId: string, classPropertyId: string) => {
@@ -337,12 +378,20 @@ const StudioContent = () => {
             })
           );
 
-          setLoadingMessage('Updating canvas layout...');
+          setLoadingMessage('Updating canvas...');
 
+          // Preserve existing node positions when updating properties (no auto-layout)
+          const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
           const newNodes = await classesToNodes(classesWithProperties);
+          // Restore positions from existing nodes
+          newNodes.forEach(node => {
+            const existingPos = existingPositions.get(node.id);
+            if (existingPos) {
+              node.position = existingPos;
+            }
+          });
           const newEdges = createAllEdges(classesWithProperties);
-          const layoutedNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
-          setNodes(layoutedNodes);
+          setNodes(newNodes);
           setEdges(newEdges);
 
           setIsLoadingCanvas(false);
@@ -355,7 +404,10 @@ const StudioContent = () => {
       console.error('Error removing property from class:', error);
       alert('An error occurred while removing the property');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
+  }, [selectedVersionId, setNodes, nodes, isReadOnly]);
+
+  // Keep ref updated
+  handlePropertyDeleteRef.current = handlePropertyDelete;
 
   // Handle reference creation submission
   const handleReferenceSubmit = useCallback(async (referenceData: {
@@ -439,6 +491,9 @@ const StudioContent = () => {
     setClassEditDialogOpen(true);
   }, [isReadOnly]);
 
+  // Keep ref updated
+  handleClassEditRef.current = handleClassEdit;
+
   // Handle property edit from class
   const handlePropertyEdit = useCallback(async (classId: string, classProperty: any) => {
     // Prevent edits in read-only mode
@@ -453,6 +508,9 @@ const StudioContent = () => {
     setEditPropertyDialogOpen(true);
   }, [isReadOnly]);
 
+  // Keep ref updated
+  handlePropertyEditRef.current = handlePropertyEdit;
+
   // Handle create reference on class
   const handleCreateReference = useCallback((classOrCompositeId: string) => {
     if (isReadOnly) {
@@ -466,6 +524,9 @@ const StudioContent = () => {
     (window as any).__refParentId = parentId || null;
     setReferenceDialogOpen(true);
   }, [isReadOnly]);
+
+  // Keep ref updated
+  handleCreateReferenceRef.current = handleCreateReference;
 
   // Handle class delete from canvas
   const handleClassDelete = useCallback(async (classId: string, className: string) => {
@@ -484,8 +545,8 @@ const StudioContent = () => {
       const response = JSON.parse(result);
 
       if (response.success) {
-        // Reload classes to update the canvas
-        await reloadClasses();
+        // Reload classes to update the canvas with auto-layout (class deleted)
+        await reloadClasses(true);
         // Trigger sidebar refresh to update the class list
         triggerSidebarRefresh();
       } else {
@@ -496,6 +557,9 @@ const StudioContent = () => {
       alert('An error occurred while deleting the class');
     }
   }, [reloadClasses, triggerSidebarRefresh, isReadOnly]);
+
+  // Keep ref updated
+  handleClassDeleteRef.current = handleClassDelete;
 
   // Define custom node types
   const nodeTypes = {
@@ -517,15 +581,16 @@ const StudioContent = () => {
         description: cls.description,
         properties: cls.properties || [],
         schema: cls.schema, // Pass schema for composition handles
-        onPropertyDrop: handlePropertyDrop,
-        onPropertyEdit: handlePropertyEdit,
-        onPropertyDelete: handlePropertyDelete,
-        onClassEdit: handleClassEdit,
-        onClassDelete: handleClassDelete,
-        onCreateReference: handleCreateReference,
+        // Use refs to avoid triggering re-renders when callbacks change
+        onPropertyDrop: (...args: any[]) => handlePropertyDropRef.current?.(...args),
+        onPropertyEdit: (...args: any[]) => handlePropertyEditRef.current?.(...args),
+        onPropertyDelete: (...args: any[]) => handlePropertyDeleteRef.current?.(...args),
+        onClassEdit: (...args: any[]) => handleClassEditRef.current?.(...args),
+        onClassDelete: (...args: any[]) => handleClassDeleteRef.current?.(...args),
+        onCreateReference: (...args: any[]) => handleCreateReferenceRef.current?.(...args),
         isReadOnly: isReadOnly,
         expandedProperties: globalExpandedProperties,
-        onTogglePropertyExpansion: handleTogglePropertyExpansion
+        onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args)
       }
     }));
   };
@@ -918,7 +983,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, handlePropertyDrop, handlePropertyEdit, handlePropertyDelete, handleClassEdit, generateOpenApiSpec, projects, versions, isReadOnly, globalExpandedProperties, handleTogglePropertyExpansion]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, generateOpenApiSpec, projects, versions]);
 
   // Regenerate OpenAPI spec when switching to code or swagger views
   useEffect(() => {
