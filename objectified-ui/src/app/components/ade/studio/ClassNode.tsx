@@ -1,6 +1,7 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Edit, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
+import { useDialog } from '../../providers/DialogProvider';
 
 // Define custom node data type for classes
 type ClassProperty = {
@@ -31,6 +32,7 @@ type ClassNodeData = {
 
 function ClassNode({ data, selected }: NodeProps) {
   const typedData = data as ClassNodeData;
+  const { confirm: confirmDialog } = useDialog();
 
   const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
@@ -383,7 +385,17 @@ function ClassNode({ data, selected }: NodeProps) {
                       )}
                       {typedData.onPropertyDelete && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); if (confirm(`Remove "${p.name}" from this class?`)) typedData.onPropertyDelete!(typedData.id, p.id); }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const confirmed = await confirmDialog({
+                              title: 'Remove Property',
+                              message: `Remove "${p.name}" from this class?`,
+                              variant: 'warning',
+                              confirmLabel: 'Remove',
+                              cancelLabel: 'Cancel',
+                            });
+                            if (confirmed) typedData.onPropertyDelete!(typedData.id, p.id);
+                          }}
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 2, color: '#9ca3af' }}
                           title="Remove property from class"
                         >

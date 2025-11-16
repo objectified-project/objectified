@@ -13,6 +13,7 @@ import { Copy, Download, RefreshCw } from 'lucide-react';
 import * as yaml from 'js-yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
+import { useDialog } from '../../providers/DialogProvider';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -33,6 +34,7 @@ interface ClassEditDialogProps {
 }
 
 const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false }: ClassEditDialogProps) => {
+  const { alert: alertDialog } = useDialog();
   const [classEditFormat, setClassEditFormat] = useState<'json' | 'yaml' | 'example'>('json');
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
 
@@ -100,7 +102,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     }
 
     navigator.clipboard.writeText(content);
-    alert(`${classEditFormat === 'example' ? 'Example data' : 'Schema'} copied to clipboard as ${classEditFormat.toUpperCase()}!`);
+    alertDialog({
+      message: `${classEditFormat === 'example' ? 'Example data' : 'Schema'} copied to clipboard as ${classEditFormat.toUpperCase()}!`,
+      variant: 'success',
+    });
   };
 
   const handleExport = () => {

@@ -16,6 +16,7 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Chip from '@mui/material/Chip';
+import { useDialog } from '../../../components/providers/DialogProvider';
 import {
   getProjectsForTenant,
   getVersionsForProject,
@@ -67,6 +68,7 @@ interface Version {
 
 const Versions = () => {
   const { data: session } = useSession();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [versions, setVersions] = useState<Version[]>([]);
@@ -248,9 +250,15 @@ const Versions = () => {
 
         // Show success message with copy info if applicable
         if (response.copiedClasses > 0) {
-          alert(`Version created successfully! Copied ${response.copiedClasses} class(es) from source version.`);
+          await alertDialog({
+            message: `Version created successfully! Copied ${response.copiedClasses} class(es) from source version.`,
+            variant: 'success',
+          });
         } else if (response.copyWarning) {
-          alert(`Version created successfully, but encountered an issue copying classes: ${response.copyWarning}`);
+          await alertDialog({
+            message: `Version created successfully, but encountered an issue copying classes: ${response.copyWarning}`,
+            variant: 'warning',
+          });
         }
       } else {
         setErrorMessage(response.error || 'Failed to create version');
@@ -313,15 +321,29 @@ const Versions = () => {
   const handlePublish = async (versionRecordId: string) => {
     const ver = versions.find(v => v.id === versionRecordId);
     if (!ver) {
-      alert('Version not found');
+      await alertDialog({
+        message: 'Version not found',
+        variant: 'error',
+      });
       return;
     }
     if (ver.creator_id !== currentUserId && !effectiveIsAdmin) {
-      alert('Only the version owner or a tenant administrator can publish this version');
+      await alertDialog({
+        message: 'Only the version owner or a tenant administrator can publish this version',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (!confirm('Are you sure you want to publish this version? Once published, it cannot be edited (but can be unpublished or deleted).')) {
+    const confirmed = await confirmDialog({
+      title: 'Publish Version',
+      message: 'Are you sure you want to publish this version? Once published, it cannot be edited (but can be unpublished or deleted).',
+      variant: 'warning',
+      confirmLabel: 'Publish',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -332,25 +354,45 @@ const Versions = () => {
       if (response.success) {
         await loadVersions();
       } else {
-        alert(response.error || 'Failed to publish version');
+        await alertDialog({
+          message: response.error || 'Failed to publish version',
+          variant: 'error',
+        });
       }
     } catch (error: any) {
-      alert(error.message || 'An error occurred');
+      await alertDialog({
+        message: error.message || 'An error occurred',
+        variant: 'error',
+      });
     }
   };
 
   const handleUnpublish = async (versionRecordId: string) => {
     const ver = versions.find(v => v.id === versionRecordId);
     if (!ver) {
-      alert('Version not found');
+      await alertDialog({
+        message: 'Version not found',
+        variant: 'error',
+      });
       return;
     }
     if (ver.creator_id !== currentUserId && !effectiveIsAdmin) {
-      alert('Only the version owner or a tenant administrator can unpublish this version');
+      await alertDialog({
+        message: 'Only the version owner or a tenant administrator can unpublish this version',
+        variant: 'warning',
+      });
       return;
     }
 
-    if (!confirm('Are you sure you want to unpublish this version? It will become editable again.')) {
+    const confirmed = await confirmDialog({
+      title: 'Unpublish Version',
+      message: 'Are you sure you want to unpublish this version? It will become editable again.',
+      variant: 'warning',
+      confirmLabel: 'Unpublish',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -361,15 +403,29 @@ const Versions = () => {
       if (response.success) {
         await loadVersions();
       } else {
-        alert(response.error || 'Failed to unpublish version');
+        await alertDialog({
+          message: response.error || 'Failed to unpublish version',
+          variant: 'error',
+        });
       }
     } catch (error: any) {
-      alert(error.message || 'An error occurred');
+      await alertDialog({
+        message: error.message || 'An error occurred',
+        variant: 'error',
+      });
     }
   };
 
   const handleDelete = async (versionRecordId: string) => {
-    if (!confirm('Are you sure you want to delete this version? This action cannot be undone.')) {
+    const confirmed = await confirmDialog({
+      title: 'Delete Version',
+      message: 'Are you sure you want to delete this version? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -380,10 +436,16 @@ const Versions = () => {
       if (response.success) {
         await loadVersions();
       } else {
-        alert(response.error || 'Failed to delete version');
+        await alertDialog({
+          message: response.error || 'Failed to delete version',
+          variant: 'error',
+        });
       }
     } catch (error: any) {
-      alert(error.message || 'An error occurred');
+      await alertDialog({
+        message: error.message || 'An error occurred',
+        variant: 'error',
+      });
     }
   };
 
@@ -468,12 +530,18 @@ const Versions = () => {
 
   const handleCompareVersions = async () => {
     if (!compareVersion1Id || !compareVersion2Id) {
-      alert('Please select two versions to compare');
+      await alertDialog({
+        message: 'Please select two versions to compare',
+        variant: 'warning',
+      });
       return;
     }
 
     if (compareVersion1Id === compareVersion2Id) {
-      alert('Please select two different versions to compare');
+      await alertDialog({
+        message: 'Please select two different versions to compare',
+        variant: 'warning',
+      });
       return;
     }
 
@@ -497,7 +565,10 @@ const Versions = () => {
       setDiffResult(diff);
     } catch (error) {
       console.error('Failed to compare versions:', error);
-      alert('Failed to load version specifications for comparison');
+      await alertDialog({
+        message: 'Failed to load version specifications for comparison',
+        variant: 'error',
+      });
     } finally {
       setIsLoadingComparison(false);
     }

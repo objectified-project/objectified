@@ -15,6 +15,7 @@ import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
 import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
+import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface Project {
   id: string;
@@ -32,6 +33,7 @@ interface Project {
 
 const Projects = () => {
   const { data: session } = useSession();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -180,7 +182,15 @@ const Projects = () => {
   };
 
   const handleDelete = async (projectId: string) => {
-    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+    const confirmed = await confirmDialog({
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -191,10 +201,16 @@ const Projects = () => {
       if (response.success) {
         await loadProjects();
       } else {
-        alert(response.error || 'Failed to delete project');
+        await alertDialog({
+          message: response.error || 'Failed to delete project',
+          variant: 'error',
+        });
       }
     } catch (error: any) {
-      alert(error.message || 'An error occurred');
+      await alertDialog({
+        message: error.message || 'An error occurred',
+        variant: 'error',
+      });
     }
   };
 

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 import { StudioProvider, useStudio } from './StudioContext';
+import { useDialog } from '../../components/providers/DialogProvider';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -55,6 +56,7 @@ function StudioLayoutContent({
   children: React.ReactNode;
 }>) {
   const { data: session } = useSession();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
   // Get selected project and version from context
@@ -151,13 +153,19 @@ function StudioLayoutContent({
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'class' | 'property'; id: string } | null>(null);
 
   // Class callbacks
-  const handleClassAdd = () => {
+  const handleClassAdd = async () => {
     if (!selectedVersionId) {
-      alert('Please select a version from the canvas first');
+      await alertDialog({
+        message: 'Please select a version from the canvas first',
+        variant: 'warning',
+      });
       return;
     }
     if (isReadOnly) {
-      alert('Cannot add classes to a published version. Please select an unpublished version to make changes.');
+      await alertDialog({
+        message: 'Cannot add classes to a published version. Please select an unpublished version to make changes.',
+        variant: 'warning',
+      });
       return;
     }
     setClassDialogMode('add');
@@ -174,13 +182,19 @@ function StudioLayoutContent({
     setClassDialogOpen(true);
   };
 
-  const handleClassEdit = (classItem: ClassItem) => {
+  const handleClassEdit = async (classItem: ClassItem) => {
     if (!selectedVersionId) {
-      alert('Please select a version from the canvas first');
+      await alertDialog({
+        message: 'Please select a version from the canvas first',
+        variant: 'warning',
+      });
       return;
     }
     if (isReadOnly) {
-      alert('Cannot edit classes in a published version. Please select an unpublished version to make changes.');
+      await alertDialog({
+        message: 'Cannot edit classes in a published version. Please select an unpublished version to make changes.',
+        variant: 'warning',
+      });
       return;
     }
     setClassDialogMode('edit');
@@ -240,13 +254,19 @@ function StudioLayoutContent({
     setClassDialogOpen(true);
   };
 
-  const handleClassDelete = (classId: string) => {
+  const handleClassDelete = async (classId: string) => {
     if (!selectedVersionId) {
-      alert('Please select a version from the canvas first');
+      await alertDialog({
+        message: 'Please select a version from the canvas first',
+        variant: 'warning',
+      });
       return;
     }
     if (isReadOnly) {
-      alert('Cannot delete classes from a published version. Please select an unpublished version to make changes.');
+      await alertDialog({
+        message: 'Cannot delete classes from a published version. Please select an unpublished version to make changes.',
+        variant: 'warning',
+      });
       return;
     }
     setDeleteTarget({ type: 'class', id: classId });
@@ -371,13 +391,19 @@ function StudioLayoutContent({
   };
 
   // Property callbacks
-  const handlePropertyAdd = () => {
+  const handlePropertyAdd = async () => {
     if (!selectedProjectId) {
-      alert('Please select a project from the canvas first');
+      await alertDialog({
+        message: 'Please select a project from the canvas first',
+        variant: 'warning',
+      });
       return;
     }
     if (isReadOnly) {
-      alert('Cannot add properties to a published version. Please select an unpublished version to make changes.');
+      await alertDialog({
+        message: 'Cannot add properties to a published version. Please select an unpublished version to make changes.',
+        variant: 'warning',
+      });
       return;
     }
     setPropertyDialogMode('add');
@@ -385,13 +411,19 @@ function StudioLayoutContent({
     setPropertyDialogOpen(true);
   };
 
-  const handlePropertyEdit = (propertyItem: PropertyItem) => {
+  const handlePropertyEdit = async (propertyItem: PropertyItem) => {
     if (!selectedProjectId) {
-      alert('Please select a project from the canvas first');
+      await alertDialog({
+        message: 'Please select a project from the canvas first',
+        variant: 'warning',
+      });
       return;
     }
     if (isReadOnly) {
-      alert('Cannot edit properties in a published version. Please select an unpublished version to make changes.');
+      await alertDialog({
+        message: 'Cannot edit properties in a published version. Please select an unpublished version to make changes.',
+        variant: 'warning',
+      });
       return;
     }
     setPropertyDialogMode('edit');
@@ -399,13 +431,19 @@ function StudioLayoutContent({
     setPropertyDialogOpen(true);
   };
 
-  const handlePropertyDelete = (propertyId: string) => {
+  const handlePropertyDelete = async (propertyId: string) => {
     if (!selectedProjectId) {
-      alert('Please select a project from the canvas first');
+      await alertDialog({
+        message: 'Please select a project from the canvas first',
+        variant: 'warning',
+      });
       return;
     }
     if (isReadOnly) {
-      alert('Cannot delete properties from a published version. Please select an unpublished version to make changes.');
+      await alertDialog({
+        message: 'Cannot delete properties from a published version. Please select an unpublished version to make changes.',
+        variant: 'warning',
+      });
       return;
     }
     setDeleteTarget({ type: 'property', id: propertyId });
@@ -466,7 +504,10 @@ function StudioLayoutContent({
 
         if (!response.success) {
           console.error('Failed to delete class:', response.error);
-          alert(response.error || 'Failed to delete class');
+          await alertDialog({
+            message: response.error || 'Failed to delete class',
+            variant: 'error',
+          });
           return;
         }
       } else {
@@ -476,7 +517,10 @@ function StudioLayoutContent({
 
         if (!response.success) {
           console.error('Failed to delete property:', response.error);
-          alert(response.error || 'Failed to delete property');
+          await alertDialog({
+            message: response.error || 'Failed to delete property',
+            variant: 'error',
+          });
           return;
         }
       }
@@ -489,7 +533,10 @@ function StudioLayoutContent({
       }
     } catch (error) {
       console.error('Error deleting:', error);
-      alert('An error occurred while deleting');
+      await alertDialog({
+        message: 'An error occurred while deleting',
+        variant: 'error',
+      });
     }
   };
 

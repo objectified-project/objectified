@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import ThemeRegistry from "@/app/components/theme/ThemeRegistry";
+import { DialogProvider } from "@/app/components/providers/DialogProvider";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -25,7 +26,9 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeRegistry>
           <SessionWrapper>
-            {children}
+            <DialogProvider>
+              {children}
+            </DialogProvider>
           </SessionWrapper>
         </ThemeRegistry>
       </body>

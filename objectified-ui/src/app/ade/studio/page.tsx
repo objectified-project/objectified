@@ -10,6 +10,7 @@ import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
 import { generateOpenApiSpec } from '../../utils/openapi';
+import { useDialog } from '../../components/providers/DialogProvider';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -78,6 +79,7 @@ type ViewMode = 'canvas' | 'code' | 'swagger';
 
 const StudioContent = () => {
   const { data: session } = useSession();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const {
     setSelectedProjectId: setContextProjectId,
     setSelectedVersionId: setContextVersionId,
@@ -358,13 +360,19 @@ const StudioContent = () => {
           setLoadingMessage('');
         }
       } else {
-        alert(response.error || 'Failed to add property to class');
+        await alertDialog({
+          message: response.error || 'Failed to add property to class',
+          variant: 'error',
+        });
       }
     } catch (error) {
       console.error('Error adding property to class:', error);
-      alert('An error occurred while adding the property');
+      await alertDialog({
+        message: 'An error occurred while adding the property',
+        variant: 'error',
+      });
     }
-  }, [selectedVersionId, setNodes, nodes, isReadOnly]);
+  }, [selectedVersionId, setNodes, nodes, isReadOnly, alertDialog]);
 
   // Keep ref updated
   handlePropertyDropRef.current = handlePropertyDrop;
@@ -423,11 +431,17 @@ const StudioContent = () => {
           setLoadingMessage('');
         }
       } else {
-        alert(response.error || 'Failed to remove property from class');
+        await alertDialog({
+          message: response.error || 'Failed to remove property from class',
+          variant: 'error',
+        });
       }
     } catch (error) {
       console.error('Error removing property from class:', error);
-      alert('An error occurred while removing the property');
+      await alertDialog({
+        message: 'An error occurred while removing the property',
+        variant: 'error',
+      });
     }
   }, [selectedVersionId, setNodes, nodes, isReadOnly]);
 
@@ -500,7 +514,10 @@ const StudioContent = () => {
         triggerSidebarRefresh();
         setReferenceDialogOpen(false);
       } else {
-        alert(response.error || 'Failed to create reference');
+        await alertDialog({
+          message: response.error || 'Failed to create reference',
+          variant: 'error',
+        });
       }
     } catch (error) {
       console.error('Error creating reference:', error);
@@ -560,7 +577,15 @@ const StudioContent = () => {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete "${className}"? This action cannot be undone.`)) {
+    const confirmed = await confirmDialog({
+      title: 'Delete Class',
+      message: `Are you sure you want to delete "${className}"? This action cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -575,13 +600,19 @@ const StudioContent = () => {
         // Trigger sidebar refresh to update the class list
         triggerSidebarRefresh();
       } else {
-        alert(response.error || 'Failed to delete class');
+        await alertDialog({
+          message: response.error || 'Failed to delete class',
+          variant: 'error',
+        });
       }
     } catch (error) {
       console.error('Error deleting class:', error);
-      alert('An error occurred while deleting the class');
+      await alertDialog({
+        message: 'An error occurred while deleting the class',
+        variant: 'error',
+      });
     }
-  }, [reloadClasses, triggerSidebarRefresh, isReadOnly]);
+  }, [reloadClasses, triggerSidebarRefresh, isReadOnly, confirmDialog, alertDialog]);
 
   // Keep ref updated
   handleClassDeleteRef.current = handleClassDelete;
@@ -1111,7 +1142,10 @@ const StudioContent = () => {
             const res = await updateClassPropertyRef(classPropertyId, targetClassId);
             const resp = JSON.parse(res);
             if (!resp.success) {
-              alert(resp.error || 'Failed to update property reference');
+              await alertDialog({
+                message: resp.error || 'Failed to update property reference',
+                variant: 'error',
+              });
             } else {
               await reloadClasses();
               triggerSidebarRefresh();
@@ -1534,12 +1568,15 @@ const StudioContent = () => {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const content = codeFormat === 'json'
                         ? openApiSpec
                         : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
                       navigator.clipboard.writeText(content);
-                      alert(`OpenAPI specification (${codeFormat.toUpperCase()}) copied to clipboard!`);
+                      await alertDialog({
+                        message: `OpenAPI specification (${codeFormat.toUpperCase()}) copied to clipboard!`,
+                        variant: 'success',
+                      });
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
                     title="Copy to clipboard"
@@ -1645,9 +1682,12 @@ const StudioContent = () => {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       navigator.clipboard.writeText(openApiSpec);
-                      alert('OpenAPI specification (JSON) copied to clipboard!');
+                      await alertDialog({
+                        message: 'OpenAPI specification (JSON) copied to clipboard!',
+                        variant: 'success',
+                      });
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
                     title="Copy specification to clipboard"

@@ -9,6 +9,7 @@ import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
+import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface PublishedVersion {
   id: string;
@@ -29,6 +30,7 @@ interface PublishedVersion {
 
 const PublishedVersions = () => {
   const { data: session } = useSession();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [versions, setVersions] = useState<PublishedVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
@@ -96,7 +98,15 @@ const PublishedVersions = () => {
       ? `Change visibility to PUBLIC?\n\nThis will result in making the OpenAPI Specification public without requiring access via an API Key.`
       : `Change visibility to PRIVATE?\n\nThis will result in restricting access to the specification by requiring an API Key that matches your tenancy.`;
 
-    if (!confirm(confirmMessage)) {
+    const confirmed = await confirmDialog({
+      title: `Change Visibility to ${newVisibility.toUpperCase()}`,
+      message: confirmMessage,
+      variant: 'warning',
+      confirmLabel: 'Change Visibility',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return; // User cancelled
     }
 
@@ -113,11 +123,17 @@ const PublishedVersions = () => {
             : v
         ));
       } else {
-        alert(`Failed to update visibility: ${response.error}`);
+        await alertDialog({
+          message: `Failed to update visibility: ${response.error}`,
+          variant: 'error',
+        });
       }
     } catch (error) {
       console.error('Failed to update visibility:', error);
-      alert('An error occurred while updating visibility');
+      await alertDialog({
+        message: 'An error occurred while updating visibility',
+        variant: 'error',
+      });
     } finally {
       setChangingVisibility(null);
     }

@@ -13,6 +13,7 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface Tenant {
   id: string;
@@ -43,6 +44,7 @@ interface TenantUser {
 
 const Tenants = () => {
   const { data: session, update } = useSession();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [adminTenants, setAdminTenants] = useState<AdminUser[]>([]);
   const [tenantUsers, setTenantUsers] = useState<Record<string, TenantUser[]>>({});
@@ -239,7 +241,15 @@ const Tenants = () => {
       ? `Are you sure you want to remove ${member.name} from the tenant?\n\n⚠️ WARNING: This user is also an ADMINISTRATOR and will lose all administrative privileges.`
       : `Are you sure you want to remove ${member.name} from the tenant?`;
 
-    if (!confirm(warningMessage)) {
+    const confirmed = await confirmDialog({
+      title: 'Remove Member',
+      message: warningMessage,
+      variant: member.isAdmin ? 'danger' : 'warning',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -249,7 +259,10 @@ const Tenants = () => {
         const adminResult = await removeTenantAdministrator(member.adminRecordId);
         const adminResponse = JSON.parse(adminResult);
         if (!adminResponse.success) {
-          alert(adminResponse.error || 'Failed to remove administrator role');
+          await alertDialog({
+            message: adminResponse.error || 'Failed to remove administrator role',
+            variant: 'error',
+          });
           return;
         }
       }
@@ -259,14 +272,20 @@ const Tenants = () => {
         const userResult = await removeTenantUser(member.userRecordId);
         const userResponse = JSON.parse(userResult);
         if (!userResponse.success) {
-          alert(userResponse.error || 'Failed to remove member');
+          await alertDialog({
+            message: userResponse.error || 'Failed to remove member',
+            variant: 'error',
+          });
           return;
         }
       }
 
       await refreshData();
     } catch (error: any) {
-      alert(error.message || 'An error occurred');
+      await alertDialog({
+        message: error.message || 'An error occurred',
+        variant: 'error',
+      });
     }
   };
 
