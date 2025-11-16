@@ -144,12 +144,32 @@ const StudioContent = () => {
       } else {
         next.add(propertyId);
       }
+      // Immediately reflect changes into node data
+      setNodes((nodes) => nodes.map((n) => ({
+        ...n,
+        data: { ...(n.data as any), expandedProperties: next },
+      })));
       return next;
     });
-  }, []);
+  }, [setNodes]);
 
   // Keep ref updated
   handleTogglePropertyExpansionRef.current = handleTogglePropertyExpansion;
+
+  // Reflect expansion/read-only state changes into node data without re-layout
+  useEffect(() => {
+    setNodes((prev) =>
+      prev.map((node) => ({
+        ...node,
+        data: {
+          ...(node.data as any),
+          isReadOnly,
+          expandedProperties: globalExpandedProperties,
+          onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
+        },
+      }))
+    );
+  }, [globalExpandedProperties, isReadOnly, setNodes]);
 
   // Handle expand all properties
   const handleExpandAll = useCallback(() => {
@@ -161,12 +181,17 @@ const StudioContent = () => {
       });
     });
     setGlobalExpandedProperties(allPropertyIds);
-  }, [nodes]);
+    // Also reflect immediately into node data
+    setNodes((prev) => prev.map((n) => ({ ...n, data: { ...(n.data as any), expandedProperties: allPropertyIds } })));
+  }, [nodes, setNodes]);
 
   // Handle collapse all properties
   const handleCollapseAll = useCallback(() => {
-    setGlobalExpandedProperties(new Set());
-  }, []);
+    const empty = new Set<string>();
+    setGlobalExpandedProperties(empty);
+    // Also reflect immediately into node data
+    setNodes((prev) => prev.map((n) => ({ ...n, data: { ...(n.data as any), expandedProperties: empty } })));
+  }, [setNodes]);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async (applyLayout = false) => {
