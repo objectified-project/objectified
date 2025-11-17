@@ -6,6 +6,10 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import Avatar from '@mui/material/Avatar';
 import { usePathname } from 'next/navigation';
+import WhatsNewDialog from './WhatsNewDialog';
+
+// Import version from package.json
+const APP_VERSION = '0.4.0';
 
 type NavItem = { label: string; href: string };
 
@@ -17,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
 const TopHeader = () => {
   const [open, setOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { data: session } = useSession();
   const pathname = usePathname();
@@ -72,12 +77,24 @@ const TopHeader = () => {
       }}
     >
       {/* Left: Logo */}
-      <div style={{ display: "flex", alignItems: "center", height: 40 }}>
+      <div style={{ display: "flex", alignItems: "center", height: 40, gap: 8 }}>
         <img
           src={isDarkMode ? "/Objectified-05.png" : "/Objectified-02.png"}
           alt="Objectified Logo"
           style={{ height: "100%", width: "auto", objectFit: "contain" }}
         />
+        <button
+          onClick={() => setShowWhatsNew(true)}
+          className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+          title="View What's New"
+          style={{
+            border: "1px solid currentColor",
+            fontFamily: "monospace",
+            fontWeight: 500
+          }}
+        >
+          v{APP_VERSION}
+        </button>
       </div>
 
       {/* Center: Navigation */}
@@ -173,6 +190,12 @@ const TopHeader = () => {
           </div>
         )}
       </div>
+
+      {/* What's New Dialog */}
+      <WhatsNewDialog
+        isOpen={showWhatsNew}
+        onClose={() => setShowWhatsNew(false)}
+      />
     </header>
   );
 }
