@@ -2,17 +2,27 @@
 
 Welcome to **Objectified**!
 
-This is the initial release with exciting features for data modeling and API management.
+This is the first official release of Objectified, a powerful tool for visualizing,
+designing, and managing your OpenAPI designs through an interactive UML interface.
 
 ---
 
 ## Features
 
 - Class Diagram Visualization
+  - Create classes and properties to JSON 2020-12 specifications
+  - Generate OpenAPI 3.0/3.1 documents from your designs
+  - Import existing OpenAPI documents to UML diagrams
+- Code Generation
+  - Generate JSON and YAML Schemas along with full OpenAPI documents
+  - Publish your APIs directly to the Objectified Hub for public or private access
+  - Test your APIs with Swagger UI Integration
 - Tenancy Support
-- API Endpoints for Publications
-- Project and Versioning Support and Management
-- So many more ...
+- Full project and versioning support
+  - Includes imports of existing OpenAPI documents
+  - Create multiple versions of your API designs with copies
+  - Generate diffs between versions to see changes
+- So much more ...
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for tutorials and walkthroughs!
 
