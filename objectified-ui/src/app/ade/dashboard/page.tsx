@@ -242,34 +242,6 @@ const Dashboard = () => {
       {/*    </Paper>*/}
       {/*  </Grid>*/}
       </Grid>
-
-      {/* No Tenant Warning */}
-      {!currentTenantId && (
-        <Paper
-          elevation={0}
-          sx={{
-            mt: 3,
-            p: 3,
-            border: 1,
-            borderColor: 'warning.main',
-            bgcolor: 'warning.light',
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-            ⚠️ No Tenant Selected
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Please select a tenant to start managing your schemas and projects.
-          </Typography>
-          <Button
-            variant="contained"
-            color="warning"
-            onClick={() => router.push('/ade/dashboard/tenants')}
-          >
-            Select Tenant
-          </Button>
-        </Paper>
-      )}
     </Box>
   );
 };
