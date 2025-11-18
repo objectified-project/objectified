@@ -13,10 +13,13 @@ import Alert from '@mui/material/Alert';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
 import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
-import { filterSlugInput, generateSlug } from '../../../utils/slug';
+import { filterSlugInput } from '../../../utils/slug';
 
 interface Project {
   id: string;
@@ -259,6 +262,102 @@ const Projects = () => {
     );
   }
 
+  // Row actions dropdown component for each project
+  const RowActions = ({ project }: { project: Project }) => {
+    const [action, setAction] = useState<string>('');
+
+    const handleChange = async (value: string) => {
+      try {
+        switch (value) {
+          case 'edit':
+            handleEditClick(project);
+            break;
+          case 'delete':
+            await handleDelete(project.id);
+            break;
+        }
+      } finally {
+        setAction('');
+      }
+    };
+
+    return (
+      <FormControl
+        size="small"
+        sx={{
+          minWidth: 140,
+          '& .MuiOutlinedInput-root': {
+            color: 'var(--foreground)',
+            backgroundColor: 'var(--background)',
+            '& fieldset': {
+              borderColor: 'rgba(128, 128, 128, 0.5)',
+            },
+            '&:hover fieldset': {
+              borderColor: 'rgba(128, 128, 128, 0.7)',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: '#3b82f6',
+            },
+          },
+          '& .MuiSvgIcon-root': {
+            color: 'var(--foreground)',
+          },
+        }}
+      >
+        <Select
+          value={action}
+          onChange={(e) => handleChange(e.target.value as string)}
+          displayEmpty
+          renderValue={(selected) => {
+            if (!selected) {
+              return <span className="text-gray-600 dark:text-gray-300">Actions</span>;
+            }
+            const labels: Record<string, string> = {
+              edit: 'Edit',
+              delete: 'Delete',
+            };
+            return labels[selected as string] || 'Actions';
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                bgcolor: 'var(--background)',
+                color: 'var(--foreground)',
+                '& .MuiMenuItem-root': {
+                  '&:hover': {
+                    backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                    },
+                  },
+                },
+              },
+            },
+          }}
+        >
+          <MenuItem value="" disabled>
+            <span className="text-gray-500">Select action</span>
+          </MenuItem>
+          <MenuItem value="edit">
+            <div className="flex items-center gap-2">
+              <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span>Edit</span>
+            </div>
+          </MenuItem>
+          <MenuItem value="delete" sx={{ color: 'error.main' }}>
+            <div className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <span>Delete</span>
+            </div>
+          </MenuItem>
+        </Select>
+      </FormControl>
+    );
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -337,21 +436,8 @@ const Projects = () => {
                     {formatDate(project.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleEditClick(project)}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                        title="Edit project"
-                      >
-                        <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(project.id)}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                        title="Delete project"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      </button>
+                    <div className="flex justify-end">
+                      <RowActions project={project} />
                     </div>
                   </td>
                 </tr>

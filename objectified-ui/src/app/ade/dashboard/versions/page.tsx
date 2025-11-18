@@ -691,6 +691,161 @@ const Versions = () => {
     );
   }
 
+  // Helper to determine permissions
+  const canModify = (version: Version) => version.creator_id === currentUserId || !!effectiveIsAdmin;
+
+  // Row actions dropdown component
+  const RowActions = ({ version }: { version: Version }) => {
+    const [action, setAction] = useState<string>('');
+    const isPublished = !!version.published;
+    const canPublish = !isPublished && canModify(version);
+    const canUnpublish = isPublished && canModify(version);
+    const canEdit = !isPublished; // match previous behavior (editing a published version not allowed)
+
+    const handleChange = async (value: string) => {
+      try {
+        switch (value) {
+          case 'view':
+            await handleViewOpenApi(version);
+            break;
+          case 'edit':
+            if (!canEdit) {
+              setErrorMessage('Cannot edit published version');
+              break;
+            }
+            handleEditClick(version);
+            break;
+          case 'publish':
+            if (canPublish) {
+              await handlePublish(version.id);
+            } else {
+              await alertDialog({
+                message: 'Only the version owner or a tenant administrator can publish this version',
+                variant: 'warning',
+              });
+            }
+            break;
+          case 'unpublish':
+            if (canUnpublish) {
+              await handleUnpublish(version.id);
+            } else {
+              await alertDialog({
+                message: 'Only the version owner or a tenant administrator can unpublish this version',
+                variant: 'warning',
+              });
+            }
+            break;
+          case 'delete':
+            await handleDelete(version.id);
+            break;
+        }
+      } finally {
+        // reset selection back to placeholder
+        setAction('');
+      }
+    };
+
+    return (
+      <FormControl
+        size="small"
+        sx={{
+          minWidth: 160,
+          '& .MuiOutlinedInput-root': {
+            color: 'var(--foreground)',
+            backgroundColor: 'var(--background)',
+            '& fieldset': {
+              borderColor: 'rgba(128, 128, 128, 0.5)',
+            },
+            '&:hover fieldset': {
+              borderColor: 'rgba(128, 128, 128, 0.7)',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: '#3b82f6',
+            },
+          },
+          '& .MuiSvgIcon-root': {
+            color: 'var(--foreground)',
+          },
+        }}
+      >
+        <Select
+          value={action}
+          onChange={(e) => handleChange(e.target.value as string)}
+          displayEmpty
+          renderValue={(selected) => {
+            if (!selected) {
+              return <span className="text-gray-600 dark:text-gray-300">Actions</span>;
+            }
+            const labels: Record<string, string> = {
+              view: 'View Spec',
+              edit: 'Edit',
+              publish: 'Publish',
+              unpublish: 'Unpublish',
+              delete: 'Delete',
+            };
+            return labels[selected as string] || 'Actions';
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                bgcolor: 'var(--background)',
+                color: 'var(--foreground)',
+                '& .MuiMenuItem-root': {
+                  '&:hover': {
+                    backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                    },
+                  },
+                },
+              },
+            },
+          }}
+        >
+          <MenuItem value="" disabled>
+            <span className="text-gray-500">Select action</span>
+          </MenuItem>
+          <MenuItem value="view">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <span>View Spec</span>
+            </div>
+          </MenuItem>
+          <MenuItem value="edit" disabled={!canEdit}>
+            <div className="flex items-center gap-2">
+              <Edit2 className={`h-4 w-4 ${canEdit ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'}`} />
+              <span>Edit</span>
+            </div>
+          </MenuItem>
+          {!isPublished ? (
+            <MenuItem value="publish" disabled={!canPublish}>
+              <div className="flex items-center gap-2">
+                <Lock className={`h-4 w-4 ${canPublish ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
+                <span>Publish</span>
+              </div>
+            </MenuItem>
+          ) : (
+            <MenuItem value="unpublish" disabled={!canUnpublish}>
+              <div className="flex items-center gap-2">
+                <Unlock className={`h-4 w-4 ${canUnpublish ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400'}`} />
+                <span>Unpublish</span>
+              </div>
+            </MenuItem>
+          )}
+          <MenuItem value="delete" sx={{ color: 'error.main' }}>
+            <div className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <span>Delete</span>
+            </div>
+          </MenuItem>
+        </Select>
+      </FormControl>
+    );
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -811,7 +966,7 @@ const Versions = () => {
                   Created
                 </th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
+
                 </th>
               </tr>
             </thead>
@@ -887,54 +1042,9 @@ const Versions = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end gap-2">
-                      <div title="View OpenAPI Spec">
-                        <button
-                          onClick={() => handleViewOpenApi(version)}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                        >
-                          <Eye className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                        </button>
-                      </div>
-                      {!version.published ? (
-                        <>
-                          <div title="Edit version">
-                            <button
-                              onClick={() => handleEditClick(version)}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                            >
-                              <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            </button>
-                          </div>
-                          {(!version.published && (version.creator_id === currentUserId || effectiveIsAdmin)) && (
-                            <div title="Publish version (freeze)">
-                              <button
-                                onClick={() => handlePublish(version.id)}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                              >
-                                <Lock className="h-4 w-4 text-green-600 dark:text-green-400" />
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div title="Unpublish version">
-                          <button
-                            onClick={() => handleUnpublish(version.id)}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                          >
-                            <Unlock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                          </button>
-                        </div>
-                      )}
-                      <div title="Delete version">
-                        <button
-                          onClick={() => handleDelete(version.id)}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 rounded cursor-pointer transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                        </button>
-                      </div>
+                    {/* Replace icon buttons with dropdown */}
+                    <div className="flex justify-end">
+                      <RowActions version={version} />
                     </div>
                   </td>
                 </tr>
