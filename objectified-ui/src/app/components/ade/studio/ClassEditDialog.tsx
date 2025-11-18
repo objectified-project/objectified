@@ -10,7 +10,7 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Copy, Download, RefreshCw } from 'lucide-react';
-import * as yaml from 'js-yaml';
+import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
 import { useDialog } from '../../providers/DialogProvider';
@@ -80,7 +80,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   } else {
     schemaContent = classEditFormat === 'json'
       ? JSON.stringify(openApiDoc, null, 2)
-      : yaml.dump(openApiDoc, { lineWidth: -1, noRefs: true });
+      : YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
     editorLanguage = classEditFormat;
   }
 
@@ -98,7 +98,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     } else {
       content = classEditFormat === 'json'
         ? JSON.stringify(openApiDoc, null, 2)
-        : yaml.dump(openApiDoc, { lineWidth: -1, noRefs: true });
+        : YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
     }
 
     navigator.clipboard.writeText(content);
@@ -125,7 +125,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     } else {
       content = classEditFormat === 'json'
         ? JSON.stringify(openApiDoc, null, 2)
-        : yaml.dump(openApiDoc, { lineWidth: -1, noRefs: true });
+        : YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
       filenameSuffix = 'schema';
     }
 

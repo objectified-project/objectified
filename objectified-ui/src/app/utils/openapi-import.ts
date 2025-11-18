@@ -5,7 +5,7 @@
  * into the Objectified platform
  */
 
-import * as yaml from 'js-yaml';
+import YAML from 'yaml';
 
 export interface ParsedProperty {
   name: string;
@@ -147,7 +147,7 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       spec = JSON.parse(specContent);
     } catch {
       // If JSON parsing fails, try YAML
-      spec = yaml.load(specContent);
+      spec = YAML.parse(specContent);
     }
 
     // Validate OpenAPI version
@@ -276,5 +276,3 @@ export function validateImportedClasses(classes: ParsedClass[]): { valid: boolea
     errors
   };
 }
-
-

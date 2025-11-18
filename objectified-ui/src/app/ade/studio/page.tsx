@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
 import { Copy, Download } from 'lucide-react';
-import * as yaml from 'js-yaml';
+import YAML from 'yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
@@ -1571,7 +1571,7 @@ const StudioContent = () => {
                     onClick={async () => {
                       const content = codeFormat === 'json'
                         ? openApiSpec
-                        : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
+                        : YAML.stringify(JSON.parse(openApiSpec));
                       navigator.clipboard.writeText(content);
                       await alertDialog({
                         message: `OpenAPI specification (${codeFormat.toUpperCase()}) copied to clipboard!`,
@@ -1589,7 +1589,7 @@ const StudioContent = () => {
                       // Get content in selected format
                       const content = codeFormat === 'json'
                         ? openApiSpec
-                        : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
+                        : YAML.stringify(JSON.parse(openApiSpec));
                       const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
                       const extension = codeFormat === 'json' ? 'json' : 'yaml';
 
@@ -1641,12 +1641,12 @@ const StudioContent = () => {
                     };
                     return codeFormat === 'json'
                       ? JSON.stringify(emptySpec, null, 2)
-                      : yaml.dump(emptySpec, { lineWidth: -1, noRefs: true });
+                      : YAML.stringify(emptySpec);
                   }
 
                   return codeFormat === 'json'
                     ? openApiSpec
-                    : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
+                    : YAML.stringify(JSON.parse(openApiSpec));
                 })()}
                 theme="vs-dark"
                 options={{

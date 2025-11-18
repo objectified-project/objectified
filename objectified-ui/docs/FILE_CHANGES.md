@@ -81,7 +81,7 @@ src/app/ade/dashboard/projects/page.tsx
 ## Dependency Usage
 
 ### Existing Dependencies (No New Packages)
-- `js-yaml`: YAML parsing (already in package.json)
+- `yaml`: YAML parsing (already in package.json)
 - `@mui/material`: Dialog, Tabs, TextField, etc.
 - `lucide-react`: Icons (Upload, FileJson, AlertCircle, CheckCircle2)
 - `pg`: PostgreSQL client for database operations
@@ -196,4 +196,3 @@ git checkout src/app/ade/dashboard/projects/page.tsx
 - Monitor for OpenAPI spec changes (4.x in future)
 - Consider adding support for more schema compositions
 - May need performance optimization for very large specs (1000+ schemas)
-

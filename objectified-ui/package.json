@@ -22,7 +22,6 @@
     "bcrypt": "^6.0.0",
     "dagre": "^0.8.5",
     "diff": "^8.0.2",
-    "js-yaml": "^4.1.0",
     "json-schema-faker": "^0.5.9",
     "lucide-react": "^0.548.0",
     "next": "16.0.0",
@@ -33,13 +32,13 @@
     "react-markdown": "^9.0.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
-    "swagger-ui-react": "^5.30.2"
+    "swagger-ui-react": "^5.30.2",
+    "yaml": "^2.5.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6",
     "@types/diff": "^7.0.2",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/pg": "^8",
     "@types/react": "^19",

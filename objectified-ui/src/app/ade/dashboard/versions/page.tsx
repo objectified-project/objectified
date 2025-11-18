@@ -30,7 +30,7 @@ import {
   getTenantsAdministratedByUser
 } from '../../../../../lib/db/helper';
 import { generateOpenApiSpec } from '../../../utils/openapi';
-import * as yaml from 'js-yaml';
+import YAML from 'yaml';
 import { diffLines, Change } from 'diff';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -558,8 +558,8 @@ const Versions = () => {
       setCompareSpec2(spec2);
 
       // Calculate diff
-      const content1 = compareFormat === 'json' ? spec1 : yaml.dump(JSON.parse(spec1), { lineWidth: -1, noRefs: true });
-      const content2 = compareFormat === 'json' ? spec2 : yaml.dump(JSON.parse(spec2), { lineWidth: -1, noRefs: true });
+      const content1 = compareFormat === 'json' ? spec1 : YAML.stringify(JSON.parse(spec1));
+      const content2 = compareFormat === 'json' ? spec2 : YAML.stringify(JSON.parse(spec2));
 
       const diff = diffLines(content1, content2);
       setDiffResult(diff);
@@ -590,8 +590,8 @@ const Versions = () => {
 
     // Recalculate diff if specs are loaded
     if (compareSpec1 && compareSpec2) {
-      const content1 = newFormat === 'json' ? compareSpec1 : yaml.dump(JSON.parse(compareSpec1), { lineWidth: -1, noRefs: true });
-      const content2 = newFormat === 'json' ? compareSpec2 : yaml.dump(JSON.parse(compareSpec2), { lineWidth: -1, noRefs: true });
+      const content1 = newFormat === 'json' ? compareSpec1 : YAML.stringify(JSON.parse(compareSpec1));
+      const content2 = newFormat === 'json' ? compareSpec2 : YAML.stringify(JSON.parse(compareSpec2));
 
       const diff = diffLines(content1, content2);
       setDiffResult(diff);
@@ -1341,7 +1341,7 @@ const Versions = () => {
                       openapi: '3.1.0',
                       info: {
                         title: 'No classes defined',
-                        version: viewingVersion?.version_id || '1.0.0'
+                        version: '1.0.0'
                       },
                       components: {
                         schemas: {}
@@ -1349,24 +1349,29 @@ const Versions = () => {
                     };
                     return openApiFormat === 'json'
                       ? JSON.stringify(emptySpec, null, 2)
-                      : yaml.dump(emptySpec, { lineWidth: -1, noRefs: true });
+                      : YAML.stringify(emptySpec);
                   }
 
                   return openApiFormat === 'json'
                     ? openApiSpec
-                    : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
+                    : YAML.stringify(JSON.parse(openApiSpec));
                 })()}
+                theme="vs-dark"
                 options={{
                   readOnly: true,
                   minimap: { enabled: true },
+                  scrollBeyondLastLine: false,
                   fontSize: 13,
                   lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
+                  renderWhitespace: 'selection',
                   automaticLayout: true,
                   wordWrap: 'on',
-                  wrappingStrategy: 'advanced',
+                  folding: true,
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  contextmenu: true,
+                  selectOnLineNumbers: true,
                 }}
-                theme="vs-dark"
               />
             </div>
           )}
@@ -1376,18 +1381,49 @@ const Versions = () => {
             Close
           </Button>
           <Button
+            onClick={async () => {
+              const content = openApiFormat === 'json'
+                ? openApiSpec
+                : YAML.stringify(JSON.parse(openApiSpec));
+              navigator.clipboard.writeText(content);
+              await alertDialog({
+                message: `OpenAPI specification (${openApiFormat.toUpperCase()}) copied to clipboard!`,
+                variant: 'success',
+              });
+            }}
+            variant="contained"
+            disabled={isLoadingSpec}
+          >
+            Copy to Clipboard
+          </Button>
+          <Button
             onClick={() => {
               const content = openApiFormat === 'json'
                 ? openApiSpec
-                : yaml.dump(JSON.parse(openApiSpec), { lineWidth: -1, noRefs: true });
-              const blob = new Blob([content], { type: 'text/plain' });
+                : YAML.stringify(JSON.parse(openApiSpec));
+              const mimeType = openApiFormat === 'json' ? 'application/json' : 'text/yaml';
+              const extension = openApiFormat === 'json' ? 'json' : 'yaml';
+
+              // Create a blob from the OpenAPI spec
+              const blob = new Blob([content], { type: mimeType });
               const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `openapi-${viewingVersion?.version_id}.${openApiFormat}`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
+
+              // Create a temporary download link
+              const link = document.createElement('a');
+              link.href = url;
+
+              // Generate filename from project and version
+              const projectForViewing = viewingVersion ? projects.find(p => p.id === viewingVersion.project_id) : null;
+              const projectSlug = projectForViewing?.slug || projectForViewing?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
+              const versionSlug = viewingVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+              link.download = `${projectSlug}-${versionSlug}-openapi.${extension}`;
+
+              // Trigger download
+              document.body.appendChild(link);
+              link.click();
+
+              // Cleanup
+              document.body.removeChild(link);
               URL.revokeObjectURL(url);
             }}
             variant="contained"

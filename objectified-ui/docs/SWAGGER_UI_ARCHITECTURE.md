@@ -219,7 +219,7 @@ import dynamic from 'next/dynamic'
 
 // Icons & Utilities
 import { Copy, Download } from 'lucide-react'
-import * as yaml from 'js-yaml'
+import YAML from 'yaml'
 
 // Components
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog'
@@ -247,4 +247,3 @@ const SwaggerUI = dynamic(() => import('swagger-ui-react'), { ssr: false }) ✨
 
 ## Legend
 ✨ = New addition for Swagger UI integration
-
