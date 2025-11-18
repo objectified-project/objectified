@@ -386,7 +386,7 @@ const Versions = () => {
 
     const confirmed = await confirmDialog({
       title: 'Unpublish Version',
-      message: 'Are you sure you want to unpublish this version? It will become editable again.',
+      message: 'Are you sure you want to unpublish this version? Please note, it\'s best practice to keep it published to avoid breaking any integrations depending on it. If you really wish to unpublish, we recommend creating a new version to replace it, but we provide this ability if absolutely necessary.',
       variant: 'warning',
       confirmLabel: 'Unpublish',
       cancelLabel: 'Cancel',
