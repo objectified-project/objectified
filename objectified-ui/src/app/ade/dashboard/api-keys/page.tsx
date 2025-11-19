@@ -19,6 +19,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface ApiKey {
   id: string;
@@ -35,6 +36,7 @@ interface ApiKey {
 
 const ApiKeys = () => {
   const { data: session } = useSession();
+  const { confirm: confirmDialog } = useDialog();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -135,9 +137,27 @@ const ApiKeys = () => {
     }
   };
 
-  const handleToggleStatus = async (apiKey: ApiKey) => {
+  const handleToggleStatus = async (apiKey: ApiKey, nextEnabledParam?: boolean) => {
     try {
-      const result = await toggleApiKeyStatus(apiKey.id, !apiKey.enabled);
+      const nextEnabled = typeof nextEnabledParam === 'boolean' ? nextEnabledParam : !apiKey.enabled;
+
+      // If disabling, ask for confirmation first
+      if (!nextEnabled) {
+        const confirmed = await confirmDialog({
+          title: 'Disable API Key',
+          message: `Are you sure you want to disable "${apiKey.name}"? This will immediately block all requests using this key.`,
+          variant: 'warning',
+          confirmLabel: 'Disable',
+          cancelLabel: 'Cancel',
+        });
+        if (!confirmed) {
+          // Force a re-render to keep the switch in sync with current value
+          setApiKeys((prev) => prev.slice());
+          return;
+        }
+      }
+
+      const result = await toggleApiKeyStatus(apiKey.id, nextEnabled);
       const response = JSON.parse(result);
 
       if (response.success) {
@@ -287,7 +307,7 @@ const ApiKeys = () => {
                       control={
                         <Switch
                           checked={apiKey.enabled}
-                          onChange={() => handleToggleStatus(apiKey)}
+                          onChange={(_, checked) => handleToggleStatus(apiKey, checked)}
                           color="primary"
                         />
                       }
