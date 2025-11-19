@@ -337,8 +337,8 @@ const Versions = () => {
 
     const confirmed = await confirmDialog({
       title: 'Publish Version',
-      message: 'Are you sure you want to publish this version? Once published, it cannot be edited (but can be unpublished or deleted).',
-      variant: 'warning',
+      message: 'Are you sure you want to publish this version?\n\nOnce published, it cannot be edited (but can be unpublished or deleted).',
+      variant: 'info',
       confirmLabel: 'Publish',
       cancelLabel: 'Cancel',
     });
@@ -386,8 +386,8 @@ const Versions = () => {
 
     const confirmed = await confirmDialog({
       title: 'Unpublish Version',
-      message: 'Are you sure you want to unpublish this version? Please note, it\'s best practice to keep it published to avoid breaking any integrations depending on it. If you really wish to unpublish, we recommend creating a new version to replace it, but we provide this ability if absolutely necessary.',
-      variant: 'warning',
+      message: `Are you sure you want to unpublish this version?\n\nPlease note, it's best practice to keep it published to avoid breaking any integrations depending on it. If you really wish to unpublish, we recommend creating a new version to replace it, but we provide this ability if absolutely necessary.`,
+      variant: 'danger',
       confirmLabel: 'Unpublish',
       cancelLabel: 'Cancel',
     });
