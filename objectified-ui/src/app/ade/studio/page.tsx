@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
 import { Copy, Download } from 'lucide-react';
+import Switch from '@mui/material/Switch';
 import YAML from 'yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
@@ -106,6 +107,7 @@ const StudioContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
+  const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(true);
   const { fitView } = useReactFlow();
 
   // Class-property edit dialog state
@@ -219,7 +221,7 @@ const StudioContent = () => {
       setLoadingMessage('Updating nodes and edges...');
 
       let finalNodes: Node[];
-      if (applyLayout) {
+      if (applyLayout && autoLayoutEnabled) {
         // Apply auto-layout for class add/delete
         const newNodes = await classesToNodes(classesWithProperties);
         const newEdges = createAllEdges(classesWithProperties);
@@ -258,10 +260,16 @@ const StudioContent = () => {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
     }
-  }, [selectedVersionId, layoutDirection, setNodes, setEdges, projects, versions, generateOpenApiSpec, nodes]);
+  }, [selectedVersionId, layoutDirection, autoLayoutEnabled, setNodes, setEdges, projects, versions, generateOpenApiSpec, nodes]);
 
   // Apply auto-layout to current nodes and edges
   const onLayout = useCallback((direction: LayoutDirection) => {
+    if (!autoLayoutEnabled) {
+      // Just update the direction without applying layout
+      setLayoutDirection(direction);
+      return;
+    }
+
     setIsLoadingCanvas(true);
     setLoadingMessage('Applying layout...');
 
@@ -278,7 +286,7 @@ const StudioContent = () => {
         setLoadingMessage('');
       }, 10);
     }, 50);
-  }, [nodes, edges, setNodes, fitView]);
+  }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
 
   // Handle property drop on class
   const handlePropertyDrop = useCallback(async (classId: string, propertyData: any, parentId?: string | null) => {
@@ -1000,12 +1008,17 @@ const StudioContent = () => {
 
         setLoadingMessage('Applying auto-layout...');
 
-        // Apply auto-layout
-        const layoutedNodes = getLayoutedElements(newNodes, newEdges, {
-          direction: layoutDirection
-        });
+        // Apply auto-layout if enabled
+        let finalNodes: Node[];
+        if (autoLayoutEnabled) {
+          finalNodes = getLayoutedElements(newNodes, newEdges, {
+            direction: layoutDirection
+          });
+        } else {
+          finalNodes = newNodes;
+        }
 
-        setNodes(layoutedNodes);
+        setNodes(finalNodes);
         setEdges(newEdges);
 
         setLoadingMessage('Generating OpenAPI specification...');
@@ -1039,7 +1052,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, setNodes, setEdges, fitView, generateOpenApiSpec, projects, versions]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, autoLayoutEnabled, setNodes, setEdges, fitView, generateOpenApiSpec, projects, versions]);
 
   // Regenerate OpenAPI spec when switching to code or swagger views
   useEffect(() => {
@@ -1475,15 +1488,33 @@ const StudioContent = () => {
             {/* Layout Control Panel */}
             <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
               <div className="flex flex-col gap-2">
-                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 px-2 py-1">
-                  Auto Layout
+                <div className="flex items-center justify-between px-2 py-1">
+                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Auto Layout
+                  </div>
+                  <Switch
+                    checked={autoLayoutEnabled}
+                    onChange={(e) => setAutoLayoutEnabled(e.target.checked)}
+                    size="small"
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#2563eb',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#2563eb',
+                      },
+                    }}
+                  />
                 </div>
                 <button
                   onClick={() => onLayout('TB')}
+                  disabled={!autoLayoutEnabled}
                   className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'TB'
+                    layoutDirection === 'TB' && autoLayoutEnabled
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : autoLayoutEnabled
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                   }`}
                   title="Top to Bottom"
                 >
@@ -1491,10 +1522,13 @@ const StudioContent = () => {
                 </button>
                 <button
                   onClick={() => onLayout('LR')}
+                  disabled={!autoLayoutEnabled}
                   className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'LR'
+                    layoutDirection === 'LR' && autoLayoutEnabled
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : autoLayoutEnabled
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                   }`}
                   title="Left to Right"
                 >
@@ -1502,10 +1536,13 @@ const StudioContent = () => {
                 </button>
                 <button
                   onClick={() => onLayout('BT')}
+                  disabled={!autoLayoutEnabled}
                   className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'BT'
+                    layoutDirection === 'BT' && autoLayoutEnabled
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : autoLayoutEnabled
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                   }`}
                   title="Bottom to Top"
                 >
@@ -1513,10 +1550,13 @@ const StudioContent = () => {
                 </button>
                 <button
                   onClick={() => onLayout('RL')}
+                  disabled={!autoLayoutEnabled}
                   className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'RL'
+                    layoutDirection === 'RL' && autoLayoutEnabled
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : autoLayoutEnabled
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
                   }`}
                   title="Right to Left"
                 >
