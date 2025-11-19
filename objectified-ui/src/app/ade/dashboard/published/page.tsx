@@ -10,6 +10,9 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import { useDialog } from '../../../components/providers/DialogProvider';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
 
 interface PublishedVersion {
   id: string;
@@ -188,6 +191,118 @@ const PublishedVersions = () => {
     );
   }
 
+  // Row actions dropdown component for each published version
+  const RowActions = ({ version }: { version: PublishedVersion }) => {
+    const [action, setAction] = useState<string>('');
+
+    const handleChange = async (value: string) => {
+      try {
+        switch (value) {
+          case 'open':
+            handleOpenUrl(version);
+            break;
+          case 'copy':
+            await handleCopyUrl(version);
+            break;
+          case 'toggleVisibility':
+            await handleToggleVisibility(version);
+            break;
+        }
+      } finally {
+        setAction('');
+      }
+    };
+
+    const toggleLabel = version.visibility === 'public' ? 'Make Private' : 'Make Public';
+
+    return (
+      <FormControl
+        size="small"
+        sx={{
+          minWidth: 160,
+          '& .MuiOutlinedInput-root': {
+            color: 'var(--foreground)',
+            backgroundColor: 'var(--background)',
+            '& fieldset': {
+              borderColor: 'rgba(128, 128, 128, 0.5)',
+            },
+            '&:hover fieldset': {
+              borderColor: 'rgba(128, 128, 128, 0.7)',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: '#3b82f6',
+            },
+          },
+          '& .MuiSvgIcon-root': {
+            color: 'var(--foreground)',
+          },
+        }}
+      >
+        <Select
+          value={action}
+          onChange={(e) => handleChange(e.target.value as string)}
+          displayEmpty
+          renderValue={(selected) => {
+            if (!selected) {
+              return <span className="text-gray-600 dark:text-gray-300">Actions</span>;
+            }
+            const labels: Record<string, string> = {
+              open: 'Open URL',
+              copy: 'Copy URL',
+              toggleVisibility: toggleLabel,
+            };
+            return labels[selected as string] || 'Actions';
+          }}
+          MenuProps={{
+            PaperProps: {
+              sx: {
+                bgcolor: 'var(--background)',
+                color: 'var(--foreground)',
+                '& .MuiMenuItem-root': {
+                  '&:hover': {
+                    backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                  },
+                  '&.Mui-selected': {
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                    },
+                  },
+                },
+              },
+            },
+          }}
+        >
+          <MenuItem value="" disabled>
+            <span className="text-gray-500">Select action</span>
+          </MenuItem>
+          <MenuItem value="open">
+            <div className="flex items-center gap-2">
+              <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span>Open URL</span>
+            </div>
+          </MenuItem>
+          <MenuItem value="copy">
+            <div className="flex items-center gap-2">
+              <Copy className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span>Copy URL</span>
+            </div>
+          </MenuItem>
+          <MenuItem value="toggleVisibility">
+            <div className="flex items-center gap-2">
+              {version.visibility === 'public' ? (
+                <Lock className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+              ) : (
+                <Globe className="h-4 w-4 text-green-600 dark:text-green-400" />
+              )}
+              <span>{toggleLabel}</span>
+            </div>
+          </MenuItem>
+        </Select>
+      </FormControl>
+    );
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -263,7 +378,7 @@ const PublishedVersions = () => {
                     Published
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                     
                   </th>
                 </tr>
               </thead>
@@ -327,25 +442,8 @@ const PublishedVersions = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-1">
-                        <Tooltip title={copiedUrl === version.id ? 'Copied!' : 'Copy full URL'}>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleCopyUrl(version)}
-                            className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Open in new tab">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleOpenUrl(version)}
-                            className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </IconButton>
-                        </Tooltip>
+                      <div className="flex items-center justify-end">
+                        <RowActions version={version} />
                       </div>
                     </td>
                   </tr>
