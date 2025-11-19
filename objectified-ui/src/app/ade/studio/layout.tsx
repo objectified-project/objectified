@@ -553,8 +553,8 @@ function StudioLayoutContent({
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
-      {/* Only show StudioSideNav if a tenant is selected */}
-      {currentTenantId && (
+      {/* Only show StudioSideNav after both a project and a version are selected */}
+      {currentTenantId && selectedProjectId && selectedVersionId && (
         <StudioSideNav
           classes={classes}
           properties={properties}
@@ -1148,4 +1148,3 @@ export default function StudioLayout({
     </StudioProvider>
   );
 }
-
