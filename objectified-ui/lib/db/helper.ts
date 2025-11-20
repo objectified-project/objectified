@@ -1443,3 +1443,40 @@ export async function updateClassPropertyRef(classPropertyId: string, targetClas
     return JSON.stringify({ success: false, error: error.message });
   }
 }
+
+export async function createSignupRequest(name: string, email: string, password: string, signupSource: string) {
+  try {
+    // Check if email already exists in signup table
+    const existingSignup = await connectionPool.query(
+      'SELECT email_address FROM odb.signup WHERE email_address = $1',
+      [email]
+    );
+
+    if (existingSignup.rowCount > 0) {
+      return JSON.stringify({
+        success: false,
+        duplicate: true,
+        message: 'You have already requested account access, thank you for your continued interest!'
+      });
+    }
+
+    // Hash the password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Insert the signup request
+    await connectionPool.query(
+      'INSERT INTO odb.signup (name, email_address, password, signup_source) VALUES ($1, $2, $3, $4)',
+      [name, email, hashedPassword, signupSource]
+    );
+
+    return JSON.stringify({
+      success: true,
+      message: 'Your signup was accepted, and you will be contacted by a member of the Objectified staff shortly.'
+    });
+  } catch (error: any) {
+    console.error('Error creating signup request:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+

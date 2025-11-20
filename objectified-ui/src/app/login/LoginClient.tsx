@@ -1,26 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { Mail, Lock, User, Github } from 'lucide-react';
+import { Mail, Lock, User, Info } from 'lucide-react';
 import { signIn } from "next-auth/react";
-
-const PROVIDER_LIST: any = {
-  "Google": "google",
-  "GitHub": "github",
-  "GitLab": "gitlab",
-  "Microsoft": "azure-ad",
-};
-
-const SSOButton = ({ provider, icon, onClick }: { provider: string; icon: React.ReactNode; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors cursor-pointer"
-  >
-    {icon}
-    <span className="text-sm font-medium text-gray-700">Continue with {provider}</span>
-  </button>
-);
+import { createSignupRequest } from '../../../lib/db/helper';
 
 const LoginClient = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -28,18 +11,45 @@ const LoginClient = () => {
     email: '',
     password: '',
   });
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [signInEnabled, setSignInEnabled] = useState(true);
+  const [signupMessage, setSignupMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignInEnabled(false);
+    setSignupMessage(null);
 
     if (isSignUp) {
-      console.log('Sign up with:', payload);
-      setSignInEnabled(true);
+      try {
+        const result = await createSignupRequest(
+          payload.name || '',
+          payload.email || '',
+          payload.password || '',
+          payload.signupSource || ''
+        );
+
+        const response = JSON.parse(result);
+
+        if (response.success) {
+          setSignupMessage({ type: 'success', text: response.message });
+          // Clear the form
+          setPayload({
+            email: '',
+            password: '',
+            name: '',
+            signupSource: '',
+          });
+        } else if (response.duplicate) {
+          setSignupMessage({ type: 'info', text: response.message });
+        } else {
+          setSignupMessage({ type: 'error', text: response.error || 'An error occurred during signup.' });
+        }
+      } catch (error) {
+        console.error('Signup error:', error);
+        setSignupMessage({ type: 'error', text: 'An unexpected error occurred. Please try again.' });
+      } finally {
+        setSignInEnabled(true);
+      }
     } else {
       signIn('credentials', {
         payload: JSON.stringify(payload),
@@ -55,10 +65,6 @@ const LoginClient = () => {
       [e.target.name]: e.target.value,
     });
   }
-
-  const handleSSOLogin = (provider: string) => {
-    console.log(`Login with ${provider} (${PROVIDER_LIST[provider]})`);
-  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -82,6 +88,23 @@ const LoginClient = () => {
               {isSignUp ? 'Sign up for early access' : 'Sign in to continue to your account'}
             </p>
           </div>
+
+          {/* Message Display */}
+          {signupMessage && (
+            <div className={`mb-6 p-4 rounded-lg ${
+              signupMessage.type === 'success' ? 'bg-green-50 border border-green-200' :
+              signupMessage.type === 'info' ? 'bg-blue-50 border border-blue-200' :
+              'bg-red-50 border border-red-200'
+            }`}>
+              <p className={`text-sm ${
+                signupMessage.type === 'success' ? 'text-green-800' :
+                signupMessage.type === 'info' ? 'text-blue-800' :
+                'text-red-800'
+              }`}>
+                {signupMessage.text}
+              </p>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -146,6 +169,27 @@ const LoginClient = () => {
                 />
               </div>
             </div>
+
+            {isSignUp && (
+              <div>
+                <label htmlFor="signupSource" className="block text-sm font-medium text-gray-700 mb-1">
+                  Where did you hear about Objectified?
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Info size={20} className="text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    name={'signupSource'}
+                    value={payload['signupSource'] || ''}
+                    onChange={handleChange}
+                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+                    placeholder="e.g., Google, a friend, social media"
+                  />
+                </div>
+              </div>
+            )}
 
             {!isSignUp && (
               <div className="text-right">
@@ -243,7 +287,10 @@ const LoginClient = () => {
               <button
                 type="button"
                 disabled={!signInEnabled}
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setSignupMessage(null);
+                }}
                 className="text-blue-600 font-semibold hover:text-blue-500 cursor-pointer"
               >
                 {isSignUp ? 'Sign In' : 'Sign Up'}
