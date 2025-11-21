@@ -12,6 +12,190 @@ export async function getUserById(userId: string) {
   return await connectionPool.query('SELECT * FROM odb.users WHERE id = $1 AND deleted_at IS NULL', [userId]);
 }
 
+export async function getDashboardStats(userId: string) {
+  try {
+    // Get stats for the user across all their tenants
+    const result = await connectionPool.query(
+      `SELECT 
+        -- Count tenants the user belongs to
+        (SELECT COUNT(DISTINCT tenant_id) 
+         FROM odb.tenant_users 
+         WHERE user_id = $1) as total_tenants,
+        
+        -- Count tenants the user administers
+        (SELECT COUNT(DISTINCT tenant_id) 
+         FROM odb.tenant_administrators 
+         WHERE user_id = $1) as admin_tenants,
+        
+        -- Count projects in user's tenants
+        (SELECT COUNT(DISTINCT p.id)
+         FROM odb.projects p
+         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
+         AND p.deleted_at IS NULL) as total_projects,
+        
+        -- Count projects created by user
+        (SELECT COUNT(*)
+         FROM odb.projects
+         WHERE creator_id = $1 AND deleted_at IS NULL) as created_projects,
+        
+        -- Count versions in user's projects
+        (SELECT COUNT(DISTINCT v.id)
+         FROM odb.versions v
+         JOIN odb.projects p ON v.project_id = p.id
+         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
+         AND v.deleted_at IS NULL) as total_versions,
+        
+        -- Count versions created by user
+        (SELECT COUNT(*)
+         FROM odb.versions
+         WHERE creator_id = $1 AND deleted_at IS NULL) as created_versions,
+        
+        -- Count published versions
+        (SELECT COUNT(DISTINCT v.id)
+         FROM odb.versions v
+         JOIN odb.projects p ON v.project_id = p.id
+         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
+         AND v.published = true
+         AND v.deleted_at IS NULL) as published_versions,
+        
+        -- Count classes across all versions in user's tenants
+        (SELECT COUNT(DISTINCT c.id)
+         FROM odb.classes c
+         JOIN odb.versions v ON c.version_id = v.id
+         JOIN odb.projects p ON v.project_id = p.id
+         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
+         AND c.deleted_at IS NULL
+         AND v.deleted_at IS NULL) as total_classes,
+        
+        -- Count properties in user's projects
+        (SELECT COUNT(DISTINCT pr.id)
+         FROM odb.properties pr
+         JOIN odb.projects p ON pr.project_id = p.id
+         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
+         AND pr.deleted_at IS NULL) as total_properties,
+        
+        -- Count class properties (property instances)
+        (SELECT COUNT(DISTINCT cp.id)
+         FROM odb.class_properties cp
+         JOIN odb.classes c ON cp.class_id = c.id
+         JOIN odb.versions v ON c.version_id = v.id
+         JOIN odb.projects p ON v.project_id = p.id
+         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
+         AND c.deleted_at IS NULL
+         AND v.deleted_at IS NULL) as total_class_properties,
+        
+        -- Get most recent activity timestamp
+        (SELECT MAX(created_at)
+         FROM (
+           SELECT created_at FROM odb.projects WHERE creator_id = $1
+           UNION ALL
+           SELECT created_at FROM odb.versions WHERE creator_id = $1
+           UNION ALL
+           SELECT c.created_at FROM odb.classes c
+           JOIN odb.versions v ON c.version_id = v.id
+           WHERE v.creator_id = $1 AND c.deleted_at IS NULL
+         ) activities) as last_activity
+      `,
+      [userId]
+    );
+
+    return JSON.stringify(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error fetching dashboard stats:', error);
+    return JSON.stringify({
+      total_tenants: 0,
+      admin_tenants: 0,
+      total_projects: 0,
+      created_projects: 0,
+      total_versions: 0,
+      created_versions: 0,
+      published_versions: 0,
+      total_classes: 0,
+      total_properties: 0,
+      total_class_properties: 0,
+      last_activity: null
+    });
+  }
+}
+
+export async function getRecentActivity(userId: string, limit: number = 10) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT * FROM (
+        -- Recent projects
+        SELECT 
+          'project' as type,
+          p.id,
+          p.name,
+          p.description,
+          p.created_at,
+          t.name as tenant_name,
+          t.slug as tenant_slug
+        FROM odb.projects p
+        JOIN odb.tenants t ON p.tenant_id = t.id
+        WHERE p.creator_id = $1 AND p.deleted_at IS NULL
+        
+        UNION ALL
+        
+        -- Recent versions
+        SELECT 
+          'version' as type,
+          v.id,
+          v.version_id as name,
+          v.description,
+          v.created_at,
+          t.name as tenant_name,
+          t.slug as tenant_slug
+        FROM odb.versions v
+        JOIN odb.projects p ON v.project_id = p.id
+        JOIN odb.tenants t ON p.tenant_id = t.id
+        WHERE v.creator_id = $1 AND v.deleted_at IS NULL
+        
+        UNION ALL
+        
+        -- Recent classes
+        SELECT 
+          'class' as type,
+          c.id,
+          c.name,
+          c.description,
+          c.created_at,
+          t.name as tenant_name,
+          t.slug as tenant_slug
+        FROM odb.classes c
+        JOIN odb.versions v ON c.version_id = v.id
+        JOIN odb.projects p ON v.project_id = p.id
+        JOIN odb.tenants t ON p.tenant_id = t.id
+        WHERE p.creator_id = $1 AND c.deleted_at IS NULL AND v.deleted_at IS NULL
+        
+        UNION ALL
+        
+        -- Recent properties
+        SELECT 
+          'property' as type,
+          pr.id,
+          pr.name,
+          pr.description,
+          pr.created_at,
+          t.name as tenant_name,
+          t.slug as tenant_slug
+        FROM odb.properties pr
+        JOIN odb.projects p ON pr.project_id = p.id
+        JOIN odb.tenants t ON p.tenant_id = t.id
+        WHERE p.creator_id = $1 AND pr.deleted_at IS NULL
+      ) activities
+      ORDER BY created_at DESC
+      LIMIT $2`,
+      [userId, limit]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching recent activity:', error);
+    return JSON.stringify([]);
+  }
+}
+
 export async function getTenantsForUser(userId: string) {
   const result = await connectionPool.query('SELECT a.* FROM odb.tenants a, odb.tenant_users b WHERE b.user_id = $1 AND a.id = b.tenant_id', [userId]);
 

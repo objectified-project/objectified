@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React from 'react';
+import { useSession } from 'next-auth/react';
 import { User, Building2, Folders, FileDigit, Key, Eye, Link as LinkIcon } from 'lucide-react';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
@@ -29,6 +30,12 @@ interface NavSection {
 
 const DashboardSideNav: React.FC = () => {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const hasTenant = !!currentTenantId;
+
+  console.log('Current Tenant ID:', currentTenantId);
 
   const navSections: NavSection[] = [
     {
@@ -42,15 +49,15 @@ const DashboardSideNav: React.FC = () => {
       header: 'Administration',
       items: [
         { label: 'Tenants', href: '/ade/dashboard/tenants', icon: Building2 },
-        { label: 'API Keys', href: '/ade/dashboard/api-keys', icon: Key },
+        { label: 'API Keys', href: '/ade/dashboard/api-keys', icon: Key, disabled: !hasTenant },
       ],
     },
     {
       header: 'Specifications',
       items: [
-        { label: 'Projects', href: '/ade/dashboard/projects', icon: Folders },
-        { label: 'Versions', href: '/ade/dashboard/versions', icon: FileDigit },
-        { label: 'Published', href: '/ade/dashboard/published', icon: Eye },
+        { label: 'Projects', href: '/ade/dashboard/projects', icon: Folders, disabled: !hasTenant },
+        { label: 'Versions', href: '/ade/dashboard/versions', icon: FileDigit, disabled: !hasTenant },
+        { label: 'Published', href: '/ade/dashboard/published', icon: Eye, disabled: !hasTenant },
       ],
     },
   ];
@@ -97,8 +104,8 @@ const DashboardSideNav: React.FC = () => {
                 return (
                   <ListItem key={item.href} disablePadding>
                     <ListItemButton
-                      component={Link}
-                      href={item.href}
+                      component={item.disabled ? 'div' : Link}
+                      href={item.disabled ? undefined : item.href}
                       disabled={item.disabled}
                       selected={active}
                       sx={{
@@ -113,6 +120,9 @@ const DashboardSideNav: React.FC = () => {
                           '& .MuiListItemIcon-root': {
                             color: 'primary.contrastText',
                           },
+                        },
+                        '&.Mui-disabled': {
+                          opacity: 0.5,
                         },
                       }}
                     >
