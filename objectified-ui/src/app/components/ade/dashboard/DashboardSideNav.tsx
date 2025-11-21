@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React from 'react';
-import { User, Building2, Folders, FileDigit, Key, Eye } from 'lucide-react';
+import { User, Building2, Folders, FileDigit, Key, Eye, Link as LinkIcon } from 'lucide-react';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
@@ -33,7 +33,10 @@ const DashboardSideNav: React.FC = () => {
   const navSections: NavSection[] = [
     {
       header: 'Account',
-      items: [{ label: 'Profile', href: '/ade/dashboard/profile', icon: User }],
+      items: [
+        { label: 'Profile', href: '/ade/dashboard/profile', icon: User },
+        { label: 'Linked Accounts', href: '/ade/dashboard/linked-accounts', icon: LinkIcon },
+      ],
     },
     {
       header: 'Administration',

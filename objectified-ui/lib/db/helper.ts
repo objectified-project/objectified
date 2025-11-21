@@ -8,6 +8,10 @@ export async function getUserByEmail(emailAddress: string) {
   return await connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
 }
 
+export async function getUserById(userId: string) {
+  return await connectionPool.query('SELECT * FROM odb.users WHERE id = $1 AND deleted_at IS NULL', [userId]);
+}
+
 export async function getTenantsForUser(userId: string) {
   const result = await connectionPool.query('SELECT a.* FROM odb.tenants a, odb.tenant_users b WHERE b.user_id = $1 AND a.id = b.tenant_id', [userId]);
 
@@ -1476,6 +1480,185 @@ export async function createSignupRequest(name: string, email: string, password:
     });
   } catch (error: any) {
     console.error('Error creating signup request:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+// External Authentication Provider Functions
+
+export async function getLinkedAccountsForUser(userId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, provider, provider_user_id, provider_email, provider_username, 
+              created_at, last_login_at
+       FROM odb.external_auth_providers
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching linked accounts:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function linkExternalAccount(
+  userId: string,
+  provider: string,
+  providerUserId: string,
+  providerEmail: string,
+  providerUsername: string | null,
+  accessToken: string | null,
+  refreshToken: string | null,
+  tokenExpiresAt: Date | null,
+  profileData: any
+) {
+  try {
+    // Check if this provider is already linked to this user
+    const existingLink = await connectionPool.query(
+      'SELECT id FROM odb.external_auth_providers WHERE user_id = $1 AND provider = $2',
+      [userId, provider]
+    );
+
+    if (existingLink.rowCount > 0) {
+      return JSON.stringify({
+        success: false,
+        error: `You have already linked a ${provider} account`
+      });
+    }
+
+    // Check if this provider account is already linked to another user
+    const existingProviderAccount = await connectionPool.query(
+      'SELECT user_id FROM odb.external_auth_providers WHERE provider = $1 AND provider_user_id = $2',
+      [provider, providerUserId]
+    );
+
+    if (existingProviderAccount.rowCount > 0) {
+      return JSON.stringify({
+        success: false,
+        error: 'This provider account is already linked to another user'
+      });
+    }
+
+    // Insert the linked account
+    const result = await connectionPool.query(
+      `INSERT INTO odb.external_auth_providers (
+        user_id, provider, provider_user_id, provider_email, provider_username,
+        access_token, refresh_token, token_expires_at, profile_data, last_login_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+      RETURNING id, provider, provider_username, provider_email`,
+      [
+        userId,
+        provider,
+        providerUserId,
+        providerEmail,
+        providerUsername,
+        accessToken,
+        refreshToken,
+        tokenExpiresAt,
+        profileData ? JSON.stringify(profileData) : null
+      ]
+    );
+
+    return JSON.stringify({
+      success: true,
+      linkedAccount: result.rows[0]
+    });
+  } catch (error: any) {
+    console.error('Error linking external account:', error);
+    if (error.code === '23505') { // Unique constraint violation
+      return JSON.stringify({
+        success: false,
+        error: 'This account is already linked'
+      });
+    }
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function unlinkExternalAccount(userId: string, linkedAccountId: string) {
+  try {
+    // Verify the linked account belongs to this user before deleting
+    const result = await connectionPool.query(
+      'DELETE FROM odb.external_auth_providers WHERE id = $1 AND user_id = $2 RETURNING provider',
+      [linkedAccountId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({
+        success: false,
+        error: 'Linked account not found or does not belong to you'
+      });
+    }
+
+    return JSON.stringify({
+      success: true,
+      provider: result.rows[0].provider
+    });
+  } catch (error: any) {
+    console.error('Error unlinking external account:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function getLinkedAccountByProvider(provider: string, providerUserId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, user_id, provider, provider_user_id, provider_email, provider_username,
+              access_token, refresh_token, token_expires_at, profile_data,
+              created_at, last_login_at
+       FROM odb.external_auth_providers
+       WHERE provider = $1 AND provider_user_id = $2`,
+      [provider, providerUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ found: false });
+    }
+
+    return JSON.stringify({ found: true, account: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching linked account by provider:', error);
+    return JSON.stringify({ found: false, error: error.message });
+  }
+}
+
+export async function getLinkedAccountByProviderForUser(userId: string, provider: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, provider, provider_user_id, provider_email, provider_username,
+              access_token, refresh_token, token_expires_at, profile_data,
+              created_at, last_login_at
+       FROM odb.external_auth_providers
+       WHERE user_id = $1 AND provider = $2`,
+      [userId, provider]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ found: false });
+    }
+
+    return JSON.stringify({ found: true, account: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching linked account by provider for user:', error);
+    return JSON.stringify({ found: false, error: error.message });
+  }
+}
+
+export async function updateLinkedAccountLastLogin(provider: string, providerUserId: string) {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.external_auth_providers 
+       SET last_login_at = CURRENT_TIMESTAMP
+       WHERE provider = $1 AND provider_user_id = $2`,
+      [provider, providerUserId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error updating last login:', error);
     return JSON.stringify({ success: false, error: error.message });
   }
 }

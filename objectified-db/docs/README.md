@@ -13,6 +13,9 @@ Migration scripts are located in the `scripts/` directory and should be run in o
 - `20251101-154100.sql` - Classes and class_properties tables
 - `20251108-220159.sql` - API keys and version visibility
 - `20251112-182735.sql` - **Nested properties support** (adds parent_id to class_properties)
+- `20251114-191956.sql` - NULL property_id support for references
+- `20251120-010147.sql` - Signup table
+- `20251121-external-auth-providers.sql` - **External authentication providers** (SSO account linking)
 
 ## Running Migrations
 
@@ -67,6 +70,34 @@ Added support for hierarchical property structures by introducing a `parent_id` 
 - [Implementation Summary](IMPLEMENTATION_SUMMARY_NESTED_PROPERTIES.md)
 - [Usage Examples](NESTED_PROPERTIES_EXAMPLE.md)
 
+### External Authentication Providers / Linked Accounts (2025-11-21)
+
+Added support for linking external OAuth provider accounts (GitHub, GitLab, AWS, GCP, etc.) to Objectified user accounts. This enables SSO authentication while keeping the master account data in `odb.users`.
+
+**Key Features:**
+- Link multiple OAuth providers to a single Objectified account
+- Auto-link on first OAuth login (if email matches)
+- Manual account linking from Dashboard → Linked Accounts
+- Unlink accounts at any time
+- All database operations are server-side only (no public REST endpoints)
+- Secure with unique constraints and foreign key cascades
+- User data always sourced from `odb.users` (never overridden by OAuth data)
+
+**Migration:**
+```bash
+psql -U your_user -d your_database -f scripts/20251121-external-auth-providers.sql
+```
+
+**Documentation:**
+- [🚀 Quick Start Guide](LINKED_ACCOUNTS_QUICKSTART.md) - Get started quickly
+- [📋 Implementation Summary](LINKED_ACCOUNTS_IMPLEMENTATION.md) - Complete implementation details
+- [🏗️ System Architecture](LINKED_ACCOUNTS_ARCHITECTURE.md) - Architecture diagrams and data flow
+- [📖 Full Feature Docs](EXTERNAL_AUTH_PROVIDERS.md) - Comprehensive documentation
+- [📝 Quick Reference](EXTERNAL_AUTH_PROVIDERS_SUMMARY.md) - Quick reference guide
+
+**UI Location:**
+Dashboard → Account → Linked Accounts
+
 ## Database Connection
 
 The database connection settings are configured in:
@@ -79,12 +110,14 @@ The database uses PostgreSQL with the `odb` schema. Key tables:
 
 - **tenants**: Multi-tenant organizations
 - **users**: Application users
+- **external_auth_providers**: OAuth provider accounts linked to users (SSO)
 - **projects**: API/schema projects
 - **versions**: Project versions
 - **classes**: Data object definitions
 - **properties**: Reusable property definitions
 - **class_properties**: Junction table linking classes to properties (supports nesting via parent_id)
 - **api_keys**: External API access keys
+- **signup**: User signup requests
 
 ## Backup and Restore
 

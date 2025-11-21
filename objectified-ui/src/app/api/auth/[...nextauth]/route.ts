@@ -6,6 +6,8 @@ import {
   credentialsAuthorize,
   credentialsSignIn,
   credentialsGithub,
+  linkGithubAccount,
+  checkLinkingIntent,
   ICredentials,
 } from '../../../../../lib/auth/credentials';
 
@@ -50,6 +52,28 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (loginProvider === 'github') {
+        // Check if this is an account linking flow
+        const linkIntent = await checkLinkingIntent();
+
+        if (linkIntent && linkIntent.provider === 'github') {
+          console.log('[signIn] Handling GitHub account linking for user:', linkIntent.userId);
+
+          // Link the GitHub account to the current user
+          const account = payload.account;
+          const profile = payload.profile || user;
+
+          const linked = await linkGithubAccount(linkIntent.userId, account, profile);
+
+          if (linked) {
+            console.log('[signIn] Successfully linked GitHub account');
+            return '/ade/dashboard/linked-accounts?linked=true';
+          } else {
+            console.log('[signIn] Failed to link GitHub account');
+            return '/ade/dashboard/linked-accounts?error=Failed to link account. It may already be linked to another user.';
+          }
+        }
+
+        // Normal login flow
         return credentialsGithub(payload);
       }
 
@@ -112,6 +136,7 @@ export const authOptions: NextAuthOptions = {
 
       if (payload.user) {
         token.user_id = payload.user.id;
+        console.log('[JWT] Setting user_id from payload.user.id:', payload.user.id, 'email:', payload.user.email);
       }
 
       return token;
