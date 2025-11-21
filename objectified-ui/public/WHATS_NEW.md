@@ -18,6 +18,7 @@ designing, and managing your OpenAPI designs through an interactive UML interfac
   - Publish your APIs directly to the Objectified Hub for public or private access
   - Test your APIs with Swagger UI Integration
 - Tenancy Support
+- Account Linking Support for SSO Login
 - Full project and versioning support
   - Includes imports of existing OpenAPI documents
   - Create multiple versions of your API designs with copies
@@ -36,5 +37,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: November 16, 2025*
+*Last updated: November 21, 2025*
 
