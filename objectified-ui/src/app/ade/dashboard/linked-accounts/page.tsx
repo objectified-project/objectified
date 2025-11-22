@@ -2,7 +2,8 @@
 
 import { useSession, signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Link as LinkIcon, Github, GitBranch, Cloud, Check } from 'lucide-react';
+import { Plus, Trash2, Link as LinkIcon, Check } from 'lucide-react';
+import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 import Card from '@mui/material/Card';
@@ -10,7 +11,7 @@ import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import { useDialog } from '../../../components/providers/DialogProvider';
+import { useDialog } from '@/app/components/providers/DialogProvider';
 import { getLinkedAccountsForUser, unlinkExternalAccount } from '../../../../../lib/db/helper';
 
 interface LinkedAccount {
@@ -26,7 +27,7 @@ interface LinkedAccount {
 interface ProviderConfig {
   name: string;
   displayName: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<any>;
   color: string;
   available: boolean;
 }
@@ -35,28 +36,28 @@ const providerConfigs: Record<string, ProviderConfig> = {
   github: {
     name: 'github',
     displayName: 'GitHub',
-    icon: Github,
+    icon: SiGithub,
     color: '#24292e',
     available: true,
   },
   gitlab: {
     name: 'gitlab',
     displayName: 'GitLab',
-    icon: GitBranch,
+    icon: SiGitlab,
     color: '#fc6d26',
     available: false,
   },
   google: {
     name: 'google',
     displayName: 'Google / GCP',
-    icon: Cloud,
+    icon: SiGoogle,
     color: '#4285f4',
     available: false,
   },
   aws: {
     name: 'aws',
     displayName: 'AWS',
-    icon: Cloud,
+    icon: SiAmazon,
     color: '#ff9900',
     available: false,
   },
@@ -265,7 +266,7 @@ const LinkedAccounts = () => {
                             bgcolor: 'action.hover',
                           }}
                         >
-                          <Icon size={24} />
+                          <Icon size={24} color={providerConfigs[account.provider]?.color || 'inherit'} />
                         </Box>
                         <Box>
                           <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -341,7 +342,7 @@ const LinkedAccounts = () => {
                           bgcolor: 'action.hover',
                         }}
                       >
-                        <Icon size={20} />
+                        <Icon size={20} color={provider.color} />
                       </Box>
                       <Box>
                         <Typography variant="body1" sx={{ fontWeight: 600 }}>
