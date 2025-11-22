@@ -51,12 +51,108 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   // Get the class schema from the generated OpenAPI doc
   const classSchema = openApiDoc.components.schemas[editingClassData.name];
 
+  // Helper function to resolve $ref references in a schema
+  const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set(), path: string = ''): any => {
+    if (!schema || typeof schema !== 'object') return schema;
+
+    // Handle $ref
+    if (schema.$ref && typeof schema.$ref === 'string') {
+      const refPath = schema.$ref.split('/');
+      const refName = refPath[refPath.length - 1];
+
+      // Prevent circular references
+      if (visited.has(refName)) {
+        return { type: 'object', description: `Circular reference to ${refName}` };
+      }
+
+      const referencedSchema = schemas[refName];
+      if (referencedSchema) {
+        const newVisited = new Set(visited);
+        newVisited.add(refName);
+        return resolveRefs(referencedSchema, schemas, newVisited, `${path}/${refName}`);
+      }
+      return schema; // Can't resolve, return as-is
+    }
+
+    // Handle allOf by merging schemas
+    if (Array.isArray(schema.allOf)) {
+      const merged: any = {};
+      const requiredSet = new Set<string>();
+
+      schema.allOf.forEach((subSchema: any, index: number) => {
+        const resolved = resolveRefs(subSchema, schemas, visited, `${path}/allOf[${index}]`);
+
+        // Extract required before merging to handle it separately
+        const { required: resolvedRequired, properties: resolvedProperties, ...resolvedRest } = resolved;
+
+        // Merge non-properties/required fields
+        Object.assign(merged, resolvedRest);
+
+        // Merge properties
+        if (resolvedProperties) {
+          merged.properties = { ...merged.properties, ...resolvedProperties };
+        }
+
+        // Merge required arrays (use Set to avoid duplicates)
+        if (resolvedRequired) {
+          resolvedRequired.forEach((field: string) => requiredSet.add(field));
+        }
+      });
+
+      // Convert Set back to array if there are required fields
+      if (requiredSet.size > 0) {
+        merged.required = Array.from(requiredSet);
+      }
+
+      // Keep other properties from the original schema
+      const { allOf, ...rest } = schema;
+      return { ...merged, ...rest };
+    }
+
+    // Handle anyOf and oneOf
+    if (Array.isArray(schema.anyOf)) {
+      return {
+        ...schema,
+        anyOf: schema.anyOf.map((s: any, index: number) =>
+          resolveRefs(s, schemas, visited, `${path}/anyOf[${index}]`)
+        )
+      };
+    }
+
+    if (Array.isArray(schema.oneOf)) {
+      return {
+        ...schema,
+        oneOf: schema.oneOf.map((s: any, index: number) =>
+          resolveRefs(s, schemas, visited, `${path}/oneOf[${index}]`)
+        )
+      };
+    }
+
+    // Recursively resolve nested objects and arrays
+    const resolved: any = Array.isArray(schema) ? [] : {};
+    for (const key in schema) {
+      if (schema.hasOwnProperty(key)) {
+        // Don't recursively resolve primitive values or strings that aren't schemas
+        const value = schema[key];
+        if (value && typeof value === 'object') {
+          resolved[key] = resolveRefs(value, schemas, visited, `${path}/${key}`);
+        } else {
+          resolved[key] = value;
+        }
+      }
+    }
+    return resolved;
+  };
+
   // Generate schema content - regenerate when exampleRefreshKey changes
   let schemaContent: string;
   let editorLanguage: string;
 
   if (classEditFormat === 'example') {
     try {
+      // Resolve all $ref references for json-schema-faker
+      const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+
       // Use exampleRefreshKey in random seed to force regeneration
       jsf.option({
         random: () => {
@@ -66,7 +162,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         }
       });
 
-      const fakeData = jsf.generate(classSchema);
+      const fakeData = jsf.generate(resolvedSchema);
       schemaContent = JSON.stringify(fakeData, null, 2);
       editorLanguage = 'json';
     } catch (error) {
@@ -89,7 +185,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     if (classEditFormat === 'example') {
       const classSchema = openApiDoc.components.schemas[editingClassData.name];
       try {
-        const fakeData = jsf.generate(classSchema);
+        const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+        const fakeData = jsf.generate(resolvedSchema);
         content = JSON.stringify(fakeData, null, 2);
       } catch (error) {
         console.error('Error generating fake data:', error);
@@ -115,7 +212,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     if (classEditFormat === 'example') {
       const classSchema = openApiDoc.components.schemas[editingClassData.name];
       try {
-        const fakeData = jsf.generate(classSchema);
+        const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+        const fakeData = jsf.generate(resolvedSchema);
         content = JSON.stringify(fakeData, null, 2);
       } catch (error) {
         console.error('Error generating fake data:', error);
