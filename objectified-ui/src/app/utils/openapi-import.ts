@@ -21,6 +21,7 @@ export interface ParsedClass {
   selected: boolean;
   warnings: string[];
   isSupported: boolean;
+  schema?: any; // Original schema structure (may include allOf/anyOf/oneOf)
 }
 
 export interface OpenAPIParseResult {
@@ -71,6 +72,126 @@ function findUnresolvedReferences(schema: any, allSchemaNames: Set<string>): str
   }
 
   return unresolved;
+}
+
+/**
+ * Resolves a $ref reference to the actual schema object
+ */
+function resolveReference(ref: string, schemas: any): any {
+  const match = ref.match(/#\/components\/schemas\/(.+)/);
+  if (match && schemas[match[1]]) {
+    return schemas[match[1]];
+  }
+  return null;
+}
+
+/**
+ * Resolves allOf compositions by merging all schemas together
+ */
+function resolveAllOf(schema: any, schemas: any): any {
+  if (!schema.allOf || !Array.isArray(schema.allOf)) {
+    return schema;
+  }
+
+  const merged: any = {
+    type: 'object',
+    properties: {},
+    required: []
+  };
+
+  // Preserve description from the parent schema if present
+  if (schema.description) {
+    merged.description = schema.description;
+  }
+
+  // Merge each schema in allOf
+  for (const item of schema.allOf) {
+    let itemSchema: any;
+
+    // Resolve $ref if present
+    if (item.$ref) {
+      itemSchema = resolveReference(item.$ref, schemas);
+      if (!itemSchema) {
+        continue; // Skip unresolved references
+      }
+      // Recursively resolve allOf in referenced schema
+      itemSchema = resolveAllOf(itemSchema, schemas);
+    } else {
+      itemSchema = item;
+    }
+
+    // Merge properties
+    if (itemSchema.properties) {
+      merged.properties = { ...merged.properties, ...itemSchema.properties };
+    }
+
+    // Merge required arrays
+    if (itemSchema.required && Array.isArray(itemSchema.required)) {
+      merged.required = [...merged.required, ...itemSchema.required];
+    }
+
+    // Merge type (prefer object if any schema specifies it)
+    if (itemSchema.type) {
+      merged.type = itemSchema.type;
+    }
+
+    // Use description from first schema that has one
+    if (!merged.description && itemSchema.description) {
+      merged.description = itemSchema.description;
+    }
+  }
+
+  // Remove empty required array
+  if (merged.required.length === 0) {
+    delete merged.required;
+  }
+
+  return merged;
+}
+
+/**
+ * Extracts only the properties directly defined in this schema (not from $ref)
+ * For allOf schemas, returns only properties from inline object definitions
+ */
+function extractDirectProperties(schema: any): { properties: any; required: string[] } {
+  const result = {
+    properties: {},
+    required: [] as string[]
+  };
+
+  // If schema has allOf, extract properties from inline objects only (not from $refs)
+  if (schema.allOf && Array.isArray(schema.allOf)) {
+    for (const item of schema.allOf) {
+      // Skip $ref items - those are inherited
+      if (item.$ref) {
+        continue;
+      }
+
+      // Merge properties from inline definitions
+      if (item.properties) {
+        result.properties = { ...result.properties, ...item.properties };
+      }
+
+      // Merge required arrays
+      if (item.required && Array.isArray(item.required)) {
+        result.required = [...result.required, ...item.required];
+      }
+    }
+    return result;
+  }
+
+  // For anyOf/oneOf, we can't really determine which properties are "direct"
+  // so we'll include all properties if it's a simple schema
+  if (schema.anyOf || schema.oneOf) {
+    // Don't extract properties from composition schemas
+    return result;
+  }
+
+  // Normal schema - return its properties
+  return {
+    properties: schema.properties || {},
+    required: schema.required || []
+  };
 }
 
 /**
@@ -179,13 +300,15 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
 
     // Convert each schema to a class
     for (const schemaName in schemas) {
-      const schema = schemas[schemaName];
+      const originalSchema = schemas[schemaName];
       const warnings: string[] = [];
       let isSupported = true;
 
+      // Resolve allOf compositions for validation and reference checking
+      const resolvedSchema = resolveAllOf(originalSchema, schemas);
 
       // Check for unresolved $ref references
-      const unresolvedRefs = findUnresolvedReferences(schema, allSchemaNames);
+      const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
       if (unresolvedRefs.length > 0) {
         warnings.push(
           `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
@@ -194,24 +317,26 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
         isSupported = false;
       }
 
-      const properties: ParsedProperty[] = [];
-      const required = schema.required || [];
+      // Extract ONLY direct properties (not inherited via $ref in allOf)
+      // This prevents storing duplicate properties that come from parent schemas
+      const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
 
-      // Extract properties (even for unsupported classes, for display purposes)
-      if (schema.properties) {
-        for (const propName in schema.properties) {
-          const propSchema = schema.properties[propName];
-          properties.push(convertSchemaProperty(propName, propSchema, required));
-        }
+      const properties: ParsedProperty[] = [];
+
+      // Convert only the direct properties for storage
+      for (const propName in directProperties) {
+        const propSchema = directProperties[propName];
+        properties.push(convertSchemaProperty(propName, propSchema, directRequired));
       }
 
       classes.push({
         name: schemaName,
-        description: schema.description,
+        description: originalSchema.description || resolvedSchema.description,
         properties,
         selected: isSupported, // Only select supported classes by default
         warnings,
-        isSupported
+        isSupported,
+        schema: originalSchema // Preserve original schema with compositions
       });
 
       // Add to global warnings if unsupported

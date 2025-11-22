@@ -1,0 +1,45 @@
+openapi: 3.0.0
+info:
+  title: Vehicle API
+  version: 1.0.0
+components:
+  schemas:
+    Vehicle:
+      type: object
+      required:
+        - id
+        - brand
+        - model
+      properties:
+        id:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        year:
+          type: integer
+
+    Car:
+      allOf:
+        - $ref: '#/components/schemas/Vehicle'
+        - type: object
+          required:
+            - numDoors
+          properties:
+            numDoors:
+              type: integer
+            hasSunroof:
+              type: boolean
+
+    Truck:
+      allOf:
+        - $ref: '#/components/schemas/Vehicle'
+        - type: object
+          required:
+            - bedLength
+          properties:
+            bedLength:
+              type: number
+            towingCapacity:
+              type: number

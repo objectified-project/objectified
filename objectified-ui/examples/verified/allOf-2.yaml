@@ -1,0 +1,75 @@
+openapi: 3.0.0
+info:
+  title: Payment API
+  version: 1.0.0
+components:
+  schemas:
+    Payment:
+      type: object
+      required:
+        - amount
+        - currency
+        - timestamp
+      properties:
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          enum: [USD, EUR, GBP]
+        timestamp:
+          type: string
+          format: date-time
+      discriminator:
+        propertyName: paymentType
+
+    CreditCardPayment:
+      allOf:
+        - $ref: '#/components/schemas/Payment'
+        - type: object
+          required:
+            - cardNumber
+            - cvv
+          properties:
+            paymentType:
+              type: string
+              enum: [credit_card]
+            cardNumber:
+              type: string
+            cvv:
+              type: string
+            expiryDate:
+              type: string
+
+    BankTransferPayment:
+      allOf:
+        - $ref: '#/components/schemas/Payment'
+        - type: object
+          required:
+            - accountNumber
+            - routingNumber
+          properties:
+            paymentType:
+              type: string
+              enum: [bank_transfer]
+            accountNumber:
+              type: string
+            routingNumber:
+              type: string
+
+    CryptoPayment:
+      allOf:
+        - $ref: '#/components/schemas/Payment'
+        - type: object
+          required:
+            - walletAddress
+            - cryptocurrency
+          properties:
+            paymentType:
+              type: string
+              enum: [crypto]
+            walletAddress:
+              type: string
+            cryptocurrency:
+              type: string
+              enum: [BTC, ETH, USDT]

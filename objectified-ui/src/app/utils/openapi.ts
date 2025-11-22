@@ -168,13 +168,28 @@ export function buildClassSchema(classData: any): any {
     });
   }
 
-  const classSchema: any = {
-    type: 'object',
-    description: classData.description || undefined,
-    ...schemaWithoutProperties,
-    properties,
-    required: required.length > 0 ? required : undefined
-  };
+  // Check if schema has composition keywords (allOf/anyOf/oneOf)
+  const hasComposition = schemaWithoutProperties.allOf || schemaWithoutProperties.anyOf || schemaWithoutProperties.oneOf;
+
+  let classSchema: any;
+
+  if (hasComposition) {
+    // Preserve composition structure - don't add type, properties, or required at root
+    // These belong inside the composition items, not at the root level
+    classSchema = {
+      description: classData.description || undefined,
+      ...schemaWithoutProperties
+    };
+  } else {
+    // Normal schema without compositions - build as usual
+    classSchema = {
+      type: 'object',
+      description: classData.description || undefined,
+      ...schemaWithoutProperties,
+      properties,
+      required: required.length > 0 ? required : undefined
+    };
+  }
 
   // Delete class properties if properties is empty
   if (classSchema.properties && Object.keys(classSchema.properties).length === 0) {

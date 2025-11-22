@@ -1398,11 +1398,13 @@ export async function importProjectFromOpenAPI(
     };
 
     for (const cls of classes) {
+      // Use the schema from the class if available, otherwise default to { type: 'object' }
+      const schema = cls.schema || { type: 'object' };
       const classRes = await client.query(
         `INSERT INTO odb.classes (version_id, name, description, schema)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
-        [version.id, cls.name.trim(), cls.description?.trim() || null, JSON.stringify({ type: 'object' })]
+        [version.id, cls.name.trim(), cls.description?.trim() || null, JSON.stringify(schema)]
       );
       await linkProperties(classRes.rows[0].id, cls.properties || [], null);
     }

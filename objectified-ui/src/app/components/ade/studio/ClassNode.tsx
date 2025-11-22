@@ -101,6 +101,30 @@ function ClassNode({ data, selected }: NodeProps) {
 
   const getPropertyType = (prop: ClassProperty): string => {
     const d = parseData(prop);
+
+    // Handle allOf/anyOf/oneOf compositions
+    if (d?.allOf && Array.isArray(d.allOf)) {
+      const types = d.allOf.map((item: any) => {
+        if (item.$ref) return item.$ref.split('/').pop();
+        return item.type || 'schema';
+      }).filter(Boolean);
+      return types.length > 0 ? `allOf(${types.join(', ')})` : 'allOf';
+    }
+    if (d?.anyOf && Array.isArray(d.anyOf)) {
+      const types = d.anyOf.map((item: any) => {
+        if (item.$ref) return item.$ref.split('/').pop();
+        return item.type || 'schema';
+      }).filter(Boolean);
+      return types.length > 0 ? `anyOf(${types.join(' | ')})` : 'anyOf';
+    }
+    if (d?.oneOf && Array.isArray(d.oneOf)) {
+      const types = d.oneOf.map((item: any) => {
+        if (item.$ref) return item.$ref.split('/').pop();
+        return item.type || 'schema';
+      }).filter(Boolean);
+      return types.length > 0 ? `oneOf(${types.join(' | ')})` : 'oneOf';
+    }
+
     if (d?.type === 'array') {
       if (d.items?.$ref) {
         const refName = d.items.$ref.split('/').pop();
