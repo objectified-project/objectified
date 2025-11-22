@@ -280,21 +280,55 @@ export function generateClassOpenApiSpec(
     [classData.name]: buildClassSchema(classData)
   };
 
-  referencedClasses.forEach(className => {
-    if (className !== classData.name) {
-      const referencedClassData = allClasses.find((cls: any) => cls.name === className);
-      if (referencedClassData) {
-        schemas[className] = buildClassSchema(referencedClassData);
-      } else {
-        // Create placeholder for missing references
-        schemas[className] = {
-          type: 'object',
-          description: `Referenced schema: ${className} (not loaded)`,
-          properties: {}
-        };
-      }
+  // Recursively resolve all transitive references
+  const processedClasses = new Set<string>([classData.name]);
+  const classesToProcess = Array.from(referencedClasses);
+
+  while (classesToProcess.length > 0) {
+    const className = classesToProcess.shift()!;
+
+    if (processedClasses.has(className)) {
+      continue; // Skip already processed classes
     }
-  });
+
+    processedClasses.add(className);
+
+    const referencedClassData = allClasses.find((cls: any) => cls.name === className);
+
+    if (referencedClassData) {
+      schemas[className] = buildClassSchema(referencedClassData);
+
+      // Find references within this referenced class (transitive references)
+      const transitiveRefs = new Set<string>();
+      const refSchema = typeof referencedClassData.schema === 'string'
+        ? JSON.parse(referencedClassData.schema)
+        : (referencedClassData.schema || {});
+
+      findReferencedClasses(refSchema, transitiveRefs);
+
+      // Also check properties for references
+      if (referencedClassData.properties && referencedClassData.properties.length > 0) {
+        referencedClassData.properties.forEach((prop: any) => {
+          const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+          findReferencedClasses(propData, transitiveRefs);
+        });
+      }
+
+      // Add new references to the queue
+      transitiveRefs.forEach(refClassName => {
+        if (!processedClasses.has(refClassName) && !classesToProcess.includes(refClassName)) {
+          classesToProcess.push(refClassName);
+        }
+      });
+    } else {
+      // Create placeholder for missing references
+      schemas[className] = {
+        type: 'object',
+        description: `Referenced schema: ${className} (not loaded)`,
+        properties: {}
+      };
+    }
+  }
 
   return {
     openapi: '3.1.0',
