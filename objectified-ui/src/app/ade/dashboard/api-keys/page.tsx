@@ -39,9 +39,7 @@ const ApiKeys = () => {
   const { confirm: confirmDialog } = useDialog();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
   const [newApiKeyName, setNewApiKeyName] = useState('');
   const [newApiKeyDescription, setNewApiKeyDescription] = useState('');
   const [newApiKeyExpiry, setNewApiKeyExpiry] = useState('');
@@ -108,32 +106,28 @@ const ApiKeys = () => {
     }
   };
 
-  const handleDeleteClick = (apiKey: ApiKey) => {
-    setSelectedApiKey(apiKey);
-    setErrorMessage('');
-    setShowDeleteModal(true);
-  };
+  const handleDeleteClick = async (apiKey: ApiKey) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete API Key',
+      message: `Are you sure you want to delete the API key "${apiKey.name}"? This action cannot be undone and will immediately revoke access for any applications using this key.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
 
-  const handleDeleteConfirm = async () => {
-    if (!selectedApiKey) return;
-
-    setIsLoading(true);
-    setErrorMessage('');
+    if (!confirmed) return;
 
     try {
-      const result = await deleteApiKey(selectedApiKey.id);
+      const result = await deleteApiKey(apiKey.id);
       const response = JSON.parse(result);
 
       if (response.success) {
-        setShowDeleteModal(false);
         await loadApiKeys();
       } else {
-        setErrorMessage(response.error || 'Failed to delete API key');
+        console.error('Failed to delete API key:', response.error);
       }
     } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to delete API key');
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to delete API key:', error.message);
     }
   };
 
@@ -436,29 +430,6 @@ const ApiKeys = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Modal */}
-      <Dialog open={showDeleteModal} onClose={() => setShowDeleteModal(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete API Key</DialogTitle>
-        <DialogContent>
-          {errorMessage && (
-            <Alert severity="error" className="mb-4">
-              {errorMessage}
-            </Alert>
-          )}
-
-          <Alert severity="warning" className="mb-4">
-            Are you sure you want to delete the API key "{selectedApiKey?.name}"? This action cannot be undone and will immediately revoke access for any applications using this key.
-          </Alert>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowDeleteModal(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleDeleteConfirm} variant="contained" color="error" disabled={isLoading}>
-            {isLoading ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 };
