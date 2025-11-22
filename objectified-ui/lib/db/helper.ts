@@ -1847,3 +1847,25 @@ export async function updateLinkedAccountLastLogin(provider: string, providerUse
   }
 }
 
+export async function getLinkedAccountById(accountId: string, userId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, user_id, provider, provider_user_id, provider_email, provider_username,
+              access_token, refresh_token, token_expires_at, profile_data,
+              created_at, last_login_at
+       FROM odb.external_auth_providers
+       WHERE id = $1 AND user_id = $2`,
+      [accountId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ found: false, error: 'Account not found or does not belong to user' });
+    }
+
+    return JSON.stringify({ found: true, account: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching linked account by ID:', error);
+    return JSON.stringify({ found: false, error: error.message });
+  }
+}
+

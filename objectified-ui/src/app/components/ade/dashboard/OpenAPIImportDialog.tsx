@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -13,9 +13,13 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import { Upload, FileJson, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { parseOpenAPISpec, validateImportedClasses, ParsedClass } from '../../../utils/openapi-import';
-import { importProjectFromOpenAPI } from '../../../../../lib/db/helper';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import CircularProgress from '@mui/material/CircularProgress';
+import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ChevronRight, ArrowLeft } from 'lucide-react';
+import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
+import { parseOpenAPISpec, ParsedClass } from '../../../utils/openapi-import';
+import { importProjectFromOpenAPI, getLinkedAccountsForUser } from '../../../../../lib/db/helper';
 import { filterSlugInput, generateSlug } from '../../../utils/slug';
 
 interface OpenAPIImportDialogProps {
@@ -34,7 +38,10 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   userId
 }) => {
   const [step, setStep] = useState<'upload' | 'review' | 'summary' | 'details'>('upload');
+  const [importMethod, setImportMethod] = useState<'file' | 'url' | 'sso'>('file');
   const [file, setFile] = useState<File | null>(null);
+  const [urlInput, setUrlInput] = useState('');
+  const [linkedAccounts, setLinkedAccounts] = useState<any[]>([]);
   const [classes, setClasses] = useState<ParsedClass[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [projectName, setProjectName] = useState('');
@@ -47,10 +54,37 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [openAPIInfo, setOpenAPIInfo] = useState<any>(null);
 
+  // SSO Repository Browser state
+  const [ssoStep, setSsoStep] = useState<'accounts' | 'repos' | 'files'>('accounts');
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
+  const [repositories, setRepositories] = useState<any[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<any>(null);
+  const [repoFiles, setRepoFiles] = useState<any[]>([]);
+  const [currentPath, setCurrentPath] = useState<string>('');
+
+
+  // Load linked accounts when dialog opens
+  useEffect(() => {
+    if (open && userId) {
+      loadLinkedAccounts();
+    }
+  }, [open, userId]);
+
+  const loadLinkedAccounts = async () => {
+    try {
+      const result = await getLinkedAccountsForUser(userId);
+      setLinkedAccounts(JSON.parse(result));
+    } catch (error) {
+      console.error('Failed to load linked accounts:', error);
+      setLinkedAccounts([]);
+    }
+  };
 
   const resetDialog = () => {
     setStep('upload');
+    setImportMethod('file');
     setFile(null);
+    setUrlInput('');
     setClasses([]);
     setWarnings([]);
     setProjectName('');
@@ -62,6 +96,12 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     setIsLoading(false);
     setIsDragging(false);
     setOpenAPIInfo(null);
+    setSsoStep('accounts');
+    setSelectedAccount(null);
+    setRepositories([]);
+    setSelectedRepo(null);
+    setRepoFiles([]);
+    setCurrentPath('');
   };
 
   const calculateImportStats = () => {
@@ -92,18 +132,10 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     };
   };
 
-  const handleFileSelect = async (selectedFile: File) => {
-    if (!selectedFile.name.endsWith('.json') && !selectedFile.name.endsWith('.yaml') && !selectedFile.name.endsWith('.yml')) {
-      setErrorMessage('Please select a JSON or YAML file');
-      return;
-    }
-
-    setFile(selectedFile);
+  const processOpenAPIContent = async (content: string, source: string = 'file') => {
     setErrorMessage('');
 
     try {
-      const content = await selectedFile.text();
-
       // Parse the OpenAPI spec
       const parseResult = parseOpenAPISpec(content);
 
@@ -117,7 +149,8 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
       setOpenAPIInfo({
         title: parseResult.title,
         version: parseResult.version,
-        description: parseResult.description
+        description: parseResult.description,
+        source
       });
 
       // Auto-fill project details from OpenAPI info
@@ -134,7 +167,195 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
       setStep('review');
     } catch (error: any) {
+      setErrorMessage(`Error processing OpenAPI spec: ${error.message}`);
+    }
+  };
+
+  const handleFileSelect = async (selectedFile: File) => {
+    if (!selectedFile.name.endsWith('.json') && !selectedFile.name.endsWith('.yaml') && !selectedFile.name.endsWith('.yml')) {
+      setErrorMessage('Please select a JSON or YAML file');
+      return;
+    }
+
+    setFile(selectedFile);
+    setIsLoading(true);
+
+    try {
+      const content = await selectedFile.text();
+      await processOpenAPIContent(content, `File: ${selectedFile.name}`);
+    } catch (error: any) {
       setErrorMessage(`Error reading file: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUrlImport = async () => {
+    if (!urlInput.trim()) {
+      setErrorMessage('Please enter a URL');
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(urlInput);
+    } catch {
+      setErrorMessage('Please enter a valid URL');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const response = await fetch(urlInput);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const content = await response.text();
+      await processOpenAPIContent(content, `URL: ${urlInput}`);
+    } catch (error: any) {
+      setErrorMessage(`Failed to fetch from URL: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectAccount = async (account: any) => {
+    setSelectedAccount(account);
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      // Fetch repositories for the selected account
+      const response = await fetch(`/api/sso/${account.provider}/repos?accountId=${account.id}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch repositories: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setRepositories(data.repositories || []);
+      setSsoStep('repos');
+    } catch (error: any) {
+      setErrorMessage(`Failed to load repositories: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectRepo = async (repo: any) => {
+    setSelectedRepo(repo);
+    setIsLoading(true);
+    setErrorMessage('');
+    setCurrentPath('');
+
+    try {
+      // Fetch files from the repository root
+      const response = await fetch(
+        `/api/sso/${selectedAccount.provider}/files?accountId=${selectedAccount.id}&repo=${repo.full_name}&path=`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch files: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setRepoFiles(data.files || []);
+      setSsoStep('files');
+    } catch (error: any) {
+      setErrorMessage(`Failed to load files: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNavigateToPath = async (path: string) => {
+    setIsLoading(true);
+    setErrorMessage('');
+    setCurrentPath(path);
+
+    try {
+      const response = await fetch(
+        `/api/sso/${selectedAccount.provider}/files?accountId=${selectedAccount.id}&repo=${selectedRepo.full_name}&path=${path}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch files: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setRepoFiles(data.files || []);
+    } catch (error: any) {
+      setErrorMessage(`Failed to load files: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectFile = async (file: any) => {
+    if (file.type === 'dir') {
+      // Navigate into directory
+      handleNavigateToPath(file.path);
+      return;
+    }
+
+    // Check if it's an OpenAPI file
+    const isOpenAPIFile =
+      file.name.includes('openapi') ||
+      file.name.includes('swagger') ||
+      file.name.endsWith('.json') ||
+      file.name.endsWith('.yaml') ||
+      file.name.endsWith('.yml');
+
+    if (!isOpenAPIFile) {
+      setErrorMessage('Please select an OpenAPI specification file (JSON or YAML)');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      // Fetch file content
+      const response = await fetch(
+        `/api/sso/${selectedAccount.provider}/content?accountId=${selectedAccount.id}&repo=${selectedRepo.full_name}&path=${file.path}&branch=${selectedRepo.default_branch}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file content: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      await processOpenAPIContent(
+        data.content,
+        `${selectedAccount.provider}:${selectedRepo.full_name}/${file.path}`
+      );
+    } catch (error: any) {
+      setErrorMessage(`Failed to load file: ${error.message}`);
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackInSSO = () => {
+    if (ssoStep === 'files') {
+      if (currentPath) {
+        // Go back to parent directory
+        const parentPath = currentPath.split('/').slice(0, -1).join('/');
+        handleNavigateToPath(parentPath);
+      } else {
+        // Go back to repos
+        setSsoStep('repos');
+        setRepoFiles([]);
+        setSelectedRepo(null);
+        setCurrentPath('');
+      }
+    } else if (ssoStep === 'repos') {
+      setSsoStep('accounts');
+      setRepositories([]);
+      setSelectedAccount(null);
     }
   };
 
@@ -179,24 +400,6 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
     updatedClasses[index].selected = !updatedClasses[index].selected;
     setClasses(updatedClasses);
-  };
-
-  const handleReviewNext = () => {
-    const selectedClasses = classes.filter(c => c.selected);
-
-    if (selectedClasses.length === 0) {
-      setErrorMessage('Please select at least one class to import');
-      return;
-    }
-
-    const validation = validateImportedClasses(selectedClasses);
-    if (!validation.valid) {
-      setErrorMessage(validation.errors.join('; '));
-      return;
-    }
-
-    setErrorMessage('');
-    setStep('details');
   };
 
   const handleImport = async () => {
@@ -280,59 +483,362 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
         {step === 'upload' && (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Upload an OpenAPI 3.x specification file (JSON format) to automatically create a project with classes and properties.
+              Import an OpenAPI 3.x specification from a file, URL, or your connected SSO accounts.
             </Typography>
 
-            <Box
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              sx={{
-                border: '2px dashed',
-                borderColor: isDragging ? 'primary.main' : 'grey.300',
-                borderRadius: 2,
-                p: 4,
-                textAlign: 'center',
-                backgroundColor: isDragging ? 'action.hover' : 'background.paper',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  backgroundColor: 'action.hover'
-                }
+            {/* Import Method Tabs */}
+            <Tabs
+              value={importMethod}
+              onChange={(_, newValue) => {
+                setImportMethod(newValue);
+                setErrorMessage('');
               }}
-              onClick={() => document.getElementById('openapi-file-input')?.click()}
+              sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
             >
-              {file ? (
-                <Box>
-                  <FileJson size={48} style={{ margin: '0 auto 16px', color: '#22c55e' }} />
-                  <Typography variant="h6" gutterBottom>
-                    {file.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Click to select a different file
-                  </Typography>
-                </Box>
-              ) : (
-                <Box>
-                  <Upload size={48} style={{ margin: '0 auto 16px', color: '#94a3b8' }} />
-                  <Typography variant="h6" gutterBottom>
-                    Drag & Drop or Click to Select
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    OpenAPI 3.x JSON specification file
-                  </Typography>
-                </Box>
-              )}
-            </Box>
+              <Tab icon={<Upload size={20} />} iconPosition="start" label="File Upload" value="file" />
+              <Tab icon={<Link2 size={20} />} iconPosition="start" label="From URL" value="url" />
+              <Tab icon={<Globe size={20} />} iconPosition="start" label="From SSO" value="sso" disabled={linkedAccounts.length === 0} />
+            </Tabs>
 
-            <input
-              id="openapi-file-input"
-              type="file"
-              accept=".json,.yaml,.yml"
-              style={{ display: 'none' }}
-              onChange={handleFileInputChange}
-            />
+            {/* File Upload Tab */}
+            {importMethod === 'file' && (
+              <Box>
+                <Box
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: isDragging ? 'primary.main' : 'grey.300',
+                    borderRadius: 2,
+                    p: 4,
+                    textAlign: 'center',
+                    backgroundColor: isDragging ? 'action.hover' : 'background.paper',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      backgroundColor: 'action.hover'
+                    }
+                  }}
+                  onClick={() => document.getElementById('openapi-file-input')?.click()}
+                >
+                  {file ? (
+                    <Box>
+                      <FileJson size={48} style={{ margin: '0 auto 16px', color: '#22c55e' }} />
+                      <Typography variant="h6" gutterBottom>
+                        {file.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Click to select a different file
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Upload size={48} style={{ margin: '0 auto 16px', color: '#94a3b8' }} />
+                      <Typography variant="h6" gutterBottom>
+                        Drag & Drop or Click to Select
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        OpenAPI 3.x JSON or YAML specification file
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                <input
+                  id="openapi-file-input"
+                  type="file"
+                  accept=".json,.yaml,.yml"
+                  style={{ display: 'none' }}
+                  onChange={handleFileInputChange}
+                />
+              </Box>
+            )}
+
+            {/* URL Import Tab */}
+            {importMethod === 'url' && (
+              <Box>
+                <TextField
+                  fullWidth
+                  label="OpenAPI Specification URL"
+                  placeholder="https://example.com/api/openapi.json"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  disabled={isLoading}
+                  sx={{ mb: 2 }}
+                  helperText="Enter the URL of a publicly accessible OpenAPI specification file"
+                />
+
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Examples:</strong>
+                  </Typography>
+                  <Typography variant="caption" component="div" sx={{ mt: 1 }}>
+                    • GitHub Raw: https://raw.githubusercontent.com/user/repo/main/openapi.json<br />
+                    • GitLab Raw: https://gitlab.com/user/repo/-/raw/main/openapi.json<br />
+                    • Direct URL: https://api.example.com/openapi.json
+                  </Typography>
+                </Alert>
+
+                <Button
+                  fullWidth
+                  variant="contained"
+                  onClick={handleUrlImport}
+                  disabled={!urlInput.trim() || isLoading}
+                  startIcon={isLoading ? <CircularProgress size={20} /> : <Link2 size={20} />}
+                >
+                  {isLoading ? 'Fetching...' : 'Import from URL'}
+                </Button>
+              </Box>
+            )}
+
+            {/* SSO Import Tab */}
+            {importMethod === 'sso' && (
+              <Box>
+                {linkedAccounts.length === 0 ? (
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      No linked accounts found. Please link an account from the{' '}
+                      <a href="/ade/dashboard/linked-accounts" target="_blank" rel="noopener noreferrer">
+                        Linked Accounts
+                      </a>{' '}
+                      page to import from SSO sources.
+                    </Typography>
+                  </Alert>
+                ) : (
+                  <Box>
+                    {/* Step 1: Select Account */}
+                    {ssoStep === 'accounts' && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Select a linked account to browse your repositories.
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {linkedAccounts.map((account) => {
+                            const getProviderIcon = (provider: string) => {
+                              switch (provider.toLowerCase()) {
+                                case 'github':
+                                  return <SiGithub size={24} color="#24292e" />;
+                                case 'gitlab':
+                                  return <SiGitlab size={24} color="#fc6d26" />;
+                                case 'google':
+                                  return <SiGoogle size={24} color="#4285f4" />;
+                                case 'aws':
+                                  return <SiAmazon size={24} color="#ff9900" />;
+                                default:
+                                  return <Globe size={24} />;
+                              }
+                            };
+
+                            return (
+                              <Box
+                                key={account.id}
+                                onClick={() => !isLoading && handleSelectAccount(account)}
+                                sx={{
+                                  p: 2,
+                                  border: 1,
+                                  borderColor: 'grey.300',
+                                  borderRadius: 2,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  cursor: isLoading ? 'default' : 'pointer',
+                                  '&:hover': {
+                                    borderColor: isLoading ? 'grey.300' : 'primary.main',
+                                    bgcolor: isLoading ? 'background.paper' : 'action.hover'
+                                  }
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                  <Box
+                                    sx={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: 1,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      bgcolor: 'action.hover',
+                                    }}
+                                  >
+                                    {getProviderIcon(account.provider)}
+                                  </Box>
+                                  <Box>
+                                    <Typography variant="subtitle1" fontWeight="bold">
+                                      {account.provider.charAt(0).toUpperCase() + account.provider.slice(1)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {account.provider_username || account.provider_email}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                                <ChevronRight size={20} />
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Step 2: Select Repository */}
+                    {ssoStep === 'repos' && (
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                          <Button
+                            startIcon={<ArrowLeft size={16} />}
+                            onClick={handleBackInSSO}
+                            disabled={isLoading}
+                            size="small"
+                          >
+                            Back to Accounts
+                          </Button>
+                        </Box>
+
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Select a repository to browse for OpenAPI specifications.
+                        </Typography>
+
+                        {isLoading ? (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress />
+                          </Box>
+                        ) : repositories.length === 0 ? (
+                          <Alert severity="info">
+                            <Typography variant="body2">
+                              No repositories found for this account.
+                            </Typography>
+                          </Alert>
+                        ) : (
+                          <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
+                            {repositories.map((repo: any) => (
+                              <Box
+                                key={repo.id}
+                                onClick={() => !isLoading && handleSelectRepo(repo)}
+                                sx={{
+                                  p: 2,
+                                  mb: 1,
+                                  border: 1,
+                                  borderColor: 'grey.300',
+                                  borderRadius: 1,
+                                  cursor: isLoading ? 'default' : 'pointer',
+                                  '&:hover': {
+                                    borderColor: isLoading ? 'grey.300' : 'primary.main',
+                                    bgcolor: isLoading ? 'background.paper' : 'action.hover'
+                                  }
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <Box>
+                                    <Typography variant="subtitle2" fontWeight="bold">
+                                      {repo.name}
+                                    </Typography>
+                                    {repo.description && (
+                                      <Typography variant="caption" color="text.secondary">
+                                        {repo.description}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                  <ChevronRight size={20} />
+                                </Box>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+
+                    {/* Step 3: Browse Files */}
+                    {ssoStep === 'files' && (
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                          <Button
+                            startIcon={<ArrowLeft size={16} />}
+                            onClick={handleBackInSSO}
+                            disabled={isLoading}
+                            size="small"
+                          >
+                            Back
+                          </Button>
+                        </Box>
+
+                        <Box sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Repository
+                          </Typography>
+                          <Typography variant="body2" fontWeight="bold">
+                            {selectedRepo?.full_name}
+                          </Typography>
+                          {currentPath && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                              Path: /{currentPath}
+                            </Typography>
+                          )}
+                        </Box>
+
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          Select an OpenAPI specification file (JSON or YAML).
+                        </Typography>
+
+                        {isLoading ? (
+                          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <CircularProgress />
+                          </Box>
+                        ) : repoFiles.length === 0 ? (
+                          <Alert severity="info">
+                            <Typography variant="body2">
+                              No files found in this directory.
+                            </Typography>
+                          </Alert>
+                        ) : (
+                          <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
+                            {repoFiles.map((file: any, idx: number) => (
+                              <Box
+                                key={idx}
+                                onClick={() => !isLoading && handleSelectFile(file)}
+                                sx={{
+                                  p: 1.5,
+                                  mb: 1,
+                                  border: 1,
+                                  borderColor: 'grey.300',
+                                  borderRadius: 1,
+                                  cursor: isLoading ? 'default' : 'pointer',
+                                  '&:hover': {
+                                    borderColor: isLoading ? 'grey.300' : 'primary.main',
+                                    bgcolor: isLoading ? 'background.paper' : 'action.hover'
+                                  }
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  {file.type === 'dir' ? (
+                                    <FolderOpen size={20} color="#94a3b8" />
+                                  ) : (
+                                    <File size={20} color={
+                                      file.name.includes('openapi') ||
+                                      file.name.includes('swagger') ||
+                                      file.name.endsWith('.json') ||
+                                      file.name.endsWith('.yaml') ||
+                                      file.name.endsWith('.yml')
+                                        ? '#22c55e'
+                                        : '#94a3b8'
+                                    } />
+                                  )}
+                                  <Typography variant="body2">
+                                    {file.name}
+                                  </Typography>
+                                  {file.type === 'dir' && <ChevronRight size={16} style={{ marginLeft: 'auto' }} />}
+                                </Box>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
         )}
 
@@ -351,6 +857,14 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                     {openAPIInfo.description}
                   </Typography>
+                )}
+                {openAPIInfo.source && (
+                  <Chip
+                    label={openAPIInfo.source}
+                    size="small"
+                    sx={{ mt: 1 }}
+                    icon={openAPIInfo.source.startsWith('URL:') ? <Link2 size={14} /> : <FileJson size={14} />}
+                  />
                 )}
               </Box>
             )}
@@ -695,11 +1209,23 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
         {step === 'upload' && (
           <Button
-            onClick={() => file && setStep('review')}
+            onClick={() => {
+              if (importMethod === 'file' && file) {
+                setStep('review');
+              } else if (importMethod === 'url') {
+                handleUrlImport();
+              }
+              // SSO import is handled by the Browse Repositories button
+            }}
             variant="contained"
-            disabled={!file || isLoading}
+            disabled={
+              (importMethod === 'file' && !file) ||
+              (importMethod === 'url' && !urlInput.trim()) ||
+              (importMethod === 'sso') ||
+              isLoading
+            }
           >
-            Next
+            {isLoading ? 'Loading...' : importMethod === 'file' ? 'Next' : 'Import'}
           </Button>
         )}
 
