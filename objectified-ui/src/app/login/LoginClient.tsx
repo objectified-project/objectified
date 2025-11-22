@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Mail, Lock, User, Info, Github } from 'lucide-react';
+import { Mail, Lock, User, Info } from 'lucide-react';
 import { signIn } from "next-auth/react";
 import { createSignupRequest } from '../../../lib/db/helper';
 import { SiGithub } from "react-icons/si";
@@ -37,6 +37,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
   });
   const [signInEnabled, setSignInEnabled] = useState(true);
   const [signupMessage, setSignupMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [isSSOLoading, setIsSSOLoading] = useState(false);
 
   // Handle OAuth error from URL
   const getErrorMessage = (errorCode?: string): { type: 'error' | 'info'; text: string } | null => {
@@ -109,9 +110,14 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
   };
 
   const handleSSOLogin = async (provider: string) => {
+    setIsSSOLoading(true);
     await signIn(provider, { callbackUrl: '/ade/dashboard' })
       .then((x) => {
         console.log('SSO sign-in initiated:', x);
+      })
+      .catch((error) => {
+        console.error('SSO sign-in error:', error);
+        setIsSSOLoading(false);
       });
   }
 
@@ -272,68 +278,79 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
             </div>
           </div>
 
-          {/* SSO Buttons */}
-          {/*<div className="space-y-3">*/}
-          {/*  <SSOButton*/}
-          {/*    provider="Google"*/}
-          {/*    icon={*/}
-          {/*      <svg width="18" height="18" viewBox="0 0 18 18">*/}
-          {/*        <path*/}
-          {/*          fill="#4285F4"*/}
-          {/*          d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"*/}
-          {/*        />*/}
-          {/*        <path*/}
-          {/*          fill="#34A853"*/}
-          {/*          d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"*/}
-          {/*        />*/}
-          {/*        <path*/}
-          {/*          fill="#FBBC05"*/}
-          {/*          d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"*/}
-          {/*        />*/}
-          {/*        <path*/}
-          {/*          fill="#EA4335"*/}
-          {/*          d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"*/}
-          {/*        />*/}
-          {/*      </svg>*/}
-          {/*    }*/}
-          {/*    onClick={() => handleSSOLogin('Google')}*/}
-          {/*  />*/}
+          {/* SSO Loading Message */}
+          {isSSOLoading ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-lg font-medium text-gray-900">Please wait while we log you in</p>
+              <p className="text-sm text-gray-600 mt-2">Redirecting to authentication provider...</p>
+            </div>
+          ) : (
+            <>
+              {/* SSO Buttons */}
+              {/*<div className="space-y-3">*/}
+              {/*  <SSOButton*/}
+              {/*    provider="Google"*/}
+              {/*    icon={*/}
+              {/*      <svg width="18" height="18" viewBox="0 0 18 18">*/}
+              {/*        <path*/}
+              {/*          fill="#4285F4"*/}
+              {/*          d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"*/}
+              {/*        />*/}
+              {/*        <path*/}
+              {/*          fill="#34A853"*/}
+              {/*          d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"*/}
+              {/*        />*/}
+              {/*        <path*/}
+              {/*          fill="#FBBC05"*/}
+              {/*          d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"*/}
+              {/*        />*/}
+              {/*        <path*/}
+              {/*          fill="#EA4335"*/}
+              {/*          d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"*/}
+              {/*        />*/}
+              {/*      </svg>*/}
+              {/*    }*/}
+              {/*    onClick={() => handleSSOLogin('Google')}*/}
+              {/*  />*/}
 
-            <SSOButton
-              provider="GitHub"
-              icon={<SiGithub size={18} className="text-gray-700" />}
-              onClick={() => handleSSOLogin('github')}
-            />
+              <SSOButton
+                provider="GitHub"
+                icon={<SiGithub size={18} className="text-gray-700" />}
+                onClick={() => handleSSOLogin('github')}
+              />
 
-          {/*  <SSOButton*/}
-          {/*    provider="GitLab"*/}
-          {/*    icon={*/}
-          {/*      <svg width="18" height="18" viewBox="0 0 18 18" fill="#FC6D26">*/}
-          {/*        <path d="M9 16.5l3.5-10.8h-7L9 16.5z" />*/}
-          {/*        <path d="M9 16.5l-3.5-10.8H1.8L9 16.5z" />*/}
-          {/*        <path d="M1.8 5.7L.3 10.2c-.2.5 0 1.1.4 1.4L9 16.5 1.8 5.7z" />*/}
-          {/*        <path d="M1.8 5.7h3.7L3.6 0c-.1-.4-.7-.4-.8 0L1.8 5.7z" />*/}
-          {/*        <path d="M9 16.5l3.5-10.8h3.7L9 16.5z" />*/}
-          {/*        <path d="M16.2 5.7l1.5 4.5c.2.5 0 1.1-.4 1.4L9 16.5l7.2-10.8z" />*/}
-          {/*        <path d="M16.2 5.7h-3.7L14.4 0c.1-.4.7-.4.8 0l1 5.7z" />*/}
-          {/*      </svg>*/}
-          {/*    }*/}
-          {/*    onClick={() => handleSSOLogin('GitLab')}*/}
-          {/*  />*/}
+              {/*  <SSOButton*/}
+              {/*    provider="GitLab"*/}
+              {/*    icon={*/}
+              {/*      <svg width="18" height="18" viewBox="0 0 18 18" fill="#FC6D26">*/}
+              {/*        <path d="M9 16.5l3.5-10.8h-7L9 16.5z" />*/}
+              {/*        <path d="M9 16.5l-3.5-10.8H1.8L9 16.5z" />*/}
+              {/*        <path d="M1.8 5.7L.3 10.2c-.2.5 0 1.1.4 1.4L9 16.5 1.8 5.7z" />*/}
+              {/*        <path d="M1.8 5.7h3.7L3.6 0c-.1-.4-.7-.4-.8 0L1.8 5.7z" />*/}
+              {/*        <path d="M9 16.5l3.5-10.8h3.7L9 16.5z" />*/}
+              {/*        <path d="M16.2 5.7l1.5 4.5c.2.5 0 1.1-.4 1.4L9 16.5l7.2-10.8z" />*/}
+              {/*        <path d="M16.2 5.7h-3.7L14.4 0c.1-.4.7-.4.8 0l1 5.7z" />*/}
+              {/*      </svg>*/}
+              {/*    }*/}
+              {/*    onClick={() => handleSSOLogin('GitLab')}*/}
+              {/*  />*/}
 
-          {/*  <SSOButton*/}
-          {/*    provider="Microsoft"*/}
-          {/*    icon={*/}
-          {/*      <svg width="18" height="18" viewBox="0 0 18 18">*/}
-          {/*        <rect width="8" height="8" fill="#F25022" />*/}
-          {/*        <rect x="10" width="8" height="8" fill="#7FBA00" />*/}
-          {/*        <rect y="10" width="8" height="8" fill="#00A4EF" />*/}
-          {/*        <rect x="10" y="10" width="8" height="8" fill="#FFB900" />*/}
-          {/*      </svg>*/}
-          {/*    }*/}
-          {/*    onClick={() => handleSSOLogin('Microsoft')}*/}
-          {/*  />*/}
-          {/*</div>*/}
+              {/*  <SSOButton*/}
+              {/*    provider="Microsoft"*/}
+              {/*    icon={*/}
+              {/*      <svg width="18" height="18" viewBox="0 0 18 18">*/}
+              {/*        <rect width="8" height="8" fill="#F25022" />*/}
+              {/*        <rect x="10" width="8" height="8" fill="#7FBA00" />*/}
+              {/*        <rect y="10" width="8" height="8" fill="#00A4EF" />*/}
+              {/*        <rect x="10" y="10" width="8" height="8" fill="#FFB900" />*/}
+              {/*      </svg>*/}
+              {/*    }*/}
+              {/*    onClick={() => handleSSOLogin('Microsoft')}*/}
+              {/*  />*/}
+              {/*</div>*/}
+            </>
+          )}
 
           {/* Toggle Sign Up/Sign In */}
           <div className="mt-6 text-center">
