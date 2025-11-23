@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, Lock, Globe, Copy, ExternalLink, Search } from 'lucide-react';
+import { Eye, Lock, Globe, Copy, ExternalLink, Search, FileText } from 'lucide-react';
 import { getPublishedVersionsForTenant, updateVersionVisibility } from '../../../../../lib/db/helper';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
@@ -74,7 +74,13 @@ const PublishedVersions = () => {
   const getFullAccessUrl = (version: PublishedVersion): string => {
     // Use REST_API_BASE_URL from environment, fallback to localhost
     const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
-    return `${restApiBaseUrl}/${getAccessUrl(version)}`;
+    return `${restApiBaseUrl}/schema/${getAccessUrl(version)}`;
+  };
+
+  const getSwaggerUrl = (version: PublishedVersion): string => {
+    // Construct Swagger UI URL
+    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
+    return `${restApiBaseUrl}/swagger/${getAccessUrl(version)}`;
   };
 
   const handleCopyUrl = async (version: PublishedVersion) => {
@@ -91,6 +97,11 @@ const PublishedVersions = () => {
   const handleOpenUrl = (version: PublishedVersion) => {
     const fullUrl = getFullAccessUrl(version);
     window.open(fullUrl, '_blank');
+  };
+
+  const handleOpenSwagger = (version: PublishedVersion) => {
+    const swaggerUrl = getSwaggerUrl(version);
+    window.open(swaggerUrl, '_blank');
   };
 
   const handleToggleVisibility = async (version: PublishedVersion) => {
@@ -201,6 +212,9 @@ const PublishedVersions = () => {
           case 'open':
             handleOpenUrl(version);
             break;
+          case 'openSwagger':
+            handleOpenSwagger(version);
+            break;
           case 'copy':
             await handleCopyUrl(version);
             break;
@@ -248,6 +262,7 @@ const PublishedVersions = () => {
             }
             const labels: Record<string, string> = {
               open: 'Open URL',
+              openSwagger: 'Open Swagger',
               copy: 'Copy URL',
               toggleVisibility: toggleLabel,
             };
@@ -280,6 +295,12 @@ const PublishedVersions = () => {
             <div className="flex items-center gap-2">
               <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span>Open URL</span>
+            </div>
+          </MenuItem>
+          <MenuItem value="openSwagger">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <span>Open Swagger</span>
             </div>
           </MenuItem>
           <MenuItem value="copy">
@@ -378,7 +399,7 @@ const PublishedVersions = () => {
                     Published
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                     
+
                   </th>
                 </tr>
               </thead>
@@ -429,7 +450,7 @@ const PublishedVersions = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <code className="text-xs bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 font-mono max-w-md truncate">
-                          {getAccessUrl(version)}
+                          schema/{getAccessUrl(version)}
                         </code>
                       </div>
                     </td>

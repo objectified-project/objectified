@@ -55,6 +55,27 @@ curl -H "Accept: application/yaml" \
 
 > **Note**: See [CONTENT_NEGOTIATION.md](./CONTENT_NEGOTIATION.md) for detailed information on content negotiation.
 
+### Swagger UI Interface
+```
+GET /v1/{tenant-slug}/{project-slug}/{version-slug}/swagger
+```
+Returns an interactive Swagger UI interface displaying the OpenAPI specification for all classes in the specified version. This provides a user-friendly way to explore and visualize the schema.
+
+**Example:**
+```bash
+# Open in browser
+http://localhost:8000/v1/acme-corp/customer-api/1.0.0/swagger
+```
+
+**Features:**
+- Interactive schema visualization
+- Expandable nested structures
+- Deep linking support
+- Download OpenAPI spec directly
+- Responsive design
+
+> **Note**: See [swagger-ui-endpoint.md](./swagger-ui-endpoint.md) for detailed information on the Swagger UI endpoint.
+
 ### Health Check
 ```
 GET /health

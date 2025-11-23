@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Response, Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from typing import Dict, Any, Optional
 import yaml
 import json
@@ -77,13 +78,14 @@ async def root():
         "message": "Objectified REST API",
         "version": "1.0.0",
         "endpoints": {
-            "version_spec": "/v1/{tenant-slug}/{project-slug}/{version-slug}",
-            "class_spec": "/v1/{tenant-slug}/{project-slug}/{version-slug}/{class-name}"
+            "version_spec": "/v1/schema/{tenant-slug}/{project-slug}/{version-slug}",
+            "class_spec": "/v1/schema/{tenant-slug}/{project-slug}/{version-slug}/{class-name}",
+            "swagger_ui": "/v1/swagger/{tenant-slug}/{project-slug}/{version-slug}"
         }
     }
 
 
-@app.get("/v1/{tenant_slug}/{project_slug}/{version_slug}")
+@app.get("/v1/schema/{tenant_slug}/{project_slug}/{version_slug}")
 async def get_version_openapi_spec(
     tenant_slug: str,
     project_slug: str,
@@ -143,7 +145,7 @@ async def get_version_openapi_spec(
     return JSONResponse(content=openapi_spec)
 
 
-@app.get("/v1/{tenant_slug}/{project_slug}/{version_slug}/{class_name}")
+@app.get("/v1/schema/{tenant_slug}/{project_slug}/{version_slug}/{class_name}")
 async def get_class_openapi_spec(
     tenant_slug: str,
     project_slug: str,
@@ -225,6 +227,112 @@ async def get_class_openapi_spec(
 
     # Default to JSON (for application/json, */* or any other Accept header)
     return JSONResponse(content=openapi_spec)
+
+
+@app.get("/v1/swagger/{tenant_slug}/{project_slug}/{version_slug}", response_class=HTMLResponse)
+async def get_swagger_ui(
+    tenant_slug: str,
+    project_slug: str,
+    version_slug: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+) -> HTMLResponse:
+    """
+    Display the OpenAPI specification in a Swagger UI interface.
+
+    Args:
+        tenant_slug: The tenant slug
+        project_slug: The project slug
+        version_slug: The version ID (e.g., "1.0.0")
+        x_api_key: Optional API key for private versions
+
+    Returns:
+        HTML page with Swagger UI displaying the schema
+    """
+    # Get version information
+    version = db.get_version_by_slugs(tenant_slug, project_slug, version_slug)
+
+    if not version:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {tenant_slug}/{project_slug}/{version_slug}"
+        )
+
+    # Check if version is published
+    if not version['published']:
+        raise HTTPException(
+            status_code=403,
+            detail="This version is not published"
+        )
+
+    # Validate access for private versions
+    validate_private_access(version, tenant_slug, x_api_key)
+
+    # Get all classes for this version
+    classes = db.get_classes_for_version(version['id'])
+
+    # Get properties for each class
+    all_properties = {}
+    for class_data in classes:
+        class_id = class_data['id']
+        properties = db.get_properties_for_class(class_id)
+        all_properties[class_id] = properties
+
+    # Generate OpenAPI specification
+    openapi_spec = generate_openapi_spec(
+        tenant_slug,
+        project_slug,
+        version_slug,
+        classes,
+        all_properties
+    )
+
+    # Create a custom Swagger UI HTML page with the spec embedded
+    swagger_html = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{project_slug} API - Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+        }}
+        .topbar {{
+            display: none;
+        }}
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {{
+            const spec = {json.dumps(openapi_spec)};
+
+            window.ui = SwaggerUIBundle({{
+                spec: spec,
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout"
+            }});
+        }};
+    </script>
+</body>
+</html>
+"""
+
+    return HTMLResponse(content=swagger_html)
 
 
 @app.get("/health")
