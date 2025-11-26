@@ -65,7 +65,7 @@ interface Version {
   published: boolean;
 }
 
-type ViewMode = 'canvas' | 'code' | 'swagger';
+type ViewMode = 'canvas' | 'code' | 'mermaid';
 
 const StudioContent = () => {
   const { data: session } = useSession();
@@ -89,6 +89,7 @@ const StudioContent = () => {
 
   // Sample OpenAPI spec - will be replaced with actual data from project/version
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
+  const [mermaidCode, setMermaidCode] = useState<string>('');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
@@ -1030,6 +1031,156 @@ const StudioContent = () => {
     return [...propertyEdges, ...compositionEdges];
   };
 
+  // Helper function to generate Mermaid class diagram from classes
+  const generateMermaidDiagram = (classes: any[]): string => {
+    const lines: string[] = ['classDiagram'];
+    const classNameToId = new Map(classes.map(cls => [cls.name, cls.id]));
+
+    // Add class definitions
+    classes.forEach((cls) => {
+      const className = cls.name.replace(/[^a-zA-Z0-9_]/g, '_'); // Sanitize for Mermaid
+
+      lines.push(`    class ${className} {`);
+
+      // Add properties
+      if (cls.properties && cls.properties.length > 0) {
+        cls.properties.forEach((prop: any) => {
+          const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+          let propType = propData.type || 'any';
+
+          // Handle array types
+          if (propType === 'array' && propData.items) {
+            if (propData.items.$ref) {
+              const refClass = extractClassNameFromRef(propData.items.$ref);
+              propType = `${refClass}[]`;
+            } else if (propData.items.type) {
+              propType = `${propData.items.type}[]`;
+            }
+          }
+
+          // Handle $ref types
+          if (propData.$ref) {
+            propType = extractClassNameFromRef(propData.$ref) || 'Object';
+          }
+
+          lines.push(`        +${propType} ${prop.name}`);
+        });
+      } else {
+        lines.push(`        // No properties`);
+      }
+
+      lines.push(`    }`);
+    });
+
+    // Add relationships
+    classes.forEach((cls) => {
+      const schema = typeof cls.schema === 'string' ? JSON.parse(cls.schema) : cls.schema;
+      const sourceClassName = cls.name.replace(/[^a-zA-Z0-9_]/g, '_');
+
+      // Property references (associations)
+      if (cls.properties) {
+        cls.properties.forEach((prop: any) => {
+          const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+          const isSourceArray = propData.type === 'array';
+
+          // Extract reference class name
+          const refClassName = propData.$ref
+            ? extractClassNameFromRef(propData.$ref)
+            : (propData.type === 'array' && propData.items?.$ref
+                ? extractClassNameFromRef(propData.items.$ref)
+                : null);
+
+          if (refClassName && classNameToId.has(refClassName)) {
+            const targetClassName = refClassName.replace(/[^a-zA-Z0-9_]/g, '_');
+            const targetClass = classes.find(c => c.id === classNameToId.get(refClassName));
+
+            // Check for reverse reference
+            let hasReverseRef = false;
+            let isTargetArray = false;
+
+            if (targetClass && targetClass.properties) {
+              targetClass.properties.forEach((targetProp: any) => {
+                const targetPropData = typeof targetProp.data === 'string' ? JSON.parse(targetProp.data) : targetProp.data;
+                const targetRefName = targetPropData.$ref
+                  ? extractClassNameFromRef(targetPropData.$ref)
+                  : (targetPropData.type === 'array' && targetPropData.items?.$ref
+                      ? extractClassNameFromRef(targetPropData.items.$ref)
+                      : null);
+
+                if (targetRefName === cls.name) {
+                  hasReverseRef = true;
+                  isTargetArray = targetPropData.type === 'array';
+                }
+              });
+            }
+
+            // Determine cardinality
+            let relationship: string;
+            if (isSourceArray && isTargetArray) {
+              relationship = `${sourceClassName} "*" -- "*" ${targetClassName} : ${prop.name}`;
+            } else if (isSourceArray && !isTargetArray) {
+              relationship = hasReverseRef
+                ? `${targetClassName} "1" -- "*" ${sourceClassName} : ${prop.name}`
+                : `${sourceClassName} "*" -- "1" ${targetClassName} : ${prop.name}`;
+            } else if (!isSourceArray && isTargetArray) {
+              relationship = `${sourceClassName} "*" -- "1" ${targetClassName} : ${prop.name}`;
+            } else {
+              relationship = hasReverseRef
+                ? `${sourceClassName} "1" -- "1" ${targetClassName} : ${prop.name}`
+                : `${sourceClassName} "1" --> ${targetClassName} : ${prop.name}`;
+            }
+
+            lines.push(`    ${relationship}`);
+          }
+        });
+      }
+
+      // Composition relationships (allOf, anyOf, oneOf)
+      if (schema) {
+        // allOf - Inheritance
+        if (schema.allOf && Array.isArray(schema.allOf)) {
+          schema.allOf.forEach((item: any) => {
+            if (item.$ref) {
+              const refClassName = extractClassNameFromRef(item.$ref);
+              if (refClassName && classNameToId.has(refClassName)) {
+                const targetClassName = refClassName.replace(/[^a-zA-Z0-9_]/g, '_');
+                lines.push(`    ${targetClassName} <|-- ${sourceClassName} : inherits`);
+              }
+            }
+          });
+        }
+
+        // anyOf - Alternatives
+        if (schema.anyOf && Array.isArray(schema.anyOf)) {
+          schema.anyOf.forEach((item: any) => {
+            if (item.$ref) {
+              const refClassName = extractClassNameFromRef(item.$ref);
+              if (refClassName && classNameToId.has(refClassName)) {
+                const targetClassName = refClassName.replace(/[^a-zA-Z0-9_]/g, '_');
+                lines.push(`    ${targetClassName} <.. ${sourceClassName} : anyOf`);
+              }
+            }
+          });
+        }
+
+        // oneOf - Exclusive alternatives
+        if (schema.oneOf && Array.isArray(schema.oneOf)) {
+          schema.oneOf.forEach((item: any) => {
+            if (item.$ref) {
+              const refClassName = extractClassNameFromRef(item.$ref);
+              if (refClassName && classNameToId.has(refClassName)) {
+                const targetClassName = refClassName.replace(/[^a-zA-Z0-9_]/g, '_');
+                lines.push(`    ${targetClassName} <.. ${sourceClassName} : oneOf`);
+              }
+            }
+          });
+        }
+      }
+    });
+
+    return lines.join('\n');
+  };
+
   // Helper to flag dangling $refs (referencing a class name that doesn't exist)
   const hasDanglingRefs = (classes: any[]): boolean => {
     const classNames = new Set(classes.map((c) => c.name));
@@ -1138,6 +1289,12 @@ const StudioContent = () => {
         });
         setOpenApiSpec(spec);
 
+        setLoadingMessage('Generating Mermaid diagram...');
+
+        // Generate Mermaid diagram
+        const mermaid = generateMermaidDiagram(classesWithProperties);
+        setMermaidCode(mermaid);
+
         setLoadingMessage('Fitting view to canvas...');
 
         // Fit view after a short delay to ensure nodes are rendered
@@ -1159,10 +1316,10 @@ const StudioContent = () => {
     loadClasses();
   }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, autoLayoutEnabled, setNodes, setEdges, fitView, generateOpenApiSpec, projects, versions]);
 
-  // Regenerate OpenAPI spec when switching to code or swagger views
+  // Regenerate OpenAPI spec and Mermaid when switching to code or mermaid views
   useEffect(() => {
     const regenerateSpec = async () => {
-      if (viewMode === 'code' && selectedVersionId) {
+      if ((viewMode === 'code' || viewMode === 'mermaid') && selectedVersionId) {
         try {
           // Reload classes from database to get latest state
           const result = await getClassesForVersion(selectedVersionId);
@@ -1177,18 +1334,24 @@ const StudioContent = () => {
             })
           );
 
-          // Generate fresh OpenAPI specification
-          const currentProject = projects.find(p => p.id === selectedProjectId);
-          const currentVersion = versions.find(v => v.id === selectedVersionId);
-          const spec = generateOpenApiSpec(classesWithProperties, {
-            projectName: currentProject?.name,
-            version: currentVersion?.version_id
-          });
-          setOpenApiSpec(spec);
-
-          console.log('Regenerated OpenAPI spec for view mode:', viewMode);
+          if (viewMode === 'code') {
+            // Generate fresh OpenAPI specification
+            const currentProject = projects.find(p => p.id === selectedProjectId);
+            const currentVersion = versions.find(v => v.id === selectedVersionId);
+            const spec = generateOpenApiSpec(classesWithProperties, {
+              projectName: currentProject?.name,
+              version: currentVersion?.version_id
+            });
+            setOpenApiSpec(spec);
+            console.log('Regenerated OpenAPI spec for view mode:', viewMode);
+          } else if (viewMode === 'mermaid') {
+            // Generate fresh Mermaid diagram
+            const mermaid = generateMermaidDiagram(classesWithProperties);
+            setMermaidCode(mermaid);
+            console.log('Regenerated Mermaid diagram for view mode:', viewMode);
+          }
         } catch (error) {
-          console.error('Failed to regenerate OpenAPI spec:', error);
+          console.error('Failed to regenerate content:', error);
         }
       }
     };
@@ -1403,13 +1566,23 @@ const StudioContent = () => {
               </button>
               <button
                 onClick={() => setViewMode('code')}
-                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 rounded-r ${
+                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
                   viewMode === 'code'
                     ? 'bg-blue-600 text-white'
                     : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
                 }`}
               >
                 Code
+              </button>
+              <button
+                onClick={() => setViewMode('mermaid')}
+                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                  viewMode === 'mermaid'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                }`}
+              >
+                Mermaid
               </button>
             </div>
           )}
@@ -1782,6 +1955,91 @@ const StudioContent = () => {
                     ? openApiSpec
                     : YAML.stringify(JSON.parse(openApiSpec));
                 })()}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: true },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  lineNumbers: 'on',
+                  renderWhitespace: 'selection',
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  folding: true,
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  contextmenu: true,
+                  selectOnLineNumbers: true,
+                }}
+              />
+            </div>
+          </div>
+        ) : viewMode === 'mermaid' ? (
+          // Mermaid Diagram View
+          <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Mermaid Class Diagram
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Diagram representation of {selectedProject?.name} v{selectedVersion?.version_id}
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      navigator.clipboard.writeText(mermaidCode);
+                      await alertDialog({
+                        message: 'Mermaid diagram code copied to clipboard!',
+                        variant: 'success',
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                    title="Copy to clipboard"
+                  >
+                    <Copy size={14} />
+                    Copy
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Create a blob from the Mermaid code
+                      const blob = new Blob([mermaidCode], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+
+                      // Create a temporary download link
+                      const link = document.createElement('a');
+                      link.href = url;
+
+                      // Generate filename from project and version
+                      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram';
+                      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+                      link.download = `${projectSlug}-${versionSlug}-diagram.mmd`;
+
+                      // Trigger download
+                      document.body.appendChild(link);
+                      link.click();
+
+                      // Cleanup
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                    title="Download as .mmd file"
+                  >
+                    <Download size={14} />
+                    Export
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1">
+              <Editor
+                height="100%"
+                language="markdown"
+                value={mermaidCode || '# No classes defined'}
                 theme="vs-dark"
                 options={{
                   readOnly: true,
