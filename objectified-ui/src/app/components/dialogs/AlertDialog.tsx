@@ -13,7 +13,7 @@ export type AlertDialogVariant = 'error' | 'warning' | 'info' | 'success';
 interface AlertDialogProps {
   open: boolean;
   title?: string;
-  message: string;
+  message: string | React.ReactNode;
   variant?: AlertDialogVariant;
   confirmLabel?: string;
   onClose: () => void;
@@ -75,9 +75,15 @@ const AlertDialog: React.FC<AlertDialogProps> = ({
         </div>
       </DialogTitle>
       <DialogContent>
-        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-          {message}
-        </p>
+        {typeof message === 'string' ? (
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+            {message}
+          </p>
+        ) : (
+          <div className="text-gray-700 dark:text-gray-300">
+            {message}
+          </div>
+        )}
       </DialogContent>
       <DialogActions sx={{ padding: '16px 24px' }}>
         <Button

@@ -13,7 +13,7 @@ export type ConfirmDialogVariant = 'danger' | 'warning' | 'info' | 'success';
 interface ConfirmDialogProps {
   open: boolean;
   title?: string;
-  message: string;
+  message: string | React.ReactNode;
   variant?: ConfirmDialogVariant;
   confirmLabel?: string;
   cancelLabel?: string;
@@ -78,9 +78,15 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         </div>
       </DialogTitle>
       <DialogContent>
-        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-          {message}
-        </p>
+        {typeof message === 'string' ? (
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+            {message}
+          </p>
+        ) : (
+          <div className="text-gray-700 dark:text-gray-300">
+            {message}
+          </div>
+        )}
       </DialogContent>
       <DialogActions sx={{ padding: '16px 24px' }}>
         <Button

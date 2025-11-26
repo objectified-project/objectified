@@ -341,6 +341,52 @@ export async function removeTenantUser(userRecordId: string) {
   }
 }
 
+export async function updateTenant(tenantId: string, name: string, description: string, customSlug?: string) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Tenant name cannot be empty' });
+    }
+
+    // Use custom slug if provided, otherwise generate from name
+    let slug: string;
+    if (customSlug && customSlug.trim().length > 0) {
+      slug = customSlug.trim().toLowerCase();
+    } else {
+      slug = name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    // Validate slug format (lowercase alphanumeric and dashes only)
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(slug)) {
+      return JSON.stringify({ success: false, error: 'Slug must contain only lowercase letters, numbers, and dashes' });
+    }
+
+    // Check if slug is unique (excluding current tenant)
+    const existingTenant = await connectionPool.query(
+      'SELECT id FROM odb.tenants WHERE slug = $1 AND id != $2',
+      [slug, tenantId]
+    );
+
+    if (existingTenant.rowCount > 0) {
+      return JSON.stringify({ success: false, error: 'A tenant with this slug already exists' });
+    }
+
+    await connectionPool.query(
+      'UPDATE odb.tenants SET name = $1, slug = $2, description = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+      [name.trim(), slug, description.trim(), tenantId]
+    );
+
+    return JSON.stringify({ success: true, slug });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 export async function updateUserName(userId: string, name: string) {
   try {
     if (!name || name.trim().length === 0) {

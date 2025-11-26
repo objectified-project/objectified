@@ -6,7 +6,7 @@ import AlertDialog, { AlertDialogVariant } from '../dialogs/AlertDialog';
 
 interface ConfirmOptions {
   title?: string;
-  message: string;
+  message: string | ReactNode;
   variant?: ConfirmDialogVariant;
   confirmLabel?: string;
   cancelLabel?: string;
@@ -14,7 +14,7 @@ interface ConfirmOptions {
 
 interface AlertOptions {
   title?: string;
-  message: string;
+  message: string | ReactNode;
   variant?: AlertDialogVariant;
   confirmLabel?: string;
 }
@@ -91,7 +91,7 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
         <ConfirmDialog
           open={confirmDialog.open}
           title={confirmDialog.options.title}
-          message={confirmDialog.options.message}
+          message={confirmDialog.options.message as string | React.ReactNode}
           variant={confirmDialog.options.variant}
           confirmLabel={confirmDialog.options.confirmLabel}
           cancelLabel={confirmDialog.options.cancelLabel}
@@ -103,7 +103,7 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
         <AlertDialog
           open={alertDialog.open}
           title={alertDialog.options.title}
-          message={alertDialog.options.message}
+          message={alertDialog.options.message as string | React.ReactNode}
           variant={alertDialog.options.variant}
           confirmLabel={alertDialog.options.confirmLabel}
           onClose={handleAlertClose}

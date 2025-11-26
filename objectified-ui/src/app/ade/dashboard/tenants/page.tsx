@@ -1,9 +1,9 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers, addTenantAdministrator, addTenantUser, removeTenantAdministrator, removeTenantUser } from '../../../../../lib/db/helper';
+import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers, addTenantAdministrator, addTenantUser, removeTenantAdministrator, removeTenantUser, updateTenant } from '../../../../../lib/db/helper';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X, Building2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X, Building2, Edit2, AlertTriangle } from 'lucide-react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -52,10 +52,15 @@ const Tenants = () => {
   const [memberFilter, setMemberFilter] = useState('');
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showEditMemberModal, setShowEditMemberModal] = useState(false);
+  const [showEditTenantModal, setShowEditTenantModal] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const [memberEmail, setMemberEmail] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingMember, setEditingMember] = useState<{ userId: string; name: string; email: string; isAdmin: boolean } | null>(null);
+  const [editingTenant, setEditingTenant] = useState<{ id: string; name: string; description: string; slug: string } | null>(null);
+  const [tenantName, setTenantName] = useState('');
+  const [tenantSlug, setTenantSlug] = useState('');
+  const [tenantDescription, setTenantDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const currentTenantId = (session?.user as any)?.current_tenant_id;
@@ -289,6 +294,113 @@ const Tenants = () => {
     }
   };
 
+  const handleEditTenant = (tenant: Tenant) => {
+    setEditingTenant(tenant);
+    setTenantName(tenant.name);
+    setTenantSlug(tenant.slug);
+    setTenantDescription(tenant.description || '');
+    setErrorMessage('');
+    setShowEditTenantModal(true);
+  };
+
+  const handleEditTenantSubmit = async () => {
+    if (!editingTenant) return;
+
+    if (!tenantName.trim()) {
+      setErrorMessage('Tenant name is required');
+      return;
+    }
+
+    if (!tenantSlug.trim()) {
+      setErrorMessage('Tenant slug is required');
+      return;
+    }
+
+    // Validate slug format
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(tenantSlug.trim())) {
+      setErrorMessage('Slug must contain only lowercase letters, numbers, and dashes');
+      return;
+    }
+
+    // Check if the slug has changed
+    const nameChanged = tenantName.trim() !== editingTenant.name;
+    const slugChanged = tenantSlug.trim() !== editingTenant.slug;
+
+    // Only show warning if the slug changed (name changes without slug changes are fine)
+    if (slugChanged) {
+      const changes = [];
+      if (nameChanged) {
+        changes.push(<p key="name">Name: <strong>"{editingTenant.name}"</strong> → <strong>"{tenantName.trim()}"</strong></p>);
+      }
+      changes.push(<p key="slug">Slug: <code className="bg-yellow-100 dark:bg-yellow-900/40 px-1 py-0.5 rounded">{editingTenant.slug}</code> → <code className="bg-yellow-100 dark:bg-yellow-900/40 px-1 py-0.5 rounded">{tenantSlug.trim()}</code></p>);
+
+      const confirmed = await confirmDialog({
+        title: 'Change Tenant Slug?',
+        message: (
+          <div className="space-y-3">
+            <p>You are about to make the following changes:</p>
+            <div className="pl-4 space-y-1 text-sm">
+              {changes}
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+              <div className="flex gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <p className="font-semibold mb-1">Warning: Changing the slug will affect URLs</p>
+                  <p>
+                    This change will affect any published OpenAPI specs that reference this tenant's slug in their URLs.
+                    Make sure to update any external references or documentation that use the old slug.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to proceed?
+            </p>
+          </div>
+        ),
+        variant: 'warning',
+        confirmLabel: 'Change Slug',
+        cancelLabel: 'Cancel',
+      });
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await updateTenant(editingTenant.id, tenantName.trim(), tenantDescription.trim(), tenantSlug.trim());
+      const response = JSON.parse(result);
+
+      if (!response.success) {
+        setErrorMessage(response.error || 'Failed to update tenant');
+        setIsLoading(false);
+        return;
+      }
+
+      setShowEditTenantModal(false);
+      setEditingTenant(null);
+      await refreshData();
+
+      // Show success message with new slug only if slug changed
+      if (slugChanged && response.slug) {
+        await alertDialog({
+          message: `Tenant updated successfully. New slug: ${response.slug}`,
+          variant: 'success',
+        });
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getMembersForTenant = (tenantId: string) => {
     const users = tenantUsers[tenantId] || [];
     const admins = adminTenants.filter((admin: AdminUser) => admin.tenant_id === tenantId);
@@ -442,18 +554,27 @@ const Tenants = () => {
                           </button>
                         )}
                         {isCurrentUserAdmin(tenant.id) && (
-                          <button
-                            onClick={() => {
-                              // Toggle expanded state for this specific tenant
-                              const expandedTenant = document.getElementById(`tenant-${tenant.id}`);
-                              if (expandedTenant) {
-                                expandedTenant.classList.toggle('hidden');
-                              }
-                            }}
-                            className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded cursor-pointer transition-colors text-sm font-medium"
-                          >
-                            Manage
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleEditTenant(tenant)}
+                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                              title="Edit tenant"
+                            >
+                              <Edit2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                // Toggle expanded state for this specific tenant
+                                const expandedTenant = document.getElementById(`tenant-${tenant.id}`);
+                                if (expandedTenant) {
+                                  expandedTenant.classList.toggle('hidden');
+                                }
+                              }}
+                              className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded cursor-pointer transition-colors text-sm font-medium"
+                            >
+                              Manage
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -753,6 +874,76 @@ const Tenants = () => {
             Cancel
           </Button>
           <Button onClick={handleEditMemberSubmit} variant="contained" disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Tenant Modal */}
+      <Dialog
+        open={showEditTenantModal}
+        onClose={() => !isLoading && setShowEditTenantModal(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit Tenant</DialogTitle>
+        <DialogContent>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+          {editingTenant && (
+            <>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Tenant Name"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={tenantName}
+                onChange={(e) => setTenantName(e.target.value)}
+                disabled={isLoading}
+                sx={{ mb: 2, mt: 1 }}
+              />
+              <TextField
+                margin="dense"
+                label="Tenant Slug"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
+                disabled={isLoading}
+                helperText="Lowercase letters, numbers, and dashes only"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                margin="dense"
+                label="Description"
+                type="text"
+                fullWidth
+                variant="outlined"
+                multiline
+                rows={3}
+                value={tenantDescription}
+                onChange={(e) => setTenantDescription(e.target.value)}
+                disabled={isLoading}
+              />
+              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-xs text-blue-800 dark:text-blue-200">
+                  <strong>Note:</strong> The slug is used in OpenAPI specification URLs. Changing it will affect any published specs.
+                </p>
+              </div>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowEditTenantModal(false)} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button onClick={handleEditTenantSubmit} variant="contained" disabled={isLoading}>
             {isLoading ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
