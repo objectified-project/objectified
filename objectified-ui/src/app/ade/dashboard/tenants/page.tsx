@@ -545,6 +545,16 @@ const Tenants = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
+                        {isCurrentUserAdmin(tenant.id) && (
+                          <>
+                          <button
+                            onClick={() => handleEditTenant(tenant)}
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                            title="Edit tenant"
+                          >
+                            <Edit2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                          </button>
+                        </>)}
                         {tenant.id !== currentTenantId && (
                           <button
                             onClick={() => handleSelectTenant(tenant)}
@@ -555,13 +565,6 @@ const Tenants = () => {
                         )}
                         {isCurrentUserAdmin(tenant.id) && (
                           <>
-                            <button
-                              onClick={() => handleEditTenant(tenant)}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-                              title="Edit tenant"
-                            >
-                              <Edit2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                            </button>
                             <button
                               onClick={() => {
                                 // Toggle expanded state for this specific tenant
