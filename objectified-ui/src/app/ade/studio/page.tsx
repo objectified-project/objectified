@@ -1048,18 +1048,75 @@ const StudioContent = () => {
           const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
           let propType = propData.type || 'any';
 
-          // Handle array types
-          if (propType === 'array' && propData.items) {
-            if (propData.items.$ref) {
+          // Handle composition types (anyOf, oneOf, allOf) at property level
+          if (propData.anyOf && Array.isArray(propData.anyOf)) {
+            const types = propData.anyOf
+              .map((item: any) => {
+                if (item.$ref) return extractClassNameFromRef(item.$ref);
+                if (item.type) return item.type;
+                return null;
+              })
+              .filter(Boolean);
+            propType = types.length > 0 ? types.join(' | ') : 'anyOf';
+          } else if (propData.oneOf && Array.isArray(propData.oneOf)) {
+            const types = propData.oneOf
+              .map((item: any) => {
+                if (item.$ref) return extractClassNameFromRef(item.$ref);
+                if (item.type) return item.type;
+                return null;
+              })
+              .filter(Boolean);
+            propType = types.length > 0 ? types.join(' | ') : 'oneOf';
+          } else if (propData.allOf && Array.isArray(propData.allOf)) {
+            const types = propData.allOf
+              .map((item: any) => {
+                if (item.$ref) return extractClassNameFromRef(item.$ref);
+                if (item.type) return item.type;
+                return null;
+              })
+              .filter(Boolean);
+            propType = types.length > 0 ? types.join(' & ') : 'allOf';
+          }
+          // Handle array types with composition in items
+          else if (propData.type === 'array' && propData.items) {
+            if (propData.items.anyOf && Array.isArray(propData.items.anyOf)) {
+              const types = propData.items.anyOf
+                .map((item: any) => {
+                  if (item.$ref) return extractClassNameFromRef(item.$ref);
+                  if (item.type) return item.type;
+                  return null;
+                })
+                .filter(Boolean);
+              propType = types.length > 0 ? `(${types.join(' | ')})[]` : 'anyOf[]';
+            } else if (propData.items.oneOf && Array.isArray(propData.items.oneOf)) {
+              const types = propData.items.oneOf
+                .map((item: any) => {
+                  if (item.$ref) return extractClassNameFromRef(item.$ref);
+                  if (item.type) return item.type;
+                  return null;
+                })
+                .filter(Boolean);
+              propType = types.length > 0 ? `(${types.join(' | ')})[]` : 'oneOf[]';
+            } else if (propData.items.allOf && Array.isArray(propData.items.allOf)) {
+              const types = propData.items.allOf
+                .map((item: any) => {
+                  if (item.$ref) return extractClassNameFromRef(item.$ref);
+                  if (item.type) return item.type;
+                  return null;
+                })
+                .filter(Boolean);
+              propType = types.length > 0 ? `(${types.join(' & ')})[]` : 'allOf[]';
+            }
+            // Handle simple array types
+            else if (propData.items.$ref) {
               const refClass = extractClassNameFromRef(propData.items.$ref);
               propType = `${refClass}[]`;
             } else if (propData.items.type) {
               propType = `${propData.items.type}[]`;
             }
           }
-
-          // Handle $ref types
-          if (propData.$ref) {
+          // Handle simple $ref types
+          else if (propData.$ref) {
             propType = extractClassNameFromRef(propData.$ref) || 'Object';
           }
 
@@ -1083,54 +1140,122 @@ const StudioContent = () => {
           const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
           const isSourceArray = propData.type === 'array';
 
-          // Extract reference class name
-          const refClassName = propData.$ref
-            ? extractClassNameFromRef(propData.$ref)
-            : (propData.type === 'array' && propData.items?.$ref
-                ? extractClassNameFromRef(propData.items.$ref)
-                : null);
+          // Helper to add relationship for a single reference
+          const addRelationship = (refClassName: string | null, relationLabel: string, compositionType?: 'anyOf' | 'oneOf' | 'allOf') => {
+            if (refClassName && classNameToId.has(refClassName)) {
+              const targetClassName = refClassName.replace(/[^a-zA-Z0-9_]/g, '_');
 
-          if (refClassName && classNameToId.has(refClassName)) {
-            const targetClassName = refClassName.replace(/[^a-zA-Z0-9_]/g, '_');
-            const targetClass = classes.find(c => c.id === classNameToId.get(refClassName));
+              // For composition types, use dashed lines
+              if (compositionType) {
+                if (compositionType === 'anyOf') {
+                  lines.push(`    ${sourceClassName} ..> ${targetClassName} : ${relationLabel}`);
+                } else if (compositionType === 'oneOf') {
+                  lines.push(`    ${sourceClassName} ..> ${targetClassName} : ${relationLabel}`);
+                } else if (compositionType === 'allOf') {
+                  lines.push(`    ${sourceClassName} ..> ${targetClassName} : ${relationLabel}`);
+                }
+              } else {
+                // Regular association
+                const targetClass = classes.find(c => c.id === classNameToId.get(refClassName));
 
-            // Check for reverse reference
-            let hasReverseRef = false;
-            let isTargetArray = false;
+                // Check for reverse reference
+                let hasReverseRef = false;
+                let isTargetArray = false;
 
-            if (targetClass && targetClass.properties) {
-              targetClass.properties.forEach((targetProp: any) => {
-                const targetPropData = typeof targetProp.data === 'string' ? JSON.parse(targetProp.data) : targetProp.data;
-                const targetRefName = targetPropData.$ref
-                  ? extractClassNameFromRef(targetPropData.$ref)
-                  : (targetPropData.type === 'array' && targetPropData.items?.$ref
-                      ? extractClassNameFromRef(targetPropData.items.$ref)
-                      : null);
+                if (targetClass && targetClass.properties) {
+                  targetClass.properties.forEach((targetProp: any) => {
+                    const targetPropData = typeof targetProp.data === 'string' ? JSON.parse(targetProp.data) : targetProp.data;
+                    const targetRefName = targetPropData.$ref
+                      ? extractClassNameFromRef(targetPropData.$ref)
+                      : (targetPropData.type === 'array' && targetPropData.items?.$ref
+                          ? extractClassNameFromRef(targetPropData.items.$ref)
+                          : null);
 
-                if (targetRefName === cls.name) {
-                  hasReverseRef = true;
-                  isTargetArray = targetPropData.type === 'array';
+                    if (targetRefName === cls.name) {
+                      hasReverseRef = true;
+                      isTargetArray = targetPropData.type === 'array';
+                    }
+                  });
+                }
+
+                // Determine cardinality
+                let relationship: string;
+                if (isSourceArray && isTargetArray) {
+                  relationship = `${sourceClassName} "*" -- "*" ${targetClassName} : ${relationLabel}`;
+                } else if (isSourceArray && !isTargetArray) {
+                  relationship = hasReverseRef
+                    ? `${targetClassName} "1" -- "*" ${sourceClassName} : ${relationLabel}`
+                    : `${sourceClassName} "*" -- "1" ${targetClassName} : ${relationLabel}`;
+                } else if (!isSourceArray && isTargetArray) {
+                  relationship = `${sourceClassName} "*" -- "1" ${targetClassName} : ${relationLabel}`;
+                } else {
+                  relationship = hasReverseRef
+                    ? `${sourceClassName} "1" -- "1" ${targetClassName} : ${relationLabel}`
+                    : `${sourceClassName} "1" --> ${targetClassName} : ${relationLabel}`;
+                }
+
+                lines.push(`    ${relationship}`);
+              }
+            }
+          };
+
+          // Handle composition types (anyOf, oneOf, allOf) at property level
+          if (propData.anyOf && Array.isArray(propData.anyOf)) {
+            propData.anyOf.forEach((item: any, index: number) => {
+              if (item.$ref) {
+                const refClassName = extractClassNameFromRef(item.$ref);
+                addRelationship(refClassName, `${prop.name}[anyOf-${index}]`, 'anyOf');
+              }
+            });
+          } else if (propData.oneOf && Array.isArray(propData.oneOf)) {
+            propData.oneOf.forEach((item: any, index: number) => {
+              if (item.$ref) {
+                const refClassName = extractClassNameFromRef(item.$ref);
+                addRelationship(refClassName, `${prop.name}[oneOf-${index}]`, 'oneOf');
+              }
+            });
+          } else if (propData.allOf && Array.isArray(propData.allOf)) {
+            propData.allOf.forEach((item: any, index: number) => {
+              if (item.$ref) {
+                const refClassName = extractClassNameFromRef(item.$ref);
+                addRelationship(refClassName, `${prop.name}[allOf-${index}]`, 'allOf');
+              }
+            });
+          }
+          // Handle composition in array items
+          else if (propData.type === 'array' && propData.items) {
+            if (propData.items.anyOf && Array.isArray(propData.items.anyOf)) {
+              propData.items.anyOf.forEach((item: any, index: number) => {
+                if (item.$ref) {
+                  const refClassName = extractClassNameFromRef(item.$ref);
+                  addRelationship(refClassName, `${prop.name}[anyOf-${index}]`, 'anyOf');
+                }
+              });
+            } else if (propData.items.oneOf && Array.isArray(propData.items.oneOf)) {
+              propData.items.oneOf.forEach((item: any, index: number) => {
+                if (item.$ref) {
+                  const refClassName = extractClassNameFromRef(item.$ref);
+                  addRelationship(refClassName, `${prop.name}[oneOf-${index}]`, 'oneOf');
+                }
+              });
+            } else if (propData.items.allOf && Array.isArray(propData.items.allOf)) {
+              propData.items.allOf.forEach((item: any, index: number) => {
+                if (item.$ref) {
+                  const refClassName = extractClassNameFromRef(item.$ref);
+                  addRelationship(refClassName, `${prop.name}[allOf-${index}]`, 'allOf');
                 }
               });
             }
-
-            // Determine cardinality
-            let relationship: string;
-            if (isSourceArray && isTargetArray) {
-              relationship = `${sourceClassName} "*" -- "*" ${targetClassName} : ${prop.name}`;
-            } else if (isSourceArray && !isTargetArray) {
-              relationship = hasReverseRef
-                ? `${targetClassName} "1" -- "*" ${sourceClassName} : ${prop.name}`
-                : `${sourceClassName} "*" -- "1" ${targetClassName} : ${prop.name}`;
-            } else if (!isSourceArray && isTargetArray) {
-              relationship = `${sourceClassName} "*" -- "1" ${targetClassName} : ${prop.name}`;
-            } else {
-              relationship = hasReverseRef
-                ? `${sourceClassName} "1" -- "1" ${targetClassName} : ${prop.name}`
-                : `${sourceClassName} "1" --> ${targetClassName} : ${prop.name}`;
+            // Handle simple array $ref
+            else if (propData.items.$ref) {
+              const refClassName = extractClassNameFromRef(propData.items.$ref);
+              addRelationship(refClassName, prop.name);
             }
-
-            lines.push(`    ${relationship}`);
+          }
+          // Handle simple $ref
+          else if (propData.$ref) {
+            const refClassName = extractClassNameFromRef(propData.$ref);
+            addRelationship(refClassName, prop.name);
           }
         });
       }
