@@ -149,6 +149,17 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
             <p className="text-sm text-gray-600">
               {isSignUp ? 'Sign up for early access' : 'Sign in to continue to your account'}
             </p>
+            <p className="text-sm text-gray-600 mt-2">
+              New to Objectified?{' '}
+              <a
+                href="https://youtu.be/kUBoB31NXrE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-500 underline"
+              >
+                Watch our intro video
+              </a>
+            </p>
           </div>
 
           {/* Message Display */}

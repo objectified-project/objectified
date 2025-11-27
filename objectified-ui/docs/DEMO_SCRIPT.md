@@ -19,7 +19,8 @@
 **You say:**  
 "Let me show you Objectified in under a minute.
 
-This is a visual OpenAPI workspace: instead of hand-editing YAML, you model your API as objects and relationships, and Objectified keeps your OpenAPI spec and Swagger docs perfectly in sync."
+This is a visual OpenAPI workspace: instead of hand-editing YAML, you model your API as objects and relationships, 
+and Objectified keeps your OpenAPI spec and Swagger docs perfectly in sync."
 
 ---
 
@@ -99,11 +100,13 @@ This document is always generated from the model—no copying into separate repo
 **You say:**  
 "And the best part is we don’t stop at the spec.
 
-From the same source of truth, you get live Swagger docs. I can expand `Order` here and you’ll see the exact same `status` enum and `customer` reference reflected in the docs.
+From the same source of truth, you get live Swagger docs. I can expand `Order` here and you’ll see the exact same 
+`status` enum and `customer` reference reflected in the docs.
 
 So in one place I have: visual modeling on the canvas, a clean OpenAPI spec, and interactive docs for API consumers.
 
-That’s the ‘aha’: every change I make to the model instantly flows through to the spec and docs, so our teams stay aligned and we never debug mismatched contracts again."
+That’s the ‘aha’: every change I make to the model instantly flows through to the spec and docs, so our teams stay
+aligned and we never debug mismatched contracts again."
 
 ---
 
