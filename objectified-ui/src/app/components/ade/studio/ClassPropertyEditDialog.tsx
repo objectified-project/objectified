@@ -313,7 +313,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
         {/* Type Information - Read Only */}
         {editingClassProperty && (
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1, border: 1, borderColor: 'grey.300' }}>
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1, border: 1, borderColor: 'divider' }}>
             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
               Property Type (Read-Only)
             </Typography>

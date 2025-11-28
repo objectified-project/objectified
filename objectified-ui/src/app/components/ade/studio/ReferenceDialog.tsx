@@ -224,7 +224,7 @@ export const ReferenceDialog: React.FC<ReferenceDialogProps> = ({
           </Box>
         )}
 
-        <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+        <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
             Reference Type
           </Typography>

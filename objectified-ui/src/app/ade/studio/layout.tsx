@@ -842,7 +842,7 @@ function StudioLayoutContent({
 
           {/* Composition Section */}
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            Composition (Optional)
+            Composition/Inheritance (Optional)
           </Typography>
 
           {/* allOf Section */}

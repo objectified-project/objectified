@@ -165,11 +165,20 @@ function ClassNode({ data, selected }: NodeProps) {
       if (d.items?.type) {
         return `${d.items.type}[]`;
       }
-      // Items missing: fallback to object[] if inline children exist, otherwise any[]
+      // Items missing or unassigned reference
+      if (d.items?.$ref) {
+        const refName = d.items.$ref.split('/').pop();
+        if (refName === '__unassigned__') return '(unassigned)[]';
+        return `${refName}[]`;
+      }
       const hasInlineChildren = (typedData.properties || []).some((p) => p.parent_id === prop.id);
       return hasInlineChildren ? 'object[]' : 'any[]';
     }
-    if (d?.$ref) return '$ref';
+    if (d?.$ref) {
+      const refName = d.$ref.split('/').pop();
+      if (refName === '__unassigned__') return '(unassigned)';
+      return '$ref';
+    }
     return d?.type || prop.type || 'object';
   };
 

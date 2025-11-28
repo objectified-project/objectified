@@ -503,8 +503,8 @@ const StudioContent = () => {
             data.items = { $ref: `#/components/schemas/${targetClassName}` };
           }
         } else {
-          // Empty items placeholder - user can connect later
-          data.items = {};
+          // Placeholder for unassigned reference - use special marker
+          data.items = { $ref: '#/components/schemas/__unassigned__' };
         }
       } else {
         // Set direct $ref if target class is specified
@@ -514,8 +514,10 @@ const StudioContent = () => {
             const targetClassName = (targetClass.data as any).name;
             data.$ref = `#/components/schemas/${targetClassName}`;
           }
+        } else {
+          // Placeholder for unassigned reference - use special marker
+          data.$ref = '#/components/schemas/__unassigned__';
         }
-        // If no target, leave data empty - it's a placeholder reference
       }
 
       const parentId: string | null = (window as any).__refParentId || null;
