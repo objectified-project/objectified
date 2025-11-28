@@ -729,7 +729,7 @@ const StudioContent = () => {
                   target: targetClassId,
                   type: 'smoothstep',
                   animated: false,
-                  label: `${prop.name} (${label}${isSourceArray ? '[]' : ''})`,
+                  label: `${prop.name} (${label}:${refClassName}${isSourceArray ? '[]' : ''})`,
                   style: {
                     stroke: edgeColor,
                     strokeWidth: 3,
@@ -910,7 +910,7 @@ const StudioContent = () => {
                 target: classNameToId.get(refClassName)!,
                 type: 'smoothstep',
                 animated: false,
-                label: 'allOf',
+                label: `allOf:${refClassName}`,
                 style: {
                   stroke: '#2563eb',
                   strokeWidth: 3,
@@ -952,7 +952,7 @@ const StudioContent = () => {
                 target: classNameToId.get(refClassName)!,
                 type: 'smoothstep',
                 animated: false,
-                label: 'anyOf',
+                label: `anyOf:${refClassName}`,
                 style: {
                   stroke: '#ea580c',
                   strokeWidth: 3,
@@ -993,7 +993,7 @@ const StudioContent = () => {
                 target: classNameToId.get(refClassName)!,
                 type: 'smoothstep',
                 animated: false,
-                label: 'oneOf',
+                label: `oneOf:${refClassName}`,
                 style: {
                   stroke: '#9333ea',
                   strokeWidth: 3,

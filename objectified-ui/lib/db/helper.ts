@@ -4,117 +4,44 @@ const connectionPool = require('./db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 
-export async function getUserByEmail(emailAddress: string) {
-  return await connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
-}
+// Helper to standardize error responses
+const errorResponse = (error: string) => JSON.stringify({ success: false, error });
+const successResponse = (data: any = {}) => JSON.stringify({ success: true, ...data });
 
-export async function getUserById(userId: string) {
-  return await connectionPool.query('SELECT * FROM odb.users WHERE id = $1 AND deleted_at IS NULL', [userId]);
-}
+export const getUserByEmail = async (emailAddress: string) =>
+  connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
+
+export const getUserById = async (userId: string) =>
+  connectionPool.query('SELECT * FROM odb.users WHERE id = $1 AND deleted_at IS NULL', [userId]);
+
+const emptyStats = {
+  total_tenants: 0, admin_tenants: 0, total_projects: 0, created_projects: 0,
+  total_versions: 0, created_versions: 0, published_versions: 0, total_classes: 0,
+  total_properties: 0, total_class_properties: 0, last_activity: null
+};
 
 export async function getDashboardStats(userId: string) {
   try {
-    // Get stats for the user across all their tenants
+    const userTenants = '(SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)';
     const result = await connectionPool.query(
       `SELECT 
-        -- Count tenants the user belongs to
-        (SELECT COUNT(DISTINCT tenant_id) 
-         FROM odb.tenant_users 
-         WHERE user_id = $1) as total_tenants,
-        
-        -- Count tenants the user administers
-        (SELECT COUNT(DISTINCT tenant_id) 
-         FROM odb.tenant_administrators 
-         WHERE user_id = $1) as admin_tenants,
-        
-        -- Count projects in user's tenants
-        (SELECT COUNT(DISTINCT p.id)
-         FROM odb.projects p
-         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
-         AND p.deleted_at IS NULL) as total_projects,
-        
-        -- Count projects created by user
-        (SELECT COUNT(*)
-         FROM odb.projects
-         WHERE creator_id = $1 AND deleted_at IS NULL) as created_projects,
-        
-        -- Count versions in user's projects
-        (SELECT COUNT(DISTINCT v.id)
-         FROM odb.versions v
-         JOIN odb.projects p ON v.project_id = p.id
-         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
-         AND v.deleted_at IS NULL) as total_versions,
-        
-        -- Count versions created by user
-        (SELECT COUNT(*)
-         FROM odb.versions
-         WHERE creator_id = $1 AND deleted_at IS NULL) as created_versions,
-        
-        -- Count published versions
-        (SELECT COUNT(DISTINCT v.id)
-         FROM odb.versions v
-         JOIN odb.projects p ON v.project_id = p.id
-         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
-         AND v.published = true
-         AND v.deleted_at IS NULL) as published_versions,
-        
-        -- Count classes across all versions in user's tenants
-        (SELECT COUNT(DISTINCT c.id)
-         FROM odb.classes c
-         JOIN odb.versions v ON c.version_id = v.id
-         JOIN odb.projects p ON v.project_id = p.id
-         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
-         AND c.deleted_at IS NULL
-         AND v.deleted_at IS NULL) as total_classes,
-        
-        -- Count properties in user's projects
-        (SELECT COUNT(DISTINCT pr.id)
-         FROM odb.properties pr
-         JOIN odb.projects p ON pr.project_id = p.id
-         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
-         AND pr.deleted_at IS NULL) as total_properties,
-        
-        -- Count class properties (property instances)
-        (SELECT COUNT(DISTINCT cp.id)
-         FROM odb.class_properties cp
-         JOIN odb.classes c ON cp.class_id = c.id
-         JOIN odb.versions v ON c.version_id = v.id
-         JOIN odb.projects p ON v.project_id = p.id
-         WHERE p.tenant_id IN (SELECT tenant_id FROM odb.tenant_users WHERE user_id = $1)
-         AND c.deleted_at IS NULL
-         AND v.deleted_at IS NULL) as total_class_properties,
-        
-        -- Get most recent activity timestamp
-        (SELECT MAX(created_at)
-         FROM (
-           SELECT created_at FROM odb.projects WHERE creator_id = $1
-           UNION ALL
-           SELECT created_at FROM odb.versions WHERE creator_id = $1
-           UNION ALL
-           SELECT c.created_at FROM odb.classes c
-           JOIN odb.versions v ON c.version_id = v.id
-           WHERE v.creator_id = $1 AND c.deleted_at IS NULL
-         ) activities) as last_activity
-      `,
+        (SELECT COUNT(DISTINCT tenant_id) FROM odb.tenant_users WHERE user_id = $1) as total_tenants,
+        (SELECT COUNT(DISTINCT tenant_id) FROM odb.tenant_administrators WHERE user_id = $1) as admin_tenants,
+        (SELECT COUNT(DISTINCT p.id) FROM odb.projects p WHERE p.tenant_id IN ${userTenants} AND p.deleted_at IS NULL) as total_projects,
+        (SELECT COUNT(*) FROM odb.projects WHERE creator_id = $1 AND deleted_at IS NULL) as created_projects,
+        (SELECT COUNT(DISTINCT v.id) FROM odb.versions v JOIN odb.projects p ON v.project_id = p.id WHERE p.tenant_id IN ${userTenants} AND v.deleted_at IS NULL) as total_versions,
+        (SELECT COUNT(*) FROM odb.versions WHERE creator_id = $1 AND deleted_at IS NULL) as created_versions,
+        (SELECT COUNT(DISTINCT v.id) FROM odb.versions v JOIN odb.projects p ON v.project_id = p.id WHERE p.tenant_id IN ${userTenants} AND v.published = true AND v.deleted_at IS NULL) as published_versions,
+        (SELECT COUNT(DISTINCT c.id) FROM odb.classes c JOIN odb.versions v ON c.version_id = v.id JOIN odb.projects p ON v.project_id = p.id WHERE p.tenant_id IN ${userTenants} AND c.deleted_at IS NULL AND v.deleted_at IS NULL) as total_classes,
+        (SELECT COUNT(DISTINCT pr.id) FROM odb.properties pr JOIN odb.projects p ON pr.project_id = p.id WHERE p.tenant_id IN ${userTenants} AND pr.deleted_at IS NULL) as total_properties,
+        (SELECT COUNT(DISTINCT cp.id) FROM odb.class_properties cp JOIN odb.classes c ON cp.class_id = c.id JOIN odb.versions v ON c.version_id = v.id JOIN odb.projects p ON v.project_id = p.id WHERE p.tenant_id IN ${userTenants} AND c.deleted_at IS NULL AND v.deleted_at IS NULL) as total_class_properties,
+        (SELECT MAX(created_at) FROM (SELECT created_at FROM odb.projects WHERE creator_id = $1 UNION ALL SELECT created_at FROM odb.versions WHERE creator_id = $1 UNION ALL SELECT c.created_at FROM odb.classes c JOIN odb.versions v ON c.version_id = v.id WHERE v.creator_id = $1 AND c.deleted_at IS NULL) activities) as last_activity`,
       [userId]
     );
-
     return JSON.stringify(result.rows[0]);
   } catch (error: any) {
     console.error('Error fetching dashboard stats:', error);
-    return JSON.stringify({
-      total_tenants: 0,
-      admin_tenants: 0,
-      total_projects: 0,
-      created_projects: 0,
-      total_versions: 0,
-      created_versions: 0,
-      published_versions: 0,
-      total_classes: 0,
-      total_properties: 0,
-      total_class_properties: 0,
-      last_activity: null
-    });
+    return JSON.stringify(emptyStats);
   }
 }
 
@@ -122,70 +49,22 @@ export async function getRecentActivity(userId: string, limit: number = 10) {
   try {
     const result = await connectionPool.query(
       `SELECT * FROM (
-        -- Recent projects
-        SELECT 
-          'project' as type,
-          p.id,
-          p.name,
-          p.description,
-          p.created_at,
-          t.name as tenant_name,
-          t.slug as tenant_slug
-        FROM odb.projects p
-        JOIN odb.tenants t ON p.tenant_id = t.id
+        SELECT 'project' as type, p.id, p.name, p.description, p.created_at, t.name as tenant_name, t.slug as tenant_slug
+        FROM odb.projects p JOIN odb.tenants t ON p.tenant_id = t.id
         WHERE p.creator_id = $1 AND p.deleted_at IS NULL
-        
         UNION ALL
-        
-        -- Recent versions
-        SELECT 
-          'version' as type,
-          v.id,
-          v.version_id as name,
-          v.description,
-          v.created_at,
-          t.name as tenant_name,
-          t.slug as tenant_slug
-        FROM odb.versions v
-        JOIN odb.projects p ON v.project_id = p.id
-        JOIN odb.tenants t ON p.tenant_id = t.id
+        SELECT 'version' as type, v.id, v.version_id as name, v.description, v.created_at, t.name as tenant_name, t.slug as tenant_slug
+        FROM odb.versions v JOIN odb.projects p ON v.project_id = p.id JOIN odb.tenants t ON p.tenant_id = t.id
         WHERE v.creator_id = $1 AND v.deleted_at IS NULL
-        
         UNION ALL
-        
-        -- Recent classes
-        SELECT 
-          'class' as type,
-          c.id,
-          c.name,
-          c.description,
-          c.created_at,
-          t.name as tenant_name,
-          t.slug as tenant_slug
-        FROM odb.classes c
-        JOIN odb.versions v ON c.version_id = v.id
-        JOIN odb.projects p ON v.project_id = p.id
-        JOIN odb.tenants t ON p.tenant_id = t.id
+        SELECT 'class' as type, c.id, c.name, c.description, c.created_at, t.name as tenant_name, t.slug as tenant_slug
+        FROM odb.classes c JOIN odb.versions v ON c.version_id = v.id JOIN odb.projects p ON v.project_id = p.id JOIN odb.tenants t ON p.tenant_id = t.id
         WHERE p.creator_id = $1 AND c.deleted_at IS NULL AND v.deleted_at IS NULL
-        
         UNION ALL
-        
-        -- Recent properties
-        SELECT 
-          'property' as type,
-          pr.id,
-          pr.name,
-          pr.description,
-          pr.created_at,
-          t.name as tenant_name,
-          t.slug as tenant_slug
-        FROM odb.properties pr
-        JOIN odb.projects p ON pr.project_id = p.id
-        JOIN odb.tenants t ON p.tenant_id = t.id
+        SELECT 'property' as type, pr.id, pr.name, pr.description, pr.created_at, t.name as tenant_name, t.slug as tenant_slug
+        FROM odb.properties pr JOIN odb.projects p ON pr.project_id = p.id JOIN odb.tenants t ON p.tenant_id = t.id
         WHERE p.creator_id = $1 AND pr.deleted_at IS NULL
-      ) activities
-      ORDER BY created_at DESC
-      LIMIT $2`,
+      ) activities ORDER BY created_at DESC LIMIT $2`,
       [userId, limit]
     );
 
@@ -197,266 +76,151 @@ export async function getRecentActivity(userId: string, limit: number = 10) {
 }
 
 export async function getTenantsForUser(userId: string) {
-  const result = await connectionPool.query('SELECT a.* FROM odb.tenants a, odb.tenant_users b WHERE b.user_id = $1 AND a.id = b.tenant_id', [userId]);
-
+  const result = await connectionPool.query(
+    'SELECT a.* FROM odb.tenants a, odb.tenant_users b WHERE b.user_id = $1 AND a.id = b.tenant_id', [userId]);
   return JSON.stringify(result.rows);
 }
 
 export async function getTenantsAdministratedByUser(userId: string) {
-  // Get all administrators for tenants where the current user is an admin
   const result = await connectionPool.query(
-    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email 
-     FROM odb.tenant_administrators a, odb.users b 
-     WHERE b.id = a.user_id 
-     AND a.tenant_id IN (
-       SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = $1
-     )`,
-    [userId]
-  );
-
+    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email FROM odb.tenant_administrators a, odb.users b 
+     WHERE b.id = a.user_id AND a.tenant_id IN (SELECT tenant_id FROM odb.tenant_administrators WHERE user_id = $1)`,
+    [userId]);
   return JSON.stringify(result.rows);
 }
 
 export async function getTenantUsers(tenantId: string) {
-  // Get all users for a specific tenant (including administrators)
   const result = await connectionPool.query(
-    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email 
-     FROM odb.tenant_users a, odb.users b 
-     WHERE b.id = a.user_id 
-     AND a.tenant_id = $1`,
-    [tenantId]
-  );
-
+    `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email FROM odb.tenant_users a, odb.users b 
+     WHERE b.id = a.user_id AND a.tenant_id = $1`,
+    [tenantId]);
   return JSON.stringify(result.rows);
 }
 
 export async function addTenantAdministrator(tenantId: string, userEmail: string) {
   try {
-    // First, get the user by email
-    const userResult = await connectionPool.query(
-      'SELECT id FROM odb.users WHERE email = $1',
-      [userEmail]
-    );
-
-    if (userResult.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'User not found' });
-    }
+    const userResult = await connectionPool.query('SELECT id FROM odb.users WHERE email = $1', [userEmail]);
+    if (userResult.rowCount === 0) return errorResponse('User not found');
 
     const userId = userResult.rows[0].id;
-
-    // Check if already an admin
     const existingAdmin = await connectionPool.query(
-      'SELECT id FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2',
-      [tenantId, userId]
-    );
+      'SELECT id FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2', [tenantId, userId]);
+    if (existingAdmin.rowCount > 0) return errorResponse('User is already an administrator');
 
-    if (existingAdmin.rowCount > 0) {
-      return JSON.stringify({ success: false, error: 'User is already an administrator' });
-    }
-
-    // Add to tenant_administrators
-    await connectionPool.query(
-      'INSERT INTO odb.tenant_administrators (tenant_id, user_id) VALUES ($1, $2)',
-      [tenantId, userId]
-    );
+    await connectionPool.query('INSERT INTO odb.tenant_administrators (tenant_id, user_id) VALUES ($1, $2)', [tenantId, userId]);
 
     // Ensure user is also in tenant_users
     const existingUser = await connectionPool.query(
-      'SELECT id FROM odb.tenant_users WHERE tenant_id = $1 AND user_id = $2',
-      [tenantId, userId]
-    );
-
+      'SELECT id FROM odb.tenant_users WHERE tenant_id = $1 AND user_id = $2', [tenantId, userId]);
     if (existingUser.rowCount === 0) {
-      await connectionPool.query(
-        'INSERT INTO odb.tenant_users (tenant_id, user_id) VALUES ($1, $2)',
-        [tenantId, userId]
-      );
+      await connectionPool.query('INSERT INTO odb.tenant_users (tenant_id, user_id) VALUES ($1, $2)', [tenantId, userId]);
     }
 
-    return JSON.stringify({ success: true });
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
 export async function addTenantUser(tenantId: string, userEmail: string) {
   try {
-    // First, get the user by email
-    const userResult = await connectionPool.query(
-      'SELECT id FROM odb.users WHERE email = $1',
-      [userEmail]
-    );
-
-    if (userResult.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'User not found' });
-    }
+    const userResult = await connectionPool.query('SELECT id FROM odb.users WHERE email = $1', [userEmail]);
+    if (userResult.rowCount === 0) return errorResponse('User not found');
 
     const userId = userResult.rows[0].id;
-
-    // Check if already a member
     const existingUser = await connectionPool.query(
-      'SELECT id FROM odb.tenant_users WHERE tenant_id = $1 AND user_id = $2',
-      [tenantId, userId]
-    );
+      'SELECT id FROM odb.tenant_users WHERE tenant_id = $1 AND user_id = $2', [tenantId, userId]);
+    if (existingUser.rowCount > 0) return errorResponse('User is already a member of this tenant');
 
-    if (existingUser.rowCount > 0) {
-      return JSON.stringify({ success: false, error: 'User is already a member of this tenant' });
-    }
-
-    // Add to tenant_users
-    await connectionPool.query(
-      'INSERT INTO odb.tenant_users (tenant_id, user_id) VALUES ($1, $2)',
-      [tenantId, userId]
-    );
-
-    return JSON.stringify({ success: true });
+    await connectionPool.query('INSERT INTO odb.tenant_users (tenant_id, user_id) VALUES ($1, $2)', [tenantId, userId]);
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
 export async function removeTenantAdministrator(adminRecordId: string) {
   try {
-    await connectionPool.query(
-      'DELETE FROM odb.tenant_administrators WHERE id = $1',
-      [adminRecordId]
-    );
-
-    return JSON.stringify({ success: true });
+    await connectionPool.query('DELETE FROM odb.tenant_administrators WHERE id = $1', [adminRecordId]);
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
 export async function removeTenantUser(userRecordId: string) {
   try {
-    await connectionPool.query(
-      'DELETE FROM odb.tenant_users WHERE id = $1',
-      [userRecordId]
-    );
-
-    return JSON.stringify({ success: true });
+    await connectionPool.query('DELETE FROM odb.tenant_users WHERE id = $1', [userRecordId]);
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
+const slugRegex = /^[a-z0-9-]+$/;
+const generateSlug = (name: string) =>
+  name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+
+const validateSlug = (slug: string) => {
+  if (!slugRegex.test(slug)) return 'Slug must contain only lowercase letters, numbers, and dashes';
+  return null;
+};
+
 export async function updateTenant(tenantId: string, name: string, description: string, customSlug?: string) {
   try {
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Tenant name cannot be empty' });
-    }
+    if (!name?.trim()) return errorResponse('Tenant name cannot be empty');
 
-    // Use custom slug if provided, otherwise generate from name
-    let slug: string;
-    if (customSlug && customSlug.trim().length > 0) {
-      slug = customSlug.trim().toLowerCase();
-    } else {
-      slug = name
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-    }
+    const slug = customSlug?.trim() || generateSlug(name);
+    const slugError = validateSlug(slug);
+    if (slugError) return errorResponse(slugError);
 
-    // Validate slug format (lowercase alphanumeric and dashes only)
-    const slugRegex = /^[a-z0-9-]+$/;
-    if (!slugRegex.test(slug)) {
-      return JSON.stringify({ success: false, error: 'Slug must contain only lowercase letters, numbers, and dashes' });
-    }
-
-    // Check if slug is unique (excluding current tenant)
     const existingTenant = await connectionPool.query(
-      'SELECT id FROM odb.tenants WHERE slug = $1 AND id != $2',
-      [slug, tenantId]
-    );
-
-    if (existingTenant.rowCount > 0) {
-      return JSON.stringify({ success: false, error: 'A tenant with this slug already exists' });
-    }
+      'SELECT id FROM odb.tenants WHERE slug = $1 AND id != $2', [slug, tenantId]);
+    if (existingTenant.rowCount > 0) return errorResponse('A tenant with this slug already exists');
 
     await connectionPool.query(
       'UPDATE odb.tenants SET name = $1, slug = $2, description = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
-      [name.trim(), slug, description.trim(), tenantId]
-    );
-
-    return JSON.stringify({ success: true, slug });
+      [name.trim(), slug, description.trim(), tenantId]);
+    return successResponse({ slug });
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
 export async function updateUserName(userId: string, name: string) {
   try {
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Name cannot be empty' });
-    }
-
-    await connectionPool.query(
-      'UPDATE odb.users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [name.trim(), userId]
-    );
-
-    return JSON.stringify({ success: true });
+    if (!name?.trim()) return errorResponse('Name cannot be empty');
+    await connectionPool.query('UPDATE odb.users SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [name.trim(), userId]);
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
+const validatePassword = (password: string) => {
+  if (!password || password.length < 8) return 'Password must be at least 8 characters long';
+  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+  if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
+  if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) return 'Password must contain at least one number or special character';
+  return null;
+};
+
 export async function updateUserPassword(userId: string, currentPassword: string, newPassword: string) {
   try {
-    // Validate new password format
-    if (!newPassword || newPassword.length < 8) {
-      return JSON.stringify({ success: false, error: 'Password must be at least 8 characters long' });
-    }
+    const validationError = validatePassword(newPassword);
+    if (validationError) return errorResponse(validationError);
 
-    // Check for uppercase letter
-    if (!/[A-Z]/.test(newPassword)) {
-      return JSON.stringify({ success: false, error: 'Password must contain at least one uppercase letter' });
-    }
+    const userResult = await connectionPool.query('SELECT password FROM odb.users WHERE id = $1', [userId]);
+    if (userResult.rowCount === 0) return errorResponse('User not found');
 
-    // Check for lowercase letter
-    if (!/[a-z]/.test(newPassword)) {
-      return JSON.stringify({ success: false, error: 'Password must contain at least one lowercase letter' });
-    }
+    const isPasswordValid = await bcrypt.compare(currentPassword, userResult.rows[0].password);
+    if (!isPasswordValid) return errorResponse('Current password is incorrect');
 
-    // Check for number or special character
-    if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) {
-      return JSON.stringify({ success: false, error: 'Password must contain at least one number or special character' });
-    }
-
-    // Get current password hash from database
-    const userResult = await connectionPool.query(
-      'SELECT password FROM odb.users WHERE id = $1',
-      [userId]
-    );
-
-    if (userResult.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'User not found' });
-    }
-
-    const currentPasswordHash = userResult.rows[0].password;
-
-    // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, currentPasswordHash);
-    if (!isPasswordValid) {
-      return JSON.stringify({ success: false, error: 'Current password is incorrect' });
-    }
-
-    // Hash new password
-    const saltRounds = 10;
-    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
-
-    // Update password in database
-    await connectionPool.query(
-      'UPDATE odb.users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [newPasswordHash, userId]
-    );
-
-    return JSON.stringify({ success: true });
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    await connectionPool.query('UPDATE odb.users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newPasswordHash, userId]);
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
@@ -465,14 +229,9 @@ export async function updateUserPassword(userId: string, currentPassword: string
 export async function getProjectsForTenant(tenantId: string) {
   try {
     const result = await connectionPool.query(
-      `SELECT p.*, u.name as creator_name, u.email as creator_email
-       FROM odb.projects p
-       LEFT JOIN odb.users u ON p.creator_id = u.id
-       WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
-       ORDER BY p.created_at DESC`,
-      [tenantId]
-    );
-
+      `SELECT p.*, u.name as creator_name, u.email as creator_email FROM odb.projects p 
+       LEFT JOIN odb.users u ON p.creator_id = u.id WHERE p.tenant_id = $1 AND p.deleted_at IS NULL ORDER BY p.created_at DESC`,
+      [tenantId]);
     return JSON.stringify(result.rows);
   } catch (error: any) {
     return JSON.stringify([]);
@@ -481,81 +240,46 @@ export async function getProjectsForTenant(tenantId: string) {
 
 export async function createProject(tenantId: string, creatorId: string, name: string, description: string, slug: string) {
   try {
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Project name is required' });
-    }
-
-    if (!slug || slug.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Project slug is required' });
-    }
-
-    // Validate slug format (lowercase, alphanumeric, dashes only)
-    const slugRegex = /^[a-z0-9-]+$/;
-    if (!slugRegex.test(slug.trim())) {
-      return JSON.stringify({ success: false, error: 'Slug must contain only lowercase letters, numbers, and dashes' });
-    }
+    if (!name?.trim()) return errorResponse('Project name is required');
+    if (!slug?.trim()) return errorResponse('Project slug is required');
+    const slugError = validateSlug(slug.trim());
+    if (slugError) return errorResponse(slugError);
 
     const result = await connectionPool.query(
-      `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [tenantId, creatorId, name.trim(), description?.trim() || null, slug.trim().toLowerCase()]
-    );
-
-    return JSON.stringify({ success: true, project: result.rows[0] });
+      `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [tenantId, creatorId, name.trim(), description?.trim() || null, slug.trim().toLowerCase()]);
+    return successResponse({ project: result.rows[0] });
   } catch (error: any) {
-    if (error.code === '23505') { // Unique constraint violation
-      return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
-    }
-    return JSON.stringify({ success: false, error: error.message });
+    if (error.code === '23505') return errorResponse('A project with this slug already exists in this tenant');
+    return errorResponse(error.message);
   }
 }
 
 export async function updateProject(projectId: string, name: string, description: string, slug: string, enabled: boolean) {
   try {
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Project name is required' });
-    }
-
-    if (!slug || slug.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Project slug is required' });
-    }
-
-    // Validate slug format (lowercase, alphanumeric, dashes only)
-    const slugRegex = /^[a-z0-9-]+$/;
-    if (!slugRegex.test(slug.trim())) {
-      return JSON.stringify({ success: false, error: 'Slug must contain only lowercase letters, numbers, and dashes' });
-    }
+    if (!name?.trim()) return errorResponse('Project name is required');
+    if (!slug?.trim()) return errorResponse('Project slug is required');
+    const slugError = validateSlug(slug.trim());
+    if (slugError) return errorResponse(slugError);
 
     await connectionPool.query(
-      `UPDATE odb.projects 
-       SET name = $1, description = $2, slug = $3, enabled = $4, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5 AND deleted_at IS NULL`,
-      [name.trim(), description?.trim() || null, slug.trim().toLowerCase(), enabled, projectId]
-    );
-
-    return JSON.stringify({ success: true });
+      `UPDATE odb.projects SET name = $1, description = $2, slug = $3, enabled = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 AND deleted_at IS NULL`,
+      [name.trim(), description?.trim() || null, slug.trim().toLowerCase(), enabled, projectId]);
+    return successResponse();
   } catch (error: any) {
-    if (error.code === '23505') { // Unique constraint violation
-      return JSON.stringify({ success: false, error: 'A project with this slug already exists in this tenant' });
-    }
-    return JSON.stringify({ success: false, error: error.message });
+    if (error.code === '23505') return errorResponse('A project with this slug already exists in this tenant');
+    return errorResponse(error.message);
   }
 }
 
 export async function deleteProject(projectId: string) {
   try {
-    // Soft delete - set enabled to false and deleted_at timestamp
     await connectionPool.query(
-      `UPDATE odb.projects 
-       SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND deleted_at IS NULL`,
-      [projectId]
-    );
-
-    return JSON.stringify({ success: true });
+      `UPDATE odb.projects SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`,
+      [projectId]);
+    return successResponse();
   } catch (error: any) {
-    return JSON.stringify({ success: false, error: error.message });
+    return errorResponse(error.message);
   }
 }
 
@@ -564,14 +288,9 @@ export async function deleteProject(projectId: string) {
 export async function getVersionsForProject(projectId: string) {
   try {
     const result = await connectionPool.query(
-      `SELECT v.*, u.name as creator_name, u.email as creator_email
-       FROM odb.versions v
-       LEFT JOIN odb.users u ON v.creator_id = u.id
-       WHERE v.project_id = $1 AND v.deleted_at IS NULL
-       ORDER BY v.created_at DESC`,
-      [projectId]
-    );
-
+      `SELECT v.*, u.name as creator_name, u.email as creator_email FROM odb.versions v 
+       LEFT JOIN odb.users u ON v.creator_id = u.id WHERE v.project_id = $1 AND v.deleted_at IS NULL ORDER BY v.created_at DESC`,
+      [projectId]);
     return JSON.stringify(result.rows);
   } catch (error: any) {
     return JSON.stringify([]);
@@ -581,44 +300,28 @@ export async function getVersionsForProject(projectId: string) {
 export async function getLatestVersionForProject(projectId: string) {
   try {
     const result = await connectionPool.query(
-      `SELECT version_id
-       FROM odb.versions
-       WHERE project_id = $1 AND deleted_at IS NULL
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [projectId]
-    );
-
+      `SELECT version_id FROM odb.versions WHERE project_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+      [projectId]);
     return result.rowCount > 0 ? result.rows[0].version_id : null;
   } catch (error: any) {
     return null;
   }
 }
 
-function parseSemanticVersion(version: string): { major: number, minor: number, patch: number } | null {
+const parseSemanticVersion = (version: string) => {
   const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
-  if (!match) return null;
+  return match ? { major: parseInt(match[1], 10), minor: parseInt(match[2], 10), patch: parseInt(match[3], 10) } : null;
+};
 
-  return {
-    major: parseInt(match[1], 10),
-    minor: parseInt(match[2], 10),
-    patch: parseInt(match[3], 10)
-  };
-}
-
-function bumpMinorVersion(version: string): string {
+const bumpMinorVersion = (version: string) => {
   const parsed = parseSemanticVersion(version);
-  if (!parsed) return '0.1.0';
+  return parsed ? `${parsed.major}.${parsed.minor + 1}.0` : '0.1.0';
+};
 
-  return `${parsed.major}.${parsed.minor + 1}.0`;
-}
-
-function bumpPatchVersion(version: string): string {
+const bumpPatchVersion = (version: string) => {
   const parsed = parseSemanticVersion(version);
-  if (!parsed) return '0.1.0';
-
-  return `${parsed.major}.${parsed.minor}.${parsed.patch + 1}`;
-}
+  return parsed ? `${parsed.major}.${parsed.minor}.${parsed.patch + 1}` : '0.1.0';
+};
 
 export async function copyClassesFromVersion(sourceVersionId: string, targetVersionId: string) {
   try {
