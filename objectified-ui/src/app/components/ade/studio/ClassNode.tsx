@@ -118,21 +118,21 @@ function ClassNode({ data, selected }: NodeProps) {
         if (item.$ref) return item.$ref.split('/').pop();
         return item.type || 'schema';
       }).filter(Boolean);
-      return types.length > 0 ? `allOf(${types.join(', ')})` : 'allOf';
+      return types.length > 0 ? `allOf(${types.length})` : 'allOf';
     }
     if (d?.anyOf && Array.isArray(d.anyOf)) {
       const types = d.anyOf.map((item: any) => {
         if (item.$ref) return item.$ref.split('/').pop();
         return item.type || 'schema';
       }).filter(Boolean);
-      return types.length > 0 ? `anyOf(${types.join(' | ')})` : 'anyOf';
+      return types.length > 0 ? `anyOf(${types.length})` : 'anyOf';
     }
     if (d?.oneOf && Array.isArray(d.oneOf)) {
       const types = d.oneOf.map((item: any) => {
         if (item.$ref) return item.$ref.split('/').pop();
         return item.type || 'schema';
       }).filter(Boolean);
-      return types.length > 0 ? `oneOf(${types.join(' | ')})` : 'oneOf';
+      return types.length > 0 ? `oneOf(${types.length})` : 'oneOf';
     }
 
     if (d?.type === 'array') {
@@ -142,21 +142,21 @@ function ClassNode({ data, selected }: NodeProps) {
           if (item.$ref) return item.$ref.split('/').pop();
           return item.type || 'schema';
         }).filter(Boolean);
-        return types.length > 0 ? `allOf(${types.join(', ')})[]` : 'allOf[]';
+        return types.length > 0 ? `allOf(${types.length})[]` : 'allOf[]';
       }
       if (d.items?.anyOf && Array.isArray(d.items.anyOf)) {
         const types = d.items.anyOf.map((item: any) => {
           if (item.$ref) return item.$ref.split('/').pop();
           return item.type || 'schema';
         }).filter(Boolean);
-        return types.length > 0 ? `anyOf(${types.join(' | ')})[]` : 'anyOf[]';
+        return types.length > 0 ? `anyOf(${types.length})[]` : 'anyOf[]';
       }
       if (d.items?.oneOf && Array.isArray(d.items.oneOf)) {
         const types = d.items.oneOf.map((item: any) => {
           if (item.$ref) return item.$ref.split('/').pop();
           return item.type || 'schema';
         }).filter(Boolean);
-        return types.length > 0 ? `oneOf(${types.join(' | ')})[]` : 'oneOf[]';
+        return types.length > 0 ? `oneOf(${types.length})[]` : 'oneOf[]';
       }
       if (d.items?.$ref) {
         const refName = d.items.$ref.split('/').pop();
