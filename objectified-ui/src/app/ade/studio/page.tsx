@@ -38,7 +38,8 @@ import {
   addPropertyToClass,
   removePropertyFromClass,
   deleteClass,
-  updateClassPropertyRef
+  updateClassPropertyRef,
+  getTenantsForUser
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
@@ -96,6 +97,7 @@ const StudioContent = () => {
   const mermaidPreviewRef = useRef<MermaidPreviewRef>(null);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const [currentTenantName, setCurrentTenantName] = useState<string>('');
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -1250,6 +1252,26 @@ const StudioContent = () => {
     return false;
   };
 
+  // Load current tenant name
+  useEffect(() => {
+    const loadTenantName = async () => {
+      if (session && currentTenantId) {
+        try {
+          const userId = (session.user as any)?.user_id;
+          const result = await getTenantsForUser(userId);
+          const tenants = JSON.parse(result);
+          const currentTenant = tenants.find((t: any) => t.id === currentTenantId);
+          if (currentTenant) {
+            setCurrentTenantName(currentTenant.name);
+          }
+        } catch (error) {
+          console.error('Failed to load tenant name:', error);
+        }
+      }
+    };
+    loadTenantName();
+  }, [session, currentTenantId]);
+
   // Load projects on mount
   useEffect(() => {
     if (currentTenantId) {
@@ -1643,12 +1665,10 @@ const StudioContent = () => {
             </div>
           )}
 
-          {/* Context Display */}
-          {selectedProject && selectedVersion && (
+          {/* Context Display - Tenant Name */}
+          {currentTenantName && (
             <div className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-              <span className="font-medium">{selectedProject.name}</span>
-              <span>/</span>
-              <span className="font-mono">{selectedVersion.version_id}</span>
+              <span className="font-medium">{currentTenantName}</span>
             </div>
           )}
         </div>

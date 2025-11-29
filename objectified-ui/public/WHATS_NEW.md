@@ -10,6 +10,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Modified canvas layout to improve visibility and usability
   - Auto layout buttons are now more concise and compact
   - Automatically returns to canvas view when changing projects or versions
+  - Canvas now displays current tenant name in upper right corner
 - Enhanced button styling with consistent text transformation across the application
 - Improved status pill visibility with borders in light mode
 - Mermaid mode improvements:
