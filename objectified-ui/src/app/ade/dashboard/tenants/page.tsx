@@ -551,6 +551,7 @@ const Tenants = () => {
                             onClick={() => handleEditTenant(tenant)}
                             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
                             title="Edit tenant"
+                            style={{ textTransform: 'none' }}
                           >
                             <Edit2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                           </button>
@@ -559,6 +560,7 @@ const Tenants = () => {
                           <button
                             onClick={() => handleSelectTenant(tenant)}
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer transition-colors text-sm font-medium"
+                            style={{ textTransform: 'none' }}
                           >
                             Select
                           </button>

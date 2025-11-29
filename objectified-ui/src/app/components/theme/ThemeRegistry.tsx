@@ -14,6 +14,22 @@ const theme = createTheme({
   typography: {
     fontFamily: 'var(--font-inter)',
   },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+        },
+      },
+    },
+  },
 });
 
 export default function ThemeRegistry({ children }: { children: React.ReactNode }) {

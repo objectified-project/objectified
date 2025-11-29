@@ -307,7 +307,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     bgcolor: classEditFormat === 'json' ? 'primary.dark' : 'action.hover',
                   },
                 }}
-                style={{ textTransform: 'none' }}
               >
                 JSON
               </Button>
@@ -325,7 +324,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     bgcolor: classEditFormat === 'yaml' ? 'primary.dark' : 'action.hover',
                   },
                 }}
-                style={{ textTransform: 'none' }}
               >
                 YAML
               </Button>
@@ -343,7 +341,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     bgcolor: classEditFormat === 'example' ? 'primary.dark' : 'action.hover',
                   },
                 }}
-                style={{ textTransform: 'none' }}
               >
                 Example
               </Button>
@@ -359,7 +356,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 onClick={() => setExampleRefreshKey(prev => prev + 1)}
                 variant="outlined"
                 title="Generate new example"
-                style={{ textTransform: 'none' }}
               >
                 Refresh
               </Button>
@@ -370,7 +366,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               onClick={handleCopy}
               variant="outlined"
               disabled={copied}
-              style={{ textTransform: 'none' }}
             >
               {copied ? 'Copied' : 'Copy'}
             </Button>
@@ -379,7 +374,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               startIcon={<Download size={16} />}
               onClick={handleExport}
               variant="contained"
-              style={{ textTransform: 'none' }}
             >
               Export
             </Button>

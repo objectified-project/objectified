@@ -205,7 +205,6 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             value="classes"
             sx={{
               minHeight: 48,
-              textTransform: 'none',
               fontWeight: currentTab === 'classes' ? 600 : 400,
             }}
           />
@@ -214,7 +213,6 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             value="properties"
             sx={{
               minHeight: 48,
-              textTransform: 'none',
               fontWeight: currentTab === 'properties' ? 600 : 400,
             }}
           />
