@@ -4,7 +4,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
-import { Copy, Download } from 'lucide-react';
+import { Copy, Download, Check } from 'lucide-react';
 import Switch from '@mui/material/Switch';
 import YAML from 'yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
@@ -118,6 +118,10 @@ const StudioContent = () => {
   // Canvas loading state
   const [isLoadingCanvas, setIsLoadingCanvas] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+
+  // Copy button states
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [mermaidCopied, setMermaidCopied] = useState(false);
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -1919,21 +1923,24 @@ const StudioContent = () => {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       const content = codeFormat === 'json'
                         ? openApiSpec
                         : YAML.stringify(JSON.parse(openApiSpec));
                       navigator.clipboard.writeText(content);
-                      await alertDialog({
-                        message: `OpenAPI specification (${codeFormat.toUpperCase()}) copied to clipboard!`,
-                        variant: 'success',
-                      });
+                      setCodeCopied(true);
+                      setTimeout(() => setCodeCopied(false), 2000);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                    disabled={codeCopied}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      codeCopied
+                        ? 'bg-gray-500 text-white'
+                        : 'bg-gray-600 hover:bg-gray-700 text-white'
+                    }`}
                     title="Copy to clipboard"
                   >
-                    <Copy size={14} />
-                    Copy
+                    {codeCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {codeCopied ? 'Copied' : 'Copy'}
                   </button>
                   <button
                     onClick={() => {
@@ -2034,18 +2041,21 @@ const StudioContent = () => {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       navigator.clipboard.writeText(mermaidCode);
-                      await alertDialog({
-                        message: 'Mermaid diagram code copied to clipboard!',
-                        variant: 'success',
-                      });
+                      setMermaidCopied(true);
+                      setTimeout(() => setMermaidCopied(false), 2000);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
+                    disabled={mermaidCopied}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      mermaidCopied
+                        ? 'bg-gray-500 text-white cursor-not-allowed'
+                        : 'bg-gray-600 hover:bg-gray-700 text-white'
+                    }`}
                     title="Copy to clipboard"
                   >
-                    <Copy size={14} />
-                    Copy
+                    {mermaidCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {mermaidCopied ? 'Copied' : 'Copy'}
                   </button>
                   <button
                     onClick={() => {

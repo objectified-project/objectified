@@ -9,11 +9,10 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { Copy, Download, RefreshCw } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
-import { useDialog } from '../../providers/DialogProvider';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -34,9 +33,9 @@ interface ClassEditDialogProps {
 }
 
 const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false }: ClassEditDialogProps) => {
-  const { alert: alertDialog } = useDialog();
   const [classEditFormat, setClassEditFormat] = useState<'json' | 'yaml' | 'example'>('json');
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   if (!editingClassData) return null;
 
@@ -216,10 +215,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     }
 
     navigator.clipboard.writeText(content);
-    alertDialog({
-      message: `${classEditFormat === 'example' ? 'Example data' : 'Schema'} copied to clipboard as ${classEditFormat.toUpperCase()}!`,
-      variant: 'success',
-    });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleExport = () => {
@@ -310,6 +307,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     bgcolor: classEditFormat === 'json' ? 'primary.dark' : 'action.hover',
                   },
                 }}
+                style={{ textTransform: 'none' }}
               >
                 JSON
               </Button>
@@ -327,6 +325,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     bgcolor: classEditFormat === 'yaml' ? 'primary.dark' : 'action.hover',
                   },
                 }}
+                style={{ textTransform: 'none' }}
               >
                 YAML
               </Button>
@@ -344,8 +343,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     bgcolor: classEditFormat === 'example' ? 'primary.dark' : 'action.hover',
                   },
                 }}
+                style={{ textTransform: 'none' }}
               >
-                EXAMPLE
+                Example
               </Button>
             </Box>
           </Box>
@@ -359,23 +359,27 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 onClick={() => setExampleRefreshKey(prev => prev + 1)}
                 variant="outlined"
                 title="Generate new example"
+                style={{ textTransform: 'none' }}
               >
                 Refresh
               </Button>
             )}
             <Button
               size="small"
-              startIcon={<Copy size={16} />}
+              startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
               onClick={handleCopy}
               variant="outlined"
+              disabled={copied}
+              style={{ textTransform: 'none' }}
             >
-              Copy
+              {copied ? 'Copied' : 'Copy'}
             </Button>
             <Button
               size="small"
               startIcon={<Download size={16} />}
               onClick={handleExport}
               variant="contained"
+              style={{ textTransform: 'none' }}
             >
               Export
             </Button>
