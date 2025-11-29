@@ -4,12 +4,13 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
-import { Copy, Download, Check, MoveUp, MoveDown, MoveLeft, MoveRight } from 'lucide-react';
+import { Copy, Download, Check, MoveUp, MoveDown, MoveLeft, MoveRight, Eye, Code } from 'lucide-react';
 import Switch from '@mui/material/Switch';
 import YAML from 'yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
+import MermaidPreview, { type MermaidPreviewRef } from '../../components/ade/studio/MermaidPreview';
 import { generateOpenApiSpec } from '../../utils/openapi';
 import { useDialog } from '../../components/providers/DialogProvider';
 import {
@@ -90,6 +91,9 @@ const StudioContent = () => {
   // Sample OpenAPI spec - will be replaced with actual data from project/version
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
   const [mermaidCode, setMermaidCode] = useState<string>('');
+  const [mermaidViewMode, setMermaidViewMode] = useState<'code' | 'preview'>('preview');
+  const [mermaidSvgReady, setMermaidSvgReady] = useState(false);
+  const mermaidPreviewRef = useRef<MermaidPreviewRef>(null);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
@@ -2041,78 +2045,142 @@ const StudioContent = () => {
                   </p>
                 </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(mermaidCode);
-                      setMermaidCopied(true);
-                      setTimeout(() => setMermaidCopied(false), 2000);
-                    }}
-                    disabled={mermaidCopied}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      mermaidCopied
-                        ? 'bg-gray-500 text-white cursor-not-allowed'
-                        : 'bg-gray-600 hover:bg-gray-700 text-white'
-                    }`}
-                    title="Copy to clipboard"
-                  >
-                    {mermaidCopied ? <Check size={14} /> : <Copy size={14} />}
-                    {mermaidCopied ? 'Copied' : 'Copy'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Create a blob from the Mermaid code
-                      const blob = new Blob([mermaidCode], { type: 'text/plain' });
-                      const url = URL.createObjectURL(blob);
+                <div className="flex gap-2 items-center">
+                  {/* View Mode Toggle */}
+                  <div className="flex border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                    <button
+                      onClick={() => setMermaidViewMode('preview')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                        mermaidViewMode === 'preview'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title="Preview diagram"
+                    >
+                      <Eye size={14} />
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => setMermaidViewMode('code')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                        mermaidViewMode === 'code'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title="View code"
+                    >
+                      <Code size={14} />
+                      Code
+                    </button>
+                  </div>
 
-                      // Create a temporary download link
-                      const link = document.createElement('a');
-                      link.href = url;
+                  {/* Mode-specific actions */}
+                  {mermaidViewMode === 'preview' ? (
+                    <>
+                      <button
+                        onClick={() => mermaidPreviewRef.current?.exportSVG()}
+                        disabled={!mermaidSvgReady}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded transition-colors"
+                        title="Export as SVG"
+                      >
+                        <Download size={14} />
+                        SVG
+                      </button>
+                      <button
+                        onClick={() => mermaidPreviewRef.current?.exportPNG()}
+                        disabled={!mermaidSvgReady}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded transition-colors"
+                        title="Export as PNG"
+                      >
+                        <Download size={14} />
+                        PNG
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(mermaidCode);
+                          setMermaidCopied(true);
+                          setTimeout(() => setMermaidCopied(false), 2000);
+                        }}
+                        disabled={mermaidCopied}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                          mermaidCopied
+                            ? 'bg-gray-500 text-white cursor-not-allowed'
+                            : 'bg-gray-600 hover:bg-gray-700 text-white'
+                        }`}
+                        title="Copy code to clipboard"
+                      >
+                        {mermaidCopied ? <Check size={14} /> : <Copy size={14} />}
+                        {mermaidCopied ? 'Copied' : 'Copy'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Create a blob from the Mermaid code
+                          const blob = new Blob([mermaidCode], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
 
-                      // Generate filename from project and version
-                      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram';
-                      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-                      link.download = `${projectSlug}-${versionSlug}-diagram.mmd`;
+                          // Create a temporary download link
+                          const link = document.createElement('a');
+                          link.href = url;
 
-                      // Trigger download
-                      document.body.appendChild(link);
-                      link.click();
+                          // Generate filename from project and version
+                          const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram';
+                          const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+                          link.download = `${projectSlug}-${versionSlug}-diagram.mmd`;
 
-                      // Cleanup
-                      document.body.removeChild(link);
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                    title="Download as .mmd file"
-                  >
-                    <Download size={14} />
-                    Export
-                  </button>
+                          // Trigger download
+                          document.body.appendChild(link);
+                          link.click();
+
+                          // Cleanup
+                          document.body.removeChild(link);
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                        title="Download as .mmd file"
+                      >
+                        <Download size={14} />
+                        Export
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
             <div className="flex-1">
-              <Editor
-                height="100%"
-                language="markdown"
-                value={mermaidCode || '# No classes defined'}
-                theme="vs-dark"
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: true },
-                  scrollBeyondLastLine: false,
-                  fontSize: 13,
-                  lineNumbers: 'on',
-                  renderWhitespace: 'selection',
-                  automaticLayout: true,
-                  wordWrap: 'on',
-                  folding: true,
-                  formatOnPaste: true,
-                  formatOnType: true,
-                  contextmenu: true,
-                  selectOnLineNumbers: true,
-                }}
-              />
+              {mermaidViewMode === 'preview' ? (
+                <MermaidPreview
+                  ref={mermaidPreviewRef}
+                  code={mermaidCode}
+                  projectSlug={selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram'}
+                  versionSlug={selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0'}
+                  onSvgReady={setMermaidSvgReady}
+                />
+              ) : (
+                <Editor
+                  height="100%"
+                  language="markdown"
+                  value={mermaidCode || '# No classes defined'}
+                  theme="vs-dark"
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: true },
+                    scrollBeyondLastLine: false,
+                    fontSize: 13,
+                    lineNumbers: 'on',
+                    renderWhitespace: 'selection',
+                    automaticLayout: true,
+                    wordWrap: 'on',
+                    folding: true,
+                    formatOnPaste: true,
+                    formatOnType: true,
+                    contextmenu: true,
+                    selectOnLineNumbers: true,
+                  }}
+                />
+              )}
             </div>
           </div>
         ) : null}
