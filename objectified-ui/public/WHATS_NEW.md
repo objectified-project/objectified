@@ -25,7 +25,7 @@ designing, and managing your OpenAPI designs through an interactive UML interfac
   - Generate diffs between versions to see changes
 - So much more ...
 
-View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for tutorials and walkthroughs!
+View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
 ---
 
@@ -37,5 +37,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: November 21, 2025*
+*Last updated: November 28, 2025*
 
