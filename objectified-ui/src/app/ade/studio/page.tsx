@@ -1450,6 +1450,7 @@ const StudioContent = () => {
     setSelectedProjectId(e.target.value);
     setSelectedVersionId(''); // Reset version when project changes
     setIsReadOnly(false); // Reset read-only flag when version is cleared
+    setViewMode('canvas'); // Reset view to canvas when project changes
   };
 
   const handleVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -1459,6 +1460,9 @@ const StudioContent = () => {
     // Update read-only status based on whether version is published
     const version = versions.find(v => v.id === versionId);
     setIsReadOnly(version?.published || false);
+
+    // Reset view to canvas when version changes
+    setViewMode('canvas');
   };
 
   const onConnect = useCallback(
