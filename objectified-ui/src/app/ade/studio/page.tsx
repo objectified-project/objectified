@@ -4,7 +4,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
-import { Copy, Download, Check } from 'lucide-react';
+import { Copy, Download, Check, MoveUp, MoveDown, MoveLeft, MoveRight } from 'lucide-react';
 import Switch from '@mui/material/Switch';
 import YAML from 'yaml';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
@@ -1821,62 +1821,64 @@ const StudioContent = () => {
                     }}
                   />
                 </div>
-                <button
-                  onClick={() => onLayout('TB')}
-                  disabled={!autoLayoutEnabled}
-                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'TB' && autoLayoutEnabled
-                      ? 'bg-blue-600 text-white'
-                      : autoLayoutEnabled
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                  }`}
-                  title="Top to Bottom"
-                >
-                  ↓ Vertical
-                </button>
-                <button
-                  onClick={() => onLayout('LR')}
-                  disabled={!autoLayoutEnabled}
-                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'LR' && autoLayoutEnabled
-                      ? 'bg-blue-600 text-white'
-                      : autoLayoutEnabled
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                  }`}
-                  title="Left to Right"
-                >
-                  → Horizontal
-                </button>
-                <button
-                  onClick={() => onLayout('BT')}
-                  disabled={!autoLayoutEnabled}
-                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'BT' && autoLayoutEnabled
-                      ? 'bg-blue-600 text-white'
-                      : autoLayoutEnabled
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                  }`}
-                  title="Bottom to Top"
-                >
-                  ↑ Vertical (Up)
-                </button>
-                <button
-                  onClick={() => onLayout('RL')}
-                  disabled={!autoLayoutEnabled}
-                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                    layoutDirection === 'RL' && autoLayoutEnabled
-                      ? 'bg-blue-600 text-white'
-                      : autoLayoutEnabled
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                  }`}
-                  title="Right to Left"
-                >
-                  ← Horizontal (Rev)
-                </button>
+                <div className="flex flex-row gap-2">
+                  <button
+                    onClick={() => onLayout('TB')}
+                    disabled={!autoLayoutEnabled}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      layoutDirection === 'TB' && autoLayoutEnabled
+                        ? 'bg-blue-600 text-white'
+                        : autoLayoutEnabled
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                    title="Top to Bottom"
+                  >
+                    <MoveDown size={12}/>
+                  </button>
+                  <button
+                    onClick={() => onLayout('LR')}
+                    disabled={!autoLayoutEnabled}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      layoutDirection === 'LR' && autoLayoutEnabled
+                        ? 'bg-blue-600 text-white'
+                        : autoLayoutEnabled
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                    title="Left to Right"
+                  >
+                    <MoveRight size={12}/>
+                  </button>
+                  <button
+                    onClick={() => onLayout('BT')}
+                    disabled={!autoLayoutEnabled}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      layoutDirection === 'BT' && autoLayoutEnabled
+                        ? 'bg-blue-600 text-white'
+                        : autoLayoutEnabled
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                    title="Bottom to Top"
+                  >
+                    <MoveUp size={12}/>
+                  </button>
+                  <button
+                    onClick={() => onLayout('RL')}
+                    disabled={!autoLayoutEnabled}
+                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      layoutDirection === 'RL' && autoLayoutEnabled
+                        ? 'bg-blue-600 text-white'
+                        : autoLayoutEnabled
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                    }`}
+                    title="Right to Left"
+                  >
+                    <MoveLeft size={12}/>
+                  </button>
+                </div>
               </div>
             </Panel>
           </ReactFlow>
