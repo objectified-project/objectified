@@ -518,7 +518,7 @@ const Tenants = () => {
                           {tenant.name}
                         </div>
                         {tenant.id === currentTenantId && (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-800 dark:border-transparent">
                             Current
                           </span>
                         )}
@@ -534,11 +534,11 @@ const Tenants = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {tenant.enabled ? (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-800 dark:border-transparent">
                           Enabled
                         </span>
                       ) : (
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-800 dark:border-transparent">
                           Disabled
                         </span>
                       )}
@@ -687,13 +687,13 @@ const Tenants = () => {
                                     <td className="px-6 py-4 whitespace-nowrap">
                                       <div className="flex gap-2">
                                         {member.isAdmin && (
-                                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-800 dark:border-transparent">
                                             <Shield className="h-3 w-3" />
                                             Admin
                                           </span>
                                         )}
                                         {member.isMember && (
-                                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                                          <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-800 dark:border-transparent">
                                             <Users className="h-3 w-3" />
                                             Member
                                           </span>
@@ -956,3 +956,5 @@ const Tenants = () => {
 };
 
 export default Tenants;
+
+

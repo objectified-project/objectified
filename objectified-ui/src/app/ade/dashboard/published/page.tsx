@@ -433,6 +433,12 @@ const PublishedVersions = () => {
                               onClick={() => handleToggleVisibility(version)}
                               disabled={changingVisibility === version.id}
                               className="bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 cursor-pointer hover:bg-green-200 dark:hover:bg-green-900/60 transition-colors"
+                              sx={{
+                                border: (theme) =>
+                                  theme.palette.mode === 'light'
+                                    ? '1px solid rgb(22, 101, 52)'
+                                    : 'none',
+                              }}
                             />
                           ) : (
                             <Chip
@@ -442,6 +448,12 @@ const PublishedVersions = () => {
                               onClick={() => handleToggleVisibility(version)}
                               disabled={changingVisibility === version.id}
                               className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                              sx={{
+                                border: (theme) =>
+                                  theme.palette.mode === 'light'
+                                    ? '1px solid rgb(31, 41, 55)'
+                                    : 'none',
+                              }}
                             />
                           )}
                         </div>
