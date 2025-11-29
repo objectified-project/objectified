@@ -351,13 +351,53 @@ export async function copyClassesFromVersion(sourceVersionId: string, targetVers
         const newClassId = copiedClass.id;
 
         // Copy all class properties (including parent_id for nested properties)
-        await connectionPool.query(
-          `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
-           SELECT $1, property_id, name, description, data, parent_id
+        // We need to map old property IDs to new ones to maintain parent_id relationships
+        
+        // First, get all properties from the original class
+        const originalPropertiesResult = await connectionPool.query(
+          `SELECT id, property_id, name, description, data, parent_id
            FROM odb.class_properties
-           WHERE class_id = $2`,
-          [newClassId, originalClassId]
+           WHERE class_id = $1`,
+          [originalClassId]
         );
+
+        const oldToNewIdMap = new Map<string, string>();
+        const allProperties = originalPropertiesResult.rows;
+        const processedIds = new Set<string>();
+
+        // Recursive function to copy properties level by level (breadth-first)
+        // This ensures parent properties are created before their children
+        const copyPropertiesRecursively = async (parentId: string | null) => {
+          // Find all properties with the given parent_id
+          const propsAtThisLevel = allProperties.filter(
+            (p: any) => (p.parent_id === parentId || (p.parent_id === null && parentId === null)) && !processedIds.has(p.id)
+          );
+
+          // Copy each property at this level
+          for (const prop of propsAtThisLevel) {
+            // Resolve the new parent_id (will be null for top-level, or mapped ID for nested)
+            const newParentId = prop.parent_id ? oldToNewIdMap.get(prop.parent_id) || null : null;
+
+            // Insert the property with the updated parent_id
+            const insertResult = await connectionPool.query(
+              `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               RETURNING id`,
+              [newClassId, prop.property_id, prop.name, prop.description, prop.data, newParentId]
+            );
+
+            // Map the old property ID to the new one
+            const newId = insertResult.rows[0].id;
+            oldToNewIdMap.set(prop.id, newId);
+            processedIds.add(prop.id);
+
+            // Recursively copy children of this property
+            await copyPropertiesRecursively(prop.id);
+          }
+        };
+
+        // Start with top-level properties (parent_id = null)
+        await copyPropertiesRecursively(null);
       }
     }
 
