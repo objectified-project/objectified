@@ -277,17 +277,13 @@ const StudioContent = () => {
     }, 50);
   }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
 
-  // Handle property drop on class
+// Handle property drop on class
   const handlePropertyDrop = useCallback(async (classId: string, propertyData: any, parentId?: string | null) => {
-    // Prevent edits in read-only mode
-    if (isReadOnly) {
-      return;
-    }
+    if (isReadOnly) return;
 
     try {
       console.log('Property dropped on class:', classId, propertyData, 'parentId:', parentId);
 
-      // Add property to class in database
       const result = await addPropertyToClass(
         classId,
         propertyData.id,
@@ -307,7 +303,6 @@ const StudioContent = () => {
           minItems: propertyData.minItems,
           maxItems: propertyData.maxItems,
           uniqueItems: propertyData.uniqueItems,
-          // Preserve array item schema when present (e.g., items: { type: 'object' } or $ref)
           items: propertyData.items,
           enum: propertyData.enum,
           default: propertyData.default,
@@ -318,44 +313,7 @@ const StudioContent = () => {
 
       const response = JSON.parse(result);
       if (response.success) {
-        // Reload classes to show updated properties
-        if (selectedVersionId) {
-          setIsLoadingCanvas(true);
-          setLoadingMessage('Property added, updating canvas...');
-
-          const classesResult = await getClassesForVersion(selectedVersionId);
-          const classesData = JSON.parse(classesResult);
-
-          setLoadingMessage('Reloading properties...');
-
-          // Load properties for each class
-          const classesWithProperties = await Promise.all(
-            classesData.map(async (cls: any) => {
-              const propsResult = await getPropertiesForClass(cls.id);
-              const properties = JSON.parse(propsResult);
-              return { ...cls, properties };
-            })
-          );
-
-          setLoadingMessage('Updating canvas...');
-
-          // Preserve existing node positions when updating properties (no auto-layout)
-          const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
-          const newNodes = await classesToNodes(classesWithProperties);
-          // Restore positions from existing nodes
-          newNodes.forEach(node => {
-            const existingPos = existingPositions.get(node.id);
-            if (existingPos) {
-              node.position = existingPos;
-            }
-          });
-          const newEdges = createAllEdges(classesWithProperties);
-          setNodes(newNodes);
-          setEdges(newEdges);
-
-          setIsLoadingCanvas(false);
-          setLoadingMessage('');
-        }
+        await reloadClasses(false); // Reuse existing reload function without layout
       } else {
         await alertDialog({
           message: response.error || 'Failed to add property to class',
@@ -369,64 +327,23 @@ const StudioContent = () => {
         variant: 'error',
       });
     }
-  }, [selectedVersionId, setNodes, nodes, isReadOnly, alertDialog]);
+  }, [isReadOnly, reloadClasses, alertDialog]);
 
   // Keep ref updated
   handlePropertyDropRef.current = handlePropertyDrop;
 
   // Handle property deletion from class
   const handlePropertyDelete = useCallback(async (classId: string, classPropertyId: string) => {
-    // Prevent edits in read-only mode
-    if (isReadOnly) {
-      return;
-    }
+    if (isReadOnly) return;
 
     try {
       console.log('Removing property from class:', classId, classPropertyId);
 
-      // Remove property from class in database
       const result = await removePropertyFromClass(classPropertyId);
       const response = JSON.parse(result);
 
       if (response.success) {
-        // Reload classes to show updated properties
-        if (selectedVersionId) {
-          setIsLoadingCanvas(true);
-          setLoadingMessage('Property removed, updating canvas...');
-
-          const classesResult = await getClassesForVersion(selectedVersionId);
-          const classesData = JSON.parse(classesResult);
-
-          setLoadingMessage('Reloading properties...');
-
-          // Load properties for each class
-          const classesWithProperties = await Promise.all(
-            classesData.map(async (cls: any) => {
-              const propsResult = await getPropertiesForClass(cls.id);
-              const properties = JSON.parse(propsResult);
-              return { ...cls, properties };
-            })
-          );
-
-          setLoadingMessage('Updating canvas...');
-
-          // Preserve existing node positions when updating properties (no auto-layout)
-          const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
-          const newNodes = await classesToNodes(classesWithProperties);
-          // Restore positions from existing nodes
-          newNodes.forEach(node => {
-            const existingPos = existingPositions.get(node.id);
-            if (existingPos) {
-              node.position = existingPos;
-            }
-          });
-          const newEdges = createAllEdges(classesWithProperties);
-          setNodes(newNodes);
-          setEdges(newEdges);
-
-          setIsLoadingCanvas(false);
-          setLoadingMessage('');
-        }
+        await reloadClasses(false); // Reuse existing reload function without layout
       } else {
         await alertDialog({
           message: response.error || 'Failed to remove property from class',
@@ -440,7 +357,7 @@ const StudioContent = () => {
         variant: 'error',
       });
     }
-  }, [selectedVersionId, setNodes, nodes, isReadOnly]);
+  }, [isReadOnly, reloadClasses, alertDialog]);
 
   // Keep ref updated
   handlePropertyDeleteRef.current = handlePropertyDelete;
