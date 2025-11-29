@@ -155,19 +155,39 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       return;
     }
 
-    // Build schema
-    const schema: any = { type: 'object' };
+    // Build schema - preserve existing schema structure when editing
+    let schema: any;
+    if (classDialog.mode === 'edit' && classDialog.selectedClass) {
+      // Start with existing schema to preserve properties, required, and other fields
+      const existingSchema = typeof classDialog.selectedClass.schema === 'string'
+        ? JSON.parse(classDialog.selectedClass.schema)
+        : classDialog.selectedClass.schema;
+      schema = { ...existingSchema };
+    } else {
+      // New class - start with basic object type
+      schema = { type: 'object' };
+    }
 
+    // Update composition keywords
     if (classForm.allOf.length > 0) {
       schema.allOf = classForm.allOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
-    }
-    if (classForm.anyOf.length > 0) {
-      schema.anyOf = classForm.anyOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
-    }
-    if (classForm.oneOf.length > 0) {
-      schema.oneOf = classForm.oneOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
+    } else {
+      delete schema.allOf;
     }
 
+    if (classForm.anyOf.length > 0) {
+      schema.anyOf = classForm.anyOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
+    } else {
+      delete schema.anyOf;
+    }
+
+    if (classForm.oneOf.length > 0) {
+      schema.oneOf = classForm.oneOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
+    } else {
+      delete schema.oneOf;
+    }
+
+    // Update discriminator
     if (classForm.discriminatorProperty?.trim() && (classForm.allOf.length > 0 || classForm.anyOf.length > 0 || classForm.oneOf.length > 0)) {
       schema.discriminator = { propertyName: classForm.discriminatorProperty.trim() };
       if (classForm.discriminatorUseAuto) {
@@ -182,10 +202,15 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           });
         }
       }
+    } else {
+      delete schema.discriminator;
     }
 
+    // Update additionalProperties
     if (classForm.additionalProperties !== null) {
       schema.additionalProperties = classForm.additionalProperties;
+    } else {
+      delete schema.additionalProperties;
     }
 
     try {

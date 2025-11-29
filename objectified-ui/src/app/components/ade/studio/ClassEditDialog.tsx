@@ -105,7 +105,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       }
 
       // Keep other properties from the original schema
-      const { allOf, ...rest } = schema;
+      const { allOf, required: restRequired, properties: restProperties, ...rest } = schema;
+
+      // Merge properties from original schema (these are additional properties)
+      if (restProperties) {
+        merged.properties = { ...merged.properties, ...restProperties };
+      }
+
+      // Merge required from original schema
+      if (restRequired) {
+        restRequired.forEach((field: string) => requiredSet.add(field));
+        merged.required = Array.from(requiredSet);
+      }
+
       return { ...merged, ...rest };
     }
 
@@ -152,6 +164,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     try {
       // Resolve all $ref references for json-schema-faker
       const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+
+      // Debug: Log the resolved schema to verify allOf merging
+      console.log('Original schema:', classSchema);
+      console.log('Resolved schema for example generation:', resolvedSchema);
+      console.log('Resolved schema properties:', resolvedSchema.properties);
 
       // Use exampleRefreshKey in random seed to force regeneration
       jsf.option({

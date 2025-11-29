@@ -174,12 +174,21 @@ export function buildClassSchema(classData: any): any {
   let classSchema: any;
 
   if (hasComposition) {
-    // Preserve composition structure - don't add type, properties, or required at root
-    // These belong inside the composition items, not at the root level
+    // Preserve composition structure
+    // If we have properties from class_properties table, add them alongside the composition
+    // This is valid OpenAPI - properties at the same level as allOf represent additional fields
     classSchema = {
       description: classData.description || undefined,
       ...schemaWithoutProperties
     };
+
+    // Add properties if we have any defined in the class_properties table
+    if (Object.keys(properties).length > 0) {
+      classSchema.properties = properties;
+      if (required.length > 0) {
+        classSchema.required = required;
+      }
+    }
   } else {
     // Normal schema without compositions - build as usual
     classSchema = {
