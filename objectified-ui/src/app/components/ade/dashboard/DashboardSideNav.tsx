@@ -112,10 +112,7 @@ const DashboardSideNav: React.FC = () => {
                         borderRadius: 1,
                         mb: 0.5,
                         '&:hover': {
-                          bgcolor: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? 'rgba(0, 0, 0, 0.25)'
-                              : 'rgba(255, 255, 255, 0.08)',
+                          bgcolor: (theme) => '#4B5563'
                         },
                         '&.Mui-selected': {
                           bgcolor: 'primary.main',
