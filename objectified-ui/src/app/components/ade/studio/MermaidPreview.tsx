@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import mermaid from 'mermaid';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 interface MermaidPreviewProps {
   code: string;
@@ -22,6 +22,7 @@ const MermaidPreview = forwardRef<MermaidPreviewRef, MermaidPreviewProps>(
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [svg, setSvg] = useState<string>('');
+  const [zoom, setZoom] = useState<number>(100);
 
   useEffect(() => {
     // Initialize mermaid
@@ -144,12 +145,66 @@ const MermaidPreview = forwardRef<MermaidPreviewRef, MermaidPreviewProps>(
     );
   }
 
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(prev + 25, 400));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(prev - 25, 25));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(100);
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className="h-full overflow-auto p-8 flex items-center justify-center bg-white dark:bg-gray-900"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900 relative">
+      {/* Zoom Controls */}
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-2">
+        <button
+          onClick={handleZoomIn}
+          disabled={zoom >= 400}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          title="Zoom In"
+        >
+          <ZoomIn size={16} className="text-gray-700 dark:text-gray-300" />
+        </button>
+        <div className="text-xs font-medium text-center text-gray-700 dark:text-gray-300 px-1">
+          {zoom}%
+        </div>
+        <button
+          onClick={handleZoomOut}
+          disabled={zoom <= 25}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          title="Zoom Out"
+        >
+          <ZoomOut size={16} className="text-gray-700 dark:text-gray-300" />
+        </button>
+        <div className="border-t border-gray-300 dark:border-gray-600 my-1"></div>
+        <button
+          onClick={handleResetZoom}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex items-center justify-center"
+          title="Reset Zoom (100%)"
+        >
+          <Maximize2 size={16} className="text-gray-700 dark:text-gray-300" />
+        </button>
+      </div>
+
+      {/* Scrollable Diagram Container */}
+      <div className="flex-1 overflow-auto">
+        <div className="min-w-full min-h-full p-8 flex items-start justify-center">
+          <div
+            ref={containerRef}
+            style={{
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.2s ease-out',
+            }}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        </div>
+      </div>
+    </div>
   );
 });
 
