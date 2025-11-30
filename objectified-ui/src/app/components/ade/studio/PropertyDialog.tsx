@@ -397,7 +397,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 }}
                 SelectProps={{ native: true }}
                 disabled={mode === 'edit'}
-                helperText={mode === 'edit' ? 'Type cannot be changed after creation' : '$ref is a placeholder for class references set via canvas connections'}
+                helperText={mode === 'edit' ? 'Type cannot be changed after creation' : ''}
                 sx={{ flex: 1 }}
               >
                 <option value="string">string</option>
@@ -406,7 +406,6 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 <option value="boolean">boolean</option>
                 <option value="object">object</option>
                 <option value="null">null</option>
-                <option value="$ref">$ref (class reference placeholder)</option>
               </TextField>
             </Box>
 
