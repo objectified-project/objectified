@@ -1,304 +1,128 @@
-# OpenAPI Import Feature - Implementation Summary
+# Mermaid Image Export Feature - Implementation Summary
 
-## Overview
+## What Was Implemented
 
-Successfully implemented the ability to import OpenAPI specifications when creating a new project in Objectified. The feature provides a user-friendly interface with drag-and-drop file upload, class selection, and automatic property reuse across classes.
+### 1. New MermaidPreview Component
+**File**: `src/app/components/ade/studio/MermaidPreview.tsx`
 
-## Files Created
+Features:
+- Renders Mermaid diagrams using the `mermaid` library
+- Displays rendered SVG in a scrollable container
+- Exposes export methods via React ref (forwardRef pattern)
+- Export to SVG (vector format)
+- Export to PNG (raster format with white background)
+- Error handling with user-friendly messages
+- Responsive design with proper styling
+- Clean, minimal UI (no internal header - keeps UX consistent)
 
-### 1. Core Utilities
-- **`src/app/utils/openapi-import.ts`** (204 lines)
-  - `parseOpenAPISpec()`: Parses OpenAPI 3.x JSON/YAML specifications
-  - `validateImportedClasses()`: Validates class and property uniqueness
-  - `consolidateProperties()`: Identifies reusable properties across classes
-  - Filters out unsupported inline object properties automatically
-  - Supports both JSON and YAML formats using `js-yaml` library
+### 2. Updated Studio Page
+**File**: `src/app/ade/studio/page.tsx`
 
-### 2. UI Components
-- **`src/app/components/ade/dashboard/OpenAPIImportDialog.tsx`** (438 lines)
-  - Multi-step wizard interface (Upload → Review → Details)
-  - Drag-and-drop file upload with visual feedback
-  - Class selection with property preview (shows up to 10 properties per class)
-  - Auto-fills project details from OpenAPI metadata
-  - Real-time validation and error handling
-  - Material-UI components for consistent styling
+Changes:
+- Added imports for `Eye`, `Code` icons and `MermaidPreview` component with ref type
+- Added `mermaidViewMode` state to toggle between 'code' and 'preview'
+- Added `mermaidPreviewRef` using useRef to access MermaidPreview methods
+- Added toggle buttons in the header (Preview/Code)
+- **All export buttons consolidated in the main header** (no button shifting between modes)
+- Conditional rendering:
+  - Preview mode: Shows MermaidPreview component, header shows SVG/PNG buttons
+  - Code mode: Shows Monaco editor, header shows Copy/Export .mmd buttons
+- Export buttons remain in consistent positions (prevents UI shifting)
 
-### 3. Database Functions
-- **`lib/db/helper.ts`** (Modified - added 96 lines)
-  - `importProjectFromOpenAPI()`: Handles bulk import in a transaction
-  - Creates: Project → Version → Properties → Classes → Class-Property links
-  - Implements property reuse strategy (identical properties stored once)
-  - Rollback on failure to maintain data integrity
-  - Uses PostgreSQL connection pooling from existing db.ts
+### 3. Package Dependencies
+**File**: `package.json`
 
-### 4. Modified Pages
-- **`src/app/ade/dashboard/projects/page.tsx`** (Modified)
-  - Added tabbed interface in "Create New Project" dialog
-  - Tab 1: "From Scratch" (existing functionality)
-  - Tab 2: "From OpenAPI Import" (new functionality)
-  - Integrated OpenAPIImportDialog component
-  - Success callback to refresh project list after import
+Added:
+- `mermaid: ^11.4.1` - For rendering Mermaid diagrams
 
-### 5. API Routes (Placeholder)
-- **`src/app/api/openapi/import/route.ts`** (Minimal - for Next.js)
-- **`src/app/api/openapi/parse/route.ts`** (Minimal - for Next.js)
-  - Not used for actual functionality (client-side only)
-  - Added to satisfy Next.js route structure and TypeScript
+### 4. Documentation
+Created:
+- `MERMAID_SETUP.md` - Comprehensive setup and usage guide
+- Updated `public/WHATS_NEW.md` - Release notes for v0.4.1
 
-### 6. Documentation & Examples
-- **`docs/OPENAPI_IMPORT_FEATURE.md`** (Comprehensive documentation)
-- **`docs/sample-openapi.json`** (Sample e-commerce API with 5 schemas)
+## How It Works
 
-## Key Features Implemented
+### Preview Mode (Default)
+1. User switches to Mermaid tab in Studio
+2. MermaidPreview component receives the Mermaid code and ref
+3. Component initializes mermaid library with default settings
+4. Renders the diagram as SVG using `mermaid.render()`
+5. Displays the SVG in a scrollable container (no internal header)
+6. Parent component controls SVG and PNG exports via ref methods
+7. Export buttons in main header call ref.exportSVG() and ref.exportPNG()
 
-### ✅ User Experience
-- Drag-and-drop file upload interface
-- Multi-step wizard with progress indication
-- Class selection with property count display
-- Auto-fill project details from OpenAPI metadata
-- Visual feedback for selected/unselected classes
-- Inline error messages with helpful guidance
+### Code Mode
+1. User clicks "Code" toggle button
+2. Shows Monaco editor with Mermaid syntax
+3. Provides Copy and Export (.mmd file) buttons
+4. Read-only mode with syntax highlighting
 
-### ✅ Data Processing
-- Parse OpenAPI 3.x specifications (JSON and YAML)
-- Extract schemas from `components/schemas` section
-- Filter out inline object properties (not supported)
-- Handle `$ref` references for schema composition
-- Preserve property metadata (descriptions, formats, enums, etc.)
-- Maintain required field information
+### Image Export
 
-### ✅ Property Reuse Strategy
-- Identify identical properties across classes
-- Store unique properties once in `properties` table
-- Link properties to classes via `class_properties` junction table
-- Use JSON serialization for property comparison
-- Reduces data duplication and maintains consistency
+#### SVG Export
+- Creates a Blob from the rendered SVG string
+- Downloads as a .svg file
+- Preserves vector quality
 
-### ✅ Database Transactions
-- All operations wrapped in a transaction
-- Rollback on any failure
-- Create project, version, properties, classes atomically
-- Handle constraint violations gracefully
-- Return detailed error messages
+#### PNG Export
+1. Creates an Image element from SVG Blob
+2. Draws the image onto a Canvas element
+3. Adds white background and padding
+4. Converts canvas to PNG Blob
+5. Downloads as a .png file
 
-### ✅ Validation
-- OpenAPI version check (must be 3.x)
-- Schema existence validation
-- Duplicate property name detection
-- Project slug format validation
-- Semantic version format validation
-- At least one class must be selected
+## Key Features
 
-## Technical Architecture
+✅ **Visual Rendering**: Mermaid diagrams display as beautiful, interactive graphics
+✅ **Dual Modes**: Toggle between preview and code views
+✅ **Multiple Export Formats**: SVG for vectors, PNG for raster images
+✅ **Consistent UX**: All action buttons in main header, no shifting between modes
+✅ **Error Handling**: Clear error messages for invalid syntax
+✅ **Professional Naming**: Files named based on project slug and version
+✅ **Responsive UI**: Clean, modern interface with proper dark mode support
+✅ **Minimal Design**: No redundant headers, streamlined interface
 
-```
-User Interface Layer
-├── Projects Page (Tabbed Dialog)
-└── OpenAPIImportDialog Component
-    ├── Step 1: Upload (File Selection)
-    ├── Step 2: Review (Class Selection)
-    └── Step 3: Details (Project Information)
+## Installation Required
 
-Processing Layer
-├── openapi-import.ts (Parsing & Validation)
-└── OpenAPIImportDialog.tsx (UI State Management)
-
-Data Layer
-├── helper.ts (Database Operations)
-└── db.ts (Connection Pool)
-
-Database Schema
-├── projects (Project records)
-├── versions (Version records)
-├── properties (Unique property definitions)
-├── classes (Class definitions)
-└── class_properties (Class-property relationships)
+Users need to run:
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
 ```
 
-## Property Reuse Example
+This will install the `mermaid` package and its dependencies.
 
-Given two classes:
-```json
-{
-  "Product": {
-    "properties": {
-      "id": { "type": "string", "format": "uuid" },
-      "name": { "type": "string" }
-    }
-  },
-  "Customer": {
-    "properties": {
-      "id": { "type": "string", "format": "uuid" },
-      "name": { "type": "string" }
-    }
-  }
-}
-```
+## User Experience Flow
 
-Result:
-- 2 unique properties created: `id` (uuid string), `name` (string)
-- 2 classes created: `Product`, `Customer`
-- 4 class-property links: Product→id, Product→name, Customer→id, Customer→name
+1. **Navigate to Studio** → Select project/version → Switch to Mermaid tab
+2. **Default View**: Rendered diagram in Preview mode
+3. **Toggle to Code**: Click "Code" button to see raw syntax
+4. **Export Options**:
+   - Preview mode: SVG or PNG buttons
+   - Code mode: Copy or Export .mmd buttons
+5. **Download**: Files automatically download with proper naming
 
-## Supported OpenAPI Features
+## Benefits
 
-| Feature | Supported | Notes |
-|---------|-----------|-------|
-| OpenAPI 3.x | ✅ | JSON and YAML formats |
-| Schema extraction | ✅ | From `components/schemas` |
-| Basic types | ✅ | string, number, integer, boolean |
-| Array types | ✅ | Including arrays with `$ref` |
-| Property formats | ✅ | uuid, email, date-time, etc. |
-| Enums | ✅ | Preserved in property data |
-| Required fields | ✅ | Stored in property data |
-| Descriptions | ✅ | For schemas and properties |
-| `$ref` references | ✅ | For schema composition |
-| Inline objects | ❌ | Filtered out automatically |
-| Nested properties | ❌ | Not supported by platform |
+- **Better Visualization**: See class diagrams as they're meant to be seen
+- **Documentation Ready**: Export high-quality images for docs
+- **Flexibility**: Choose between vector (SVG) and raster (PNG)
+- **User-Friendly**: Simple toggle between code and visual views
+- **Professional**: Consistent naming and clean exports
 
-## Testing Instructions
+## Future Enhancements (Potential)
 
-### Manual Test with Sample File
+- Dark theme support for rendered diagrams
+- Additional export formats (PDF, JPEG)
+- Zoom controls in preview mode
+- Custom color themes
+- Inline editing of Mermaid code
+- Diagram annotations
 
-1. Start the development server:
-   ```bash
-   cd objectified-ui
-   npm run dev
-   ```
+---
 
-2. Navigate to Projects page:
-   - Log in to the application
-   - Go to Dashboard → Projects
-   - Ensure a tenant is selected
-
-3. Import sample specification:
-   - Click "New Project" button
-   - Select "From OpenAPI Import" tab
-   - Click "Start Import"
-   - Upload `docs/sample-openapi.json`
-
-4. Review and import:
-   - Verify 5 classes are shown: Product, Customer, Address, Order, OrderItem
-   - Check property counts match expected values
-   - Verify descriptions are displayed
-   - Proceed to project details
-   - Confirm auto-filled name: "Sample E-commerce API"
-   - Click "Import Project"
-
-5. Verify results:
-   - Check project appears in list
-   - Navigate to Studio to view imported classes
-   - Verify properties are correctly linked
-
-### Expected Results
-
-- **Project**: "Sample E-commerce API"
-- **Version**: "1.0.0"
-- **Classes**: 5 (all selected by default)
-- **Properties**: ~25 unique properties
-- **Import Time**: < 5 seconds
-
-## Error Handling
-
-The implementation handles these scenarios:
-
-1. **Invalid file format**: "Failed to parse OpenAPI specification"
-2. **Wrong version**: "Only OpenAPI 3.x specifications are supported"
-3. **No schemas**: "No schemas found in OpenAPI specification"
-4. **All filtered**: "No valid schemas found to import"
-5. **Duplicate slug**: "A project with this slug already exists"
-6. **No selection**: "Please select at least one class to import"
-7. **Database error**: Transaction rollback with error message
-
-## Performance Considerations
-
-- **File Size**: Tested with specs up to 100 schemas
-- **Memory**: Client-side parsing minimal overhead
-- **Database**: Single transaction for all operations
-- **Property Deduplication**: O(n*m) where n=classes, m=properties per class
-- **UI Responsiveness**: Non-blocking file upload with progress feedback
-
-## Future Enhancements
-
-Potential improvements noted in documentation:
-1. OpenAPI 2.0 (Swagger) support
-2. Import into existing projects (merge mode)
-3. Support for `allOf`, `oneOf`, `anyOf` compositions
-4. Import API paths and operations
-5. Preview mode with diff comparison
-6. Batch import multiple specs
-7. Export modified specs back to OpenAPI
-
-## Dependencies
-
-Existing dependencies used:
-- `js-yaml` (v4.1.0): YAML parsing
-- `@mui/material` (v7.3.4): UI components
-- `lucide-react` (v0.548.0): Icons
-- `pg` (v8.16.3): PostgreSQL client
-- `next-auth` (v4.24.11): Authentication
-
-No new dependencies added.
-
-## Database Impact
-
-New records created per import:
-- 1 project record
-- 1 version record
-- N property records (unique properties)
-- M class records (selected schemas)
-- N*M class_properties records (worst case, fewer if properties are reused)
-
-Example for sample spec:
-- 1 project
-- 1 version
-- ~25 properties
-- 5 classes
-- ~25 class_properties (reuse reduces this)
-
-## Security Considerations
-
-- ✅ File size limits enforced by browser
-- ✅ SQL injection prevented (parameterized queries)
-- ✅ Transaction rollback on error
-- ✅ User authentication required
-- ✅ Tenant isolation enforced
-- ✅ Input validation on all fields
-- ⚠️ Large files could cause browser memory issues (add size check in future)
-
-## Backwards Compatibility
-
-- ✅ No breaking changes to existing functionality
-- ✅ "From Scratch" workflow unchanged
-- ✅ Existing database schema compatible
-- ✅ No migration required
-- ✅ Graceful degradation if feature not used
-
-## Code Quality
-
-- TypeScript with full type safety
-- No TypeScript errors or warnings
-- Consistent code style with existing codebase
-- Comprehensive inline comments
-- Error handling at all levels
-- Reusable utility functions
-- Component composition (separation of concerns)
-
-## Completion Status
-
-✅ **COMPLETE** - All requirements met:
-- [x] Drag-and-drop or file selection dialog
-- [x] Tabulated form ("From Scratch" and "From Import")
-- [x] Verify classes before import
-- [x] Select/deselect classes
-- [x] Show properties for each class
-- [x] Filter out inline object properties
-- [x] Import from components/schemas only
-- [x] Reuse identical properties
-- [x] Database helper functions
-- [x] Avoid REST endpoints (client-side only)
-- [x] Documentation
-- [x] Sample OpenAPI file
-
-The feature is ready for use and testing!
+**Implementation Date**: November 29, 2025
 

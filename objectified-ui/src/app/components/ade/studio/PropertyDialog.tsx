@@ -511,49 +511,50 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                     These constraints apply to each {propertyType} item in the array
                   </Typography>
                 )}
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  <TextField
-                    margin="dense"
-                    label="Minimum"
-                    type="number"
-                    fullWidth
-                    value={propertyMinimum}
-                    onChange={(e) => setPropertyMinimum(e.target.value)}
-                    sx={{ mb: 2 }}
-                  />
-
-                  <TextField
-                    margin="dense"
-                    label="Maximum"
-                    type="number"
-                    fullWidth
-                    value={propertyMaximum}
-                    onChange={(e) => setPropertyMaximum(e.target.value)}
-                    sx={{ mb: 2 }}
-                  />
-                </div>
-
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={propertyExclusiveMinimum}
-                        onChange={(e) => setPropertyExclusiveMinimum(e.target.checked)}
-                        disabled={!propertyMinimum}
-                      />
-                    }
-                    label="Exclusive Minimum"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={propertyExclusiveMaximum}
-                        onChange={(e) => setPropertyExclusiveMaximum(e.target.checked)}
-                        disabled={!propertyMaximum}
-                      />
-                    }
-                    label="Exclusive Maximum"
-                  />
+                  <div style={{ flex: 1 }}>
+                    <TextField
+                      margin="dense"
+                      label="Minimum"
+                      type="number"
+                      fullWidth
+                      value={propertyMinimum}
+                      onChange={(e) => setPropertyMinimum(e.target.value)}
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={propertyExclusiveMinimum}
+                          onChange={(e) => setPropertyExclusiveMinimum(e.target.checked)}
+                          disabled={!propertyMinimum}
+                        />
+                      }
+                      label="Exclusive Minimum"
+                      sx={{ mt: 0.5 }}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <TextField
+                      margin="dense"
+                      label="Maximum"
+                      type="number"
+                      fullWidth
+                      value={propertyMaximum}
+                      onChange={(e) => setPropertyMaximum(e.target.value)}
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={propertyExclusiveMaximum}
+                          onChange={(e) => setPropertyExclusiveMaximum(e.target.checked)}
+                          disabled={!propertyMaximum}
+                        />
+                      }
+                      label="Exclusive Maximum"
+                      sx={{ mt: 0.5 }}
+                    />
+                  </div>
                 </div>
 
                 <TextField
