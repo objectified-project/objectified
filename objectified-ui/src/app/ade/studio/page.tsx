@@ -12,6 +12,7 @@ import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEd
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
 import MermaidPreview, { type MermaidPreviewRef } from '../../components/ade/studio/MermaidPreview';
 import { generateOpenApiSpec } from '../../utils/openapi';
+import { generateArazzoSpec } from '../../utils/arazzo';
 import { useDialog } from '../../components/providers/DialogProvider';
 import {
   ReactFlow,
@@ -88,10 +89,11 @@ const StudioContent = () => {
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [codeFormat, setCodeFormat] = useState<'json' | 'yaml'>('json');
-  const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'other'>('openapi');
+  const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'arazzo'>('openapi');
 
   // Sample OpenAPI spec - will be replaced with actual data from project/version
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
+  const [arazzoSpec, setArazzoSpec] = useState<string>('');
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [mermaidViewMode, setMermaidViewMode] = useState<'code' | 'preview'>('preview');
   const [mermaidSvgReady, setMermaidSvgReady] = useState(false);
@@ -255,6 +257,13 @@ const StudioContent = () => {
         version: currentVersion?.version_id
       });
       setOpenApiSpec(spec);
+
+      // Generate Arazzo spec
+      const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
+        projectName: currentProject?.name,
+        version: currentVersion?.version_id
+      });
+      setArazzoSpec(arazzoSpecContent);
     } catch (error) {
       console.error('Failed to reload classes:', error);
     } finally {
@@ -1366,6 +1375,13 @@ const StudioContent = () => {
         });
         setOpenApiSpec(spec);
 
+        // Generate Arazzo specification
+        const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
+          projectName: currentProject?.name,
+          version: currentVersion?.version_id
+        });
+        setArazzoSpec(arazzoSpecContent);
+
         setLoadingMessage('Generating Mermaid diagram...');
 
         // Generate Mermaid diagram
@@ -1420,7 +1436,14 @@ const StudioContent = () => {
               version: currentVersion?.version_id
             });
             setOpenApiSpec(spec);
-            console.log('Regenerated OpenAPI spec for view mode:', viewMode);
+
+            // Generate fresh Arazzo specification
+            const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
+              projectName: currentProject?.name,
+              version: currentVersion?.version_id
+            });
+            setArazzoSpec(arazzoSpecContent);
+            console.log('Regenerated OpenAPI and Arazzo specs for view mode:', viewMode);
           } else if (viewMode === 'mermaid') {
             // Generate fresh Mermaid diagram
             const mermaid = generateMermaidDiagram(classesWithProperties);
@@ -1922,12 +1945,12 @@ const StudioContent = () => {
                 <div className="flex items-center gap-4">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {codeDisplayFormat === 'openapi' ? 'OpenAPI 3.1.0 Specification' : 'Other Format'}
+                      {codeDisplayFormat === 'openapi' ? 'OpenAPI 3.1.0 Specification' : 'Arazzo Specification v1.0.1'}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {codeDisplayFormat === 'openapi'
                         ? `Complete schema definition for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : 'Additional format coming soon'}
+                        : `Workflow specification for ${selectedProject?.name} v${selectedVersion?.version_id}`}
                     </p>
                   </div>
 
@@ -1935,17 +1958,16 @@ const StudioContent = () => {
                   <div className="flex items-center gap-2">
                     <select
                       value={codeDisplayFormat}
-                      onChange={(e) => setCodeDisplayFormat(e.target.value as 'openapi' | 'other')}
+                      onChange={(e) => setCodeDisplayFormat(e.target.value as 'openapi' | 'arazzo')}
                       className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="openapi">OpenAPI</option>
-                      <option value="other" disabled>Other (Coming Soon)</option>
+                      <option value="openapi">OpenAPI Specification</option>
+                      <option value="arazzo">Arazzo Specification</option>
                     </select>
                   </div>
 
-                  {/* Format Toggle (JSON/YAML) - Only show for OpenAPI */}
-                  {codeDisplayFormat === 'openapi' && (
-                    <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                  {/* Format Toggle (JSON/YAML) */}
+                  <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
                       <button
                         onClick={() => setCodeFormat('json')}
                         className={`px-3 py-1 text-xs font-medium transition-colors ${
@@ -1967,133 +1989,127 @@ const StudioContent = () => {
                         YAML
                       </button>
                     </div>
-                  )}
                 </div>
 
                 <div className="flex gap-2">
-                  {codeDisplayFormat === 'openapi' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          const content = codeFormat === 'json'
-                            ? openApiSpec
-                            : YAML.stringify(JSON.parse(openApiSpec));
-                          navigator.clipboard.writeText(content);
-                          setCodeCopied(true);
-                          setTimeout(() => setCodeCopied(false), 2000);
-                        }}
-                        disabled={codeCopied}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                          codeCopied
-                            ? 'bg-gray-500 text-white cursor-not-allowed'
-                            : 'bg-gray-600 hover:bg-gray-700 text-white'
-                        }`}
-                        title="Copy to clipboard"
-                      >
-                        {codeCopied ? <Check size={14} /> : <Copy size={14} />}
-                        {codeCopied ? 'Copied' : 'Copy'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Get content in selected format
-                          const content = codeFormat === 'json'
-                            ? openApiSpec
-                            : YAML.stringify(JSON.parse(openApiSpec));
-                          const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
-                          const extension = codeFormat === 'json' ? 'json' : 'yaml';
+                  <>
+                    <button
+                      onClick={() => {
+                        const specContent = codeDisplayFormat === 'openapi' ? openApiSpec : arazzoSpec;
+                        const content = codeFormat === 'json'
+                          ? specContent
+                          : YAML.stringify(JSON.parse(specContent));
+                        navigator.clipboard.writeText(content);
+                        setCodeCopied(true);
+                        setTimeout(() => setCodeCopied(false), 2000);
+                      }}
+                      disabled={codeCopied}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                        codeCopied
+                          ? 'bg-gray-500 text-white cursor-not-allowed'
+                          : 'bg-gray-600 hover:bg-gray-700 text-white'
+                      }`}
+                      title="Copy to clipboard"
+                    >
+                      {codeCopied ? <Check size={14} /> : <Copy size={14} />}
+                      {codeCopied ? 'Copied' : 'Copy'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Get content in selected format
+                        const specContent = codeDisplayFormat === 'openapi' ? openApiSpec : arazzoSpec;
+                        const content = codeFormat === 'json'
+                          ? specContent
+                          : YAML.stringify(JSON.parse(specContent));
+                        const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
+                        const extension = codeFormat === 'json' ? 'json' : 'yaml';
 
-                          // Create a blob from the OpenAPI spec
-                          const blob = new Blob([content], { type: mimeType });
-                          const url = URL.createObjectURL(blob);
+                        // Create a blob from the spec
+                        const blob = new Blob([content], { type: mimeType });
+                        const url = URL.createObjectURL(blob);
 
-                          // Create a temporary download link
-                          const link = document.createElement('a');
-                          link.href = url;
+                        // Create a temporary download link
+                        const link = document.createElement('a');
+                        link.href = url;
 
-                          // Generate filename from project and version
-                          const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
-                          const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-                          link.download = `${projectSlug}-${versionSlug}-openapi.${extension}`;
+                        // Generate filename from project and version
+                        const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
+                        const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+                        const specType = codeDisplayFormat === 'openapi' ? 'openapi' : 'arazzo';
+                        link.download = `${projectSlug}-${versionSlug}-${specType}.${extension}`;
 
-                          // Trigger download
-                          document.body.appendChild(link);
-                          link.click();
+                        // Trigger download
+                        document.body.appendChild(link);
+                        link.click();
 
-                          // Cleanup
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(url);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                        title={`Download as ${codeFormat.toUpperCase()} file`}
-                      >
-                        <Download size={14} />
-                        Export
-                      </button>
-                    </>
-                  )}
+                        // Cleanup
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                      title={`Download as ${codeFormat.toUpperCase()} file`}
+                    >
+                      <Download size={14} />
+                      Export
+                    </button>
+                  </>
                 </div>
               </div>
             </div>
             <div className="flex-1">
-              {codeDisplayFormat === 'openapi' ? (
-                <Editor
-                  height="100%"
-                  language={codeFormat}
-                  value={(() => {
-                    if (!openApiSpec) {
-                      const emptySpec = {
-                        openapi: '3.1.0',
-                        info: {
-                          title: 'No classes defined',
-                          version: '1.0.0'
-                        },
-                        components: {
-                          schemas: {}
-                        }
-                      };
-                      return codeFormat === 'json'
-                        ? JSON.stringify(emptySpec, null, 2)
-                        : YAML.stringify(emptySpec);
-                    }
+              <Editor
+                height="100%"
+                language={codeFormat}
+                value={(() => {
+                  const specContent = codeDisplayFormat === 'openapi' ? openApiSpec : arazzoSpec;
 
+                  if (!specContent) {
+                    const emptySpec = codeDisplayFormat === 'openapi'
+                      ? {
+                          openapi: '3.1.0',
+                          info: {
+                            title: 'No classes defined',
+                            version: '1.0.0'
+                          },
+                          components: {
+                            schemas: {}
+                          }
+                        }
+                      : {
+                          arazzo: '1.0.1',
+                          info: {
+                            title: 'No workflows defined',
+                            version: '1.0.0'
+                          },
+                          sourceDescriptions: [],
+                          workflows: []
+                        };
                     return codeFormat === 'json'
-                      ? openApiSpec
-                      : YAML.stringify(JSON.parse(openApiSpec));
-                  })()}
-                  theme="vs-dark"
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: true },
-                    scrollBeyondLastLine: false,
-                    fontSize: 13,
-                    lineNumbers: 'on',
-                    renderWhitespace: 'selection',
-                    automaticLayout: true,
-                    wordWrap: 'on',
-                    folding: true,
-                    formatOnPaste: true,
-                    formatOnType: true,
-                    contextmenu: true,
-                    selectOnLineNumbers: true,
-                  }}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-                  <div className="text-center p-8">
-                    <div className="text-gray-400 dark:text-gray-500 mb-3">
-                      <svg className="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Additional Format Coming Soon
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      More display formats will be available in a future update
-                    </p>
-                  </div>
-                </div>
-              )}
+                      ? JSON.stringify(emptySpec, null, 2)
+                      : YAML.stringify(emptySpec);
+                  }
+
+                  return codeFormat === 'json'
+                    ? specContent
+                    : YAML.stringify(JSON.parse(specContent));
+                })()}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: true },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  lineNumbers: 'on',
+                  renderWhitespace: 'selection',
+                  automaticLayout: true,
+                  wordWrap: 'on',
+                  folding: true,
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  contextmenu: true,
+                  selectOnLineNumbers: true,
+                }}
+              />
             </div>
           </div>
         ) : viewMode === 'mermaid' ? (

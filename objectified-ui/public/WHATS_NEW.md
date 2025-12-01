@@ -13,7 +13,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Canvas now displays current tenant name instead of project/version in upper right corner
 - Enhanced Code view with display format selector
   - OpenAPI format selected by default
-  - Additional formats coming soon
+  - Added Arazzo 1.0.1 generation support
   - Format selector dropdown for easy switching
 - Enhanced button styling with consistent text transformation across the application
 - Properties form enhancements:
