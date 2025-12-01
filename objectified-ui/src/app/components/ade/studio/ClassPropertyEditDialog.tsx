@@ -21,6 +21,7 @@ import ListItemText from '@mui/material/ListItemText';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { updateClassProperty } from '../../../../../lib/db/helper';
+import { RegexTester } from './RegexTester';
 
 interface Props {
   open: boolean;
@@ -539,6 +540,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                     helperText="Regular expression pattern for validation"
                     sx={{ mt: 2 }}
                   />
+                  <RegexTester pattern={editPropPattern} />
                   <TextField
                     label="Format"
                     size="small"

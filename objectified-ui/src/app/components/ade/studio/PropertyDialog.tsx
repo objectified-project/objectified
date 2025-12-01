@@ -19,6 +19,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { RegexTester } from './RegexTester';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -475,6 +476,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                   helperText="Regular expression pattern for validation"
                   sx={{ mb: 2 }}
                 />
+
+                <RegexTester pattern={propertyPattern} />
 
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <TextField
