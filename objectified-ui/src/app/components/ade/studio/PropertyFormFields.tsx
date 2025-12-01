@@ -84,12 +84,27 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       return;
     }
 
-    if (data.enum?.includes(enumInput.trim())) {
+    const trimmedValue = enumInput.trim();
+
+    // Validate based on data type
+    if (baseType === 'number' || baseType === 'integer') {
+      const numValue = Number(trimmedValue);
+      if (isNaN(numValue)) {
+        setEnumError(`Value must be a valid ${baseType}`);
+        return;
+      }
+      if (baseType === 'integer' && !Number.isInteger(numValue)) {
+        setEnumError('Value must be an integer (no decimals)');
+        return;
+      }
+    }
+
+    if (data.enum?.includes(trimmedValue)) {
       setEnumError('This value already exists');
       return;
     }
 
-    onChange('enum', [...(data.enum || []), enumInput.trim()]);
+    onChange('enum', [...(data.enum || []), trimmedValue]);
     setEnumInput('');
     setEnumError('');
   };
@@ -304,25 +319,37 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       )}
 
       {/* Enum Values */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Allowed Values (Enum)
-        </Typography>
+      {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Allowed Values (Enum)
+          </Typography>
+          {isArray && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Enum values apply to each item in the array
+            </Typography>
+          )}
 
-        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-          <TextField
-            label="Add Enum Value"
-            size={size}
-            fullWidth
-            value={enumInput}
-            onChange={(e) => {
-              setEnumInput(e.target.value);
-              setEnumError('');
-            }}
-            onKeyDown={handleEnumKeyPress}
-            error={!!enumError}
-            helperText={enumError || 'Press Enter to add'}
-          />
+          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <TextField
+              label="Add Enum Value"
+              size={size}
+              fullWidth
+              type={baseType === 'string' ? 'text' : 'number'}
+              value={enumInput}
+              onChange={(e) => {
+                setEnumInput(e.target.value);
+                setEnumError('');
+              }}
+              onKeyDown={handleEnumKeyPress}
+              error={!!enumError}
+              helperText={enumError || `Enter a ${baseType} value and press Enter`}
+              placeholder={
+                baseType === 'integer' ? 'e.g., 1, 2, 3' :
+                baseType === 'number' ? 'e.g., 1.5, 2.0, 3.14' :
+                'e.g., "active", "pending"'
+              }
+            />
           <IconButton
             onClick={handleAddEnum}
             color="primary"
@@ -358,7 +385,8 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             ))}
           </List>
         )}
-      </Box>
+        </Box>
+      )}
 
       {/* Default Value */}
       <TextField
