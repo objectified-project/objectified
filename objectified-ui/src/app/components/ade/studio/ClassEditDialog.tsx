@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -36,6 +36,14 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [classEditFormat, setClassEditFormat] = useState<'json' | 'yaml' | 'example'>('json');
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
+
+  // Reset view to JSON when dialog opens
+  useEffect(() => {
+    if (open) {
+      setClassEditFormat('json');
+      setExampleRefreshKey(0);
+    }
+  }, [open]);
 
   if (!editingClassData) return null;
 
