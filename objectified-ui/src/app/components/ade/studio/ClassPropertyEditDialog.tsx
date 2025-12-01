@@ -9,19 +9,12 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Checkbox from '@mui/material/Checkbox';
 import Radio from '@mui/material/Radio';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
 import { updateClassProperty } from '../../../../../lib/db/helper';
-import { RegexTester } from './RegexTester';
+import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
 
 interface Props {
   open: boolean;
@@ -33,31 +26,11 @@ interface Props {
 
 export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved }: Props) {
   const [editPropName, setEditPropName] = useState('');
-  const [editPropDescription, setEditPropDescription] = useState('');
-  const [editPropRequired, setEditPropRequired] = useState(false);
-  const [editPropDeprecated, setEditPropDeprecated] = useState(false);
-  const [editPropReadOnly, setEditPropReadOnly] = useState(false);
-  const [editPropWriteOnly, setEditPropWriteOnly] = useState(false);
-  const [editPropExample, setEditPropExample] = useState('');
   const [editPropAdditionalProperties, setEditPropAdditionalProperties] = useState<'default' | 'true' | 'false'>('default');
   const [editPropertyError, setEditPropertyError] = useState('');
 
-  // Constraint fields
-  const [editPropMinLength, setEditPropMinLength] = useState('');
-  const [editPropMaxLength, setEditPropMaxLength] = useState('');
-  const [editPropPattern, setEditPropPattern] = useState('');
-  const [editPropFormat, setEditPropFormat] = useState('');
-  const [editPropMinimum, setEditPropMinimum] = useState('');
-  const [editPropMaximum, setEditPropMaximum] = useState('');
-  const [editPropExclusiveMinimum, setEditPropExclusiveMinimum] = useState(false);
-  const [editPropExclusiveMaximum, setEditPropExclusiveMaximum] = useState(false);
-  const [editPropMultipleOf, setEditPropMultipleOf] = useState('');
-  const [editPropMinItems, setEditPropMinItems] = useState('');
-  const [editPropMaxItems, setEditPropMaxItems] = useState('');
-  const [editPropUniqueItems, setEditPropUniqueItems] = useState(false);
-  const [editPropDefault, setEditPropDefault] = useState('');
-  const [editPropEnum, setEditPropEnum] = useState<string[]>([]);
-  const [enumInput, setEnumInput] = useState('');
+  // Use shared form data structure
+  const [formData, setFormData] = useState<PropertyFormData>({});
 
   // Helper to get property type display
   const getPropertyTypeInfo = () => {
@@ -86,33 +59,15 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     };
   };
 
-  const handleAddEnum = () => {
-    if (enumInput.trim() && !editPropEnum.includes(enumInput.trim())) {
-      setEditPropEnum([...editPropEnum, enumInput.trim()]);
-      setEnumInput('');
-    }
-  };
-
-  const handleRemoveEnum = (value: string) => {
-    setEditPropEnum(editPropEnum.filter(v => v !== value));
-  };
-
   // Initialize form when editingClassProperty changes
   useEffect(() => {
     if (!editingClassProperty) return;
 
     setEditPropName(editingClassProperty.name || '');
-    setEditPropDescription(editingClassProperty.description || '');
 
     const propData = typeof editingClassProperty.data === 'string'
       ? JSON.parse(editingClassProperty.data)
       : (editingClassProperty.data || {});
-
-    setEditPropRequired(!!propData.required);
-    setEditPropDeprecated(!!propData.deprecated);
-    setEditPropReadOnly(!!propData.readOnly);
-    setEditPropWriteOnly(!!propData.writeOnly);
-    setEditPropExample(propData.example ? JSON.stringify(propData.example) : '');
 
     // Handle additionalProperties - relevant for direct object or array items object
     const isArrayInlineObject = propData.type === 'array' && propData.items && propData.items.type === 'object' && !propData.items.$ref;
@@ -126,28 +81,37 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     // Get the actual schema (handle array types)
     const schema = propData.type === 'array' ? (propData.items || {}) : propData;
 
-    // String constraints
-    setEditPropMinLength(schema.minLength?.toString() || '');
-    setEditPropMaxLength(schema.maxLength?.toString() || '');
-    setEditPropPattern(schema.pattern || '');
-    setEditPropFormat(schema.format || '');
+    // Populate form data
+    setFormData({
+      description: editingClassProperty.description || '',
+      required: !!propData.required,
+      deprecated: !!propData.deprecated,
+      readOnly: !!propData.readOnly,
+      writeOnly: !!propData.writeOnly,
+      example: propData.example ? JSON.stringify(propData.example) : '',
 
-    // Number constraints
-    setEditPropMinimum(schema.minimum?.toString() || '');
-    setEditPropMaximum(schema.maximum?.toString() || '');
-    setEditPropExclusiveMinimum(!!schema.exclusiveMinimum);
-    setEditPropExclusiveMaximum(!!schema.exclusiveMaximum);
-    setEditPropMultipleOf(schema.multipleOf?.toString() || '');
+      // String constraints
+      minLength: schema.minLength?.toString() || '',
+      maxLength: schema.maxLength?.toString() || '',
+      pattern: schema.pattern || '',
+      format: schema.format || '',
 
-    // Array constraints (on the array itself, not items)
-    setEditPropMinItems(propData.minItems?.toString() || '');
-    setEditPropMaxItems(propData.maxItems?.toString() || '');
-    setEditPropUniqueItems(!!propData.uniqueItems);
+      // Number constraints
+      minimum: schema.minimum?.toString() || '',
+      maximum: schema.maximum?.toString() || '',
+      exclusiveMinimum: !!schema.exclusiveMinimum,
+      exclusiveMaximum: !!schema.exclusiveMaximum,
+      multipleOf: schema.multipleOf?.toString() || '',
 
-    // Common constraints
-    setEditPropDefault(schema.default !== undefined ? JSON.stringify(schema.default) : '');
-    setEditPropEnum(schema.enum || []);
-    setEnumInput('');
+      // Array constraints
+      minItems: propData.minItems?.toString() || '',
+      maxItems: propData.maxItems?.toString() || '',
+      uniqueItems: !!propData.uniqueItems,
+
+      // Common constraints
+      default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
+      enum: schema.enum || [],
+    });
 
     setEditPropertyError('');
   }, [editingClassProperty]);
@@ -170,17 +134,17 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
       const updatedData: any = {
         ...originalData,
-        required: editPropRequired,
-        deprecated: editPropDeprecated,
-        readOnly: editPropReadOnly,
-        writeOnly: editPropWriteOnly,
+        required: formData.required,
+        deprecated: formData.deprecated,
+        readOnly: formData.readOnly,
+        writeOnly: formData.writeOnly,
       };
 
-      if (editPropExample.trim()) {
+      if (formData.example?.trim()) {
         try {
-          updatedData.example = JSON.parse(editPropExample);
+          updatedData.example = JSON.parse(formData.example);
         } catch (e) {
-          updatedData.example = editPropExample;
+          updatedData.example = formData.example;
         }
       } else {
         delete updatedData.example;
@@ -201,25 +165,25 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       }
 
       // String constraints
-      if (editPropMinLength) targetSchema.minLength = parseInt(editPropMinLength);
+      if (formData.minLength) targetSchema.minLength = parseInt(formData.minLength);
       else delete targetSchema.minLength;
 
-      if (editPropMaxLength) targetSchema.maxLength = parseInt(editPropMaxLength);
+      if (formData.maxLength) targetSchema.maxLength = parseInt(formData.maxLength);
       else delete targetSchema.maxLength;
 
-      if (editPropPattern) targetSchema.pattern = editPropPattern;
+      if (formData.pattern) targetSchema.pattern = formData.pattern;
       else delete targetSchema.pattern;
 
-      if (editPropFormat) targetSchema.format = editPropFormat;
+      if (formData.format) targetSchema.format = formData.format;
       else delete targetSchema.format;
 
       // Number constraints
-      if (editPropMinimum) {
-        if (editPropExclusiveMinimum) {
-          targetSchema.exclusiveMinimum = parseFloat(editPropMinimum);
+      if (formData.minimum) {
+        if (formData.exclusiveMinimum) {
+          targetSchema.exclusiveMinimum = parseFloat(formData.minimum);
           delete targetSchema.minimum;
         } else {
-          targetSchema.minimum = parseFloat(editPropMinimum);
+          targetSchema.minimum = parseFloat(formData.minimum);
           delete targetSchema.exclusiveMinimum;
         }
       } else {
@@ -227,12 +191,12 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         delete targetSchema.exclusiveMinimum;
       }
 
-      if (editPropMaximum) {
-        if (editPropExclusiveMaximum) {
-          targetSchema.exclusiveMaximum = parseFloat(editPropMaximum);
+      if (formData.maximum) {
+        if (formData.exclusiveMaximum) {
+          targetSchema.exclusiveMaximum = parseFloat(formData.maximum);
           delete targetSchema.maximum;
         } else {
-          targetSchema.maximum = parseFloat(editPropMaximum);
+          targetSchema.maximum = parseFloat(formData.maximum);
           delete targetSchema.exclusiveMaximum;
         }
       } else {
@@ -240,31 +204,31 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         delete targetSchema.exclusiveMaximum;
       }
 
-      if (editPropMultipleOf) targetSchema.multipleOf = parseFloat(editPropMultipleOf);
+      if (formData.multipleOf) targetSchema.multipleOf = parseFloat(formData.multipleOf);
       else delete targetSchema.multipleOf;
 
       // Array constraints (on array itself, not items)
       if (isArray) {
-        if (editPropMinItems) updatedData.minItems = parseInt(editPropMinItems);
+        if (formData.minItems) updatedData.minItems = parseInt(formData.minItems);
         else delete updatedData.minItems;
 
-        if (editPropMaxItems) updatedData.maxItems = parseInt(editPropMaxItems);
+        if (formData.maxItems) updatedData.maxItems = parseInt(formData.maxItems);
         else delete updatedData.maxItems;
 
-        if (editPropUniqueItems) updatedData.uniqueItems = true;
+        if (formData.uniqueItems) updatedData.uniqueItems = true;
         else delete updatedData.uniqueItems;
       }
 
       // Enum values
-      if (editPropEnum.length > 0) targetSchema.enum = editPropEnum;
+      if (formData.enum && formData.enum.length > 0) targetSchema.enum = formData.enum;
       else delete targetSchema.enum;
 
       // Default value
-      if (editPropDefault.trim()) {
+      if (formData.default?.trim()) {
         try {
-          targetSchema.default = JSON.parse(editPropDefault);
+          targetSchema.default = JSON.parse(formData.default);
         } catch (e) {
-          targetSchema.default = editPropDefault;
+          targetSchema.default = formData.default;
         }
       } else {
         delete targetSchema.default;
@@ -280,7 +244,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       const result = await updateClassProperty(
         editingClassProperty.id,
         editPropName.trim(),
-        editPropDescription || null,
+        formData.description || null,
         updatedData
       );
 
@@ -345,71 +309,6 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
           onChange={(e) => setEditPropName(e.target.value)}
           sx={{ mb: 2 }}
         />
-
-        <TextField
-          margin="dense"
-          label="Description"
-          type="text"
-          fullWidth
-          multiline
-          rows={2}
-          value={editPropDescription}
-          onChange={(e) => setEditPropDescription(e.target.value)}
-          helperText="Optional description for this property in this class"
-          sx={{ mb: 2 }}
-        />
-
-        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-          OpenAPI 3.1.0 Extensions
-        </Typography>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editPropRequired}
-                onChange={(e) => setEditPropRequired(e.target.checked)}
-              />
-            }
-            label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><span>Required</span><Typography variant="caption" color="text.secondary">- Must be present in the object</Typography></Box>}
-          />
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editPropDeprecated}
-                onChange={(e) => setEditPropDeprecated(e.target.checked)}
-              />
-            }
-            label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><span>Deprecated</span><Typography variant="caption" color="text.secondary">- Should be transitioned out of usage</Typography></Box>}
-          />
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editPropReadOnly}
-                onChange={(e) => {
-                  setEditPropReadOnly(e.target.checked);
-                  if (e.target.checked) setEditPropWriteOnly(false);
-                }}
-              />
-            }
-            label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><span>Read Only</span><Typography variant="caption" color="text.secondary">- Only in responses (OpenAPI)</Typography></Box>}
-          />
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={editPropWriteOnly}
-                onChange={(e) => {
-                  setEditPropWriteOnly(e.target.checked);
-                  if (e.target.checked) setEditPropReadOnly(false);
-                }}
-              />
-            }
-            label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><span>Write Only</span><Typography variant="caption" color="text.secondary">- Only in requests (OpenAPI)</Typography></Box>}
-          />
-        </Box>
 
         {/* Show additionalProperties control for object types or arrays with inline object items */}
         {editingClassProperty && (() => {
@@ -504,225 +403,23 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
           return (
             <>
               <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 600 }}>
-                Constraints
+                Property Details
               </Typography>
 
-              {/* String Constraints */}
-              {baseType === 'string' && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    String Constraints
-                  </Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                    <TextField
-                      label="Min Length"
-                      type="number"
-                      size="small"
-                      value={editPropMinLength}
-                      onChange={(e) => setEditPropMinLength(e.target.value)}
-                      inputProps={{ min: 0 }}
-                    />
-                    <TextField
-                      label="Max Length"
-                      type="number"
-                      size="small"
-                      value={editPropMaxLength}
-                      onChange={(e) => setEditPropMaxLength(e.target.value)}
-                      inputProps={{ min: 0 }}
-                    />
-                  </Box>
-                  <TextField
-                    label="Pattern (Regex)"
-                    size="small"
-                    fullWidth
-                    value={editPropPattern}
-                    onChange={(e) => setEditPropPattern(e.target.value)}
-                    helperText="Regular expression pattern for validation"
-                    sx={{ mt: 2 }}
-                  />
-                  <RegexTester pattern={editPropPattern} />
-                  <TextField
-                    label="Format"
-                    size="small"
-                    fullWidth
-                    value={editPropFormat}
-                    onChange={(e) => setEditPropFormat(e.target.value)}
-                    helperText="e.g., date, date-time, email, uri, uuid"
-                    sx={{ mt: 2 }}
-                  />
-                </Box>
-              )}
-
-              {/* Number Constraints */}
-              {(baseType === 'number' || baseType === 'integer') && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Number Constraints
-                  </Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                    <Box>
-                      <TextField
-                        label="Minimum"
-                        type="number"
-                        size="small"
-                        fullWidth
-                        value={editPropMinimum}
-                        onChange={(e) => setEditPropMinimum(e.target.value)}
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={editPropExclusiveMinimum}
-                            onChange={(e) => setEditPropExclusiveMinimum(e.target.checked)}
-                            size="small"
-                          />
-                        }
-                        label={<Typography variant="caption">Exclusive</Typography>}
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Box>
-                    <Box>
-                      <TextField
-                        label="Maximum"
-                        type="number"
-                        size="small"
-                        fullWidth
-                        value={editPropMaximum}
-                        onChange={(e) => setEditPropMaximum(e.target.value)}
-                      />
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={editPropExclusiveMaximum}
-                            onChange={(e) => setEditPropExclusiveMaximum(e.target.checked)}
-                            size="small"
-                          />
-                        }
-                        label={<Typography variant="caption">Exclusive</Typography>}
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Box>
-                  </Box>
-                  <TextField
-                    label="Multiple Of"
-                    type="number"
-                    size="small"
-                    fullWidth
-                    value={editPropMultipleOf}
-                    onChange={(e) => setEditPropMultipleOf(e.target.value)}
-                    helperText="Value must be a multiple of this number"
-                    sx={{ mt: 2 }}
-                  />
-                </Box>
-              )}
-
-              {/* Array Constraints */}
-              {typeInfo.isArray && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Array Constraints
-                  </Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                    <TextField
-                      label="Min Items"
-                      type="number"
-                      size="small"
-                      value={editPropMinItems}
-                      onChange={(e) => setEditPropMinItems(e.target.value)}
-                      inputProps={{ min: 0 }}
-                    />
-                    <TextField
-                      label="Max Items"
-                      type="number"
-                      size="small"
-                      value={editPropMaxItems}
-                      onChange={(e) => setEditPropMaxItems(e.target.value)}
-                      inputProps={{ min: 0 }}
-                    />
-                  </Box>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={editPropUniqueItems}
-                        onChange={(e) => setEditPropUniqueItems(e.target.checked)}
-                      />
-                    }
-                    label="Unique Items (all items must be unique)"
-                    sx={{ mt: 1 }}
-                  />
-                </Box>
-              )}
-
-              {/* Enum Values */}
-              {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Enum Values
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                    <TextField
-                      label="Add enum value"
-                      size="small"
-                      fullWidth
-                      value={enumInput}
-                      onChange={(e) => setEnumInput(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddEnum();
-                        }
-                      }}
-                    />
-                    <IconButton onClick={handleAddEnum} color="primary" size="small">
-                      <AddIcon />
-                    </IconButton>
-                  </Box>
-                  {editPropEnum.length > 0 && (
-                    <List dense sx={{ bgcolor: 'grey.50', borderRadius: 1, maxHeight: 150, overflow: 'auto' }}>
-                      {editPropEnum.map((value, index) => (
-                        <ListItem
-                          key={index}
-                          secondaryAction={
-                            <IconButton edge="end" size="small" onClick={() => handleRemoveEnum(value)}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          }
-                        >
-                          <ListItemText primary={value} />
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
-                </Box>
-              )}
-
-              {/* Default Value */}
-              <Box sx={{ mb: 2 }}>
-                <TextField
-                  label="Default Value"
-                  size="small"
-                  fullWidth
-                  value={editPropDefault}
-                  onChange={(e) => setEditPropDefault(e.target.value)}
-                  helperText="Default value (JSON format for objects/arrays)"
-                />
-              </Box>
+              <PropertyFormFields
+                baseType={baseType}
+                isArray={typeInfo.isArray}
+                data={formData}
+                onChange={(field, value) => {
+                  setFormData(prev => ({ ...prev, [field]: value }));
+                }}
+                showMetadata={true}
+                showTitle={false}
+                size="small"
+              />
             </>
           );
         })()}
-
-        <TextField
-          margin="dense"
-          label="Example Value"
-          type="text"
-          fullWidth
-          multiline
-          rows={2}
-          value={editPropExample}
-          onChange={(e) => setEditPropExample(e.target.value)}
-          helperText="Example value (JSON format)"
-          sx={{ mt: 2 }}
-        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
