@@ -22,9 +22,17 @@ interface Props {
   editingClassProperty: any | null;
   // Callback to reload classes after a successful save
   onSaved?: () => Promise<void> | void;
+  // All properties from the parent class (to show nested properties)
+  allClassProperties?: Array<{
+    id: string;
+    name: string;
+    data: any;
+    description?: string;
+    parent_id?: string | null;
+  }>;
 }
 
-export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved }: Props) {
+export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved, allClassProperties }: Props) {
   const [editPropName, setEditPropName] = useState('');
   const [editPropAdditionalProperties, setEditPropAdditionalProperties] = useState<'default' | 'true' | 'false'>('default');
   const [editPropertyError, setEditPropertyError] = useState('');
@@ -416,6 +424,11 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                 showMetadata={true}
                 showTitle={false}
                 size="small"
+                nestedProperties={
+                  baseType === 'object'
+                    ? (allClassProperties || []).filter(p => p.parent_id === editingClassProperty.id)
+                    : undefined
+                }
               />
             </>
           );

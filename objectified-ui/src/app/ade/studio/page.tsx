@@ -113,6 +113,7 @@ const StudioContent = () => {
   const [classEditDialogOpen, setClassEditDialogOpen] = useState(false);
   const [editingClassData, setEditingClassData] = useState<any>(null);
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
   // Note: dialog-specific form state moved to ClassPropertyEditDialog component
 
   // Reference dialog state
@@ -500,6 +501,7 @@ const StudioContent = () => {
 
     // Load the full property data from the class_properties record
     setEditingClassProperty(classProperty);
+    setEditingClassId(classId);
     setEditPropertyDialogOpen(true);
   }, [isReadOnly]);
 
@@ -2255,6 +2257,11 @@ const StudioContent = () => {
         onClose={() => setEditPropertyDialogOpen(false)}
         editingClassProperty={editingClassProperty}
         onSaved={reloadClasses}
+        allClassProperties={
+          editingClassId
+            ? (nodes.find(n => n.id === editingClassId)?.data as any)?.properties || []
+            : []
+        }
       />
 
       {/* Reference Dialog */}
