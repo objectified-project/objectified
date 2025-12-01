@@ -153,7 +153,8 @@ def generate_openapi_spec(
     project_slug: str,
     version_id: str,
     classes: List[Dict[str, Any]],
-    all_properties: Dict[str, List[Dict[str, Any]]]
+    all_properties: Dict[str, List[Dict[str, Any]]],
+    project_description: Optional[str] = None
 ) -> Dict[str, Any]:
     """Generate a complete OpenAPI 3.1.0 specification for all classes in a version."""
 
@@ -165,13 +166,16 @@ def generate_openapi_spec(
         properties = all_properties.get(class_id, [])
         schemas[class_name] = build_class_openapi_schema(class_data, properties)
 
+    # Use project description if provided and not empty, otherwise use default
+    description = project_description if project_description and project_description.strip() else "No description provided"
+
     # Build the OpenAPI specification
     openapi_spec = {
         "openapi": "3.1.0",
         "info": {
             "title": f"{project_slug} API",
             "version": version_id,
-            "description": f"OpenAPI specification for {tenant_slug}/{project_slug}/{version_id}"
+            "description": description
         },
         "paths": {},
         "components": {

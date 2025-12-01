@@ -38,7 +38,8 @@ class Database:
     def get_version_by_slugs(self, tenant_slug: str, project_slug: str, version_id: str) -> Optional[Dict[str, Any]]:
         """Get version information by tenant, project, and version slugs."""
         query = """
-            SELECT v.id, v.version_id, v.visibility, v.published
+            SELECT v.id, v.version_id, v.visibility, v.published,
+                   p.description as project_description
             FROM odb.versions v
             JOIN odb.projects p ON v.project_id = p.id
             JOIN odb.tenants t ON p.tenant_id = t.id
