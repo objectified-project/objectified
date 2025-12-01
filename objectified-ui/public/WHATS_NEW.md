@@ -19,6 +19,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Properties form enhancements:
   - Added the ability to test regular expressions directly within the form
   - Small improvements to the layouts and spacing for better readability
+  - Editing a property of type "object" now gives visibility into its nested properties
 - Improved status pill visibility with borders in light mode
 - Mermaid mode improvements:
   - Now adds display of the Mermaid diagram as an image by default
