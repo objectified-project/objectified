@@ -6,6 +6,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import Checkbox from '@mui/material/Checkbox';
@@ -16,7 +17,7 @@ import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import CircularProgress from '@mui/material/CircularProgress';
-import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import { parseOpenAPISpec, ParsedClass } from '../../../utils/openapi-import';
 import { importProjectFromOpenAPI, getLinkedAccountsForUser } from '../../../../../lib/db/helper';
@@ -55,7 +56,6 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   const [openAPIInfo, setOpenAPIInfo] = useState<any>(null);
 
   // SSO Repository Browser state
-  const [ssoStep, setSsoStep] = useState<'accounts' | 'repos' | 'files'>('accounts');
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [repositories, setRepositories] = useState<any[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<any>(null);
@@ -96,7 +96,6 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     setIsLoading(false);
     setIsDragging(false);
     setOpenAPIInfo(null);
-    setSsoStep('accounts');
     setSelectedAccount(null);
     setRepositories([]);
     setSelectedRepo(null);
@@ -238,7 +237,6 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
       const data = await response.json();
       setRepositories(data.repositories || []);
-      setSsoStep('repos');
     } catch (error: any) {
       setErrorMessage(`Failed to load repositories: ${error.message}`);
     } finally {
@@ -264,7 +262,6 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
       const data = await response.json();
       setRepoFiles(data.files || []);
-      setSsoStep('files');
     } catch (error: any) {
       setErrorMessage(`Failed to load files: ${error.message}`);
     } finally {
@@ -335,27 +332,8 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
       );
     } catch (error: any) {
       setErrorMessage(`Failed to load file: ${error.message}`);
+    } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleBackInSSO = () => {
-    if (ssoStep === 'files') {
-      if (currentPath) {
-        // Go back to parent directory
-        const parentPath = currentPath.split('/').slice(0, -1).join('/');
-        handleNavigateToPath(parentPath);
-      } else {
-        // Go back to repos
-        setSsoStep('repos');
-        setRepoFiles([]);
-        setSelectedRepo(null);
-        setCurrentPath('');
-      }
-    } else if (ssoStep === 'repos') {
-      setSsoStep('accounts');
-      setRepositories([]);
-      setSelectedAccount(null);
     }
   };
 
@@ -607,234 +585,245 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                     </Typography>
                   </Alert>
                 ) : (
-                  <Box>
-                    {/* Step 1: Select Account */}
-                    {ssoStep === 'accounts' && (
-                      <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                          Select a linked account to browse your repositories.
-                        </Typography>
+                  /* macOS Finder Column View - Dark Mode Compatible */
+                  <Box sx={{
+                    display: 'flex',
+                    height: 500,
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    bgcolor: 'background.paper'
+                  }}>
+                    {/* Column 1: Accounts */}
+                    <Box sx={{
+                      width: '33.33%',
+                      minWidth: 200,
+                      maxWidth: 300,
+                      borderRight: 1,
+                      borderColor: 'divider',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: 0
+                    }}>
+                      <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                        {linkedAccounts.map((account) => {
+                          const getProviderIcon = (provider: string) => {
+                            switch (provider.toLowerCase()) {
+                              case 'github':
+                                return <SiGithub size={16} />;
+                              case 'gitlab':
+                                return <SiGitlab size={16} />;
+                              case 'google':
+                                return <SiGoogle size={16} />;
+                              case 'aws':
+                                return <SiAmazon size={16} />;
+                              default:
+                                return <Globe size={16} />;
+                            }
+                          };
 
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          {linkedAccounts.map((account) => {
-                            const getProviderIcon = (provider: string) => {
-                              switch (provider.toLowerCase()) {
-                                case 'github':
-                                  return <SiGithub size={24} color="#24292e" />;
-                                case 'gitlab':
-                                  return <SiGitlab size={24} color="#fc6d26" />;
-                                case 'google':
-                                  return <SiGoogle size={24} color="#4285f4" />;
-                                case 'aws':
-                                  return <SiAmazon size={24} color="#ff9900" />;
-                                default:
-                                  return <Globe size={24} />;
-                              }
-                            };
+                          const isSelected = selectedAccount?.id === account.id;
 
-                            return (
-                              <Box
-                                key={account.id}
-                                onClick={() => !isLoading && handleSelectAccount(account)}
-                                sx={{
-                                  p: 2,
-                                  border: 1,
-                                  borderColor: 'grey.300',
-                                  borderRadius: 2,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  cursor: isLoading ? 'default' : 'pointer',
-                                  '&:hover': {
-                                    borderColor: isLoading ? 'grey.300' : 'primary.main',
-                                    bgcolor: isLoading ? 'background.paper' : 'action.hover'
-                                  }
-                                }}
-                              >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                  <Box
-                                    sx={{
-                                      width: 48,
-                                      height: 48,
-                                      borderRadius: 1,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      bgcolor: 'action.hover',
-                                    }}
-                                  >
-                                    {getProviderIcon(account.provider)}
-                                  </Box>
-                                  <Box>
-                                    <Typography variant="subtitle1" fontWeight="bold">
-                                      {account.provider.charAt(0).toUpperCase() + account.provider.slice(1)}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                      {account.provider_username || account.provider_email}
-                                    </Typography>
-                                  </Box>
-                                </Box>
-                                <ChevronRight size={20} />
+                          return (
+                            <Box
+                              key={account.id}
+                              onClick={() => !isLoading && handleSelectAccount(account)}
+                              sx={{
+                                px: 1.5,
+                                py: 0.75,
+                                cursor: isLoading ? 'default' : 'pointer',
+                                bgcolor: isSelected ? 'primary.main' : 'transparent',
+                                color: isSelected ? 'primary.contrastText' : 'text.primary',
+                                borderBottom: 1,
+                                borderColor: 'divider',
+                                '&:hover': {
+                                  bgcolor: isSelected ? 'primary.dark' : 'action.hover'
+                                },
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                              }}
+                            >
+                              <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', opacity: isSelected ? 1 : 0.7 }}>
+                                {getProviderIcon(account.provider)}
                               </Box>
-                            );
-                          })}
-                        </Box>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 400 }} noWrap>
+                                  {account.provider.charAt(0).toUpperCase() + account.provider.slice(1)}
+                                </Typography>
+                                <Typography variant="caption" sx={{ fontSize: '11px', opacity: isSelected ? 0.9 : 0.6 }} noWrap>
+                                  {account.provider_username || account.provider_email}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          );
+                        })}
                       </Box>
-                    )}
+                    </Box>
 
-                    {/* Step 2: Select Repository */}
-                    {ssoStep === 'repos' && (
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <Button
-                            startIcon={<ArrowLeft size={16} />}
-                            onClick={handleBackInSSO}
-                            disabled={isLoading}
-                            size="small"
-                          >
-                            Back to Accounts
-                          </Button>
-                        </Box>
-
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                          Select a repository to browse for OpenAPI specifications.
-                        </Typography>
-
-                        {isLoading ? (
+                    {/* Column 2: Repositories */}
+                    <Box sx={{
+                      width: '33.33%',
+                      minWidth: 200,
+                      maxWidth: 300,
+                      borderRight: 1,
+                      borderColor: 'divider',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: 0
+                    }}>
+                      <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                        {!selectedAccount ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 2 }}>
+                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }} textAlign="center">
+                              Select an account
+                            </Typography>
+                          </Box>
+                        ) : isLoading && repositories.length === 0 ? (
                           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                            <CircularProgress />
+                            <CircularProgress size={24} />
                           </Box>
                         ) : repositories.length === 0 ? (
-                          <Alert severity="info">
-                            <Typography variant="body2">
-                              No repositories found for this account.
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 2 }}>
+                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }} textAlign="center">
+                              No repositories
                             </Typography>
-                          </Alert>
+                          </Box>
                         ) : (
-                          <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-                            {repositories.map((repo: any) => (
+                          repositories.map((repo: any) => {
+                            const isSelected = selectedRepo?.id === repo.id;
+                            return (
                               <Box
                                 key={repo.id}
                                 onClick={() => !isLoading && handleSelectRepo(repo)}
                                 sx={{
-                                  p: 2,
-                                  mb: 1,
-                                  border: 1,
-                                  borderColor: 'grey.300',
-                                  borderRadius: 1,
+                                  px: 1.5,
+                                  py: 0.75,
                                   cursor: isLoading ? 'default' : 'pointer',
+                                  bgcolor: isSelected ? 'primary.main' : 'transparent',
+                                  color: isSelected ? 'primary.contrastText' : 'text.primary',
+                                  borderBottom: 1,
+                                  borderColor: 'divider',
                                   '&:hover': {
-                                    borderColor: isLoading ? 'grey.300' : 'primary.main',
-                                    bgcolor: isLoading ? 'background.paper' : 'action.hover'
+                                    bgcolor: isSelected ? 'primary.dark' : 'action.hover'
                                   }
                                 }}
                               >
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <Box>
-                                    <Typography variant="subtitle2" fontWeight="bold">
-                                      {repo.name}
-                                    </Typography>
-                                    {repo.description && (
-                                      <Typography variant="caption" color="text.secondary">
-                                        {repo.description}
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                  <ChevronRight size={20} />
-                                </Box>
+                                <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 400 }} noWrap>
+                                  {repo.name}
+                                </Typography>
+                                {repo.description && (
+                                  <Typography variant="caption" sx={{ fontSize: '11px', opacity: isSelected ? 0.9 : 0.6, display: 'block' }} noWrap>
+                                    {repo.description}
+                                  </Typography>
+                                )}
                               </Box>
-                            ))}
-                          </Box>
+                            );
+                          })
                         )}
                       </Box>
-                    )}
+                    </Box>
 
-                    {/* Step 3: Browse Files */}
-                    {ssoStep === 'files' && (
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <Button
-                            startIcon={<ArrowLeft size={16} />}
-                            onClick={handleBackInSSO}
+                    {/* Column 3: Files */}
+                    <Box sx={{
+                      flex: 1,
+                      minWidth: 200,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      minHeight: 0
+                    }}>
+                      {currentPath && (
+                        <Box sx={{
+                          px: 1.5,
+                          py: 0.5,
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          bgcolor: 'action.hover',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}>
+                          <IconButton
+                            onClick={() => {
+                              const parentPath = currentPath.split('/').slice(0, -1).join('/');
+                              handleNavigateToPath(parentPath);
+                            }}
                             disabled={isLoading}
                             size="small"
+                            sx={{
+                              p: 0.25,
+                              '&:hover': {
+                                bgcolor: 'action.selected'
+                              }
+                            }}
                           >
-                            Back
-                          </Button>
+                            <ArrowLeft size={14} />
+                          </IconButton>
+                          <Typography variant="caption" sx={{ fontSize: '11px', color: 'text.secondary' }} noWrap>
+                            /{currentPath}
+                          </Typography>
                         </Box>
-
-                        <Box sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Repository
-                          </Typography>
-                          <Typography variant="body2" fontWeight="bold">
-                            {selectedRepo?.full_name}
-                          </Typography>
-                          {currentPath && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                              Path: /{currentPath}
+                      )}
+                      <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                        {!selectedRepo ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 2 }}>
+                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }} textAlign="center">
+                              Select a repository
                             </Typography>
-                          )}
-                        </Box>
-
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                          Select an OpenAPI specification file (JSON or YAML).
-                        </Typography>
-
-                        {isLoading ? (
+                          </Box>
+                        ) : isLoading && repoFiles.length === 0 ? (
                           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                            <CircularProgress />
+                            <CircularProgress size={24} />
                           </Box>
                         ) : repoFiles.length === 0 ? (
-                          <Alert severity="info">
-                            <Typography variant="body2">
-                              No files found in this directory.
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 2 }}>
+                            <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }} textAlign="center">
+                              No files
                             </Typography>
-                          </Alert>
+                          </Box>
                         ) : (
-                          <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-                            {repoFiles.map((file: any, idx: number) => (
+                          repoFiles.map((file: any, idx: number) => {
+                            const isOpenAPIFile =
+                              file.name.includes('openapi') ||
+                              file.name.includes('swagger') ||
+                              file.name.endsWith('.json') ||
+                              file.name.endsWith('.yaml') ||
+                              file.name.endsWith('.yml');
+
+                            return (
                               <Box
                                 key={idx}
                                 onClick={() => !isLoading && handleSelectFile(file)}
                                 sx={{
-                                  p: 1.5,
-                                  mb: 1,
-                                  border: 1,
-                                  borderColor: 'grey.300',
-                                  borderRadius: 1,
+                                  px: 1.5,
+                                  py: 0.75,
                                   cursor: isLoading ? 'default' : 'pointer',
+                                  borderBottom: 1,
+                                  borderColor: 'divider',
                                   '&:hover': {
-                                    borderColor: isLoading ? 'grey.300' : 'primary.main',
-                                    bgcolor: isLoading ? 'background.paper' : 'action.hover'
-                                  }
+                                    bgcolor: 'action.hover'
+                                  },
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1
                                 }}
                               >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  {file.type === 'dir' ? (
-                                    <FolderOpen size={20} color="#94a3b8" />
-                                  ) : (
-                                    <File size={20} color={
-                                      file.name.includes('openapi') ||
-                                      file.name.includes('swagger') ||
-                                      file.name.endsWith('.json') ||
-                                      file.name.endsWith('.yaml') ||
-                                      file.name.endsWith('.yml')
-                                        ? '#22c55e'
-                                        : '#94a3b8'
-                                    } />
-                                  )}
-                                  <Typography variant="body2">
-                                    {file.name}
-                                  </Typography>
-                                  {file.type === 'dir' && <ChevronRight size={16} style={{ marginLeft: 'auto' }} />}
-                                </Box>
+                                {file.type === 'dir' ? (
+                                  <FolderOpen size={16} color="#94a3b8" />
+                                ) : (
+                                  <File size={16} color={isOpenAPIFile ? '#22c55e' : '#94a3b8'} />
+                                )}
+                                <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 400, color: 'text.primary' }} noWrap>
+                                  {file.name}
+                                </Typography>
                               </Box>
-                            ))}
-                          </Box>
+                            );
+                          })
                         )}
                       </Box>
-                    )}
+                    </Box>
                   </Box>
                 )}
               </Box>

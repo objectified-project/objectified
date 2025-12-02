@@ -6,6 +6,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## New Features and Improvements
 
+- **macOS-style column layout for project import** - The SSO import screen now features a Finder-like column browser for navigating accounts, repositories, and files simultaneously, eliminating the need for back/forward navigation
 - More consistent look and feel in dark and light mode across the board
 - Modified canvas layout to improve visibility and usability
   - Auto layout buttons are now more concise and compact
