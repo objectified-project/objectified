@@ -17,7 +17,7 @@ import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import CircularProgress from '@mui/material/CircularProgress';
-import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft, Lock } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import { parseOpenAPISpec, ParsedClass } from '../../../utils/openapi-import';
 import { importProjectFromOpenAPI, getLinkedAccountsForUser } from '../../../../../lib/db/helper';
@@ -236,7 +236,12 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
       }
 
       const data = await response.json();
-      setRepositories(data.repositories || []);
+      const sortedRepos = (data.repositories || []).sort((a: any, b: any) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      setRepositories(sortedRepos);
     } catch (error: any) {
       setErrorMessage(`Failed to load repositories: ${error.message}`);
     } finally {
@@ -710,9 +715,14 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                                   }
                                 }}
                               >
-                                <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 400 }} noWrap>
-                                  {repo.name}
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                  <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 400, flex: 1 }} noWrap>
+                                    {repo.name}
+                                  </Typography>
+                                  {repo.private && (
+                                    <Lock size={12} style={{ flexShrink: 0, opacity: isSelected ? 0.9 : 0.6 }} />
+                                  )}
+                                </Box>
                                 {repo.description && (
                                   <Typography variant="caption" sx={{ fontSize: '11px', opacity: isSelected ? 0.9 : 0.6, display: 'block' }} noWrap>
                                     {repo.description}
