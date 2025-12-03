@@ -830,7 +830,7 @@ export async function updateClass(classId: string, name: string, description: st
         [versionId]
       );
 
-      const classIds = classesInVersion.rows.map(row => row.id);
+      const classIds = classesInVersion.rows.map((row: any) => row.id);
 
       if (classIds.length > 0) {
         // Get all class properties for these classes
