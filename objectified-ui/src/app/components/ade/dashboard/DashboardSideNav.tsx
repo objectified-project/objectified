@@ -112,7 +112,7 @@ const DashboardSideNav: React.FC = () => {
                         borderRadius: 1,
                         mb: 0.5,
                         '&:hover': {
-                          bgcolor: (theme) => '#b8b8b8'
+                          bgcolor: (theme) => '#888'
                         },
                         '&.Mui-selected': {
                           bgcolor: 'primary.main',

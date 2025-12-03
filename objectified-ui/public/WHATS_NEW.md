@@ -6,6 +6,8 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## New Features and Improvements
 
+- More consistent look and feel in dark and light mode across the board
+- Enhanced button styling with consistent text transformation across the application
 - New project support improvements
   - Ability to import projects from SSO with a columnar navigation interface
   - Added support for Personal Access Tokens (PAT) for repository access
@@ -17,7 +19,6 @@ We continue to improve the platform based on your feedback with improvements and
     - Lists all repositories available, sorted alphabetically
     - Private repositories are marked with a lock icon for easy identification
     - Search functionality to quickly find repositories by name or description
-- More consistent look and feel in dark and light mode across the board
 - Modified canvas layout to improve visibility and usability
   - Auto layout buttons are now more concise and compact
   - Automatically returns to canvas view when changing projects or versions
@@ -26,13 +27,11 @@ We continue to improve the platform based on your feedback with improvements and
   - OpenAPI format selected by default
   - Added Arazzo 1.0.1 generation support
   - Format selector dropdown for easy switching
-- Enhanced button styling with consistent text transformation across the application
 - Properties form enhancements:
   - Added the ability to test regular expressions directly within the form
   - Small improvements to the layouts and spacing for better readability
   - Editing a property of type "object" now gives visibility into its nested properties
   - Added the ability to auto-generate an example value based on the property's schema
-- Improved status pill visibility with borders in light mode
 - Mermaid mode improvements:
   - Now adds display of the Mermaid diagram as an image by default
   - Adds SVG and PNG downloadability of the Mermaid diagram
