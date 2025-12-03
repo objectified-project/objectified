@@ -17,7 +17,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import { useDialog } from '@/app/components/providers/DialogProvider';
-import { getLinkedAccountsForUser, unlinkExternalAccount, updatePersonalAccessToken } from '../../../../../lib/db/helper';
+import { getLinkedAccountsForUser, unlinkExternalAccount, updatePersonalAccessToken, removePersonalAccessToken } from '../../../../../lib/db/helper';
 
 interface LinkedAccount {
   id: string;
@@ -223,6 +223,40 @@ const LinkedAccounts = () => {
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred while saving the Personal Access Token');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemovePatToken = async (provider: string, accountId: string) => {
+    const providerConfig = providerConfigs[provider];
+    const account = linkedAccounts.find(a => a.id === accountId);
+
+    const confirmed = await confirmDialog({
+      title: `Remove Personal Access Token`,
+      message: `Are you sure you want to remove the Personal Access Token for your ${providerConfig?.displayName || provider} account (${account?.provider_username || account?.provider_email})?\n\nYou will lose direct repository access until you add a new PAT with the same repository access permissions.`,
+    });
+
+    if (!confirmed) return;
+
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const result = await removePersonalAccessToken(userId, accountId);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        setSuccessMessage(
+          `Successfully removed Personal Access Token for ${providerConfig?.displayName || provider}`
+        );
+        await loadLinkedAccounts();
+      } else {
+        setErrorMessage(response.error || 'Failed to remove Personal Access Token');
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'An error occurred while removing the Personal Access Token');
     } finally {
       setIsLoading(false);
     }
@@ -463,6 +497,18 @@ const LinkedAccounts = () => {
                           >
                             {linkedAccount?.access_token ? 'Update PAT' : 'Add PAT'}
                           </Button>
+                          {linkedAccount?.access_token && (
+                            <Button
+                              variant="outlined"
+                              color="error"
+                              size="small"
+                              startIcon={<Trash2 size={14} />}
+                              onClick={() => handleRemovePatToken(provider.name, linkedAccount.id)}
+                              disabled={isLoading}
+                            >
+                              Remove PAT
+                            </Button>
+                          )}
                         </Box>
                       </Box>
                       <Typography variant="caption" color="text.secondary">

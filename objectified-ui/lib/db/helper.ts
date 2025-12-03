@@ -1727,3 +1727,34 @@ export async function updatePersonalAccessToken(
   }
 }
 
+export async function removePersonalAccessToken(
+  userId: string,
+  accountId: string
+) {
+  try {
+    // Verify the account belongs to this user and remove the PAT by setting it to null
+    const result = await connectionPool.query(
+      `UPDATE odb.external_auth_providers 
+       SET access_token = NULL
+       WHERE id = $1 AND user_id = $2
+       RETURNING id, provider`,
+      [accountId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({
+        success: false,
+        error: 'Account not found or does not belong to you'
+      });
+    }
+
+    return JSON.stringify({
+      success: true,
+      provider: result.rows[0].provider
+    });
+  } catch (error: any) {
+    console.error('Error removing personal access token:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
