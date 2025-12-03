@@ -6,7 +6,13 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## New Features and Improvements
 
-- **macOS-style column layout for project import** - The SSO import screen now features a Finder-like column browser for navigating accounts, repositories, and files simultaneously, eliminating the need for back/forward navigation
+- New project support improvements
+  - Ability to import projects from SSO with a columnar navigation interface
+  - Added support for Personal Access Tokens (PAT) for repository access
+    - Users can now add their own PAT to access repositories they own
+    - Supports both GitHub and GitLab providers
+    - PAT tokens require "read" permissions for API and repositories to avoid 401 Unauthorized errors
+    - Provider-specific instructions provided for creating tokens with proper permissions
 - More consistent look and feel in dark and light mode across the board
 - Modified canvas layout to improve visibility and usability
   - Auto layout buttons are now more concise and compact

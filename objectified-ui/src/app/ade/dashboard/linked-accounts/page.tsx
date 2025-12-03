@@ -2,7 +2,7 @@
 
 import { useSession, signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Link as LinkIcon, Check } from 'lucide-react';
+import { Plus, Trash2, Link as LinkIcon, Check, Key } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
@@ -11,8 +11,13 @@ import CardContent from '@mui/material/CardContent';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
+import TextField from '@mui/material/TextField';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import { useDialog } from '@/app/components/providers/DialogProvider';
-import { getLinkedAccountsForUser, unlinkExternalAccount } from '../../../../../lib/db/helper';
+import { getLinkedAccountsForUser, unlinkExternalAccount, updatePersonalAccessToken } from '../../../../../lib/db/helper';
 
 interface LinkedAccount {
   id: string;
@@ -20,6 +25,7 @@ interface LinkedAccount {
   provider_user_id: string;
   provider_email: string;
   provider_username: string | null;
+  access_token?: string | null;
   created_at: string;
   last_login_at: string | null;
 }
@@ -45,7 +51,7 @@ const providerConfigs: Record<string, ProviderConfig> = {
     displayName: 'GitLab',
     icon: SiGitlab,
     color: '#fc6d26',
-    available: false,
+    available: true,
   },
   google: {
     name: 'google',
@@ -70,6 +76,10 @@ const LinkedAccounts = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [patDialogOpen, setPatDialogOpen] = useState(false);
+  const [patProvider, setPatProvider] = useState<string>('');
+  const [patToken, setPatToken] = useState('');
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 
   const userId = (session?.user as any)?.user_id;
 
@@ -162,6 +172,57 @@ const LinkedAccounts = () => {
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred while unlinking the account');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOpenPatDialog = (provider: string, accountId?: string) => {
+    setPatProvider(provider);
+    setEditingAccountId(accountId || null);
+    setPatToken('');
+    setErrorMessage('');
+    setPatDialogOpen(true);
+  };
+
+  const handleClosePatDialog = () => {
+    setPatDialogOpen(false);
+    setPatProvider('');
+    setPatToken('');
+    setEditingAccountId(null);
+  };
+
+  const handleSavePatToken = async () => {
+    if (!patToken.trim()) {
+      setErrorMessage('Personal Access Token is required');
+      return;
+    }
+
+    if (!editingAccountId) {
+      setErrorMessage('No linked account found. Please link your account first.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      // Always updating existing account - PAT is added to OAuth-linked account
+      const result = await updatePersonalAccessToken(userId, editingAccountId, patToken);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        setSuccessMessage(
+          `Successfully ${linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'updated' : 'added'} Personal Access Token for ${providerConfigs[patProvider]?.displayName || patProvider}`
+        );
+        await loadLinkedAccounts();
+        handleClosePatDialog();
+      } else {
+        setErrorMessage(response.error || 'Failed to save Personal Access Token');
+      }
+    } catch (error: any) {
+      setErrorMessage(error.message || 'An error occurred while saving the Personal Access Token');
     } finally {
       setIsLoading(false);
     }
@@ -320,6 +381,8 @@ const LinkedAccounts = () => {
             const Icon = provider.icon;
             const isLinked = isProviderLinked(provider.name);
             const isAvailable = provider.available;
+            const linkedAccount = linkedAccounts.find(a => a.provider === provider.name);
+            const hasPAT = !!linkedAccount?.access_token;
 
             return (
               <Card
@@ -329,7 +392,7 @@ const LinkedAccounts = () => {
                 }}
               >
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: provider.name === 'github' && isAvailable ? 2 : 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Box
                         sx={{
@@ -353,6 +416,14 @@ const LinkedAccounts = () => {
                             Coming soon
                           </Typography>
                         )}
+                        {hasPAT && (
+                          <Chip
+                            icon={<Key size={12} />}
+                            label="Using PAT"
+                            size="small"
+                            sx={{ mt: 0.5 }}
+                          />
+                        )}
                       </Box>
                     </Box>
                     {isLinked ? (
@@ -373,6 +444,34 @@ const LinkedAccounts = () => {
                       </Button>
                     )}
                   </Box>
+
+                  {/* Personal Access Token Section (GitHub and GitLab) - Only shown if account is linked */}
+                  {(provider.name === 'github' || provider.name === 'gitlab') && isAvailable && isLinked && (
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Key size={14} />
+                          Personal Access Token
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<Key size={14} />}
+                            onClick={() => handleOpenPatDialog(provider.name, linkedAccount?.id)}
+                            disabled={isLoading}
+                          >
+                            {linkedAccount?.access_token ? 'Update PAT' : 'Add PAT'}
+                          </Button>
+                        </Box>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {linkedAccount?.access_token
+                          ? 'Update your PAT to access repositories'
+                          : 'Add a PAT to your linked account for direct repository access'}
+                      </Typography>
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -388,6 +487,67 @@ const LinkedAccounts = () => {
           </Typography>
         </Alert>
       </Box>
+
+      {/* Personal Access Token Dialog */}
+      <Dialog open={patDialogOpen} onClose={handleClosePatDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'Update Personal Access Token' : 'Add Personal Access Token'}
+          {patProvider && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {providerConfigs[patProvider]?.displayName} - {linkedAccounts.find(a => a.id === editingAccountId)?.provider_username || linkedAccounts.find(a => a.id === editingAccountId)?.provider_email}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Personal Access Token"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={patToken}
+            onChange={(e) => setPatToken(e.target.value)}
+            helperText={`The token used to authenticate with ${providerConfigs[patProvider]?.displayName || 'the provider'}'s API`}
+            sx={{ mb: 2 }}
+          />
+
+          {/* Provider-specific instructions */}
+          {patProvider === 'github' && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="caption">
+                <strong>Required GitHub scopes:</strong> repo (or public_repo), read:org, read:user, user:email
+              </Typography>
+            </Alert>
+          )}
+          {patProvider === 'gitlab' && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="caption">
+                <strong>Required GitLab scopes:</strong> read_api, read_repository, read_user
+              </Typography>
+            </Alert>
+          )}
+
+          {errorMessage && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePatDialog} color="primary">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSavePatToken}
+            color="primary"
+            variant="contained"
+            disabled={isLoading}
+          >
+            {linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'Update Token' : 'Add Token'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

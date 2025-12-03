@@ -1465,7 +1465,7 @@ export async function getLinkedAccountsForUser(userId: string) {
   try {
     const result = await connectionPool.query(
       `SELECT id, provider, provider_user_id, provider_email, provider_username, 
-              created_at, last_login_at
+              access_token, created_at, last_login_at
        FROM odb.external_auth_providers
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -1657,6 +1657,73 @@ export async function getLinkedAccountById(accountId: string, userId: string) {
   } catch (error: any) {
     console.error('Error fetching linked account by ID:', error);
     return JSON.stringify({ found: false, error: error.message });
+  }
+}
+
+// Personal Access Token (PAT) Management Functions
+
+export async function addPersonalAccessToken(
+  userId: string,
+  accountId: string,
+  accessToken: string
+) {
+  try {
+    // Update the existing OAuth account with PAT
+    // This adds the PAT to an already-linked account
+    const result = await connectionPool.query(
+      `UPDATE odb.external_auth_providers 
+       SET access_token = $1, last_login_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND user_id = $3
+       RETURNING id, provider, provider_username, provider_email`,
+      [accessToken, accountId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({
+        success: false,
+        error: 'Account not found or does not belong to you'
+      });
+    }
+
+    return JSON.stringify({
+      success: true,
+      linkedAccount: result.rows[0]
+    });
+  } catch (error: any) {
+    console.error('Error adding personal access token:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updatePersonalAccessToken(
+  userId: string,
+  accountId: string,
+  accessToken: string
+) {
+  try {
+    // Verify the account belongs to this user and update the token
+    const result = await connectionPool.query(
+      `UPDATE odb.external_auth_providers 
+       SET access_token = $1, last_login_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND user_id = $3
+       RETURNING id, provider`,
+      [accessToken, accountId, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({
+        success: false,
+        error: 'Account not found or does not belong to you'
+      });
+    }
+
+    return JSON.stringify({
+      success: true,
+      provider: result.rows[0].provider
+    });
+  } catch (error: any) {
+    console.error('Error updating personal access token:', error);
+    return JSON.stringify({ success: false, error: error.message });
   }
 }
 
