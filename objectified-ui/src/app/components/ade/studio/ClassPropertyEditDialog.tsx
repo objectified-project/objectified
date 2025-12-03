@@ -15,13 +15,16 @@ import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
 import { updateClassProperty } from '../../../../../lib/db/helper';
 import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
+import ExtractToClassDialog from './ExtractToClassDialog';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   editingClassProperty: any | null;
   // Callback to reload classes after a successful save
-  onSaved?: () => Promise<void> | void;
+  // applyLayout: optional parameter to trigger layout recalculation after reload
+  onSaved?: (applyLayout?: boolean) => Promise<void> | void;
   // All properties from the parent class (to show nested properties)
   allClassProperties?: Array<{
     id: string;
@@ -30,12 +33,15 @@ interface Props {
     description?: string;
     parent_id?: string | null;
   }>;
+  // For extract to class feature
+  existingClassNames?: string[];
 }
 
-export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved, allClassProperties }: Props) {
+export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved, allClassProperties, existingClassNames = [] }: Props) {
   const [editPropName, setEditPropName] = useState('');
   const [editPropAdditionalProperties, setEditPropAdditionalProperties] = useState<'default' | 'true' | 'false'>('default');
   const [editPropertyError, setEditPropertyError] = useState('');
+  const [extractDialogOpen, setExtractDialogOpen] = useState(false);
 
   // Use shared form data structure
   const [formData, setFormData] = useState<PropertyFormData>({});
@@ -65,6 +71,27 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       isArray,
       hasRef: !!schema.$ref
     };
+  };
+
+  // Check if property can be extracted to a class
+  const canExtractToClass = () => {
+    if (!editingClassProperty) return false;
+
+    const propData = typeof editingClassProperty.data === 'string'
+      ? JSON.parse(editingClassProperty.data)
+      : (editingClassProperty.data || {});
+
+    const isDirectObject = propData.type === 'object' && !propData.$ref;
+    const isArrayOfObjects = propData.type === 'array' && propData.items?.type === 'object' && !propData.items?.$ref;
+
+    return isDirectObject || isArrayOfObjects;
+  };
+
+  const handleExtractSuccess = async (newClassId: string, newClassName: string) => {
+    setExtractDialogOpen(false);
+    // Reload classes with layout applied to properly position the new class
+    if (onSaved) await onSaved(true); // Pass true to apply layout
+    onClose();
   };
 
   // Initialize form when editingClassProperty changes
@@ -435,9 +462,34 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         })()}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={handleSave} variant="contained">Save</Button>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+          <Box>
+            {canExtractToClass() && (
+              <Button
+                onClick={() => setExtractDialogOpen(true)}
+                startIcon={<CallSplitIcon />}
+                color="secondary"
+                variant="outlined"
+              >
+                Extract to Class
+              </Button>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSave} variant="contained">Save</Button>
+          </Box>
+        </Box>
       </DialogActions>
+
+      {/* Extract to Class Dialog */}
+      <ExtractToClassDialog
+        open={extractDialogOpen}
+        onClose={() => setExtractDialogOpen(false)}
+        classProperty={editingClassProperty}
+        existingClassNames={existingClassNames}
+        onSuccess={handleExtractSuccess}
+      />
     </Dialog>
   );
 }

@@ -11,8 +11,8 @@ We continue to improve the platform based on your feedback with improvements and
 - New project support improvements
   - Ability to import projects from SSO with a columnar navigation interface
   - Added support for Personal Access Tokens (PAT) for repository access
-    - Users can now add their own PAT to access repositories they own
-    - Supports both GitHub and GitLab providers
+    - Add/Update/Delete PAT tokens directly from the UI
+    - Currently supports GitHub
     - PAT tokens require "read" permissions for API and repositories to avoid 401 Unauthorized errors
     - Provider-specific instructions provided for creating tokens with proper permissions
   - Repository browser enhancements:
@@ -32,6 +32,19 @@ We continue to improve the platform based on your feedback with improvements and
   - Small improvements to the layouts and spacing for better readability
   - Editing a property of type "object" now gives visibility into its nested properties
   - Added the ability to auto-generate an example value based on the property's schema
+  - **New:** Extract object properties to reusable classes
+    - Convert inline object properties into standalone classes that can be referenced using $ref
+    - Works with both direct object types and arrays of objects
+    - Automatically copies nested properties (references and library properties) to the new class
+    - Prevents duplicate class names with validation
+    - Updates original property to use $ref upon creation
+    - Sidebar and canvas automatically refresh with proper layout to display the new class
+- Class management improvements:
+  - **New:** Automatic reference updates when renaming classes
+    - When a class is renamed, all properties that reference it are automatically updated
+    - Updates both direct references and array item references
+    - Maintains data integrity by updating all `$ref` paths throughout the version
+    - Ensures OpenAPI specifications remain valid after class renames
 - Mermaid mode improvements:
   - Now adds display of the Mermaid diagram as an image by default
   - Adds SVG and PNG downloadability of the Mermaid diagram

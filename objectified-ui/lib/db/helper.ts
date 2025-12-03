@@ -792,16 +792,79 @@ export async function updateClass(classId: string, name: string, description: st
       return JSON.stringify({ success: false, error: 'Class schema is required' });
     }
 
+    // Get the old class name before updating
+    const oldClassResult = await connectionPool.query(
+      `SELECT name, version_id FROM odb.classes WHERE id = $1 AND deleted_at IS NULL`,
+      [classId]
+    );
+
+    if (oldClassResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    const oldClassName = oldClassResult.rows[0].name;
+    const versionId = oldClassResult.rows[0].version_id;
+    const newClassName = name.trim();
+
+    // Update the class
     const result = await connectionPool.query(
       `UPDATE odb.classes
        SET name = $1, description = $2, schema = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4 AND deleted_at IS NULL
        RETURNING id, version_id, name, description, schema, enabled, created_at, updated_at`,
-      [name.trim(), description, JSON.stringify(schema), classId]
+      [newClassName, description, JSON.stringify(schema), classId]
     );
 
     if (result.rowCount === 0) {
       return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    // If the class name changed, update all $ref values that reference it
+    if (oldClassName !== newClassName) {
+      const oldRefPath = `#/components/schemas/${oldClassName}`;
+      const newRefPath = `#/components/schemas/${newClassName}`;
+
+      // Get all classes in the same version
+      const classesInVersion = await connectionPool.query(
+        `SELECT id FROM odb.classes WHERE version_id = $1 AND deleted_at IS NULL`,
+        [versionId]
+      );
+
+      const classIds = classesInVersion.rows.map(row => row.id);
+
+      if (classIds.length > 0) {
+        // Get all class properties for these classes
+        const propertiesResult = await connectionPool.query(
+          `SELECT id, data FROM odb.class_properties WHERE class_id = ANY($1)`,
+          [classIds]
+        );
+
+        // Update each property that references the old class name
+        for (const prop of propertiesResult.rows) {
+          const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
+          let updated = false;
+
+          // Check direct $ref
+          if (propData.$ref === oldRefPath) {
+            propData.$ref = newRefPath;
+            updated = true;
+          }
+
+          // Check array items $ref
+          if (propData.type === 'array' && propData.items?.$ref === oldRefPath) {
+            propData.items.$ref = newRefPath;
+            updated = true;
+          }
+
+          // Update the property if it was changed
+          if (updated) {
+            await connectionPool.query(
+              `UPDATE odb.class_properties SET data = $1 WHERE id = $2`,
+              [JSON.stringify(propData), prop.id]
+            );
+          }
+        }
+      }
     }
 
     return JSON.stringify({ success: true, class: result.rows[0] });
@@ -835,6 +898,164 @@ export async function deleteClass(classId: string) {
     return JSON.stringify({ success: true });
   } catch (error: any) {
     console.error('Error deleting class:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function extractObjectPropertyToClass(
+  classPropertyId: string,
+  newClassName: string,
+  newClassDescription: string | null
+) {
+  try {
+    if (!newClassName || newClassName.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'New class name is required' });
+    }
+
+    // Get the class property to extract
+    const propertyResult = await connectionPool.query(
+      `SELECT cp.id, cp.class_id, cp.name, cp.description, cp.data, cp.parent_id,
+              c.version_id
+       FROM odb.class_properties cp
+       JOIN odb.classes c ON cp.class_id = c.id
+       WHERE cp.id = $1`,
+      [classPropertyId]
+    );
+
+    if (propertyResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Property not found' });
+    }
+
+    const classProperty = propertyResult.rows[0];
+    const propData = typeof classProperty.data === 'string'
+      ? JSON.parse(classProperty.data)
+      : classProperty.data;
+
+    // Validate that it's an object type
+    const isDirectObject = propData.type === 'object' && !propData.$ref;
+    const isArrayOfObjects = propData.type === 'array' && propData.items?.type === 'object' && !propData.items?.$ref;
+
+    if (!isDirectObject && !isArrayOfObjects) {
+      return JSON.stringify({
+        success: false,
+        error: 'Only object properties or arrays of objects can be extracted to a class'
+      });
+    }
+
+    // Check if class name already exists in this version
+    const existingClassCheck = await connectionPool.query(
+      `SELECT id FROM odb.classes 
+       WHERE version_id = $1 AND name = $2 AND deleted_at IS NULL`,
+      [classProperty.version_id, newClassName.trim()]
+    );
+
+    if (existingClassCheck.rowCount > 0) {
+      return JSON.stringify({
+        success: false,
+        error: `A class named "${newClassName}" already exists in this version`
+      });
+    }
+
+    // Get nested properties if any exist
+    const nestedPropsResult = await connectionPool.query(
+      `SELECT id, property_id, name, description, data
+       FROM odb.class_properties
+       WHERE parent_id = $1
+       ORDER BY name ASC`,
+      [classPropertyId]
+    );
+
+    // Extract the object schema
+    const objectSchema = isArrayOfObjects ? propData.items : propData;
+
+    // Create the new class with the object schema
+    const newClassResult = await connectionPool.query(
+      `INSERT INTO odb.classes (version_id, name, description, schema)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name`,
+      [
+        classProperty.version_id,
+        newClassName.trim(),
+        newClassDescription || `Extracted from ${classProperty.name}`,
+        JSON.stringify(objectSchema)
+      ]
+    );
+
+    const newClass = newClassResult.rows[0];
+
+    // Copy nested properties to the new class
+    // Note: Due to the database constraint 'class_properties_null_property_id_is_reference',
+    // we can only copy properties that either:
+    // 1. Have a property_id (from the property library), OR
+    // 2. Are references (contain $ref in their data)
+    // Non-reference inline properties (property_id IS NULL and no $ref) cannot be copied
+    // as they would violate the constraint.
+    for (const nestedProp of nestedPropsResult.rows) {
+      const nestedData = typeof nestedProp.data === 'string'
+        ? JSON.parse(nestedProp.data)
+        : nestedProp.data;
+
+      // Check if this is a reference (has $ref)
+      const isReference = nestedData.$ref || (nestedData.type === 'array' && nestedData.items?.$ref);
+
+      // Only copy if it has a property_id OR is a reference
+      if (nestedProp.property_id !== null || isReference) {
+        await connectionPool.query(
+          `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+           VALUES ($1, $2, $3, $4, $5, NULL)`,
+          [
+            newClass.id,
+            nestedProp.property_id, // Will be NULL for references, which is OK
+            nestedProp.name,
+            nestedProp.description,
+            nestedProp.data
+          ]
+        );
+      }
+      // Non-reference inline properties are skipped - they remain in the object schema
+    }
+
+    // Update the original property to reference the new class
+    const updatedPropData = { ...propData };
+    if (isArrayOfObjects) {
+      updatedPropData.items = {
+        $ref: `#/components/schemas/${newClassName.trim()}`
+      };
+    } else {
+      updatedPropData.$ref = `#/components/schemas/${newClassName.trim()}`;
+      delete updatedPropData.type;
+      delete updatedPropData.properties;
+      delete updatedPropData.additionalProperties;
+    }
+
+    await connectionPool.query(
+      `UPDATE odb.class_properties
+       SET data = $1
+       WHERE id = $2`,
+      [JSON.stringify(updatedPropData), classPropertyId]
+    );
+
+    // Delete the nested properties from the original location
+    await connectionPool.query(
+      `DELETE FROM odb.class_properties
+       WHERE parent_id = $1`,
+      [classPropertyId]
+    );
+
+    return JSON.stringify({
+      success: true,
+      newClassId: newClass.id,
+      newClassName: newClass.name,
+      message: `Successfully extracted "${classProperty.name}" to new class "${newClass.name}"`
+    });
+  } catch (error: any) {
+    console.error('Error extracting property to class:', error);
+    if (error.code === '23505') {
+      return JSON.stringify({
+        success: false,
+        error: 'A class with this name already exists in this version'
+      });
+    }
     return JSON.stringify({ success: false, error: error.message });
   }
 }

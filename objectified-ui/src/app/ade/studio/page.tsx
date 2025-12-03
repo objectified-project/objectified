@@ -2278,6 +2278,7 @@ const StudioContent = () => {
             ? (nodes.find(n => n.id === editingClassId)?.data as any)?.properties || []
             : []
         }
+        existingClassNames={nodes.map(n => (n.data as any).name).filter(Boolean)}
       />
 
       {/* Reference Dialog */}
