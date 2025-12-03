@@ -17,7 +17,7 @@ import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import CircularProgress from '@mui/material/CircularProgress';
-import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft, Lock } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft, Lock, Search } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import { parseOpenAPISpec, ParsedClass } from '../../../utils/openapi-import';
 import { importProjectFromOpenAPI, getLinkedAccountsForUser } from '../../../../../lib/db/helper';
@@ -61,6 +61,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   const [selectedRepo, setSelectedRepo] = useState<any>(null);
   const [repoFiles, setRepoFiles] = useState<any[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
+  const [repoSearchQuery, setRepoSearchQuery] = useState<string>('');
 
 
   // Load linked accounts when dialog opens
@@ -101,6 +102,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     setSelectedRepo(null);
     setRepoFiles([]);
     setCurrentPath('');
+    setRepoSearchQuery('');
   };
 
   const calculateImportStats = () => {
@@ -678,6 +680,35 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                       flexDirection: 'column',
                       minHeight: 0
                     }}>
+                      {/* Search Box */}
+                      {selectedAccount && repositories.length > 0 && (
+                        <Box sx={{
+                          p: 1,
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          flexShrink: 0
+                        }}>
+                          <TextField
+                            size="small"
+                            placeholder="Search repositories..."
+                            value={repoSearchQuery}
+                            onChange={(e) => setRepoSearchQuery(e.target.value)}
+                            fullWidth
+                            InputProps={{
+                              startAdornment: <Search size={16} style={{ marginRight: 8, opacity: 0.6 }} />,
+                            }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                fontSize: '13px',
+                                '& input': {
+                                  py: 0.75,
+                                }
+                              }
+                            }}
+                          />
+                        </Box>
+                      )}
+
                       <Box sx={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
                         {!selectedAccount ? (
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 2 }}>
@@ -695,8 +726,24 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                               No repositories
                             </Typography>
                           </Box>
-                        ) : (
-                          repositories.map((repo: any) => {
+                        ) : (() => {
+                          // Filter repositories based on search query
+                          const filteredRepos = repositories.filter((repo: any) =>
+                            repo.name.toLowerCase().includes(repoSearchQuery.toLowerCase()) ||
+                            (repo.description && repo.description.toLowerCase().includes(repoSearchQuery.toLowerCase()))
+                          );
+
+                          if (filteredRepos.length === 0) {
+                            return (
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', p: 2 }}>
+                                <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary' }} textAlign="center">
+                                  No repositories match "{repoSearchQuery}"
+                                </Typography>
+                              </Box>
+                            );
+                          }
+
+                          return filteredRepos.map((repo: any) => {
                             const isSelected = selectedRepo?.id === repo.id;
                             return (
                               <Box
@@ -730,8 +777,8 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                                 )}
                               </Box>
                             );
-                          })
-                        )}
+                          });
+                        })()}
                       </Box>
                     </Box>
 

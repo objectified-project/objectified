@@ -13,7 +13,10 @@ We continue to improve the platform based on your feedback with improvements and
     - Supports both GitHub and GitLab providers
     - PAT tokens require "read" permissions for API and repositories to avoid 401 Unauthorized errors
     - Provider-specific instructions provided for creating tokens with proper permissions
-    - Lists all repositories available, and any private repositories with a lock
+  - Repository browser enhancements:
+    - Lists all repositories available, sorted alphabetically
+    - Private repositories are marked with a lock icon for easy identification
+    - Search functionality to quickly find repositories by name or description
 - More consistent look and feel in dark and light mode across the board
 - Modified canvas layout to improve visibility and usability
   - Auto layout buttons are now more concise and compact
