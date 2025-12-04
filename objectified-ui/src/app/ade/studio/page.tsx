@@ -13,6 +13,7 @@ import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
 import MermaidPreview, { type MermaidPreviewRef } from '../../components/ade/studio/MermaidPreview';
 import { generateOpenApiSpec } from '../../utils/openapi';
 import { generateArazzoSpec } from '../../utils/arazzo';
+import { generateJsonSchema } from '../../utils/jsonschema';
 import { useDialog } from '../../components/providers/DialogProvider';
 import {
   ReactFlow,
@@ -89,11 +90,12 @@ const StudioContent = () => {
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [codeFormat, setCodeFormat] = useState<'json' | 'yaml'>('json');
-  const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'arazzo'>('openapi');
+  const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'arazzo' | 'jsonschema'>('openapi');
 
   // Sample OpenAPI spec - will be replaced with actual data from project/version
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
   const [arazzoSpec, setArazzoSpec] = useState<string>('');
+  const [jsonSchemaSpec, setJsonSchemaSpec] = useState<string>('');
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [mermaidViewMode, setMermaidViewMode] = useState<'code' | 'preview'>('preview');
   const [mermaidSvgReady, setMermaidSvgReady] = useState(false);
@@ -264,6 +266,13 @@ const StudioContent = () => {
         version: currentVersion?.version_id
       });
       setArazzoSpec(arazzoSpecContent);
+
+      // Generate JSON Schema spec
+      const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
+        projectName: currentProject?.name,
+        version: currentVersion?.version_id
+      });
+      setJsonSchemaSpec(jsonSchemaContent);
     } catch (error) {
       console.error('Failed to reload classes:', error);
     } finally {
@@ -1382,6 +1391,13 @@ const StudioContent = () => {
         });
         setArazzoSpec(arazzoSpecContent);
 
+        // Generate JSON Schema specification
+        const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
+          projectName: currentProject?.name,
+          version: currentVersion?.version_id
+        });
+        setJsonSchemaSpec(jsonSchemaContent);
+
         setLoadingMessage('Generating Mermaid diagram...');
 
         // Generate Mermaid diagram
@@ -1443,7 +1459,14 @@ const StudioContent = () => {
               version: currentVersion?.version_id
             });
             setArazzoSpec(arazzoSpecContent);
-            console.log('Regenerated OpenAPI and Arazzo specs for view mode:', viewMode);
+
+            // Generate fresh JSON Schema specification
+            const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
+              projectName: currentProject?.name,
+              version: currentVersion?.version_id
+            });
+            setJsonSchemaSpec(jsonSchemaContent);
+            console.log('Regenerated OpenAPI, Arazzo, and JSON Schema specs for view mode:', viewMode);
           } else if (viewMode === 'mermaid') {
             // Generate fresh Mermaid diagram
             const mermaid = generateMermaidDiagram(classesWithProperties);
@@ -1945,12 +1968,18 @@ const StudioContent = () => {
                 <div className="flex items-center gap-4">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {codeDisplayFormat === 'openapi' ? 'OpenAPI 3.1.0 Specification' : 'Arazzo Specification v1.0.1'}
+                      {codeDisplayFormat === 'openapi'
+                        ? 'OpenAPI 3.1.0 Specification'
+                        : codeDisplayFormat === 'arazzo'
+                        ? 'Arazzo Specification v1.0.1'
+                        : 'JSON Schema (Draft 2020-12)'}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {codeDisplayFormat === 'openapi'
                         ? `Complete schema definition for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : `Workflow specification for ${selectedProject?.name} v${selectedVersion?.version_id}`}
+                        : codeDisplayFormat === 'arazzo'
+                        ? `Workflow specification for ${selectedProject?.name} v${selectedVersion?.version_id}`
+                        : `JSON Schema definition for ${selectedProject?.name} v${selectedVersion?.version_id}`}
                     </p>
                   </div>
 
@@ -1958,11 +1987,12 @@ const StudioContent = () => {
                   <div className="flex items-center gap-2">
                     <select
                       value={codeDisplayFormat}
-                      onChange={(e) => setCodeDisplayFormat(e.target.value as 'openapi' | 'arazzo')}
+                      onChange={(e) => setCodeDisplayFormat(e.target.value as 'openapi' | 'arazzo' | 'jsonschema')}
                       className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="openapi">OpenAPI Specification</option>
                       <option value="arazzo">Arazzo Specification</option>
+                      <option value="jsonschema">JSON Schema</option>
                     </select>
                   </div>
 
@@ -1995,7 +2025,11 @@ const StudioContent = () => {
                   <>
                     <button
                       onClick={() => {
-                        const specContent = codeDisplayFormat === 'openapi' ? openApiSpec : arazzoSpec;
+                        const specContent = codeDisplayFormat === 'openapi'
+                          ? openApiSpec
+                          : codeDisplayFormat === 'arazzo'
+                          ? arazzoSpec
+                          : jsonSchemaSpec;
                         const content = codeFormat === 'json'
                           ? specContent
                           : YAML.stringify(JSON.parse(specContent));
@@ -2017,7 +2051,11 @@ const StudioContent = () => {
                     <button
                       onClick={() => {
                         // Get content in selected format
-                        const specContent = codeDisplayFormat === 'openapi' ? openApiSpec : arazzoSpec;
+                        const specContent = codeDisplayFormat === 'openapi'
+                          ? openApiSpec
+                          : codeDisplayFormat === 'arazzo'
+                          ? arazzoSpec
+                          : jsonSchemaSpec;
                         const content = codeFormat === 'json'
                           ? specContent
                           : YAML.stringify(JSON.parse(specContent));
@@ -2035,7 +2073,11 @@ const StudioContent = () => {
                         // Generate filename from project and version
                         const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
                         const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-                        const specType = codeDisplayFormat === 'openapi' ? 'openapi' : 'arazzo';
+                        const specType = codeDisplayFormat === 'openapi'
+                          ? 'openapi'
+                          : codeDisplayFormat === 'arazzo'
+                          ? 'arazzo'
+                          : 'jsonschema';
                         link.download = `${projectSlug}-${versionSlug}-${specType}.${extension}`;
 
                         // Trigger download
@@ -2061,7 +2103,11 @@ const StudioContent = () => {
                 height="100%"
                 language={codeFormat}
                 value={(() => {
-                  const specContent = codeDisplayFormat === 'openapi' ? openApiSpec : arazzoSpec;
+                  const specContent = codeDisplayFormat === 'openapi'
+                    ? openApiSpec
+                    : codeDisplayFormat === 'arazzo'
+                    ? arazzoSpec
+                    : jsonSchemaSpec;
 
                   if (!specContent) {
                     const emptySpec = codeDisplayFormat === 'openapi'
@@ -2075,7 +2121,8 @@ const StudioContent = () => {
                             schemas: {}
                           }
                         }
-                      : {
+                      : codeDisplayFormat === 'arazzo'
+                      ? {
                           arazzo: '1.0.1',
                           info: {
                             title: 'No workflows defined',
@@ -2083,6 +2130,12 @@ const StudioContent = () => {
                           },
                           sourceDescriptions: [],
                           workflows: []
+                        }
+                      : {
+                          $schema: 'https://json-schema.org/draft/2020-12/schema',
+                          title: 'No schemas defined',
+                          type: 'object',
+                          $defs: {}
                         };
                     return codeFormat === 'json'
                       ? JSON.stringify(emptySpec, null, 2)

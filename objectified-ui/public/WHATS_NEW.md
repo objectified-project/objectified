@@ -26,7 +26,8 @@ We continue to improve the platform based on your feedback with improvements and
 - Enhanced Code view with display format selector
   - OpenAPI format selected by default
   - Added Arazzo 1.0.1 generation support
-  - Format selector dropdown for easy switching
+  - **New:** Added JSON Schema (Draft 2020-12) generation support
+  - Format selector dropdown for easy switching between OpenAPI, Arazzo, and JSON Schema formats
 - Properties form enhancements:
   - Added the ability to test regular expressions directly within the form
   - Small improvements to the layouts and spacing for better readability
