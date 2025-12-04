@@ -69,7 +69,7 @@ interface Version {
   published: boolean;
 }
 
-type ViewMode = 'canvas' | 'code' | 'mermaid';
+type ViewMode = 'canvas' | 'code' | 'generate' | 'mermaid';
 
 const StudioContent = () => {
   const { data: session } = useSession();
@@ -1702,6 +1702,16 @@ const StudioContent = () => {
                 Code
               </button>
               <button
+                onClick={() => setViewMode('generate')}
+                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                  viewMode === 'generate'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                }`}
+              >
+                Generate
+              </button>
+              <button
                 onClick={() => setViewMode('mermaid')}
                 className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
                   viewMode === 'mermaid'
@@ -2163,6 +2173,118 @@ const StudioContent = () => {
                   selectOnLineNumbers: true,
                 }}
               />
+            </div>
+          </div>
+        ) : viewMode === 'generate' ? (
+          // Generate Coming Soon View
+          <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-8">
+            <div className="max-w-2xl w-full">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                    <svg className="w-7 h-7 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                      DTO Generation
+                    </h2>
+                    <p className="text-base text-blue-600 dark:text-blue-400 font-semibold">
+                      Coming Soon!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    We're developing an exciting new feature that will revolutionize how you work with your data models.
+                    Soon, you'll be able to automatically generate Data Transfer Objects (DTOs) directly from your project definitions.
+                  </p>
+
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-blue-950 rounded-lg p-5 border border-blue-100 dark:border-blue-800">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                      </svg>
+                      Planned Features
+                    </h3>
+                    <ul className="space-y-2.5">
+                      <li className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Multi-Language Support</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Generate DTOs in TypeScript, Java, C#, Python, Go, Rust, and more</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Customizable Output</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Configure naming conventions, formatting styles, and code structure preferences</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Validation Support</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Include validation annotations, decorators, and runtime checks based on your schemas</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Flexible Export Options</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Download as individual files, complete packages, or copy to clipboard</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">Framework Integration</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Generate code compatible with popular frameworks and libraries</p>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-1">
+                          Stay Updated
+                        </h4>
+                        <p className="text-xs text-amber-800 dark:text-amber-400">
+                          This feature is under active development. We'll announce its availability through release notes and updates.
+                          Check back soon or follow our{' '}
+                          <a
+                            href="https://www.youtube.com/@objectifieddev"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium underline hover:text-amber-900 dark:hover:text-amber-300"
+                          >
+                            YouTube channel
+                          </a>
+                          {' '}for the latest news!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : viewMode === 'mermaid' ? (

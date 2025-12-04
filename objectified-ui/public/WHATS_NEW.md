@@ -52,6 +52,13 @@ We continue to improve the platform based on your feedback with improvements and
   - Diagram preview is now scrollable for large diagrams
   - Added zoom controls (Zoom In, Zoom Out, Reset) for better diagram viewing
   - Supports zoom levels from 25% to 400%
+- Canvas toolbar enhancements:
+  - **New:** Added "Generate" view mode (coming soon)
+    - New tab positioned between Code and Mermaid for easy access
+    - Dedicated page showcasing the upcoming DTO generation feature
+    - Will enable automatic DTO generation from project definitions
+    - Planned support for multiple languages (TypeScript, Java, C#, Python, Go, Rust, and more)
+    - Future features include customizable output formats, validation annotations, framework integration, and flexible export options
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
@@ -65,5 +72,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: November 30, 2025*
+*Last updated: December 3, 2025*
 
