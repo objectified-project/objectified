@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation';
 import WhatsNewDialog from './WhatsNewDialog';
 
 // Import version from package.json
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '12-2025';
 
 type NavItem = { label: string; href: string };
 

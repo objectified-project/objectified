@@ -1,4 +1,4 @@
-# Objectified v0.4.1
+# Objectified 12-2025
 
 We continue to improve the platform based on your feedback with improvements and new features!
 
