@@ -983,36 +983,75 @@ export async function extractObjectPropertyToClass(
 
     const newClass = newClassResult.rows[0];
 
-    // Copy nested properties to the new class
-    // Note: Due to the database constraint 'class_properties_null_property_id_is_reference',
-    // we can only copy properties that either:
-    // 1. Have a property_id (from the property library), OR
-    // 2. Are references (contain $ref in their data)
-    // Non-reference inline properties (property_id IS NULL and no $ref) cannot be copied
-    // as they would violate the constraint.
-    for (const nestedProp of nestedPropsResult.rows) {
+    // Get ALL nested properties recursively using a CTE that tracks depth
+    // We need to fetch the entire hierarchy and process level by level to maintain parent-child relationships
+    const allNestedPropsResult = await connectionPool.query(
+      `WITH RECURSIVE nested_props AS (
+        -- Base case: direct children of the extracted property (depth 1)
+        SELECT id, property_id, name, description, data, parent_id, 1 as depth
+        FROM odb.class_properties
+        WHERE parent_id = $1
+        
+        UNION ALL
+        
+        -- Recursive case: children of children (depth + 1)
+        SELECT cp.id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id, np.depth + 1
+        FROM odb.class_properties cp
+        INNER JOIN nested_props np ON cp.parent_id = np.id
+      )
+      SELECT * FROM nested_props
+      ORDER BY depth ASC, name ASC`,
+      [classPropertyId]
+    );
+
+    // Map old property IDs to new property IDs to maintain parent-child relationships
+    const oldToNewIdMap = new Map<string, string | null>();
+    oldToNewIdMap.set(classPropertyId, null); // The extracted property becomes the root (NULL parent)
+
+    // Copy all nested properties level by level (parents before children)
+    // Due to constraint 'class_properties_null_property_id_is_reference', we can only copy properties that:
+    // 1. Have property_id !== NULL (from property library), OR
+    // 2. Are references (have $ref in data)
+    for (const nestedProp of allNestedPropsResult.rows) {
       const nestedData = typeof nestedProp.data === 'string'
         ? JSON.parse(nestedProp.data)
         : nestedProp.data;
 
-      // Check if this is a reference (has $ref)
+      // Check if this property satisfies the database constraint
+      const hasPropertyId = nestedProp.property_id !== null;
       const isReference = nestedData.$ref || (nestedData.type === 'array' && nestedData.items?.$ref);
+      const canBeCopied = hasPropertyId || isReference;
 
-      // Only copy if it has a property_id OR is a reference
-      if (nestedProp.property_id !== null || isReference) {
-        await connectionPool.query(
-          `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
-           VALUES ($1, $2, $3, $4, $5, NULL)`,
-          [
-            newClass.id,
-            nestedProp.property_id, // Will be NULL for references, which is OK
-            nestedProp.name,
-            nestedProp.description,
-            nestedProp.data
-          ]
-        );
+      if (!canBeCopied) {
+        // Skip inline properties that don't have property_id and aren't references
+        // They will remain in the class schema's properties field
+        console.warn(`Skipping inline property "${nestedProp.name}" at depth ${nestedProp.depth} - not from library and not a reference`);
+        continue;
       }
-      // Non-reference inline properties are skipped - they remain in the object schema
+
+      // Determine the new parent_id by looking up the old parent_id in our map
+      const oldParentId = nestedProp.parent_id;
+      const newParentId = oldToNewIdMap.get(oldParentId) !== undefined
+        ? oldToNewIdMap.get(oldParentId)
+        : null;
+
+      // Insert the property into the new class
+      const insertResult = await connectionPool.query(
+        `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [
+          newClass.id,
+          nestedProp.property_id, // Preserve property_id (NULL for references, ID for library properties)
+          nestedProp.name,
+          nestedProp.description,
+          nestedProp.data,
+          newParentId
+        ]
+      );
+
+      // Store the mapping of old ID to new ID for this property
+      oldToNewIdMap.set(nestedProp.id, insertResult.rows[0].id);
     }
 
     // Update the original property to reference the new class
