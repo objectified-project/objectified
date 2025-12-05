@@ -80,49 +80,88 @@ const MermaidPreview = forwardRef<MermaidPreviewRef, MermaidPreviewProps>(
     if (!svg) return;
 
     try {
-      // Create an image from the SVG
+      // Create an image from the SVG using data URL to avoid CORS issues
       const img = new Image();
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+
+      // Ensure SVG has proper namespace and dimensions
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+      const svgElement = svgDoc.documentElement;
+
+      // Get SVG dimensions
+      const viewBox = svgElement.getAttribute('viewBox');
+      let width = parseFloat(svgElement.getAttribute('width') || '800');
+      let height = parseFloat(svgElement.getAttribute('height') || '600');
+
+      // If viewBox exists but no width/height, extract from viewBox
+      if (viewBox && (!svgElement.getAttribute('width') || !svgElement.getAttribute('height'))) {
+        const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number);
+        width = vbWidth || width;
+        height = vbHeight || height;
+        svgElement.setAttribute('width', width.toString());
+        svgElement.setAttribute('height', height.toString());
+      }
+
+      // Serialize the SVG back to string
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgElement);
+
+      // Convert SVG to data URL
+      const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
 
       img.onload = () => {
-        // Create a canvas and draw the image
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        try {
+          // Create a canvas and draw the image
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
 
-        // Set canvas size with some padding
-        canvas.width = img.width + 40;
-        canvas.height = img.height + 40;
+          // Set canvas size with some padding
+          const padding = 40;
+          canvas.width = width + padding;
+          canvas.height = height + padding;
 
-        if (ctx) {
-          // Fill with white background
-          ctx.fillStyle = 'white';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          if (ctx) {
+            // Fill with white background
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Draw the image centered with padding
-          ctx.drawImage(img, 20, 20);
+            // Draw the image centered with padding
+            ctx.drawImage(img, padding / 2, padding / 2, width, height);
 
-          // Convert to PNG and download
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const pngUrl = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = pngUrl;
-              link.download = `${projectSlug}-${versionSlug}-diagram.png`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(pngUrl);
-            }
-          }, 'image/png');
+            // Convert to PNG and download
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const pngUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = pngUrl;
+                link.download = `${projectSlug}-${versionSlug}-diagram.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(pngUrl);
+              } else {
+                console.error('Failed to create blob from canvas');
+                alert('Failed to export PNG. Please try again or use SVG export.');
+              }
+            }, 'image/png');
+          }
+        } catch (err) {
+          console.error('Canvas drawing error:', err);
+          alert('Failed to export PNG. Please try SVG export instead.');
         }
-
-        URL.revokeObjectURL(url);
       };
 
-      img.src = url;
+      img.onerror = (err) => {
+        console.error('Image loading error:', err);
+        alert('Failed to load diagram for PNG export. Please try SVG export instead.');
+      };
+
+      // Set cross-origin to anonymous (though not needed for data URLs)
+      img.crossOrigin = 'anonymous';
+      img.src = svgDataUrl;
     } catch (err) {
       console.error('PNG export error:', err);
+      alert('Failed to export PNG. Please try SVG export instead.');
     }
   };
 
