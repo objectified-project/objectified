@@ -152,7 +152,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
             <p className="text-sm text-gray-600 mt-2">
               New to Objectified?{' '}
               <a
-                href="https://youtu.be/kUBoB31NXrE"
+                href="https://youtu.be/GQBgza8eYoQ"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-500 underline"
