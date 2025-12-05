@@ -5,6 +5,7 @@ import { Mail, Lock, User, Info } from 'lucide-react';
 import { signIn } from "next-auth/react";
 import { createSignupRequest } from '../../../lib/db/helper';
 import { SiGithub } from "react-icons/si";
+import BetaBackground from './BetaBackground';
 
 interface SSOButtonProps {
   provider: string;
@@ -128,9 +129,16 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
     });
   }
 
+  const isBetaMode = process.env.NEXT_PUBLIC_BETA_MODE;
+  console.log('Beta Mode Environment Variable:', process.env.NEXT_PUBLIC_BETA_MODE);
+  console.log('Is Beta Mode Active:', isBetaMode);
+
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 relative">
+      {/* Beta Background */}
+      {isBetaMode && <BetaBackground />}
+
+      <div className="w-full max-w-md relative z-10">
         <div className="bg-white rounded-lg shadow-lg p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
