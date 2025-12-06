@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { isAdminAuthenticated } from '@/app/utils/adminAuth';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const isAuthenticated = await isAdminAuthenticated();
 
   if (!isAuthenticated) {
