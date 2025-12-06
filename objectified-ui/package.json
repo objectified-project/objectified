@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "docker:build": "./build-docker.sh",
+    "docker:build:fast": "./build-docker.sh --no-test",
+    "docker:build:package": "./build-docker.sh --package",
+    "docker:build:push": "./build-docker.sh --push"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
