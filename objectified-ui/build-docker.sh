@@ -72,8 +72,30 @@ build_image() {
     print_info "Image: ${IMAGE_NAME}:${TAG}"
     print_info "Version: ${VERSION}"
 
+    # Determine platform to use
+    local platform=""
+
+    # Priority: PLATFORM env var > BUILDPLATFORM env var > auto-detect
+    if [ -n "$PLATFORM" ]; then
+        platform="$PLATFORM"
+        print_info "Using PLATFORM environment variable: $platform"
+    elif [ -n "$BUILDPLATFORM" ]; then
+        platform="$BUILDPLATFORM"
+        print_info "Using BUILDPLATFORM environment variable: $platform"
+    else
+        # Auto-detect platform
+        if [[ "$(uname -m)" == "arm64" ]] || [[ "$(uname -m)" == "aarch64" ]]; then
+            platform="linux/arm64"
+            print_info "Auto-detected ARM64 platform"
+        else
+            platform="linux/amd64"
+            print_info "Auto-detected AMD64 platform"
+        fi
+    fi
+
     # Build with multiple tags
     local build_args=(
+        "--platform" "$platform"
         "--build-arg" "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
         "--build-arg" "VERSION=${VERSION}"
         "-t" "${IMAGE_NAME}:${TAG}"
@@ -87,7 +109,7 @@ build_image() {
     fi
 
     # Execute build
-    docker build "${build_args[@]}" .
+    docker build --platform linux/amd64 "${build_args[@]}" .
 
     if [ $? -eq 0 ]; then
         print_success "Docker image built successfully"

@@ -1,7 +1,8 @@
 # Dockerfile for Objectified UI (Next.js)
+# Supports: linux/amd64, linux/arm64
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM --platform=$BUILDPLATFORM node:20-alpine AS deps
 WORKDIR /app
 
 # Install dependencies for native modules (bcrypt, pg)
@@ -10,11 +11,12 @@ RUN apk add --no-cache libc6-compat python3 make g++
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci
+# Install ALL dependencies (including dev deps) for build
+# TypeScript is needed to transpile next.config.ts
+RUN npm install
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy dependencies from deps stage
@@ -57,6 +59,7 @@ EXPOSE 3000
 
 # Set hostname to allow external connections
 ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 
 # Start the application
 CMD ["node", "server.js"]
