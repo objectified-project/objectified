@@ -8,7 +8,9 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Even more look and feel improvements
 - Fixed Mermaid PNG generation issue
-- Property enumerations can now be sorted ascending or descending
+- Property enumerations can now be:
+  - Sorted in ascending or descending order
+  - Repositioned as desired within the enumeration list
 - Added GitLab support for linked accounts and repositories
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
