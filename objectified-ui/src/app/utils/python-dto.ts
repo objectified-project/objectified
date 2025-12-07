@@ -213,23 +213,26 @@ function generateField(
   const fieldName = toSnakeCase(prop.name);
   const nestedClasses: string[] = [];
 
-  // Handle nested object types
-  if (propData.type === 'object' && !propData.$ref && propData.properties) {
-    const nestedClassName = toPascalCase(prop.name);
-    const nestedClass = generateNestedClass(prop, allProperties, nestedClassName, globalImports);
-    nestedClasses.push(nestedClass);
+  // Handle nested object types - check for child properties
+  if (propData.type === 'object' && !propData.$ref) {
+    const children = allProperties.filter((p: any) => p.parent_id === prop.id);
+    if (children.length > 0) {
+      const nestedClassName = toPascalCase(prop.name);
+      const nestedClass = generateNestedClass(prop, allProperties, nestedClassName, globalImports);
+      nestedClasses.push(nestedClass);
 
-    const typeHint = isRequired ? nestedClassName : `Optional[${nestedClassName}]`;
-    const fieldArgs = generateFieldArgs(propData, isRequired);
+      const typeHint = isRequired ? nestedClassName : `Optional[${nestedClassName}]`;
+      const fieldArgs = generateFieldArgs(propData, isRequired);
 
-    return {
-      field: `${indent}${fieldName}: ${typeHint}${fieldArgs}`,
-      nestedClasses
-    };
+      return {
+        field: `${indent}${fieldName}: ${typeHint}${fieldArgs}`,
+        nestedClasses
+      };
+    }
   }
 
-  // Handle array of nested objects
-  if (propData.type === 'array' && propData.items?.type === 'object' && propData.items.properties) {
+  // Handle array of nested objects - check for child properties
+  if (propData.type === 'array' && propData.items?.type === 'object') {
     const children = allProperties.filter((p: any) => p.parent_id === prop.id);
     if (children.length > 0) {
       const nestedClassName = toPascalCase(prop.name.replace(/s$/, '')) + 'Item';
