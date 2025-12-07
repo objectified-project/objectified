@@ -28,3 +28,19 @@ button {
   text-transform: none;
 }
 
+/* Layout Animation Styles */
+/* Smooth transitions for node positions during layout changes */
+.layout-animating .react-flow__node {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Smooth transitions for edges during layout changes */
+.layout-animating .react-flow__edge {
+  transition: opacity 0.4s ease-in-out;
+}
+
+/* Ensure edge paths animate smoothly */
+.layout-animating .react-flow__edge-path {
+  transition: d 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+

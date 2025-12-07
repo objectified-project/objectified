@@ -4,7 +4,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from './StudioContext';
-import { Copy, Download, Check, MoveUp, MoveDown, MoveLeft, MoveRight, Eye, Code } from 'lucide-react';
+import { Copy, Download, Check, Eye, Code } from 'lucide-react';
 import Switch from '@mui/material/Switch';
 import YAML from 'yaml';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
@@ -43,7 +43,8 @@ import {
   getTenantsForUser
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
-import { getLayoutedElements, type LayoutDirection } from './layoutUtils';
+import { getLayoutedElements, type LayoutDirection, applyAutoLayout, type LayoutAlgorithm } from './layoutUtils';
+import { getLayoutAlgorithmName, getLayoutAlgorithmDescription } from './autoLayoutAlgorithms';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -106,7 +107,9 @@ const StudioContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
+  const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('hierarchical-tb');
   const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(true);
+  const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const { fitView } = useReactFlow();
 
   // Class-property edit dialog state
@@ -278,7 +281,7 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, layoutDirection, autoLayoutEnabled, setNodes, setEdges, projects, versions, generateOpenApiSpec, nodes]);
 
-  // Apply auto-layout to current nodes and edges
+  // Apply auto-layout to current nodes and edges with animation
   const onLayout = useCallback((direction: LayoutDirection) => {
     if (!autoLayoutEnabled) {
       // Just update the direction without applying layout
@@ -288,19 +291,120 @@ const StudioContent = () => {
 
     setIsLoadingCanvas(true);
     setLoadingMessage('Applying layout...');
+    setIsAnimating(true); // Enable CSS transitions
 
-    // Use setTimeout to allow the loading state to render before heavy computation
+    // First, add transition styles to all existing nodes
+    const nodesWithTransition = nodes.map(node => ({
+      ...node,
+      style: {
+        ...node.style,
+        transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+    }));
+    setNodes(nodesWithTransition);
+
+    // Use setTimeout to allow the transition styles to be applied
     setTimeout(() => {
       const layoutedNodes = getLayoutedElements(nodes, edges, { direction });
-      setNodes(layoutedNodes);
+
+      // Apply new positions while keeping transition styles
+      const animatedNodes = layoutedNodes.map(node => ({
+        ...node,
+        style: {
+          ...node.style,
+          transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+        },
+      }));
+
+      setNodes(animatedNodes);
       setLayoutDirection(direction);
 
-      // Fit view after layout with a small delay to ensure layout is applied
+      // Fit view after animation completes
       setTimeout(() => {
         fitView({ padding: 0.2, duration: 400 });
         setIsLoadingCanvas(false);
         setLoadingMessage('');
-      }, 10);
+
+        // Remove transition styles using functional update
+        setTimeout(() => {
+          setNodes((currentNodes) =>
+            currentNodes.map(node => {
+              const { transition, ...restStyle } = node.style || {};
+              return {
+                ...node,
+                style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+              };
+            })
+          );
+          setIsAnimating(false);
+        }, 400);
+      }, 650);
+    }, 50);
+  }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
+
+  // Apply layout algorithm with animation
+  const onLayoutAlgorithm = useCallback((algorithm: LayoutAlgorithm) => {
+    if (!autoLayoutEnabled) {
+      setLayoutAlgorithm(algorithm);
+      return;
+    }
+
+    setIsLoadingCanvas(true);
+    setLoadingMessage(`Applying ${getLayoutAlgorithmName(algorithm)} layout...`);
+    setIsAnimating(true); // Enable CSS transitions
+
+    // First, add transition styles to all existing nodes
+    const nodesWithTransition = nodes.map(node => ({
+      ...node,
+      style: {
+        ...node.style,
+        transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+    }));
+    setNodes(nodesWithTransition);
+
+    // Use setTimeout to allow the transition styles to be applied
+    setTimeout(() => {
+      const layoutedNodes = applyAutoLayout(nodes, edges, { algorithm });
+
+      // Apply new positions while keeping transition styles
+      const animatedNodes = layoutedNodes.map(node => ({
+        ...node,
+        style: {
+          ...node.style,
+          transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+        },
+      }));
+
+      setNodes(animatedNodes);
+      setLayoutAlgorithm(algorithm);
+
+      // Update direction if it's a hierarchical layout
+      if (algorithm.startsWith('hierarchical-')) {
+        const dir = algorithm.split('-')[1].toUpperCase() as LayoutDirection;
+        setLayoutDirection(dir);
+      }
+
+      // Fit view after animation completes (600ms animation + small delay)
+      setTimeout(() => {
+        fitView({ padding: 0.2, duration: 400 });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+
+        // Remove transition styles to avoid interfering with manual dragging
+        setTimeout(() => {
+          setNodes((currentNodes) =>
+            currentNodes.map(node => {
+              const { transition, ...restStyle } = node.style || {};
+              return {
+                ...node,
+                style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
+              };
+            })
+          );
+          setIsAnimating(false);
+        }, 400);
+      }, 650);
     }, 50);
   }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
 
@@ -1805,7 +1909,7 @@ const StudioContent = () => {
               onEdgeClick={onEdgeClick}
               fitView
               attributionPosition="bottom-left"
-              className="dark:bg-gray-900"
+              className={`dark:bg-gray-900 ${isAnimating ? 'layout-animating' : ''}`}
               nodesDraggable={true}
               nodesConnectable={!isReadOnly}
               elementsSelectable={true}
@@ -1894,9 +1998,10 @@ const StudioContent = () => {
             })()}
 
             {/* Layout Control Panel */}
-            <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-2 border border-gray-200 dark:border-gray-700">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between px-2 py-1">
+            <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700 min-w-[280px]">
+              <div className="flex flex-col gap-3">
+                {/* Auto Layout Toggle */}
+                <div className="flex items-center justify-between px-1">
                   <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                     Auto Layout
                   </div>
@@ -1914,63 +2019,38 @@ const StudioContent = () => {
                     }}
                   />
                 </div>
-                <div className="flex flex-row gap-2">
-                  <button
-                    onClick={() => onLayout('TB')}
+
+                {/* Algorithm Selector */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400 px-1">
+                    Algorithm
+                  </label>
+                  <select
+                    value={layoutAlgorithm}
+                    onChange={(e) => onLayoutAlgorithm(e.target.value as LayoutAlgorithm)}
                     disabled={!autoLayoutEnabled}
-                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      layoutDirection === 'TB' && autoLayoutEnabled
-                        ? 'bg-blue-600 text-white'
-                        : autoLayoutEnabled
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                    className={`text-xs px-2 py-1.5 rounded border transition-colors ${
+                      autoLayoutEnabled
+                        ? 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:border-blue-500 dark:hover:border-blue-500'
+                        : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                     }`}
-                    title="Top to Bottom"
                   >
-                    <MoveDown size={12}/>
-                  </button>
-                  <button
-                    onClick={() => onLayout('LR')}
-                    disabled={!autoLayoutEnabled}
-                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      layoutDirection === 'LR' && autoLayoutEnabled
-                        ? 'bg-blue-600 text-white'
-                        : autoLayoutEnabled
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                    }`}
-                    title="Left to Right"
-                  >
-                    <MoveRight size={12}/>
-                  </button>
-                  <button
-                    onClick={() => onLayout('BT')}
-                    disabled={!autoLayoutEnabled}
-                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      layoutDirection === 'BT' && autoLayoutEnabled
-                        ? 'bg-blue-600 text-white'
-                        : autoLayoutEnabled
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                    }`}
-                    title="Bottom to Top"
-                  >
-                    <MoveUp size={12}/>
-                  </button>
-                  <button
-                    onClick={() => onLayout('RL')}
-                    disabled={!autoLayoutEnabled}
-                    className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      layoutDirection === 'RL' && autoLayoutEnabled
-                        ? 'bg-blue-600 text-white'
-                        : autoLayoutEnabled
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
-                    }`}
-                    title="Right to Left"
-                  >
-                    <MoveLeft size={12}/>
-                  </button>
+                    <option value="hierarchical-tb">📊 Hierarchical (Top-Down)</option>
+                    <option value="hierarchical-lr">📊 Hierarchical (Left-Right)</option>
+                    <option value="hierarchical-bt">📊 Hierarchical (Bottom-Top)</option>
+                    <option value="hierarchical-rl">📊 Hierarchical (Right-Left)</option>
+                    <option value="force-directed">🔄 Force-Directed</option>
+                    <option value="circular">⭕ Circular</option>
+                    <option value="grid">⊞ Grid</option>
+                    <option value="layered">📚 Layered</option>
+                    <option value="tree">🌳 Tree</option>
+                    <option value="radial">🎯 Radial</option>
+                  </select>
+                  {autoLayoutEnabled && (
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 px-1 leading-tight">
+                      {getLayoutAlgorithmDescription(layoutAlgorithm)}
+                    </p>
+                  )}
                 </div>
               </div>
             </Panel>

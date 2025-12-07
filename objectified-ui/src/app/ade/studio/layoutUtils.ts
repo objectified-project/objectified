@@ -1,5 +1,5 @@
-import dagre from 'dagre';
 import type { Node, Edge } from '@xyflow/react';
+import { applyAutoLayout, type LayoutAlgorithm } from './autoLayoutAlgorithms';
 
 export type LayoutDirection = 'TB' | 'BT' | 'LR' | 'RL';
 
@@ -17,7 +17,7 @@ export interface LayoutOptions {
 }
 
 /**
- * Layout nodes and edges using Dagre
+ * Layout nodes and edges using Dagre (backwards compatibility)
  * @param nodes - Array of nodes to layout
  * @param edges - Array of edges connecting the nodes
  * @param options - Layout configuration options
@@ -32,52 +32,35 @@ export function getLayoutedElements(
     direction = 'TB',
     nodeWidth = NODE_WIDTH,
     nodeHeight = NODE_HEIGHT,
-    rankSeparation = 100,    // Increased from 150 for better vertical spacing
-    nodeSeparation = 100,    // Increased from 120 for better horizontal spacing
-    edgeSeparation = 30,     // Increased from 20 for better edge spacing
+    rankSeparation = 100,
+    nodeSeparation = 100,
+    edgeSeparation = 30,
   } = options;
 
-  // Create a new directed graph
-  const dagreGraph = new dagre.graphlib.Graph();
+  // Map direction to algorithm
+  let algorithm: LayoutAlgorithm = 'hierarchical-tb';
+  switch (direction) {
+    case 'TB':
+      algorithm = 'hierarchical-tb';
+      break;
+    case 'LR':
+      algorithm = 'hierarchical-lr';
+      break;
+    case 'BT':
+      algorithm = 'hierarchical-bt';
+      break;
+    case 'RL':
+      algorithm = 'hierarchical-rl';
+      break;
+  }
 
-  // Set graph configuration
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({
-    rankdir: direction,
-    ranksep: rankSeparation,
-    nodesep: nodeSeparation,
-    edgesep: edgeSeparation,
-  });
-
-  // Add nodes to the graph
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, {
-      width: node.measured?.width ?? nodeWidth,
-      height: node.measured?.height ?? nodeHeight,
-    });
-  });
-
-  // Add edges to the graph
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  // Run the layout algorithm
-  dagre.layout(dagreGraph);
-
-  // Update node positions based on layout
-  return nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-
-    // Dagre positions nodes from center, React Flow from top-left
-    // So we need to adjust the position
-    const x = nodeWithPosition.x - (node.measured?.width ?? nodeWidth) / 2;
-    const y = nodeWithPosition.y - (node.measured?.height ?? nodeHeight) / 2;
-
-    return {
-      ...node,
-      position: { x, y },
-    };
+  return applyAutoLayout(nodes, edges, {
+    algorithm,
+    nodeWidth,
+    nodeHeight,
+    rankSeparation,
+    nodeSeparation,
+    edgeSeparation,
   });
 }
 
@@ -94,4 +77,7 @@ export function getHorizontalLayout(nodes: Node[], edges: Edge[]): Node[] {
 export function getVerticalLayout(nodes: Node[], edges: Edge[]): Node[] {
   return getLayoutedElements(nodes, edges, { direction: 'TB' });
 }
+
+// Re-export for convenience
+export { applyAutoLayout, type LayoutAlgorithm } from './autoLayoutAlgorithms';
 
