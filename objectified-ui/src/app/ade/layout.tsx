@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Objectified: Studio",
-  description: "Objectified Application",
+  description: "Objectified ADE Platform - Studio",
 };
 
 export default function RootLayout({

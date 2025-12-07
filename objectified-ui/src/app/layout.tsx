@@ -13,7 +13,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Objectified",
-  description: "Objectified",
+  description: "Objectified ADE Platform",
 };
 
 export default function RootLayout({

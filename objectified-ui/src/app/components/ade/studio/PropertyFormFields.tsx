@@ -18,6 +18,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
 import Collapse from '@mui/material/Collapse';
 import { RegexTester } from './RegexTester';
 
@@ -242,6 +243,36 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       e.preventDefault();
       handleAddEnum();
     }
+  };
+
+  const handleSortEnumAZ = () => {
+    if (!data.enum || data.enum.length === 0) return;
+
+    const sorted = [...data.enum].sort((a, b) => {
+      // For numeric types, sort as numbers
+      if (baseType === 'number' || baseType === 'integer') {
+        return Number(a) - Number(b);
+      }
+      // For strings, sort alphabetically (case-insensitive)
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    onChange('enum', sorted);
+  };
+
+  const handleSortEnumZA = () => {
+    if (!data.enum || data.enum.length === 0) return;
+
+    const sorted = [...data.enum].sort((a, b) => {
+      // For numeric types, sort as numbers in descending order
+      if (baseType === 'number' || baseType === 'integer') {
+        return Number(b) - Number(a);
+      }
+      // For strings, sort alphabetically in reverse (case-insensitive)
+      return b.toLowerCase().localeCompare(a.toLowerCase());
+    });
+
+    onChange('enum', sorted);
   };
 
   return (
@@ -567,9 +598,44 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       {/* Enum Values */}
       {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Allowed Values (Enum)
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Allowed Values (Enum)
+            </Typography>
+            {data.enum && data.enum.length > 1 && (
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <Tooltip title="Sort A-Z (ascending)">
+                  <IconButton
+                    onClick={handleSortEnumAZ}
+                    size="small"
+                    sx={{
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      p: 0.5,
+                    }}
+                  >
+                    <SortByAlphaIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Sort Z-A (descending)">
+                  <IconButton
+                    onClick={handleSortEnumZA}
+                    size="small"
+                    sx={{
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      p: 0.5,
+                      transform: 'scaleY(-1)',
+                    }}
+                  >
+                    <SortByAlphaIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            )}
+          </Box>
           {isArray && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               Enum values apply to each item in the array
