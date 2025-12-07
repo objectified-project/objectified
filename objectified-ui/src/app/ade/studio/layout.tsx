@@ -20,7 +20,11 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '@/app/components/ade/studio/StudioSideNav';
 import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
 import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, createClass, updateClass, deleteClass } from '../../../../lib/db/helper';
-import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button, TextField, Alert, FormControlLabel, Checkbox, Radio, RadioGroup, Typography, Chip, Box } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button, TextField, Alert, FormControlLabel, Checkbox, Radio, RadioGroup, Typography, Chip, Box, Tabs, Tab } from '@mui/material';
+import { Copy, Download, RefreshCw, Check } from 'lucide-react';
+import YAML from 'yaml';
+import jsf from 'json-schema-faker';
+import { generateClassOpenApiSpec } from '../../utils/openapi';
 
 // Helper function to check permissions
 const checkPermissions = async (condition: boolean, message: string, alertDialog: any) => {
@@ -62,6 +66,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     name: '', description: '', allOf: [] as string[], anyOf: [] as string[], oneOf: [] as string[],
     discriminatorProperty: '', discriminatorUseAuto: true, additionalProperties: null as boolean | null, error: ''
   });
+
+  // Class dialog view state
+  const [classDialogTab, setClassDialogTab] = useState(0);
+  const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   // Load data effects
   React.useEffect(() => {
@@ -109,12 +118,20 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     loadClasses();
   }, [selectedVersionId, refreshKey, sidebarRefreshKey]);
 
+  // Expose handleClassEdit via ref for canvas to trigger
+  const handleClassEditRef = React.useRef<((classItem: ClassItem) => Promise<void>) | null>(null);
+  React.useEffect(() => {
+    (window as any).__studioHandleClassEdit = handleClassEditRef.current;
+  }, []);
+
   // Class handlers
   const handleClassAdd = async () => {
     if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
     if (!(await checkPermissions(!isReadOnly, 'Cannot add classes to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
 
     setClassForm({ name: '', description: '', allOf: [], anyOf: [], oneOf: [], discriminatorProperty: '', discriminatorUseAuto: true, additionalProperties: null, error: '' });
+    setClassDialogTab(0);
+    setExampleRefreshKey(0);
     setClassDialog({ open: true, mode: 'add', selectedClass: null });
   };
 
@@ -135,8 +152,16 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       additionalProperties: schema?.additionalProperties !== undefined ? schema.additionalProperties : null,
       error: ''
     });
+    setClassDialogTab(0);
+    setExampleRefreshKey(0);
     setClassDialog({ open: true, mode: 'edit', selectedClass: classItem });
   };
+
+  // Keep ref updated
+  React.useEffect(() => {
+    handleClassEditRef.current = handleClassEdit;
+    (window as any).__studioHandleClassEdit = handleClassEdit;
+  }, [handleClassEdit]);
 
   const handleClassDelete = async (classId: string) => {
     if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
@@ -348,12 +373,43 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       </main>
 
       {/* Class Dialog */}
-      <Dialog open={classDialog.open} onClose={() => setClassDialog({ open: false, mode: 'add', selectedClass: null })} maxWidth="md" fullWidth>
-        <DialogTitle>{classDialog.mode === 'add' ? 'Add Class' : 'Edit Class'}</DialogTitle>
-        <DialogContent>
-          {classForm.error && <Alert severity="error" sx={{ mb: 2 }}>{classForm.error}</Alert>}
+      <Dialog
+        open={classDialog.open}
+        onClose={() => setClassDialog({ open: false, mode: 'add', selectedClass: null })}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              height: classDialog.mode === 'add' ? 'auto' : '80vh',
+              maxHeight: '700px',
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
+          {classDialog.mode === 'add' ? 'Add Class' : 'Edit Class'}
+        </DialogTitle>
 
-          <TextField autoFocus margin="dense" label="Class Name" fullWidth required value={classForm.name}
+        {/* Tabs - only show for edit mode */}
+        {classDialog.mode === 'edit' && classDialog.selectedClass && (
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs value={classDialogTab} onChange={(_, newValue) => setClassDialogTab(newValue)}>
+              <Tab label="Edit" />
+              <Tab label="JSON" />
+              <Tab label="YAML" />
+              <Tab label="Example" />
+            </Tabs>
+          </Box>
+        )}
+
+        <DialogContent sx={{ p: classDialogTab === 0 || classDialog.mode === 'add' ? 3 : 0, overflow: classDialogTab === 0 || classDialog.mode === 'add' ? 'auto' : 'hidden' }}>
+          {/* Tab 0: Edit Form (always shown for add mode, only shown when tab=0 for edit mode) */}
+          {(classDialog.mode === 'add' || classDialogTab === 0) && (
+            <Box>
+              {classForm.error && <Alert severity="error" sx={{ mb: 2 }}>{classForm.error}</Alert>}
+
+              <TextField autoFocus margin="dense" label="Class Name" fullWidth required value={classForm.name}
                      onChange={(e) => setClassForm(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') }))}
                      helperText="Only letters, numbers, and underscores are allowed; recommend PascalCase class names." sx={{ mb: 2 }} />
 
@@ -399,10 +455,214 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
               <FormControlLabel value="disallow" control={<Radio />} label="Disallow additional properties (set false)" />
             </RadioGroup>
           </Box>
+            </Box>
+          )}
+
+          {/* View tabs content (only for edit mode) */}
+          {classDialog.mode === 'edit' && classDialog.selectedClass && classDialogTab > 0 && (() => {
+            // Generate OpenAPI spec for view tabs
+            const allClasses = classes.map(cls => ({
+              id: cls.id,
+              name: cls.name,
+              description: cls.description,
+              properties: [],
+              schema: cls.schema
+            }));
+
+            const openApiDoc = generateClassOpenApiSpec(classDialog.selectedClass, allClasses, {
+              title: `${classDialog.selectedClass.name} Schema`,
+              version: '1.0.0',
+              description: 'OpenAPI 3.1.0 schema definition'
+            });
+
+            const classSchema = openApiDoc.components.schemas[classDialog.selectedClass.name];
+
+            // Helper to resolve $ref references
+            const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set()): any => {
+              if (!schema || typeof schema !== 'object') return schema;
+              if (schema.$ref && typeof schema.$ref === 'string') {
+                const refName = schema.$ref.split('/').pop();
+                if (visited.has(refName!)) {
+                  return { type: 'object', description: `Circular reference to ${refName}` };
+                }
+                const referencedSchema = schemas[refName!];
+                if (referencedSchema) {
+                  const newVisited = new Set(visited);
+                  newVisited.add(refName!);
+                  return resolveRefs(referencedSchema, schemas, newVisited);
+                }
+                return schema;
+              }
+              if (Array.isArray(schema.allOf)) {
+                const merged: any = {};
+                const requiredSet = new Set<string>();
+                schema.allOf.forEach((subSchema: any) => {
+                  const resolved = resolveRefs(subSchema, schemas, visited);
+                  const { required: resolvedRequired, properties: resolvedProperties, ...resolvedRest } = resolved;
+                  Object.assign(merged, resolvedRest);
+                  if (resolvedProperties) {
+                    merged.properties = { ...merged.properties, ...resolvedProperties };
+                  }
+                  if (resolvedRequired) {
+                    resolvedRequired.forEach((field: string) => requiredSet.add(field));
+                  }
+                });
+                if (requiredSet.size > 0) {
+                  merged.required = Array.from(requiredSet);
+                }
+                const { allOf, required: restRequired, properties: restProperties, ...rest } = schema;
+                if (restProperties) {
+                  merged.properties = { ...merged.properties, ...restProperties };
+                }
+                if (restRequired) {
+                  restRequired.forEach((field: string) => requiredSet.add(field));
+                  merged.required = Array.from(requiredSet);
+                }
+                return { ...merged, ...rest };
+              }
+              if (Array.isArray(schema.anyOf)) {
+                return { ...schema, anyOf: schema.anyOf.map((s: any) => resolveRefs(s, schemas, visited)) };
+              }
+              if (Array.isArray(schema.oneOf)) {
+                return { ...schema, oneOf: schema.oneOf.map((s: any) => resolveRefs(s, schemas, visited)) };
+              }
+              const resolved: any = Array.isArray(schema) ? [] : {};
+              for (const key in schema) {
+                if (schema.hasOwnProperty(key)) {
+                  const value = schema[key];
+                  if (value && typeof value === 'object') {
+                    resolved[key] = resolveRefs(value, schemas, visited);
+                  } else {
+                    resolved[key] = value;
+                  }
+                }
+              }
+              return resolved;
+            };
+
+            let schemaContent: string = '';
+            if (classDialogTab === 1) {
+              schemaContent = JSON.stringify(openApiDoc, null, 2);
+            } else if (classDialogTab === 2) {
+              schemaContent = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+            } else if (classDialogTab === 3) {
+              try {
+                const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+                jsf.option({
+                  random: () => {
+                    const seed = Math.random() * (exampleRefreshKey + 1);
+                    return seed - Math.floor(seed);
+                  }
+                });
+                const fakeData = jsf.generate(resolvedSchema);
+                schemaContent = JSON.stringify(fakeData, null, 2);
+              } catch (error) {
+                console.error('Error generating fake data:', error);
+                schemaContent = JSON.stringify({
+                  error: 'Could not generate example data',
+                  message: error instanceof Error ? error.message : String(error)
+                }, null, 2);
+              }
+            }
+
+            const handleCopy = () => {
+              navigator.clipboard.writeText(schemaContent);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            };
+
+            const handleExport = () => {
+              let filenameSuffix: string;
+              let mimeType: string;
+              let extension: string;
+              if (classDialogTab === 3) {
+                filenameSuffix = 'example';
+                mimeType = 'application/json';
+                extension = 'json';
+              } else if (classDialogTab === 2) {
+                filenameSuffix = 'schema';
+                mimeType = 'text/yaml';
+                extension = 'yaml';
+              } else {
+                filenameSuffix = 'schema';
+                mimeType = 'application/json';
+                extension = 'json';
+              }
+              const blob = new Blob([schemaContent], { type: mimeType });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${classDialog.selectedClass!.name.toLowerCase()}-${filenameSuffix}.${extension}`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            };
+
+            return (
+              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ display: 'flex', gap: 1, p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                  {classDialogTab === 3 && (
+                    <Button
+                      size="small"
+                      startIcon={<RefreshCw size={16} />}
+                      onClick={() => setExampleRefreshKey(prev => prev + 1)}
+                      variant="outlined"
+                      title="Generate new example"
+                    >
+                      Refresh
+                    </Button>
+                  )}
+                  <Button
+                    size="small"
+                    startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
+                    onClick={handleCopy}
+                    variant="outlined"
+                    disabled={copied}
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                  <Button
+                    size="small"
+                    startIcon={<Download size={16} />}
+                    onClick={handleExport}
+                    variant="contained"
+                  >
+                    Export
+                  </Button>
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Editor
+                    key={classDialogTab === 3 ? `example-${exampleRefreshKey}` : `tab-${classDialogTab}`}
+                    height="100%"
+                    language={classDialogTab === 2 ? 'yaml' : 'json'}
+                    value={schemaContent}
+                    theme="vs-dark"
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 13,
+                      wordWrap: 'on',
+                      lineNumbers: 'on',
+                      renderWhitespace: 'none',
+                      folding: true
+                    }}
+                  />
+                </Box>
+              </Box>
+            );
+          })()}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setClassDialog({ open: false, mode: 'add', selectedClass: null })}>Cancel</Button>
-          <Button onClick={handleClassSubmit} variant="contained">{classDialog.mode === 'add' ? 'Add' : 'Save'}</Button>
+          <Button onClick={() => setClassDialog({ open: false, mode: 'add', selectedClass: null })}>
+            {classDialog.mode === 'edit' && classDialogTab > 0 ? 'Close' : 'Cancel'}
+          </Button>
+          {(classDialog.mode === 'add' || classDialogTab === 0) && (
+            <Button onClick={handleClassSubmit} variant="contained">
+              {classDialog.mode === 'add' ? 'Add' : 'Save'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

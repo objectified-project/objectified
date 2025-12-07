@@ -7,7 +7,6 @@ import { useStudio } from './StudioContext';
 import { Copy, Download, Check, MoveUp, MoveDown, MoveLeft, MoveRight, Eye, Code } from 'lucide-react';
 import Switch from '@mui/material/Switch';
 import YAML from 'yaml';
-import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
 import MermaidPreview, { type MermaidPreviewRef } from '../../components/ade/studio/MermaidPreview';
@@ -114,8 +113,6 @@ const StudioContent = () => {
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
 
   // Class edit dialog state
-  const [classEditDialogOpen, setClassEditDialogOpen] = useState(false);
-  const [editingClassData, setEditingClassData] = useState<any>(null);
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
   // Note: dialog-specific form state moved to ClassPropertyEditDialog component
@@ -499,10 +496,19 @@ const StudioContent = () => {
 
   // Handle class edit (double-click on node)
   const handleClassEdit = useCallback(async (classData: any) => {
-    // Allow viewing in read-only mode - the dialog will handle read-only restrictions
+    // Call the sidebar's handleClassEdit function
     console.log(isReadOnly ? 'Viewing class:' : 'Editing class:', classData);
-    setEditingClassData(classData);
-    setClassEditDialogOpen(true);
+    const sidebarHandler = (window as any).__studioHandleClassEdit;
+    if (sidebarHandler) {
+      // Convert canvas classData to ClassItem format expected by sidebar
+      const classItem = {
+        id: classData.id,
+        name: classData.name,
+        description: classData.description || '',
+        schema: classData.schema
+      };
+      await sidebarHandler(classItem);
+    }
   }, [isReadOnly]);
 
   // Keep ref updated
@@ -2466,15 +2472,6 @@ const StudioContent = () => {
           description: (n.data as any).description
         }))}
         onSubmit={handleReferenceSubmit}
-      />
-
-      {/* Class Edit Dialog */}
-      <ClassEditDialog
-        open={classEditDialogOpen}
-        onClose={() => setClassEditDialogOpen(false)}
-        editingClassData={editingClassData}
-        nodes={nodes}
-        isReadOnly={isReadOnly}
       />
     </div>
   );

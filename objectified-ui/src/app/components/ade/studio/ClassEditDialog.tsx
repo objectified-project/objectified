@@ -9,10 +9,20 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Alert from '@mui/material/Alert';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
+import Autocomplete from '@mui/material/Autocomplete';
 import { Copy, Download, RefreshCw, Check } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
+import { updateClass } from '../../../../../lib/db/helper';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -30,22 +40,169 @@ interface ClassEditDialogProps {
   editingClassData: any;
   nodes: any[];
   isReadOnly?: boolean;
+  onSave?: () => void;
 }
 
-const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false }: ClassEditDialogProps) => {
-  const [classEditFormat, setClassEditFormat] = useState<'json' | 'yaml' | 'example'>('json');
+const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave }: ClassEditDialogProps) => {
+  const [tabValue, setTabValue] = useState(0);
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Reset view to JSON when dialog opens
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    allOf: [] as string[],
+    anyOf: [] as string[],
+    oneOf: [] as string[],
+    discriminatorProperty: '',
+    discriminatorUseAuto: true,
+    additionalProperties: null as boolean | null,
+    error: ''
+  });
+
+  // Reset view and form when dialog opens
   useEffect(() => {
-    if (open) {
-      setClassEditFormat('json');
+    if (open && editingClassData) {
+      setTabValue(0);
       setExampleRefreshKey(0);
+
+      // Parse schema to populate form
+      const schema = typeof editingClassData.schema === 'string'
+        ? JSON.parse(editingClassData.schema)
+        : editingClassData.schema || {};
+
+      const allOf = schema.allOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+      const anyOf = schema.anyOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+      const oneOf = schema.oneOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+
+      setFormData({
+        name: editingClassData.name || '',
+        description: editingClassData.description || '',
+        allOf,
+        anyOf,
+        oneOf,
+        discriminatorProperty: schema.discriminator?.propertyName || '',
+        discriminatorUseAuto: !schema.discriminator?.mapping,
+        additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+        error: ''
+      });
     }
-  }, [open]);
+  }, [open, editingClassData]);
 
   if (!editingClassData) return null;
+
+  // Get all available class names for composition selectors (excluding current class)
+  const availableClasses = nodes
+    .map(node => node.data)
+    .filter(data => data && data.name && data.name !== editingClassData.name)
+    .map(data => data.name);
+
+  // Save handler
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      setFormData(prev => ({ ...prev, error: 'Class name is required' }));
+      return;
+    }
+
+    setSaving(true);
+    setFormData(prev => ({ ...prev, error: '' }));
+
+    try {
+      // Build schema from form data
+      const schema: any = { type: 'object', properties: {} };
+
+      // Add composition types
+      if (formData.allOf.length > 0) {
+        schema.allOf = formData.allOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
+      }
+      if (formData.anyOf.length > 0) {
+        schema.anyOf = formData.anyOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
+      }
+      if (formData.oneOf.length > 0) {
+        schema.oneOf = formData.oneOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
+      }
+
+      // Add discriminator if specified
+      if (formData.discriminatorProperty && (formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0)) {
+        schema.discriminator = { propertyName: formData.discriminatorProperty };
+        if (!formData.discriminatorUseAuto) {
+          schema.discriminator.mapping = {};
+          const list = formData.allOf.length > 0 ? formData.allOf : formData.anyOf.length > 0 ? formData.anyOf : formData.oneOf;
+          list.forEach((name: string) => {
+            schema.discriminator.mapping[name] = `#/components/schemas/${name}`;
+          });
+        }
+      }
+
+      // Add additionalProperties
+      if (formData.additionalProperties !== null) {
+        schema.additionalProperties = formData.additionalProperties;
+      }
+
+      const result = await updateClass(
+        editingClassData.id,
+        formData.name,
+        formData.description || null,
+        schema
+      );
+
+      const response = JSON.parse(result);
+      if (!response.success) {
+        setFormData(prev => ({ ...prev, error: response.error || 'Failed to save class' }));
+        setSaving(false);
+        return;
+      }
+
+      // Success - call onSave callback and close
+      if (onSave) {
+        onSave();
+      }
+      onClose();
+    } catch (error) {
+      console.error('Error saving class:', error);
+      setFormData(prev => ({ ...prev, error: 'An error occurred while saving the class' }));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Render composition selector
+  const renderCompositionSelector = (
+    label: string,
+    helperText: string,
+    value: string[],
+    onChange: (items: string[]) => void,
+    color: 'primary' | 'info' | 'secondary'
+  ) => (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
+        {label}
+      </Typography>
+      <Autocomplete
+        multiple
+        options={availableClasses}
+        value={value}
+        onChange={(_, newValue) => onChange(newValue)}
+        disabled={isReadOnly}
+        slotProps={{
+          chip: {
+            color: color,
+            size: "small"
+          }
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder="Select classes..."
+            helperText={helperText}
+            size="small"
+          />
+        )}
+      />
+    </Box>
+  );
 
   // Generate OpenAPI spec using the consolidated utility
   const allClasses = nodes.map(node => node.data).filter(data => data && data.name);
@@ -163,11 +320,17 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     return resolved;
   };
 
-  // Generate schema content - regenerate when exampleRefreshKey changes
-  let schemaContent: string;
-  let editorLanguage: string;
+  // Generate schema content based on current tab
+  let schemaContent: string = '';
 
-  if (classEditFormat === 'example') {
+  if (tabValue === 1) {
+    // JSON view
+    schemaContent = JSON.stringify(openApiDoc, null, 2);
+  } else if (tabValue === 2) {
+    // YAML view
+    schemaContent = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+  } else if (tabValue === 3) {
+    // Example view - regenerate when exampleRefreshKey changes
     try {
       // Resolve all $ref references for json-schema-faker
       const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
@@ -188,26 +351,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
       const fakeData = jsf.generate(resolvedSchema);
       schemaContent = JSON.stringify(fakeData, null, 2);
-      editorLanguage = 'json';
     } catch (error) {
       console.error('Error generating fake data:', error);
       schemaContent = JSON.stringify({
         error: 'Could not generate example data',
         message: error instanceof Error ? error.message : String(error)
       }, null, 2);
-      editorLanguage = 'json';
     }
-  } else {
-    schemaContent = classEditFormat === 'json'
-      ? JSON.stringify(openApiDoc, null, 2)
-      : YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
-    editorLanguage = classEditFormat;
   }
 
   const handleCopy = () => {
     let content: string;
-    if (classEditFormat === 'example') {
-      const classSchema = openApiDoc.components.schemas[editingClassData.name];
+    if (tabValue === 3) {
+      // Example view
       try {
         const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
         const fakeData = jsf.generate(resolvedSchema);
@@ -216,10 +372,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         console.error('Error generating fake data:', error);
         content = JSON.stringify({ error: 'Could not generate example data' }, null, 2);
       }
+    } else if (tabValue === 2) {
+      // YAML view
+      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
     } else {
-      content = classEditFormat === 'json'
-        ? JSON.stringify(openApiDoc, null, 2)
-        : YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+      // JSON view
+      content = JSON.stringify(openApiDoc, null, 2);
     }
 
     navigator.clipboard.writeText(content);
@@ -230,9 +388,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const handleExport = () => {
     let content: string;
     let filenameSuffix: string;
+    let mimeType: string;
+    let extension: string;
 
-    if (classEditFormat === 'example') {
-      const classSchema = openApiDoc.components.schemas[editingClassData.name];
+    if (tabValue === 3) {
+      // Example view
       try {
         const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
         const fakeData = jsf.generate(resolvedSchema);
@@ -242,15 +402,21 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         content = JSON.stringify({ error: 'Could not generate example data' }, null, 2);
       }
       filenameSuffix = 'example';
-    } else {
-      content = classEditFormat === 'json'
-        ? JSON.stringify(openApiDoc, null, 2)
-        : YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+      mimeType = 'application/json';
+      extension = 'json';
+    } else if (tabValue === 2) {
+      // YAML view
+      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
       filenameSuffix = 'schema';
+      mimeType = 'text/yaml';
+      extension = 'yaml';
+    } else {
+      // JSON view
+      content = JSON.stringify(openApiDoc, null, 2);
+      filenameSuffix = 'schema';
+      mimeType = 'application/json';
+      extension = 'json';
     }
-
-    const mimeType = (classEditFormat === 'json' || classEditFormat === 'example') ? 'application/json' : 'text/yaml';
-    const extension = (classEditFormat === 'json' || classEditFormat === 'example') ? 'json' : 'yaml';
 
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -282,7 +448,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6" component="span">
-              {isReadOnly ? 'View Class: ' : 'Edit Class: '}{editingClassData.name}
+              {isReadOnly ? 'View Class: ' : 'Edit Class: '}{formData.name || editingClassData.name}
             </Typography>
             {isReadOnly && (
               <Typography
@@ -300,64 +466,236 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 Read Only
               </Typography>
             )}
+          </Box>
+        </Box>
+      </DialogTitle>
 
-            {/* Format Toggle */}
-            <Box sx={{ display: 'flex', border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-              <Button
-                size="small"
-                onClick={() => setClassEditFormat('json')}
-                sx={{
-                  minWidth: 60,
-                  borderRadius: 0,
-                  bgcolor: classEditFormat === 'json' ? 'primary.main' : 'transparent',
-                  color: classEditFormat === 'json' ? 'primary.contrastText' : 'text.primary',
-                  '&:hover': {
-                    bgcolor: classEditFormat === 'json' ? 'primary.dark' : 'action.hover',
-                  },
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+          <Tab label="Edit" />
+          <Tab label="JSON" />
+          <Tab label="YAML" />
+          <Tab label="Example" />
+        </Tabs>
+      </Box>
+
+      <DialogContent sx={{ p: tabValue === 0 ? 3 : 0, overflow: tabValue === 0 ? 'auto' : 'hidden' }}>
+        {/* Tab 0: Edit Form */}
+        {tabValue === 0 && (
+          <Box>
+            {formData.error && <Alert severity="error" sx={{ mb: 2 }}>{formData.error}</Alert>}
+
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Class Name"
+              fullWidth
+              required
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') }))}
+              helperText="Only letters, numbers, and underscores are allowed; recommend PascalCase class names."
+              sx={{ mb: 2 }}
+              disabled={isReadOnly}
+            />
+
+            <TextField
+              margin="dense"
+              label="Description"
+              fullWidth
+              multiline
+              rows={2}
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              sx={{ mb: 3 }}
+              disabled={isReadOnly}
+            />
+
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              Composition/Inheritance (Optional)
+            </Typography>
+
+            {renderCompositionSelector(
+              "allOf (Inheritance)",
+              "Must match all listed schemas",
+              formData.allOf,
+              (items) => setFormData(prev => ({ ...prev, allOf: items })),
+              "primary"
+            )}
+
+            {renderCompositionSelector(
+              "anyOf (Alternatives)",
+              "Must match at least one listed schema",
+              formData.anyOf,
+              (items) => setFormData(prev => ({ ...prev, anyOf: items })),
+              "info"
+            )}
+
+            {renderCompositionSelector(
+              "oneOf (Exclusive)",
+              "Must match exactly one listed schema",
+              formData.oneOf,
+              (items) => setFormData(prev => ({ ...prev, oneOf: items })),
+              "secondary"
+            )}
+
+            {/* Discriminator */}
+            {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                  Discriminator (Optional)
+                </Typography>
+                <TextField
+                  margin="dense"
+                  label="Discriminator Property Name"
+                  fullWidth
+                  placeholder="e.g., type, petType, kind"
+                  value={formData.discriminatorProperty}
+                  onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
+                  helperText="Property name that indicates which schema variant to use for polymorphic objects. This is used for (de)serialization operations."
+                  sx={{ mb: 2 }}
+                  disabled={isReadOnly}
+                />
+                {formData.discriminatorProperty && (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.discriminatorUseAuto}
+                        onChange={(e) => setFormData(prev => ({ ...prev, discriminatorUseAuto: e.target.checked }))}
+                        disabled={isReadOnly}
+                      />
+                    }
+                    label="Use automatic mapping"
+                  />
+                )}
+              </Box>
+            )}
+
+            {/* Additional Properties */}
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Additional Properties
+              </Typography>
+              <RadioGroup
+                value={formData.additionalProperties === null ? 'default' : formData.additionalProperties ? 'allow' : 'disallow'}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData(prev => ({ ...prev, additionalProperties: value === 'default' ? null : value === 'allow' }));
                 }}
               >
-                JSON
-              </Button>
-              <Button
-                size="small"
-                onClick={() => setClassEditFormat('yaml')}
-                sx={{
-                  minWidth: 60,
-                  borderRadius: 0,
-                  borderLeft: 1,
-                  borderColor: 'divider',
-                  bgcolor: classEditFormat === 'yaml' ? 'primary.main' : 'transparent',
-                  color: classEditFormat === 'yaml' ? 'primary.contrastText' : 'text.primary',
-                  '&:hover': {
-                    bgcolor: classEditFormat === 'yaml' ? 'primary.dark' : 'action.hover',
-                  },
-                }}
-              >
-                YAML
-              </Button>
-              <Button
-                size="small"
-                onClick={() => setClassEditFormat('example')}
-                sx={{
-                  minWidth: 80,
-                  borderRadius: 0,
-                  borderLeft: 1,
-                  borderColor: 'divider',
-                  bgcolor: classEditFormat === 'example' ? 'primary.main' : 'transparent',
-                  color: classEditFormat === 'example' ? 'primary.contrastText' : 'text.primary',
-                  '&:hover': {
-                    bgcolor: classEditFormat === 'example' ? 'primary.dark' : 'action.hover',
-                  },
-                }}
-              >
-                Example
-              </Button>
+                <FormControlLabel
+                  value="default"
+                  control={<Radio />}
+                  label="Not specified (default behavior - property omitted)"
+                  disabled={isReadOnly}
+                />
+                <FormControlLabel
+                  value="allow"
+                  control={<Radio />}
+                  label="Allow additional properties (set true)"
+                  disabled={isReadOnly}
+                />
+                <FormControlLabel
+                  value="disallow"
+                  control={<Radio />}
+                  label="Disallow additional properties (set false)"
+                  disabled={isReadOnly}
+                />
+              </RadioGroup>
             </Box>
           </Box>
+        )}
 
-          {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {classEditFormat === 'example' && (
+        {/* Tab 1: JSON View */}
+        {tabValue === 1 && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', gap: 1, p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Button
+                size="small"
+                startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
+                onClick={handleCopy}
+                variant="outlined"
+                disabled={copied}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button
+                size="small"
+                startIcon={<Download size={16} />}
+                onClick={handleExport}
+                variant="contained"
+              >
+                Export
+              </Button>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Editor
+                height="100%"
+                language="json"
+                value={schemaContent}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  renderWhitespace: 'none',
+                  folding: true
+                }}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {/* Tab 2: YAML View */}
+        {tabValue === 2 && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', gap: 1, p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Button
+                size="small"
+                startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
+                onClick={handleCopy}
+                variant="outlined"
+                disabled={copied}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button
+                size="small"
+                startIcon={<Download size={16} />}
+                onClick={handleExport}
+                variant="contained"
+              >
+                Export
+              </Button>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Editor
+                height="100%"
+                language="yaml"
+                value={schemaContent}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  renderWhitespace: 'none',
+                  folding: true
+                }}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {/* Tab 3: Example View */}
+        {tabValue === 3 && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', gap: 1, p: 2, borderBottom: 1, borderColor: 'divider' }}>
               <Button
                 size="small"
                 startIcon={<RefreshCw size={16} />}
@@ -367,50 +705,61 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               >
                 Refresh
               </Button>
-            )}
-            <Button
-              size="small"
-              startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
-              onClick={handleCopy}
-              variant="outlined"
-              disabled={copied}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
-            <Button
-              size="small"
-              startIcon={<Download size={16} />}
-              onClick={handleExport}
-              variant="contained"
-            >
-              Export
-            </Button>
+              <Button
+                size="small"
+                startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
+                onClick={handleCopy}
+                variant="outlined"
+                disabled={copied}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button
+                size="small"
+                startIcon={<Download size={16} />}
+                onClick={handleExport}
+                variant="contained"
+              >
+                Export
+              </Button>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Editor
+                key={`example-${exampleRefreshKey}`}
+                height="100%"
+                language="json"
+                value={schemaContent}
+                theme="vs-dark"
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  wordWrap: 'on',
+                  lineNumbers: 'on',
+                  renderWhitespace: 'none',
+                  folding: true
+                }}
+              />
+            </Box>
           </Box>
-        </Box>
-      </DialogTitle>
-      <DialogContent sx={{ p: 0 }}>
-        <Editor
-          key={classEditFormat === 'example' ? `example-${exampleRefreshKey}` : classEditFormat}
-          height="100%"
-          language={editorLanguage}
-          value={schemaContent}
-          theme="vs-dark"
-          options={{
-            readOnly: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            fontSize: 13,
-            wordWrap: 'on',
-            lineNumbers: 'on',
-            renderWhitespace: 'none',
-            folding: true
-          }}
-        />
+        )}
       </DialogContent>
+
       <DialogActions>
         <Button onClick={onClose}>
-          Close
+          Cancel
         </Button>
+        {!isReadOnly && tabValue === 0 && (
+          <Button onClick={handleSave} variant="contained" disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        )}
+        {tabValue !== 0 && (
+          <Button onClick={onClose} variant="contained">
+            Close
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
