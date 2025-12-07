@@ -13,7 +13,8 @@ COPY package.json package-lock.json* ./
 
 # Install ALL dependencies (including dev deps) for build
 # TypeScript is needed to transpile next.config.ts
-RUN npm install
+#RUN npm install
+
 
 # Stage 2: Builder
 FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
@@ -62,5 +63,5 @@ ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
 # Start the application
-CMD ["node", "server.js"]
+CMD ["yarn", "start"]
 

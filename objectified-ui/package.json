@@ -10,7 +10,13 @@
     "docker:build": "./build-docker.sh",
     "docker:build:fast": "./build-docker.sh --no-test",
     "docker:build:package": "./build-docker.sh --package",
-    "docker:build:push": "./build-docker.sh --push"
+    "docker:build:push": "./build-docker.sh --push",
+    "docker:run": "docker rm -f objectified-ui 2>/dev/null || true; docker run -d -p 8000:3000 --env-file .env --name objectified-ui --restart unless-stopped objectified-ui:latest",
+    "docker:stop": "docker stop objectified-ui",
+    "docker:start": "docker start objectified-ui",
+    "docker:restart": "docker restart objectified-ui",
+    "docker:logs": "docker logs -f objectified-ui",
+    "docker:remove": "docker stop objectified-ui 2>/dev/null || true && docker rm objectified-ui"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
