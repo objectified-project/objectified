@@ -583,7 +583,7 @@ export function generatePythonDTOs(
 
   // Build imports section
   let code = '"""\n';
-  code += `${options?.projectName || 'Data Transfer Objects'}\n`;
+  code += `${options?.projectName || 'Data Type Objects'}\n`;
   if (options?.version) {
     code += `Version: ${options.version}\n`;
   }

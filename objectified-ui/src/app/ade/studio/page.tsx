@@ -284,7 +284,7 @@ const StudioContent = () => {
       const pythonCode = generatePythonDTOs(classesWithProperties, {
         projectName: currentProject?.name,
         version: currentVersion?.version_id,
-        description: `Data Transfer Objects for ${currentProject?.name || 'API'}`
+        description: `Data Type Objects for ${currentProject?.name || 'API'}`
       });
       setGeneratedCode(pythonCode);
     } catch (error) {
@@ -1526,7 +1526,7 @@ const StudioContent = () => {
         const pythonCode = generatePythonDTOs(classesWithProperties, {
           projectName: currentProject?.name,
           version: currentVersion?.version_id,
-          description: `Data Transfer Objects for ${currentProject?.name || 'API'}`
+          description: `Data Type Objects for ${currentProject?.name || 'API'}`
         });
         setGeneratedCode(pythonCode);
 
@@ -1606,7 +1606,7 @@ const StudioContent = () => {
             const pythonCode = generatePythonDTOs(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id,
-              description: `Data Transfer Objects for ${currentProject?.name || 'API'}`
+              description: `Data Type Objects for ${currentProject?.name || 'API'}`
             });
             setGeneratedCode(pythonCode);
             console.log('Regenerated Python DTOs for view mode:', viewMode);
@@ -2298,7 +2298,7 @@ const StudioContent = () => {
                       Generated DTOs - {generateLanguage === 'python' ? 'Python' : generateLanguage}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Data Transfer Objects for {selectedProject?.name} v{selectedVersion?.version_id}
+                      Data Type Objects for {selectedProject?.name} v{selectedVersion?.version_id}
                     </p>
                   </div>
 
