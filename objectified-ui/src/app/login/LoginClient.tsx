@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Mail, Lock, User, Info } from 'lucide-react';
 import { signIn } from "next-auth/react";
 import { createSignupRequest } from '../../../lib/db/helper';
-import { SiGithub } from "react-icons/si";
+import { SiGithub, SiGitlab } from "react-icons/si";
 import BetaBackground from './BetaBackground';
 
 interface SSOButtonProps {
@@ -337,21 +337,11 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
                 onClick={() => handleSSOLogin('github')}
               />
 
-              {/*  <SSOButton*/}
-              {/*    provider="GitLab"*/}
-              {/*    icon={*/}
-              {/*      <svg width="18" height="18" viewBox="0 0 18 18" fill="#FC6D26">*/}
-              {/*        <path d="M9 16.5l3.5-10.8h-7L9 16.5z" />*/}
-              {/*        <path d="M9 16.5l-3.5-10.8H1.8L9 16.5z" />*/}
-              {/*        <path d="M1.8 5.7L.3 10.2c-.2.5 0 1.1.4 1.4L9 16.5 1.8 5.7z" />*/}
-              {/*        <path d="M1.8 5.7h3.7L3.6 0c-.1-.4-.7-.4-.8 0L1.8 5.7z" />*/}
-              {/*        <path d="M9 16.5l3.5-10.8h3.7L9 16.5z" />*/}
-              {/*        <path d="M16.2 5.7l1.5 4.5c.2.5 0 1.1-.4 1.4L9 16.5l7.2-10.8z" />*/}
-              {/*        <path d="M16.2 5.7h-3.7L14.4 0c.1-.4.7-.4.8 0l1 5.7z" />*/}
-              {/*      </svg>*/}
-              {/*    }*/}
-              {/*    onClick={() => handleSSOLogin('GitLab')}*/}
-              {/*  />*/}
+              <SSOButton
+                provider="GitLab"
+                icon={<SiGitlab size={18} className="text-orange-600" />}
+                onClick={() => handleSSOLogin('gitlab')}
+              />
 
               {/*  <SSOButton*/}
               {/*    provider="Microsoft"*/}

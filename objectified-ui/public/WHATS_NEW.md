@@ -9,6 +9,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Even more look and feel improvements
 - Fixed Mermaid PNG generation issue
 - Property enumerations can now be sorted ascending or descending
+- Added GitLab support for linked accounts and repositories
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

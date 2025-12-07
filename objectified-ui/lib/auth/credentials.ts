@@ -38,6 +38,37 @@ export const linkGithubAccount = async (userId: string, account: any, profile: a
 };
 
 /**
+ * Helper function to link GitLab account during OAuth flow
+ */
+export const linkGitlabAccount = async (userId: string, account: any, profile: any) => {
+  try {
+    console.log('[linkGitlabAccount] Linking GitLab account for user:', userId);
+
+    const result = await helper.linkExternalAccount(
+      userId,
+      'gitlab',
+      account.providerAccountId || profile.id,
+      profile.email,
+      profile.login || profile.username,
+      account.access_token || null,
+      account.refresh_token || null,
+      account.expires_at ? new Date(account.expires_at * 1000) : null,
+      {
+        name: profile.name,
+        avatar_url: profile.image_url || profile.avatar_url || profile.picture,
+        profile_url: profile.web_url || profile.url,
+      }
+    );
+
+    const response = JSON.parse(result);
+    return response.success;
+  } catch (error) {
+    console.error('[linkGitlabAccount] Error linking account:', error);
+    return false;
+  }
+};
+
+/**
  * Check if this is a linking flow (user already logged in and clicking "Link" button)
  * Note: This function will be called from the OAuth callback
  */
@@ -233,6 +264,106 @@ export const credentialsGithub = async (payload: any) => {
   }
 
   console.log('[credentialsGithub] User account not found for e-mail address:', user.email);
+
+  return false;
+}
+
+/*
+ * Sign-in Steps for GitLab OAuth:
+ * 1. Check if this GitLab account is already linked to a user in external_auth_providers
+ *    - If linked, login as that user
+ * 2. If not linked, check if user exists by email
+ *    - If user exists by email, this is the initial login, proceed normally
+ * 3. User must be enabled and verified
+ *
+ * IMPORTANT: This function modifies payload.user to use the odb.users data instead of GitLab data
+ * If all passes, true is returned.
+ */
+export const credentialsGitlab = async (payload: any) => {
+  const user = payload.user;
+  const account = payload.account;
+  const profile = payload.profile;
+
+  console.log('[credentialsGitlab] Handling gitlab provider', user, 'account:', account);
+
+  // First, check if this GitLab account is already linked to an existing user
+  if (account?.providerAccountId) {
+    console.log('[credentialsGitlab] Checking for existing linked account with GitLab ID:', account.providerAccountId);
+
+    // Check if this GitLab account is already linked
+    const linkedAccountResult = await helper.getLinkedAccountByProvider('gitlab', account.providerAccountId);
+    const linkedAccount = JSON.parse(linkedAccountResult);
+
+    if (linkedAccount.found && linkedAccount.account) {
+      console.log('[credentialsGitlab] Found linked GitLab account for user:', linkedAccount.account.user_id);
+
+      // Get the user by ID (not email, since email might not match)
+      const userResults = await helper.getUserById(linkedAccount.account.user_id);
+
+      if (userResults.rowCount > 0) {
+        const userResult = userResults.rows[0];
+
+        if (!userResult.enabled) {
+          return '/login?error=Your account is currently disabled';
+        }
+
+        if (!userResult.verified) {
+          return '/login?error=You have not yet verified your account e-mail address';
+        }
+
+        // Update last login time for this linked account
+        await helper.updateLinkedAccountLastLogin('gitlab', account.providerAccountId);
+
+        // IMPORTANT: Replace the GitLab user data with our database user data
+        // This ensures the JWT callback gets the correct odb.users ID, not the GitLab ID
+        payload.user.id = userResult.id;
+        payload.user.email = userResult.email;
+        payload.user.name = userResult.name;
+        payload.user.enabled = userResult.enabled;
+        payload.user.verified = userResult.verified;
+
+        console.log('[credentialsGitlab] Login successful via linked account, user_id:', userResult.id);
+        return true;
+      }
+    }
+  }
+
+  // If not linked, check if user exists by email (standard OAuth flow for first-time login)
+  const results = await helper.getUserByEmail(user.email);
+
+  if (results.rowCount > 0) {
+    const userResult = results.rows[0];
+
+    console.log('[credentialsGitlab] Retrieved user record from DB:', userResult);
+
+    if (!userResult.enabled) {
+      return '/login?error=Your account is currently disabled';
+    }
+
+    if (!userResult.verified) {
+      return '/login?error=You have not yet verified your account e-mail address';
+    }
+
+    // Auto-link this GitLab account to the user on first successful login
+    if (account?.providerAccountId) {
+      console.log('[credentialsGitlab] Auto-linking GitLab account on first login');
+      await linkGitlabAccount(userResult.id, account, profile || user);
+    }
+
+    // IMPORTANT: Replace the GitLab user data with our database user data
+    // This ensures the JWT callback gets the correct odb.users ID, not the GitLab ID
+    payload.user.id = userResult.id;
+    payload.user.email = userResult.email;
+    payload.user.name = userResult.name;
+    payload.user.enabled = userResult.enabled;
+    payload.user.verified = userResult.verified;
+
+    console.log('[credentialsGitlab] Login successful, user_id:', userResult.id);
+
+    return true;
+  }
+
+  console.log('[credentialsGitlab] User account not found for e-mail address:', user.email);
 
   return false;
 }

@@ -1,12 +1,15 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GithubProvider from 'next-auth/providers/github';
+import GitlabProvider from 'next-auth/providers/gitlab';
 import { NextAuthOptions } from 'next-auth';
 import {
   credentialsAuthorize,
   credentialsSignIn,
   credentialsGithub,
+  credentialsGitlab,
   linkGithubAccount,
+  linkGitlabAccount,
   checkLinkingIntent,
   ICredentials,
 } from '../../../../../lib/auth/credentials';
@@ -17,10 +20,10 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GITHUB_ID as string,
       clientSecret: process.env.GITHUB_SECRET as string,
     }),
-  // GitlabProvider({
-  //     clientId: process.env.GITLAB_CLIENT_ID as string,
-  //     clientSecret: process.env.GITLAB_CLIENT_SECRET as string,
-  // }),
+    GitlabProvider({
+      clientId: process.env.GITLAB_CLIENT_ID as string,
+      clientSecret: process.env.GITLAB_CLIENT_SECRET as string,
+    }),
   // GoogleProvider({
   //     clientId: process.env.GOOGLE_CLIENT_ID as string,
   //     clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
@@ -75,6 +78,32 @@ export const authOptions: NextAuthOptions = {
 
         // Normal login flow
         return credentialsGithub(payload);
+      }
+
+      if (loginProvider === 'gitlab') {
+        // Check if this is an account linking flow
+        const linkIntent = await checkLinkingIntent();
+
+        if (linkIntent && linkIntent.provider === 'gitlab') {
+          console.log('[signIn] Handling GitLab account linking for user:', linkIntent.userId);
+
+          // Link the GitLab account to the current user
+          const account = payload.account;
+          const profile = payload.profile || user;
+
+          const linked = await linkGitlabAccount(linkIntent.userId, account, profile);
+
+          if (linked) {
+            console.log('[signIn] Successfully linked GitLab account');
+            return '/ade/dashboard/linked-accounts?linked=true';
+          } else {
+            console.log('[signIn] Failed to link GitLab account');
+            return '/ade/dashboard/linked-accounts?error=Failed to link account. It may already be linked to another user.';
+          }
+        }
+
+        // Normal login flow
+        return credentialsGitlab(payload);
       }
 
       console.log('[signIn] unsupported provider:', loginProvider, 'user:', user, 'payload:', payload);
