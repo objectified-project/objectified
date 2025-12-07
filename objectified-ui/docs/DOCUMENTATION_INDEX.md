@@ -2,7 +2,7 @@
 
 ## Quick Navigation
 
-### 🚀 **START HERE** → [GITLAB_QUICK_START.md](./GITLAB_QUICK_START.md)
+### 🚀 **START HERE** → [GITLAB_QUICK_START.md](GITLAB_QUICK_START.md)
 5-minute setup checklist to get GitLab login working immediately.
 
 ---
@@ -309,7 +309,7 @@ See: **GITLAB_QUICK_START.md** → "Testing" section
 
 ---
 
-**Start here**: → [GITLAB_QUICK_START.md](./GITLAB_QUICK_START.md)
+**Start here**: → [GITLAB_QUICK_START.md](GITLAB_QUICK_START.md)
 
 All documentation files are in the `/objectified` root directory.
 
