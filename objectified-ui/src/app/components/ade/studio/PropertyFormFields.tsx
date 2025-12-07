@@ -19,7 +19,24 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import Collapse from '@mui/material/Collapse';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { RegexTester } from './RegexTester';
 
 export interface PropertyFormData {
@@ -56,6 +73,79 @@ export interface PropertyFormData {
   deprecated?: boolean;
   example?: string;
 }
+
+interface SortableEnumItemProps {
+  id: string;
+  value: string;
+  onDelete: (value: string) => void;
+}
+
+const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <ListItem
+      ref={setNodeRef}
+      style={style}
+      sx={{
+        borderBottom: 1,
+        borderColor: 'divider',
+        backgroundColor: isDragging ? 'action.selected' : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        pl: 1,
+        pr: 1,
+      }}
+    >
+      <IconButton
+        {...attributes}
+        {...listeners}
+        size="small"
+        sx={{
+          cursor: 'grab',
+          '&:active': { cursor: 'grabbing' },
+          color: 'text.secondary',
+          flex: 0,
+          p: 0.5,
+        }}
+      >
+        <DragIndicatorIcon fontSize="small" />
+      </IconButton>
+      <ListItemText
+        primary={value}
+        primaryTypographyProps={{
+          fontFamily: 'monospace',
+          fontSize: '0.875rem',
+        }}
+        sx={{ flex: 1, my: 0 }}
+      />
+      <IconButton
+        edge="end"
+        onClick={() => onDelete(value)}
+        size="small"
+        sx={{
+          flex: 0,
+        }}
+      >
+        <DeleteIcon fontSize="small" />
+      </IconButton>
+    </ListItem>
+  );
+};
 
 export interface PropertyFormFieldsProps {
   // Property type info
@@ -95,6 +185,18 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   const [enumInput, setEnumInput] = React.useState('');
   const [enumError, setEnumError] = React.useState('');
   const [objectPropsExpanded, setObjectPropsExpanded] = React.useState(false);
+
+  // DnD sensors for enum reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Generate an example value based on the property schema
   const generateExample = () => {
@@ -273,6 +375,20 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
     });
 
     onChange('enum', sorted);
+  };
+
+  const handleEnumDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id || !data.enum) {
+      return;
+    }
+
+    const oldIndex = data.enum.indexOf(active.id);
+    const newIndex = data.enum.indexOf(over.id);
+
+    const newEnumArray = arrayMove(data.enum, oldIndex, newIndex);
+    onChange('enum', newEnumArray);
   };
 
   return (
@@ -672,30 +788,37 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         </Box>
 
         {data.enum && data.enum.length > 0 && (
-          <List dense sx={{ bgcolor: 'action.hover', borderRadius: 1, maxHeight: 150, overflow: 'auto' }}>
-            {data.enum.map((value, index) => (
-              <ListItem
-                key={index}
-                secondaryAction={
-                  <IconButton edge="end" onClick={() => handleRemoveEnum(value)} size="small">
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                }
-                sx={{
-                  borderBottom: index < data.enum!.length - 1 ? 1 : 0,
-                  borderColor: 'divider'
-                }}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleEnumDragEnd}
+          >
+            <List
+              dense
+              sx={{
+                bgcolor: 'action.hover',
+                borderRadius: 1,
+                maxHeight: 200,
+                overflow: 'auto',
+                border: 1,
+                borderColor: 'divider',
+              }}
+            >
+              <SortableContext
+                items={data.enum}
+                strategy={verticalListSortingStrategy}
               >
-                <ListItemText
-                  primary={value}
-                  primaryTypographyProps={{
-                    fontFamily: 'monospace',
-                    fontSize: '0.875rem'
-                  }}
-                />
-              </ListItem>
-            ))}
-          </List>
+                {data.enum.map((value, index) => (
+                  <SortableEnumItem
+                    key={value}
+                    id={value}
+                    value={value}
+                    onDelete={handleRemoveEnum}
+                  />
+                ))}
+              </SortableContext>
+            </List>
+          </DndContext>
         )}
         </Box>
       )}
