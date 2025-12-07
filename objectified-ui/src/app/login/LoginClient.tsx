@@ -130,8 +130,6 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
   }
 
   const isBetaMode = process.env.NEXT_PUBLIC_BETA_MODE;
-  console.log('Beta Mode Environment Variable:', process.env.NEXT_PUBLIC_BETA_MODE);
-  console.log('Is Beta Mode Active:', isBetaMode);
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 relative">
