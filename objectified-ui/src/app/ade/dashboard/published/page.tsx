@@ -83,6 +83,12 @@ const PublishedVersions = () => {
     return `${restApiBaseUrl}/swagger/${getAccessUrl(version)}`;
   };
 
+  const getArazzoUrl = (version: PublishedVersion): string => {
+    // Construct Arazzo workflow URL
+    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
+    return `${restApiBaseUrl}/arazzo/${getAccessUrl(version)}`;
+  };
+
   const handleCopyUrl = async (version: PublishedVersion) => {
     const fullUrl = getFullAccessUrl(version);
     try {
@@ -102,6 +108,11 @@ const PublishedVersions = () => {
   const handleOpenSwagger = (version: PublishedVersion) => {
     const swaggerUrl = getSwaggerUrl(version);
     window.open(swaggerUrl, '_blank');
+  };
+
+  const handleOpenArazzo = (version: PublishedVersion) => {
+    const arazzoUrl = getArazzoUrl(version);
+    window.open(arazzoUrl, '_blank');
   };
 
   const handleToggleVisibility = async (version: PublishedVersion) => {
@@ -215,6 +226,9 @@ const PublishedVersions = () => {
           case 'openSwagger':
             handleOpenSwagger(version);
             break;
+          case 'openArazzo':
+            handleOpenArazzo(version);
+            break;
           case 'copy':
             await handleCopyUrl(version);
             break;
@@ -261,9 +275,10 @@ const PublishedVersions = () => {
               return <span className="text-gray-600 dark:text-gray-300">Actions</span>;
             }
             const labels: Record<string, string> = {
-              open: 'Open URL',
-              openSwagger: 'Open Swagger',
-              copy: 'Copy URL',
+              open: 'View OpenAPI (JSON)',
+              openArazzo: 'View Arazzo (JSON)',
+              openSwagger: 'Open Swagger UI',
+              copy: 'Copy OpenAPI URL',
               toggleVisibility: toggleLabel,
             };
             return labels[selected as string] || 'Actions';
@@ -294,19 +309,25 @@ const PublishedVersions = () => {
           <MenuItem value="open">
             <div className="flex items-center gap-2">
               <ExternalLink className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span>Open URL</span>
+              <span>View OpenAPI (JSON)</span>
+            </div>
+          </MenuItem>
+          <MenuItem value="openArazzo">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              <span>View Arazzo (JSON)</span>
             </div>
           </MenuItem>
           <MenuItem value="openSwagger">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              <span>Open Swagger</span>
+              <span>Open Swagger UI</span>
             </div>
           </MenuItem>
           <MenuItem value="copy">
             <div className="flex items-center gap-2">
               <Copy className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span>Copy URL</span>
+              <span>Copy OpenAPI URL</span>
             </div>
           </MenuItem>
           <MenuItem value="toggleVisibility">

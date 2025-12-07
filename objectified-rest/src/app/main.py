@@ -7,6 +7,7 @@ import json
 
 from .database import db
 from .openapi_generator import generate_openapi_spec, generate_class_openapi_spec
+from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .models import OpenAPIResponse
 
 # Create FastAPI app
@@ -80,7 +81,9 @@ async def root():
         "endpoints": {
             "version_spec": "/v1/schema/{tenant-slug}/{project-slug}/{version-slug}",
             "class_spec": "/v1/schema/{tenant-slug}/{project-slug}/{version-slug}/{class-name}",
-            "swagger_ui": "/v1/swagger/{tenant-slug}/{project-slug}/{version-slug}"
+            "swagger_ui": "/v1/swagger/{tenant-slug}/{project-slug}/{version-slug}",
+            "arazzo_spec": "/v1/arazzo/{tenant-slug}/{project-slug}/{version-slug}",
+            "class_arazzo_spec": "/v1/arazzo/{tenant-slug}/{project-slug}/{version-slug}/{class-name}"
         }
     }
 
@@ -335,6 +338,157 @@ async def get_swagger_ui(
 """
 
     return HTMLResponse(content=swagger_html)
+
+
+@app.get("/v1/arazzo/{tenant_slug}/{project_slug}/{version_slug}")
+async def get_version_arazzo_spec(
+    tenant_slug: str,
+    project_slug: str,
+    version_slug: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    accept: Optional[str] = Header(None)
+) -> Response:
+    """
+    Get the complete Arazzo workflow specification for all classes in a version.
+    Uses content negotiation to determine response format (JSON or YAML).
+
+    Args:
+        tenant_slug: The tenant slug
+        project_slug: The project slug
+        version_slug: The version ID (e.g., "1.0.0")
+        x_api_key: Optional API key for private versions
+        accept: Accept header for content negotiation
+
+    Returns:
+        Arazzo 1.0.1 specification in JSON or YAML format
+    """
+    # Get version information
+    version = db.get_version_by_slugs(tenant_slug, project_slug, version_slug)
+
+    if not version:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {tenant_slug}/{project_slug}/{version_slug}"
+        )
+
+    # Check if version is published
+    if not version['published']:
+        raise HTTPException(
+            status_code=403,
+            detail="This version is not published"
+        )
+
+    # Validate access for private versions
+    validate_private_access(version, tenant_slug, x_api_key)
+
+    # Get all classes for this version
+    classes = db.get_classes_for_version(version['id'])
+
+    # Generate Arazzo specification
+    arazzo_spec = generate_arazzo_spec(
+        tenant_slug,
+        project_slug,
+        version_slug,
+        classes,
+        version.get('project_description')
+    )
+
+    # Determine response format based on Accept header
+    accept_header = (accept or "").lower()
+
+    # Check for YAML preference
+    if any(mime in accept_header for mime in ["application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml"]):
+        # Convert to YAML
+        yaml_content = yaml.dump(arazzo_spec, sort_keys=False, default_flow_style=False)
+        return Response(
+            content=yaml_content,
+            media_type="application/x-yaml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{project_slug}-workflows.yaml"'
+            }
+        )
+
+    # Default to JSON
+    return JSONResponse(content=arazzo_spec)
+
+
+@app.get("/v1/arazzo/{tenant_slug}/{project_slug}/{version_slug}/{class_name}")
+async def get_class_arazzo_spec(
+    tenant_slug: str,
+    project_slug: str,
+    version_slug: str,
+    class_name: str,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    accept: Optional[str] = Header(None)
+) -> Response:
+    """
+    Get the Arazzo workflow specification for a single class.
+    Uses content negotiation to determine response format (JSON or YAML).
+
+    Args:
+        tenant_slug: The tenant slug
+        project_slug: The project slug
+        version_slug: The version ID (e.g., "1.0.0")
+        class_name: The name of the class
+        x_api_key: Optional API key for private versions
+        accept: Accept header for content negotiation
+
+    Returns:
+        Arazzo 1.0.1 specification for the class in JSON or YAML format
+    """
+    # Get version information
+    version = db.get_version_by_slugs(tenant_slug, project_slug, version_slug)
+
+    if not version:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {tenant_slug}/{project_slug}/{version_slug}"
+        )
+
+    # Check if version is published
+    if not version['published']:
+        raise HTTPException(
+            status_code=403,
+            detail="This version is not published"
+        )
+
+    # Validate access for private versions
+    validate_private_access(version, tenant_slug, x_api_key)
+
+    # Get the specific class
+    class_data = db.get_class_by_name(version['id'], class_name)
+
+    if not class_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class not found: {class_name}"
+        )
+
+    # Generate Arazzo specification for this class
+    arazzo_spec = generate_class_arazzo_spec(
+        tenant_slug,
+        project_slug,
+        version_slug,
+        class_data
+    )
+
+    # Determine response format based on Accept header
+    accept_header = (accept or "").lower()
+
+    # Check for YAML preference
+    if any(mime in accept_header for mime in ["application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml"]):
+        # Convert to YAML
+        yaml_content = yaml.dump(arazzo_spec, sort_keys=False, default_flow_style=False)
+        return Response(
+            content=yaml_content,
+            media_type="application/x-yaml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{class_name}-workflow.yaml"'
+            }
+        )
+
+    # Default to JSON
+    return JSONResponse(content=arazzo_spec)
 
 
 @app.get("/health")

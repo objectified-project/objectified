@@ -15,7 +15,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Enhanced class editing layout
   - Double-clicking a class node now edits the node instead of displaying it as code
   - Moved the JSON/YAML and example generation to the edit form
-
+- Added Arazzo generation endpoint for publications
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
