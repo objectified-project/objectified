@@ -13,6 +13,7 @@ import { useDialog } from '../../../components/providers/DialogProvider';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
+import Divider from '@mui/material/Divider';
 
 interface PublishedVersion {
   id: string;
@@ -89,6 +90,12 @@ const PublishedVersions = () => {
     return `${restApiBaseUrl}/arazzo/${getAccessUrl(version)}`;
   };
 
+  const getJsonUrl = (version: PublishedVersion): string => {
+    // Construct Arazzo workflow URL
+    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
+    return `${restApiBaseUrl}/json/${getAccessUrl(version)}`;
+  };
+
   const handleCopyUrl = async (version: PublishedVersion) => {
     const fullUrl = getFullAccessUrl(version);
     try {
@@ -113,6 +120,11 @@ const PublishedVersions = () => {
   const handleOpenArazzo = (version: PublishedVersion) => {
     const arazzoUrl = getArazzoUrl(version);
     window.open(arazzoUrl, '_blank');
+  };
+
+  const handleOpenJson = (version: PublishedVersion) => {
+    const url = getJsonUrl(version);
+    window.open(url, '_blank');
   };
 
   const handleToggleVisibility = async (version: PublishedVersion) => {
@@ -229,6 +241,9 @@ const PublishedVersions = () => {
           case 'openArazzo':
             handleOpenArazzo(version);
             break;
+          case 'openJson':
+            handleOpenJson(version);
+            break;
           case 'copy':
             await handleCopyUrl(version);
             break;
@@ -277,6 +292,7 @@ const PublishedVersions = () => {
             const labels: Record<string, string> = {
               open: 'View OpenAPI (JSON)',
               openArazzo: 'View Arazzo (JSON)',
+              openJson: 'View JSON Schema',
               openSwagger: 'Open Swagger UI',
               copy: 'Copy OpenAPI URL',
               toggleVisibility: toggleLabel,
@@ -318,6 +334,13 @@ const PublishedVersions = () => {
               <span>View Arazzo (JSON)</span>
             </div>
           </MenuItem>
+          <MenuItem value="openJson">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              <span>View JSON Schema</span>
+            </div>
+          </MenuItem>
+          <Divider/>
           <MenuItem value="openSwagger">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -330,6 +353,7 @@ const PublishedVersions = () => {
               <span>Copy OpenAPI URL</span>
             </div>
           </MenuItem>
+          <Divider/>
           <MenuItem value="toggleVisibility">
             <div className="flex items-center gap-2">
               {version.visibility === 'public' ? (

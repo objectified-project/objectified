@@ -5,6 +5,30 @@ All notable changes to the Objectified REST API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2024-12-07
+
+### Added
+- **JSON Schema Endpoints**
+  - New endpoint: `GET /v1/json/{tenant-slug}/{project-slug}/{version-slug}` - Get JSON Schema for all classes in a version
+  - New endpoint: `GET /v1/json/{tenant-slug}/{project-slug}/{version-slug}/{class-name}` - Get JSON Schema for a single class
+  - Content negotiation support for JSON and YAML formats (same as OpenAPI endpoints)
+  - API key authentication for private versions (same as OpenAPI endpoints)
+  - Full compliance with JSON Schema Draft 2020-12 specification
+  - Schema definitions using $defs keyword
+  - Automatic $id generation for schema identification
+  - Support for nested and inline properties
+  - Support for composition patterns (allOf, anyOf, oneOf)
+
+- **New Python Module: `jsonschema_generator.py`**
+  - Function: `generate_jsonschema_spec()` - Generate JSON Schema for all classes
+  - Function: `generate_class_jsonschema_spec()` - Generate JSON Schema for single class
+  - Reuses OpenAPI schema builder for consistency
+  - Automatic format conversion to JSON Schema keywords
+
+- **JSON Schema Documentation**
+  - `docs/JSON_SCHEMA_ENDPOINTS.md` - Complete endpoint documentation
+  - `docs/JSON_SCHEMA_QUICK_REFERENCE.md` - Developer quick reference guide
+
 ## [1.1.0] - 2024-12-07
 
 ### Added
@@ -59,6 +83,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Content negotiation (JSON/YAML)
 - Database integration with PostgreSQL
 
+[1.2.0]: https://github.com/your-org/objectified-rest/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/your-org/objectified-rest/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/your-org/objectified-rest/releases/tag/v1.0.0
+
+
 
