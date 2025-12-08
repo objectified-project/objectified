@@ -13,7 +13,6 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
-import ListItemSecondaryAction from '@mui/material/ListItemSecondaryAction';
 import Alert from '@mui/material/Alert';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
@@ -126,6 +125,12 @@ const TagManager = ({ open, onClose, projectId, tags, onTagsChanged }: TagManage
         );
       }
 
+      if (!result) {
+        setError('No response from server');
+        setSaving(false);
+        return;
+      }
+
       const response = JSON.parse(result);
       if (!response.success) {
         setError(response.error || 'Failed to save tag');
@@ -148,14 +153,20 @@ const TagManager = ({ open, onClose, projectId, tags, onTagsChanged }: TagManage
     const confirmed = await confirmDialog({
       title: 'Delete Tag',
       message: `Are you sure you want to delete the tag "${tag.name}"? This will remove it from all classes.`,
-      confirmText: 'Delete',
-      confirmColor: 'error',
+      confirmLabel: 'Delete',
+      variant: 'danger',
     });
 
     if (!confirmed) return;
 
     try {
       const result = await deleteTag(tag.id);
+
+      if (!result) {
+        setError('No response from server');
+        return;
+      }
+
       const response = JSON.parse(result);
 
       if (!response.success) {
@@ -273,6 +284,26 @@ const TagManager = ({ open, onClose, projectId, tags, onTagsChanged }: TagManage
                   mb: 1,
                   bgcolor: editingTag?.id === tag.id ? 'action.selected' : 'background.paper',
                 }}
+                secondaryAction={
+                  <>
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      onClick={() => handleStartEdit(tag)}
+                      sx={{ mr: 0.5 }}
+                    >
+                      <Edit size={16} />
+                    </IconButton>
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      onClick={() => handleDelete(tag)}
+                      color="error"
+                    >
+                      <Trash2 size={16} />
+                    </IconButton>
+                  </>
+                }
               >
                 <Chip
                   label={tag.name}
@@ -285,24 +316,6 @@ const TagManager = ({ open, onClose, projectId, tags, onTagsChanged }: TagManage
                   secondary={tag.description || 'No description'}
                   sx={{ ml: 1 }}
                 />
-                <ListItemSecondaryAction>
-                  <IconButton
-                    edge="end"
-                    size="small"
-                    onClick={() => handleStartEdit(tag)}
-                    sx={{ mr: 0.5 }}
-                  >
-                    <Edit size={16} />
-                  </IconButton>
-                  <IconButton
-                    edge="end"
-                    size="small"
-                    onClick={() => handleDelete(tag)}
-                    color="error"
-                  >
-                    <Trash2 size={16} />
-                  </IconButton>
-                </ListItemSecondaryAction>
               </ListItem>
             ))
           )}
