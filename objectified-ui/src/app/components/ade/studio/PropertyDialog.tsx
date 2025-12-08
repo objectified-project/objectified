@@ -305,8 +305,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       slotProps={{
         paper: {
           sx: {
-            height: '80vh',
-            maxHeight: '700px',
+            height: '90vh',
           }
         }
       }}
