@@ -306,6 +306,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         paper: {
           sx: {
             height: '90vh',
+            maxHeight: '90vh',
           }
         }
       }}
