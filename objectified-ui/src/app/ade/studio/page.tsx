@@ -1481,12 +1481,17 @@ const StudioContent = () => {
 
         setLoadingMessage(`Loading properties for ${classesData.length} class${classesData.length !== 1 ? 'es' : ''}...`);
 
-        // Load properties for each class
+        // Load properties and tags for each class
         const classesWithProperties = await Promise.all(
           classesData.map(async (cls: any) => {
             const propsResult = await getPropertiesForClass(cls.id);
             const properties = JSON.parse(propsResult);
-            return { ...cls, properties };
+
+            // Load tags for this class
+            const tagsResult = await getTagsForClass(cls.id);
+            const tags = JSON.parse(tagsResult);
+
+            return { ...cls, properties, tags };
           })
         );
 
@@ -1584,12 +1589,17 @@ const StudioContent = () => {
           const result = await getClassesForVersion(selectedVersionId);
           const classesData = JSON.parse(result);
 
-          // Load properties for each class
+          // Load properties and tags for each class
           const classesWithProperties = await Promise.all(
             classesData.map(async (cls: any) => {
               const propsResult = await getPropertiesForClass(cls.id);
               const properties = JSON.parse(propsResult);
-              return { ...cls, properties };
+
+              // Load tags for this class
+              const tagsResult = await getTagsForClass(cls.id);
+              const tags = JSON.parse(tagsResult);
+
+              return { ...cls, properties, tags };
             })
           );
 

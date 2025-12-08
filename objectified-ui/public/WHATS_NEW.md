@@ -25,6 +25,8 @@ We continue to improve the platform based on your feedback with improvements and
   - **Grid** - Clean grid pattern with alphabetical ordering
   - **Layered** - Horizontal layers based on dependency depth
   - Smooth animations between layout transitions for professional polish
+- Additional Canvas Updates:
+  - Added the ability to tag classes
 - Generation tab:
   - Generates Python Pydantic model code with comprehensive features:
     - Full Pydantic v2 BaseModel support with runtime validation
