@@ -134,6 +134,137 @@ class Database:
 
         return api_key_data
 
+    def get_tags_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get all tags for a specific project."""
+        query = """
+            SELECT id, project_id, name, color, description, created_at, updated_at
+            FROM odb.tags
+            WHERE project_id = %s
+            ORDER BY name ASC
+        """
+        return self.execute_query(query, (project_id,))
+
+    def get_tags_for_class(self, class_id: str) -> List[Dict[str, Any]]:
+        """Get all tags assigned to a specific class."""
+        query = """
+            SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+                   t.name as tag_name, t.color as tag_color, t.description as tag_description
+            FROM odb.class_tags ct
+            JOIN odb.tags t ON ct.tag_id = t.id
+            WHERE ct.class_id = %s
+            ORDER BY t.name ASC
+        """
+        return self.execute_query(query, (class_id,))
+
+    def create_tag(self, project_id: str, name: str, color: str = "default", description: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new tag."""
+        query = """
+            INSERT INTO odb.tags (project_id, name, color, description)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, project_id, name, color, description, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (project_id, name, color, description))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_tag(self, tag_id: str, name: Optional[str] = None, color: Optional[str] = None, description: Optional[str] = None) -> Dict[str, Any]:
+        """Update an existing tag."""
+        # Build dynamic update query
+        updates = []
+        params = []
+
+        if name is not None:
+            updates.append("name = %s")
+            params.append(name)
+        if color is not None:
+            updates.append("color = %s")
+            params.append(color)
+        if description is not None:
+            updates.append("description = %s")
+            params.append(description)
+
+        if not updates:
+            # Nothing to update, just return current tag
+            return self.get_tag_by_id(tag_id)
+
+        params.append(tag_id)
+        query = f"""
+            UPDATE odb.tags
+            SET {', '.join(updates)}
+            WHERE id = %s
+            RETURNING id, project_id, name, color, description, created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_tag(self, tag_id: str) -> bool:
+        """Delete a tag (will cascade delete class_tags due to FK constraint)."""
+        query = "DELETE FROM odb.tags WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (tag_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def assign_tag_to_class(self, class_id: str, tag_id: str) -> Dict[str, Any]:
+        """Assign a tag to a class."""
+        query = """
+            INSERT INTO odb.class_tags (class_id, tag_id)
+            VALUES (%s, %s)
+            ON CONFLICT (class_id, tag_id) DO NOTHING
+            RETURNING id, class_id, tag_id, created_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (class_id, tag_id))
+                result = cursor.fetchone()
+                conn.commit()
+                # If conflict, fetch existing record
+                if result is None:
+                    cursor.execute(
+                        "SELECT id, class_id, tag_id, created_at FROM odb.class_tags WHERE class_id = %s AND tag_id = %s",
+                        (class_id, tag_id)
+                    )
+                    result = cursor.fetchone()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def remove_tag_from_class(self, class_id: str, tag_id: str) -> bool:
+        """Remove a tag from a class."""
+        query = "DELETE FROM odb.class_tags WHERE class_id = %s AND tag_id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (class_id, tag_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
 
 # Global database instance
 db = Database()

@@ -18,11 +18,12 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Autocomplete from '@mui/material/Autocomplete';
-import { Copy, Download, RefreshCw, Check } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check, Tag as TagIcon } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
-import { updateClass } from '../../../../../lib/db/helper';
+import { updateClass, assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
+import Chip from '@mui/material/Chip';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -41,9 +42,11 @@ interface ClassEditDialogProps {
   nodes: any[];
   isReadOnly?: boolean;
   onSave?: () => void;
+  projectId?: string;
+  projectTags?: any[];
 }
 
-const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave }: ClassEditDialogProps) => {
+const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', projectTags = [] }: ClassEditDialogProps) => {
   const [tabValue, setTabValue] = useState(0);
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -59,6 +62,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     discriminatorProperty: '',
     discriminatorUseAuto: true,
     additionalProperties: null as boolean | null,
+    selectedTags: [] as string[],
     error: ''
   });
 
@@ -77,17 +81,43 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       const anyOf = schema.anyOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
       const oneOf = schema.oneOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
 
-      setFormData({
-        name: editingClassData.name || '',
-        description: editingClassData.description || '',
-        allOf,
-        anyOf,
-        oneOf,
-        discriminatorProperty: schema.discriminator?.propertyName || '',
-        discriminatorUseAuto: !schema.discriminator?.mapping,
-        additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
-        error: ''
-      });
+      // Load tags for this class
+      const loadTags = async () => {
+        try {
+          const result = await getTagsForClass(editingClassData.id);
+          const classTags = JSON.parse(result);
+          const tagIds = classTags.map((ct: any) => ct.tag_id);
+
+          setFormData({
+            name: editingClassData.name || '',
+            description: editingClassData.description || '',
+            allOf,
+            anyOf,
+            oneOf,
+            discriminatorProperty: schema.discriminator?.propertyName || '',
+            discriminatorUseAuto: !schema.discriminator?.mapping,
+            additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+            selectedTags: tagIds,
+            error: ''
+          });
+        } catch (error) {
+          console.error('Error loading tags:', error);
+          setFormData({
+            name: editingClassData.name || '',
+            description: editingClassData.description || '',
+            allOf,
+            anyOf,
+            oneOf,
+            discriminatorProperty: schema.discriminator?.propertyName || '',
+            discriminatorUseAuto: !schema.discriminator?.mapping,
+            additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+            selectedTags: [],
+            error: ''
+          });
+        }
+      };
+
+      loadTags();
     }
   }, [open, editingClassData]);
 
@@ -153,6 +183,33 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         setFormData(prev => ({ ...prev, error: response.error || 'Failed to save class' }));
         setSaving(false);
         return;
+      }
+
+      // Update tag assignments
+      if (projectId) {
+        try {
+          // Get current tags
+          const currentTagsResult = await getTagsForClass(editingClassData.id);
+          const currentTags = JSON.parse(currentTagsResult);
+          const currentTagIds = currentTags.map((ct: any) => ct.tag_id);
+
+          // Find tags to add and remove
+          const tagsToAdd = formData.selectedTags.filter(id => !currentTagIds.includes(id));
+          const tagsToRemove = currentTagIds.filter((id: string) => !formData.selectedTags.includes(id));
+
+          // Add new tags
+          for (const tagId of tagsToAdd) {
+            await assignTagToClass(editingClassData.id, tagId);
+          }
+
+          // Remove old tags
+          for (const tagId of tagsToRemove) {
+            await removeTagFromClass(editingClassData.id, tagId);
+          }
+        } catch (error) {
+          console.error('Error updating tags:', error);
+          // Don't fail the whole save if tag update fails
+        }
       }
 
       // Success - call onSave callback and close
@@ -507,9 +564,65 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               rows={2}
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              sx={{ mb: 3 }}
+              sx={{ mb: 2 }}
               disabled={isReadOnly}
             />
+
+            {/* Tags */}
+            {projectId && projectTags && projectTags.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <TagIcon size={16} />
+                  Tags
+                </Typography>
+                <Autocomplete
+                  multiple
+                  options={projectTags.map((tag: any) => tag.id)}
+                  value={formData.selectedTags}
+                  onChange={(_, newValue) => setFormData(prev => ({ ...prev, selectedTags: newValue }))}
+                  disabled={isReadOnly}
+                  getOptionLabel={(tagId) => {
+                    const tag = projectTags.find((t: any) => t.id === tagId);
+                    return tag ? tag.name : tagId;
+                  }}
+                  renderTags={(value, getTagProps) =>
+                    value.map((tagId, index) => {
+                      const tag = projectTags.find((t: any) => t.id === tagId);
+                      return (
+                        <Chip
+                          label={tag?.name || tagId}
+                          color={tag?.color as any || 'default'}
+                          size="small"
+                          {...getTagProps({ index })}
+                        />
+                      );
+                    })
+                  }
+                  renderOption={(props, tagId) => {
+                    const tag = projectTags.find((t: any) => t.id === tagId);
+                    return (
+                      <li {...props}>
+                        <Chip
+                          label={tag?.name || tagId}
+                          color={tag?.color as any || 'default'}
+                          size="small"
+                          sx={{ mr: 1 }}
+                        />
+                        {tag?.description || ''}
+                      </li>
+                    );
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="Select tags..."
+                      helperText="Organize and categorize this class"
+                      size="small"
+                    />
+                  )}
+                />
+              </Box>
+            )}
 
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
               Composition/Inheritance (Optional)

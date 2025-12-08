@@ -19,6 +19,7 @@ type ClassNodeData = {
   description?: string;
   properties?: ClassProperty[];
   schema?: any; // Schema containing allOf/anyOf/oneOf
+  tags?: Array<{ id: string; tag_name: string; tag_color: string }>;
   onPropertyDrop?: (classId: string, propertyData: any, parentId?: string | null) => void;
   onPropertyEdit?: (classId: string, classProperty: ClassProperty) => void;
   onPropertyDelete?: (classId: string, classPropertyId: string) => void;
@@ -326,10 +327,47 @@ function ClassNode({ data, selected }: NodeProps) {
           justifyContent: 'space-between',
           alignItems: 'center',
           borderBottom: dragTarget === 'node' ? '2px solid #10b981' : 'none',
+          gap: '8px',
         }}
       >
-        <div style={{ fontSize: '14px', fontWeight: 600, color: 'white', wordBreak: 'break-word', flex: 1 }}>
-          {typedData.name}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'white', wordBreak: 'break-word' }}>
+            {typedData.name}
+          </div>
+          {/* Tags in header */}
+          {typedData.tags && typedData.tags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+              {typedData.tags.map((tag) => {
+                const colorMap: Record<string, string> = {
+                  default: 'rgba(255, 255, 255, 0.25)',
+                  primary: 'rgba(255, 255, 255, 0.3)',
+                  secondary: 'rgba(147, 51, 234, 0.4)',
+                  error: 'rgba(239, 68, 68, 0.4)',
+                  warning: 'rgba(245, 158, 11, 0.4)',
+                  info: 'rgba(59, 130, 246, 0.4)',
+                  success: 'rgba(16, 185, 129, 0.4)',
+                };
+                const bgColor = colorMap[tag.tag_color] || colorMap.default;
+                return (
+                  <span
+                    key={tag.id}
+                    style={{
+                      fontSize: '9px',
+                      padding: '2px 5px',
+                      borderRadius: '3px',
+                      background: bgColor,
+                      color: 'white',
+                      fontWeight: 600,
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {tag.tag_name}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
         {!typedData.isReadOnly && (
           <button
@@ -346,6 +384,7 @@ function ClassNode({ data, selected }: NodeProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
             }}
             onClick={(e) => {
               e.stopPropagation();

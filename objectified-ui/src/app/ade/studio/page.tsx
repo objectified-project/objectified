@@ -10,6 +10,8 @@ import YAML from 'yaml';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
 import MermaidPreview, { type MermaidPreviewRef } from '../../components/ade/studio/MermaidPreview';
+import TagManager from '../../components/ade/studio/TagManager';
+import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import { generateOpenApiSpec } from '../../utils/openapi';
 import { generateArazzoSpec } from '../../utils/arazzo';
 import { generateJsonSchema } from '../../utils/jsonschema';
@@ -41,7 +43,9 @@ import {
   removePropertyFromClass,
   deleteClass,
   updateClassPropertyRef,
-  getTenantsForUser
+  getTenantsForUser,
+  getTagsForProject,
+  getTagsForClass
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection, applyAutoLayout, type LayoutAlgorithm } from './layoutUtils';
@@ -123,11 +127,17 @@ const StudioContent = () => {
   // Class edit dialog state
   const [editingClassProperty, setEditingClassProperty] = useState<any>(null);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [classEditDialogOpen, setClassEditDialogOpen] = useState(false);
+  const [editingClassData, setEditingClassData] = useState<any>(null);
   // Note: dialog-specific form state moved to ClassPropertyEditDialog component
 
   // Reference dialog state
   const [referenceDialogOpen, setReferenceDialogOpen] = useState(false);
   const [referenceTargetClassId, setReferenceTargetClassId] = useState<string>('');
+
+  // Tag management state
+  const [projectTags, setProjectTags] = useState<any[]>([]);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
   // Global expanded properties state for expand/collapse all
   const [globalExpandedProperties, setGlobalExpandedProperties] = useState<Set<string>>(new Set());
@@ -225,7 +235,12 @@ const StudioContent = () => {
         classesData.map(async (cls: any) => {
           const propsResult = await getPropertiesForClass(cls.id);
           const properties = JSON.parse(propsResult);
-          return { ...cls, properties };
+
+          // Load tags for this class
+          const tagsResult = await getTagsForClass(cls.id);
+          const tags = JSON.parse(tagsResult);
+
+          return { ...cls, properties, tags };
         })
       );
 
@@ -612,21 +627,23 @@ const StudioContent = () => {
     }
   }, [referenceTargetClassId, nodes, reloadClasses, triggerSidebarRefresh]);
 
+  // Load project tags
+  const loadProjectTags = useCallback(async (projectId: string) => {
+    try {
+      const result = await getTagsForProject(projectId);
+      const tags = JSON.parse(result);
+      setProjectTags(tags);
+    } catch (error) {
+      console.error('Failed to load project tags:', error);
+      setProjectTags([]);
+    }
+  }, []);
+
   // Handle class edit (double-click on node)
   const handleClassEdit = useCallback(async (classData: any) => {
-    // Call the sidebar's handleClassEdit function
     console.log(isReadOnly ? 'Viewing class:' : 'Editing class:', classData);
-    const sidebarHandler = (window as any).__studioHandleClassEdit;
-    if (sidebarHandler) {
-      // Convert canvas classData to ClassItem format expected by sidebar
-      const classItem = {
-        id: classData.id,
-        name: classData.name,
-        description: classData.description || '',
-        schema: classData.schema
-      };
-      await sidebarHandler(classItem);
-    }
+    setEditingClassData(classData);
+    setClassEditDialogOpen(true);
   }, [isReadOnly]);
 
   // Keep ref updated
@@ -734,6 +751,7 @@ const StudioContent = () => {
         description: cls.description,
         properties: cls.properties || [],
         schema: cls.schema, // Pass schema for composition handles
+        tags: cls.tags || [], // Pass tags for display
         // Use refs to avoid triggering re-renders when callbacks change
         onPropertyDrop: (...args: any[]) => handlePropertyDropRef.current?.(...args),
         onPropertyEdit: (...args: any[]) => handlePropertyEditRef.current?.(...args),
@@ -1661,10 +1679,18 @@ const StudioContent = () => {
   };
 
   const handleProjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedProjectId(e.target.value);
+    const projectId = e.target.value;
+    setSelectedProjectId(projectId);
     setSelectedVersionId(''); // Reset version when project changes
     setIsReadOnly(false); // Reset read-only flag when version is cleared
     setViewMode('canvas'); // Reset view to canvas when project changes
+
+    // Load tags for the new project
+    if (projectId) {
+      loadProjectTags(projectId);
+    } else {
+      setProjectTags([]);
+    }
   };
 
   const handleVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -1823,48 +1849,62 @@ const StudioContent = () => {
 
           {/* View Switcher */}
           {selectedProjectId && selectedVersionId && (
-            <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+            <>
+              <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                <button
+                  onClick={() => setViewMode('canvas')}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    viewMode === 'canvas'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Canvas
+                </button>
+                <button
+                  onClick={() => setViewMode('code')}
+                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                    viewMode === 'code'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Code
+                </button>
+                <button
+                  onClick={() => setViewMode('generate')}
+                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                    viewMode === 'generate'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Generate
+                </button>
+                <button
+                  onClick={() => setViewMode('mermaid')}
+                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                    viewMode === 'mermaid'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Mermaid
+                </button>
+              </div>
+
+              {/* Manage Tags Button */}
               <button
-                onClick={() => setViewMode('canvas')}
-                className={`px-3 py-1 text-xs font-medium transition-colors ${
-                  viewMode === 'canvas'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
+                onClick={() => setTagManagerOpen(true)}
+                className="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+                title="Manage project tags"
               >
-                Canvas
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span>Tags</span>
               </button>
-              <button
-                onClick={() => setViewMode('code')}
-                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
-                  viewMode === 'code'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
-              >
-                Code
-              </button>
-              <button
-                onClick={() => setViewMode('generate')}
-                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
-                  viewMode === 'generate'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
-              >
-                Generate
-              </button>
-              <button
-                onClick={() => setViewMode('mermaid')}
-                className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
-                  viewMode === 'mermaid'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
-              >
-                Mermaid
-              </button>
-            </div>
+            </>
           )}
 
           {/* Context Display - Tenant Name */}
@@ -2567,6 +2607,37 @@ const StudioContent = () => {
           description: (n.data as any).description
         }))}
         onSubmit={handleReferenceSubmit}
+      />
+
+      {/* Class Edit Dialog */}
+      <ClassEditDialog
+        open={classEditDialogOpen}
+        onClose={() => {
+          setClassEditDialogOpen(false);
+          setEditingClassData(null);
+        }}
+        editingClassData={editingClassData}
+        nodes={nodes}
+        isReadOnly={isReadOnly}
+        onSave={() => {
+          reloadClasses();
+          triggerSidebarRefresh();
+        }}
+        projectId={selectedProjectId}
+        projectTags={projectTags}
+      />
+
+      {/* Tag Manager Dialog */}
+      <TagManager
+        open={tagManagerOpen}
+        onClose={() => setTagManagerOpen(false)}
+        projectId={selectedProjectId}
+        tags={projectTags}
+        onTagsChanged={() => {
+          if (selectedProjectId) {
+            loadProjectTags(selectedProjectId);
+          }
+        }}
       />
     </div>
   );

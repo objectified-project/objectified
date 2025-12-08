@@ -2018,3 +2018,218 @@ export async function removePersonalAccessToken(
   }
 }
 
+// ============================================================================
+// Tag Management Functions
+// ============================================================================
+
+export async function getTagsForProject(projectId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, project_id, name, color, description, created_at, updated_at
+       FROM odb.tags
+       WHERE project_id = $1
+       ORDER BY name ASC`,
+      [projectId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching tags:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function getTagsForClass(classId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+              t.name as tag_name, t.color as tag_color, t.description as tag_description,
+              t.project_id
+       FROM odb.class_tags ct
+       JOIN odb.tags t ON ct.tag_id = t.id
+       WHERE ct.class_id = $1
+       ORDER BY t.name ASC`,
+      [classId]
+    );
+
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching class tags:', error);
+    return JSON.stringify([]);
+  }
+}
+
+export async function createTag(projectId: string, name: string, color: string = 'default', description: string | null = null) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Tag name is required' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.tags (project_id, name, color, description)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, project_id, name, color, description, created_at, updated_at`,
+      [projectId, name.trim(), color, description]
+    );
+
+    return JSON.stringify({ success: true, tag: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating tag:', error);
+
+    // Handle unique constraint violation (duplicate name in same project)
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A tag with this name already exists in this project' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function updateTag(tagId: string, name: string | null = null, color: string | null = null, description: string | null = null) {
+  try {
+    // Build dynamic update query
+    const updates: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (name !== null) {
+      if (name.trim().length === 0) {
+        return JSON.stringify({ success: false, error: 'Tag name cannot be empty' });
+      }
+      updates.push(`name = $${paramIndex}`);
+      params.push(name.trim());
+      paramIndex++;
+    }
+
+    if (color !== null) {
+      updates.push(`color = $${paramIndex}`);
+      params.push(color);
+      paramIndex++;
+    }
+
+    if (description !== null) {
+      updates.push(`description = $${paramIndex}`);
+      params.push(description);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      // Nothing to update, just return current tag
+      const currentTag = await connectionPool.query(
+        `SELECT id, project_id, name, color, description, created_at, updated_at
+         FROM odb.tags WHERE id = $1`,
+        [tagId]
+      );
+      if (currentTag.rowCount === 0) {
+        return JSON.stringify({ success: false, error: 'Tag not found' });
+      }
+      return JSON.stringify({ success: true, tag: currentTag.rows[0] });
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    params.push(tagId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.tags
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex}
+       RETURNING id, project_id, name, color, description, created_at, updated_at`,
+      params
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Tag not found' });
+    }
+
+    return JSON.stringify({ success: true, tag: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating tag:', error);
+
+    // Handle unique constraint violation
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A tag with this name already exists in this project' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function deleteTag(tagId: string) {
+  try {
+    // Hard delete - will cascade delete class_tags due to FK constraint
+    const result = await connectionPool.query(
+      `DELETE FROM odb.tags WHERE id = $1 RETURNING id`,
+      [tagId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Tag not found' });
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting tag:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function assignTagToClass(classId: string, tagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `INSERT INTO odb.class_tags (class_id, tag_id)
+       VALUES ($1, $2)
+       ON CONFLICT (class_id, tag_id) DO NOTHING
+       RETURNING id, class_id, tag_id, created_at`,
+      [classId, tagId]
+    );
+
+    // If conflict, fetch existing record
+    if (result.rowCount === 0) {
+      const existing = await connectionPool.query(
+        `SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+                t.name as tag_name, t.color as tag_color
+         FROM odb.class_tags ct
+         JOIN odb.tags t ON ct.tag_id = t.id
+         WHERE ct.class_id = $1 AND ct.tag_id = $2`,
+        [classId, tagId]
+      );
+      if (existing.rowCount > 0) {
+        return JSON.stringify({ success: true, class_tag: existing.rows[0], already_existed: true });
+      }
+    }
+
+    // Get tag info for the newly created relationship
+    const tagInfo = await connectionPool.query(
+      `SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+              t.name as tag_name, t.color as tag_color
+       FROM odb.class_tags ct
+       JOIN odb.tags t ON ct.tag_id = t.id
+       WHERE ct.id = $1`,
+      [result.rows[0].id]
+    );
+
+    return JSON.stringify({ success: true, class_tag: tagInfo.rows[0] });
+  } catch (error: any) {
+    console.error('Error assigning tag to class:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+export async function removeTagFromClass(classId: string, tagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.class_tags WHERE class_id = $1 AND tag_id = $2 RETURNING id`,
+      [classId, tagId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Tag assignment not found' });
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error removing tag from class:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+

@@ -2,6 +2,33 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 
 
+class TagSchema(BaseModel):
+    """Pydantic model for a tag."""
+    id: str
+    project_id: str
+    name: str
+    color: str = "default"
+    description: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ClassTagSchema(BaseModel):
+    """Pydantic model for a class-tag relationship."""
+    id: str
+    class_id: str
+    tag_id: str
+    tag_name: Optional[str] = None
+    tag_color: Optional[str] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ClassSchema(BaseModel):
     """Pydantic model for a class schema."""
     id: str
@@ -10,6 +37,7 @@ class ClassSchema(BaseModel):
     description: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
     enabled: bool = True
+    tags: Optional[List[TagSchema]] = None
 
     class Config:
         from_attributes = True
