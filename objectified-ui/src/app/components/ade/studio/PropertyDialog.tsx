@@ -314,7 +314,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       <DialogTitle>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{mode === 'add' ? 'Add Property' : 'Edit Property'}</span>
-          <Box sx={{ display: 'flex', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+          <Box sx={{ display: 'flex', border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
             <Button
               size="small"
               variant={viewMode === 'form' ? 'contained' : 'text'}
@@ -323,6 +323,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             >
               Form
             </Button>
+            <Box sx={{ width: '1px', bgcolor: 'divider' }} />
             <Button
               size="small"
               variant={viewMode === 'json' ? 'contained' : 'text'}

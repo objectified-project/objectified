@@ -392,456 +392,175 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   };
 
   return (
-    <Box>
-      {/* Basic Fields */}
-      {showTitle && (
+    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: 0 }}>
+      {/* LEFT COLUMN: Standard Fields */}
+      <Box sx={{ pr: 3 }}>
+        {/* Section Header */}
+        <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+          Standard Fields
+        </Typography>
+
+        {/* Basic Fields */}
+        {showTitle && (
+          <TextField
+            label="Title"
+            size={size}
+            fullWidth
+            value={data.title || ''}
+            onChange={(e) => onChange('title', e.target.value)}
+            helperText="Optional display title for the property"
+            sx={{ mb: 2 }}
+          />
+        )}
+
         <TextField
-          label="Title"
+          label="Description"
           size={size}
           fullWidth
-          value={data.title || ''}
-          onChange={(e) => onChange('title', e.target.value)}
-          helperText="Optional display title for the property"
+          multiline
+          rows={3}
+          value={data.description || ''}
+          onChange={(e) => onChange('description', e.target.value)}
+          helperText="Optional description for the property"
           sx={{ mb: 2 }}
         />
-      )}
 
-      <TextField
-        label="Description"
-        size={size}
-        fullWidth
-        multiline
-        rows={2}
-        value={data.description || ''}
-        onChange={(e) => onChange('description', e.target.value)}
-        helperText="Optional description for the property"
-        sx={{ mb: 2 }}
-      />
-
-      {/* Object Properties Section */}
-      {baseType === 'object' && (
-        <Box sx={{ mb: 2 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              p: 1.5,
-              bgcolor: 'action.hover',
-              borderRadius: 1,
-              cursor: nestedProperties && nestedProperties.length > 0 ? 'pointer' : 'default',
-            }}
-            onClick={() => {
-              if (nestedProperties && nestedProperties.length > 0) {
-                setObjectPropsExpanded(!objectPropsExpanded);
-              }
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                Object Properties
-              </Typography>
-              <Chip
-                label={nestedProperties ? nestedProperties.length : 0}
-                size="small"
-                color={nestedProperties && nestedProperties.length > 0 ? 'primary' : 'default'}
-                sx={{ height: 20, fontSize: '0.75rem' }}
-              />
-            </Box>
-            {nestedProperties && nestedProperties.length > 0 && (
-              <IconButton size="small" sx={{ p: 0 }}>
-                {objectPropsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
-            )}
-          </Box>
-
-          {isArray && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 1 }}>
-              This object type is the item type of an array
-            </Typography>
-          )}
-
-          {nestedProperties && nestedProperties.length > 0 && (
-            <Collapse in={objectPropsExpanded}>
-              <Box sx={{ mt: 2, pl: 2, borderLeft: 2, borderColor: 'divider' }}>
-                <List dense>
-                  {nestedProperties.map((prop) => {
-                    const propData = typeof prop.data === 'string'
-                      ? JSON.parse(prop.data)
-                      : (prop.data || {});
-
-                    // Determine type display
-                    let typeDisplay = propData.type || 'any';
-                    if (propData.$ref) {
-                      const refParts = propData.$ref.split('/');
-                      typeDisplay = refParts[refParts.length - 1] || propData.$ref;
-                    } else if (propData.type === 'array' && propData.items) {
-                      if (propData.items.$ref) {
-                        const refParts = propData.items.$ref.split('/');
-                        typeDisplay = `${refParts[refParts.length - 1] || propData.items.$ref}[]`;
-                      } else {
-                        typeDisplay = `${propData.items.type || 'any'}[]`;
-                      }
-                    }
-
-                    return (
-                      <ListItem
-                        key={prop.id}
-                        sx={{
-                          py: 0.5,
-                          px: 1,
-                          bgcolor: 'background.paper',
-                          borderRadius: 0.5,
-                          mb: 0.5,
-                        }}
-                      >
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{ fontFamily: 'monospace', fontWeight: 500 }}
-                              >
-                                {prop.name}
-                              </Typography>
-                              <Chip
-                                label={typeDisplay}
-                                size="small"
-                                variant="outlined"
-                                sx={{ height: 18, fontSize: '0.7rem' }}
-                              />
-                            </Box>
-                          }
-                          secondary={
-                            prop.description && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{ display: 'block', mt: 0.5 }}
-                              >
-                                {prop.description}
-                              </Typography>
-                            )
-                          }
-                        />
-                      </ListItem>
-                    );
-                  })}
-                </List>
-              </Box>
-            </Collapse>
-          )}
-
-          {(!nestedProperties || nestedProperties.length === 0) && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 1 }}>
-              No properties defined for this object
-            </Typography>
-          )}
-        </Box>
-      )}
-
-      {/* String Constraints */}
-      {baseType === 'string' && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            String Constraints
-          </Typography>
-          {isArray && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              These constraints apply to each string item in the array
-            </Typography>
-          )}
-
-          <TextField
-            label="Format"
-            size={size}
-            fullWidth
-            value={data.format || ''}
-            onChange={(e) => onChange('format', e.target.value)}
-            helperText="e.g., date, date-time, email, uri, uuid"
-            sx={{ mb: 2 }}
-          />
-
-          <TextField
-            label="Pattern (Regex)"
-            size={size}
-            fullWidth
-            value={data.pattern || ''}
-            onChange={(e) => onChange('pattern', e.target.value)}
-            placeholder="e.g., ^[A-Z]{3}$"
-            helperText="Regular expression pattern for validation"
-            sx={{ mb: 2 }}
-          />
-
-          <RegexTester pattern={data.pattern || ''} />
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-            <TextField
-              label="Min Length"
-              type="number"
-              size={size}
-              fullWidth
-              value={data.minLength || ''}
-              onChange={(e) => onChange('minLength', e.target.value)}
-              inputProps={{ min: 0 }}
-            />
-            <TextField
-              label="Max Length"
-              type="number"
-              size={size}
-              fullWidth
-              value={data.maxLength || ''}
-              onChange={(e) => onChange('maxLength', e.target.value)}
-              inputProps={{ min: 0 }}
-            />
-          </Box>
-        </Box>
-      )}
-
-      {/* Number/Integer Constraints */}
-      {(baseType === 'number' || baseType === 'integer') && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Numeric Constraints
-          </Typography>
-          {isArray && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              These constraints apply to each {baseType} item in the array
-            </Typography>
-          )}
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-            <Box>
-              <TextField
-                label="Minimum"
-                type="number"
-                size={size}
-                fullWidth
-                value={data.minimum || ''}
-                onChange={(e) => onChange('minimum', e.target.value)}
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={data.exclusiveMinimum || false}
-                    onChange={(e) => onChange('exclusiveMinimum', e.target.checked)}
-                    disabled={!data.minimum}
-                    size={size}
-                  />
-                }
-                label={<Typography>Exclusive Minimum</Typography>}
-                sx={{ mt: 0.5 }}
-              />
-            </Box>
-            <Box>
-              <TextField
-                label="Maximum"
-                type="number"
-                size={size}
-                fullWidth
-                value={data.maximum || ''}
-                onChange={(e) => onChange('maximum', e.target.value)}
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={data.exclusiveMaximum || false}
-                    onChange={(e) => onChange('exclusiveMaximum', e.target.checked)}
-                    disabled={!data.maximum}
-                    size={size}
-                  />
-                }
-                label={<Typography>Exclusive Maximum</Typography>}
-                sx={{ mt: 0.5 }}
-              />
-            </Box>
-          </Box>
-
-          <TextField
-            label="Multiple Of"
-            type="number"
-            size={size}
-            fullWidth
-            value={data.multipleOf || ''}
-            onChange={(e) => onChange('multipleOf', e.target.value)}
-            helperText="Value must be a multiple of this number"
-            sx={{ mb: 2 }}
-          />
-        </Box>
-      )}
-
-      {/* Array Constraints */}
-      {isArray && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Array Constraints
-          </Typography>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-            <TextField
-              label="Min Items"
-              type="number"
-              size={size}
-              fullWidth
-              value={data.minItems || ''}
-              onChange={(e) => onChange('minItems', e.target.value)}
-              inputProps={{ min: 0 }}
-            />
-            <TextField
-              label="Max Items"
-              type="number"
-              size={size}
-              fullWidth
-              value={data.maxItems || ''}
-              onChange={(e) => onChange('maxItems', e.target.value)}
-              inputProps={{ min: 0 }}
-            />
-          </Box>
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={data.uniqueItems || false}
-                onChange={(e) => onChange('uniqueItems', e.target.checked)}
-                size={size}
-              />
-            }
-            label="Unique Items (no duplicates)"
-          />
-        </Box>
-      )}
-
-      {/* Enum Values */}
-      {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Allowed Values (Enum)
-            </Typography>
-            {data.enum && data.enum.length > 1 && (
-              <Box sx={{ display: 'flex', gap: 0.5 }}>
-                <Tooltip title="Sort A-Z (ascending)">
-                  <IconButton
-                    onClick={handleSortEnumAZ}
-                    size="small"
-                    sx={{
-                      border: 1,
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      p: 0.5,
-                    }}
-                  >
-                    <SortByAlphaIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Sort Z-A (descending)">
-                  <IconButton
-                    onClick={handleSortEnumZA}
-                    size="small"
-                    sx={{
-                      border: 1,
-                      borderColor: 'divider',
-                      borderRadius: 1,
-                      p: 0.5,
-                      transform: 'scaleY(-1)',
-                    }}
-                  >
-                    <SortByAlphaIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            )}
-          </Box>
-          {isArray && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              Enum values apply to each item in the array
-            </Typography>
-          )}
-
-          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-            <TextField
-              label="Add Enum Value"
-              size={size}
-              fullWidth
-              type={baseType === 'string' ? 'text' : 'number'}
-              value={enumInput}
-              onChange={(e) => {
-                setEnumInput(e.target.value);
-                setEnumError('');
-              }}
-              onKeyDown={handleEnumKeyPress}
-              error={!!enumError}
-              helperText={enumError || `Enter a ${baseType} value and press Enter`}
-              placeholder={
-                baseType === 'integer' ? 'e.g., 1, 2, 3' :
-                baseType === 'number' ? 'e.g., 1.5, 2.0, 3.14' :
-                'e.g., "active", "pending"'
-              }
-            />
-          <IconButton
-            onClick={handleAddEnum}
-            color="primary"
-            disabled={!enumInput.trim()}
-          >
-            <AddIcon />
-          </IconButton>
-        </Box>
-
-        {data.enum && data.enum.length > 0 && (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleEnumDragEnd}
-          >
-            <List
-              dense
+        {/* Object Properties Section */}
+        {baseType === 'object' && (
+          <Box sx={{ mb: 2 }}>
+            <Box
               sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                p: 1.5,
                 bgcolor: 'action.hover',
                 borderRadius: 1,
-                maxHeight: 200,
-                overflow: 'auto',
-                border: 1,
-                borderColor: 'divider',
+                cursor: nestedProperties && nestedProperties.length > 0 ? 'pointer' : 'default',
+              }}
+              onClick={() => {
+                if (nestedProperties && nestedProperties.length > 0) {
+                  setObjectPropsExpanded(!objectPropsExpanded);
+                }
               }}
             >
-              <SortableContext
-                items={data.enum}
-                strategy={verticalListSortingStrategy}
-              >
-                {data.enum.map((value, index) => (
-                  <SortableEnumItem
-                    key={value}
-                    id={value}
-                    value={value}
-                    onDelete={handleRemoveEnum}
-                  />
-                ))}
-              </SortableContext>
-            </List>
-          </DndContext>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                  Object Properties
+                </Typography>
+                <Chip
+                  label={nestedProperties ? nestedProperties.length : 0}
+                  size="small"
+                  color={nestedProperties && nestedProperties.length > 0 ? 'primary' : 'default'}
+                  sx={{ height: 20, fontSize: '0.75rem' }}
+                />
+              </Box>
+              {nestedProperties && nestedProperties.length > 0 && (
+                <IconButton size="small" sx={{ p: 0 }}>
+                  {objectPropsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+              )}
+            </Box>
+
+            {isArray && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 1 }}>
+                This object type is the item type of an array
+              </Typography>
+            )}
+
+            {nestedProperties && nestedProperties.length > 0 && (
+              <Collapse in={objectPropsExpanded}>
+                <Box sx={{ mt: 2, pl: 2, borderLeft: 2, borderColor: 'divider' }}>
+                  <List dense>
+                    {nestedProperties.map((prop) => {
+                      const propData = typeof prop.data === 'string'
+                        ? JSON.parse(prop.data)
+                        : (prop.data || {});
+
+                      // Determine type display
+                      let typeDisplay = propData.type || 'any';
+                      if (propData.$ref) {
+                        const refParts = propData.$ref.split('/');
+                        typeDisplay = refParts[refParts.length - 1] || propData.$ref;
+                      } else if (propData.type === 'array' && propData.items) {
+                        if (propData.items.$ref) {
+                          const refParts = propData.items.$ref.split('/');
+                          typeDisplay = `${refParts[refParts.length - 1] || propData.items.$ref}[]`;
+                        } else {
+                          typeDisplay = `${propData.items.type || 'any'}[]`;
+                        }
+                      }
+
+                      return (
+                        <ListItem
+                          key={prop.id}
+                          sx={{
+                            py: 0.5,
+                            px: 1,
+                            bgcolor: 'background.paper',
+                            borderRadius: 0.5,
+                            mb: 0.5,
+                          }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography
+                                  variant="body2"
+                                  sx={{ fontFamily: 'monospace', fontWeight: 500 }}
+                                >
+                                  {prop.name}
+                                </Typography>
+                                <Chip
+                                  label={typeDisplay}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ height: 18, fontSize: '0.7rem' }}
+                                />
+                              </Box>
+                            }
+                            secondary={
+                              prop.description && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ display: 'block', mt: 0.5 }}
+                                >
+                                  {prop.description}
+                                </Typography>
+                              )
+                            }
+                          />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                </Box>
+              </Collapse>
+            )}
+
+            {(!nestedProperties || nestedProperties.length === 0) && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 1 }}>
+                No properties defined for this object
+              </Typography>
+            )}
+          </Box>
         )}
-        </Box>
-      )}
 
-      {/* Default Value */}
-      <TextField
-        label="Default Value"
-        size={size}
-        fullWidth
-        value={data.default || ''}
-        onChange={(e) => onChange('default', e.target.value)}
-        helperText="JSON value for default"
-        sx={{ mb: 2 }}
-      />
+        {/* Default Value */}
+        <TextField
+          label="Default Value"
+          size={size}
+          fullWidth
+          value={data.default || ''}
+          onChange={(e) => onChange('default', e.target.value)}
+          helperText="JSON value for default"
+          sx={{ mb: 2 }}
+        />
 
-      {/* Metadata Fields */}
-      {showMetadata && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Metadata
-          </Typography>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        {/* Metadata Fields */}
+        {showMetadata && (
+          <Box sx={{ mb: 2 }}>
             <FormControlLabel
               control={
                 <Checkbox
@@ -888,37 +607,330 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }
               label="Deprecated"
             />
-          </Box>
 
-          <TextField
-            label="Example"
-            size={size}
-            fullWidth
-            multiline
-            rows={2}
-            value={data.example || ''}
-            onChange={(e) => onChange('example', e.target.value)}
-            helperText="JSON example value"
-            sx={{ mt: 2 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
-                  <Tooltip title="Generate example based on property schema">
+            <TextField
+              label="Example"
+              size={size}
+              fullWidth
+              multiline
+              rows={2}
+              value={data.example || ''}
+              onChange={(e) => onChange('example', e.target.value)}
+              helperText="JSON example value"
+              sx={{ mt: 2 }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
+                    <Tooltip title="Generate example based on property schema">
+                      <IconButton
+                        onClick={generateExample}
+                        size="small"
+                        edge="end"
+                        sx={{ color: 'primary.main' }}
+                      >
+                        <AutoAwesomeIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* VERTICAL DIVIDER */}
+      <Box sx={{ bgcolor: 'divider' }} />
+
+      {/* RIGHT COLUMN: Constraints & Options */}
+      <Box sx={{ pl: 3 }}>
+        {/* Section Header */}
+        <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
+          Constraints
+        </Typography>
+        {/* String Constraints */}
+        {baseType === 'string' && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              String Constraints
+            </Typography>
+            {isArray && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                These constraints apply to each string item in the array
+              </Typography>
+            )}
+
+            <TextField
+              label="Format"
+              size={size}
+              fullWidth
+              value={data.format || ''}
+              onChange={(e) => onChange('format', e.target.value)}
+              helperText="e.g., date, date-time, email, uri, uuid"
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              label="Pattern (Regex)"
+              size={size}
+              fullWidth
+              value={data.pattern || ''}
+              onChange={(e) => onChange('pattern', e.target.value)}
+              placeholder="e.g., ^[A-Z]{3}$"
+              helperText="Regular expression pattern for validation"
+              sx={{ mb: 2 }}
+            />
+
+            <RegexTester pattern={data.pattern || ''} />
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <TextField
+                label="Min Length"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.minLength || ''}
+                onChange={(e) => onChange('minLength', e.target.value)}
+                inputProps={{ min: 0 }}
+              />
+              <TextField
+                label="Max Length"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.maxLength || ''}
+                onChange={(e) => onChange('maxLength', e.target.value)}
+                inputProps={{ min: 0 }}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {/* Number/Integer Constraints */}
+        {(baseType === 'number' || baseType === 'integer') && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Numeric Constraints
+            </Typography>
+            {isArray && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                These constraints apply to each {baseType} item in the array
+              </Typography>
+            )}
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <Box>
+                <TextField
+                  label="Minimum"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.minimum || ''}
+                  onChange={(e) => onChange('minimum', e.target.value)}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={data.exclusiveMinimum || false}
+                      onChange={(e) => onChange('exclusiveMinimum', e.target.checked)}
+                      disabled={!data.minimum}
+                      size={size}
+                    />
+                  }
+                  label={<Typography>Exclusive Minimum</Typography>}
+                  sx={{ mt: 0.5 }}
+                />
+              </Box>
+              <Box>
+                <TextField
+                  label="Maximum"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.maximum || ''}
+                  onChange={(e) => onChange('maximum', e.target.value)}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={data.exclusiveMaximum || false}
+                      onChange={(e) => onChange('exclusiveMaximum', e.target.checked)}
+                      disabled={!data.maximum}
+                      size={size}
+                    />
+                  }
+                  label={<Typography>Exclusive Maximum</Typography>}
+                  sx={{ mt: 0.5 }}
+                />
+              </Box>
+            </Box>
+
+            <TextField
+              label="Multiple Of"
+              type="number"
+              size={size}
+              fullWidth
+              value={data.multipleOf || ''}
+              onChange={(e) => onChange('multipleOf', e.target.value)}
+              helperText="Value must be a multiple of this number"
+              sx={{ mb: 2 }}
+            />
+          </Box>
+        )}
+
+        {/* Array Constraints */}
+        {isArray && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Array Constraints
+            </Typography>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <TextField
+                label="Min Items"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.minItems || ''}
+                onChange={(e) => onChange('minItems', e.target.value)}
+                inputProps={{ min: 0 }}
+              />
+              <TextField
+                label="Max Items"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.maxItems || ''}
+                onChange={(e) => onChange('maxItems', e.target.value)}
+                inputProps={{ min: 0 }}
+              />
+            </Box>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.uniqueItems || false}
+                  onChange={(e) => onChange('uniqueItems', e.target.checked)}
+                  size={size}
+                />
+              }
+              label="Unique Items (no duplicates)"
+            />
+          </Box>
+        )}
+
+        {/* Enum Values */}
+        {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Allowed Values (Enum)
+              </Typography>
+              {data.enum && data.enum.length > 1 && (
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Tooltip title="Sort A-Z (ascending)">
                     <IconButton
-                      onClick={generateExample}
+                      onClick={handleSortEnumAZ}
                       size="small"
-                      edge="end"
-                      sx={{ color: 'primary.main' }}
+                      sx={{
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        p: 0.5,
+                      }}
                     >
-                      <AutoAwesomeIcon fontSize="small" />
+                      <SortByAlphaIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Box>
-      )}
+                  <Tooltip title="Sort Z-A (descending)">
+                    <IconButton
+                      onClick={handleSortEnumZA}
+                      size="small"
+                      sx={{
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        p: 0.5,
+                        transform: 'scaleY(-1)',
+                      }}
+                    >
+                      <SortByAlphaIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
+            </Box>
+            {isArray && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Enum values apply to each item in the array
+              </Typography>
+            )}
+
+            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+              <TextField
+                label="Add Enum Value"
+                size={size}
+                fullWidth
+                type={baseType === 'string' ? 'text' : 'number'}
+                value={enumInput}
+                onChange={(e) => {
+                  setEnumInput(e.target.value);
+                  setEnumError('');
+                }}
+                onKeyDown={handleEnumKeyPress}
+                error={!!enumError}
+                helperText={enumError || `Enter a ${baseType} value and press Enter`}
+                placeholder={
+                  baseType === 'integer' ? 'e.g., 1, 2, 3' :
+                  baseType === 'number' ? 'e.g., 1.5, 2.0, 3.14' :
+                  'e.g., "active", "pending"'
+                }
+              />
+            <IconButton
+              onClick={handleAddEnum}
+              color="primary"
+              disabled={!enumInput.trim()}
+            >
+              <AddIcon />
+            </IconButton>
+          </Box>
+
+          {data.enum && data.enum.length > 0 && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleEnumDragEnd}
+            >
+              <List
+                dense
+                sx={{
+                  bgcolor: 'action.hover',
+                  borderRadius: 1,
+                  maxHeight: 200,
+                  overflow: 'auto',
+                  border: 1,
+                  borderColor: 'divider',
+                }}
+              >
+                <SortableContext
+                  items={data.enum}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {data.enum.map((value, index) => (
+                    <SortableEnumItem
+                      key={value}
+                      id={value}
+                      value={value}
+                      onDelete={handleRemoveEnum}
+                    />
+                  ))}
+                </SortableContext>
+              </List>
+            </DndContext>
+          )}
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 };

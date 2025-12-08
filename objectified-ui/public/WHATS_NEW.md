@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## New Features and Improvements
 
 - Even more look and feel improvements
+- Properties form and editor have an improved layout
 - Fixed Mermaid PNG generation issue
 - Property enumerations can now be:
   - Sorted in ascending or descending order
