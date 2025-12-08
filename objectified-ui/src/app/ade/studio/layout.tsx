@@ -3,28 +3,15 @@
 import "../../globals.css";
 import * as React from 'react';
 import { useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 import { StudioProvider, useStudio } from './StudioContext';
 import { useDialog } from '../../components/providers/DialogProvider';
 
-const Editor = dynamic(() => import('@monaco-editor/react'), {
-  ssr: false,
-  loading: () => (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: '#666' }}>Loading editor...</div>
-    </div>
-  ),
-});
-
 import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '@/app/components/ade/studio/StudioSideNav';
 import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
-import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, createClass, updateClass, deleteClass } from '../../../../lib/db/helper';
-import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button, TextField, Alert, FormControlLabel, Checkbox, Radio, RadioGroup, Typography, Chip, Box, Tabs, Tab } from '@mui/material';
-import { Copy, Download, RefreshCw, Check } from 'lucide-react';
-import YAML from 'yaml';
-import jsf from 'json-schema-faker';
-import { generateClassOpenApiSpec } from '../../utils/openapi';
+import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
+import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
+import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
 
 // Helper function to check permissions
 const checkPermissions = async (condition: boolean, message: string, alertDialog: any) => {
@@ -33,15 +20,6 @@ const checkPermissions = async (condition: boolean, message: string, alertDialog
     return false;
   }
   return true;
-};
-
-// Helper function to extract class name from $ref
-const extractClassName = (s: any) => {
-  if (s.$ref) {
-    const parts = s.$ref.split('/');
-    return parts[parts.length - 1];
-  }
-  return null; // Return null for non-$ref objects so they can be filtered out
 };
 
 function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -53,24 +31,34 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   // State
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
+  const [projectTags, setProjectTags] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
 
   // Dialog state
-  const [classDialog, setClassDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedClass: null as ClassItem | null });
+  const [classDialog, setClassDialog] = useState({ open: false, selectedClass: null as ClassItem | null });
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null as { type: 'class' | 'property'; id: string } | null });
 
-  // Class form state
-  const [classForm, setClassForm] = useState({
-    name: '', description: '', allOf: [] as string[], anyOf: [] as string[], oneOf: [] as string[],
-    discriminatorProperty: '', discriminatorUseAuto: true, additionalProperties: null as boolean | null, error: ''
-  });
 
-  // Class dialog view state
-  const [classDialogTab, setClassDialogTab] = useState(0);
-  const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
-  const [copied, setCopied] = useState(false);
+  // Load project tags
+  React.useEffect(() => {
+    const loadProjectTags = async () => {
+      if (!selectedProjectId) {
+        setProjectTags([]);
+        return;
+      }
+      try {
+        const result = await getTagsForProject(selectedProjectId);
+        const tags = JSON.parse(result);
+        setProjectTags(tags);
+      } catch (error) {
+        console.error('Failed to load project tags:', error);
+        setProjectTags([]);
+      }
+    };
+    loadProjectTags();
+  }, [selectedProjectId]);
 
   // Load data effects
   React.useEffect(() => {
@@ -129,32 +117,16 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
     if (!(await checkPermissions(!isReadOnly, 'Cannot add classes to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
 
-    setClassForm({ name: '', description: '', allOf: [], anyOf: [], oneOf: [], discriminatorProperty: '', discriminatorUseAuto: true, additionalProperties: null, error: '' });
-    setClassDialogTab(0);
-    setExampleRefreshKey(0);
-    setClassDialog({ open: true, mode: 'add', selectedClass: null });
+    // Open dialog with null class data (add mode)
+    setClassDialog({ open: true, selectedClass: null });
   };
 
   const handleClassEdit = async (classItem: ClassItem) => {
     if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
     if (!(await checkPermissions(!isReadOnly, 'Cannot edit classes in a published version. Please select an unpublished version to make changes.', alertDialog))) return;
 
-    const schema = typeof classItem.schema === 'string' ? JSON.parse(classItem.schema) : classItem.schema;
-
-    setClassForm({
-      name: classItem.name,
-      description: classItem.description || '',
-      allOf: schema?.allOf?.map(extractClassName).filter(Boolean) || [],
-      anyOf: schema?.anyOf?.map(extractClassName).filter(Boolean) || [],
-      oneOf: schema?.oneOf?.map(extractClassName).filter(Boolean) || [],
-      discriminatorProperty: schema?.discriminator?.propertyName || '',
-      discriminatorUseAuto: !schema?.discriminator?.mapping || Object.keys(schema.discriminator.mapping).length === 0,
-      additionalProperties: schema?.additionalProperties !== undefined ? schema.additionalProperties : null,
-      error: ''
-    });
-    setClassDialogTab(0);
-    setExampleRefreshKey(0);
-    setClassDialog({ open: true, mode: 'edit', selectedClass: classItem });
+    // Open dialog with class data (edit mode)
+    setClassDialog({ open: true, selectedClass: classItem });
   };
 
   // Keep ref updated
@@ -170,96 +142,6 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setDeleteDialog({ open: true, target: { type: 'class', id: classId } });
   };
 
-  const handleClassSubmit = async () => {
-    if (!classForm.name.trim()) {
-      setClassForm(prev => ({ ...prev, error: 'Class name is required' }));
-      return;
-    }
-    if (!/^[A-Za-z0-9_]+$/.test(classForm.name)) {
-      setClassForm(prev => ({ ...prev, error: 'Class name can only contain letters, numbers, and underscores' }));
-      return;
-    }
-
-    // Build schema - preserve existing schema structure when editing
-    let schema: any;
-    if (classDialog.mode === 'edit' && classDialog.selectedClass) {
-      // Start with existing schema to preserve properties, required, and other fields
-      const existingSchema = typeof classDialog.selectedClass.schema === 'string'
-        ? JSON.parse(classDialog.selectedClass.schema)
-        : classDialog.selectedClass.schema;
-      schema = { ...existingSchema };
-    } else {
-      // New class - start with basic object type
-      schema = { type: 'object' };
-    }
-
-    // Update composition keywords
-    if (classForm.allOf.length > 0) {
-      schema.allOf = classForm.allOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
-    } else {
-      delete schema.allOf;
-    }
-
-    if (classForm.anyOf.length > 0) {
-      schema.anyOf = classForm.anyOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
-    } else {
-      delete schema.anyOf;
-    }
-
-    if (classForm.oneOf.length > 0) {
-      schema.oneOf = classForm.oneOf.map(ref => ref.startsWith('{') ? JSON.parse(ref) : { $ref: ref.startsWith('#') ? ref : `#/components/schemas/${ref}` });
-    } else {
-      delete schema.oneOf;
-    }
-
-    // Update discriminator
-    if (classForm.discriminatorProperty?.trim() && (classForm.allOf.length > 0 || classForm.anyOf.length > 0 || classForm.oneOf.length > 0)) {
-      schema.discriminator = { propertyName: classForm.discriminatorProperty.trim() };
-      if (classForm.discriminatorUseAuto) {
-        const allClasses = [...classForm.allOf, ...classForm.anyOf, ...classForm.oneOf];
-        if (allClasses.length > 0) {
-          schema.discriminator.mapping = {};
-          allClasses.forEach(ref => {
-            const className = ref.includes('/') ? ref.split('/').pop() : ref;
-            if (className && !className.startsWith('{')) {
-              schema.discriminator.mapping[className] = className;
-            }
-          });
-        }
-      }
-    } else {
-      delete schema.discriminator;
-    }
-
-    // Update additionalProperties
-    if (classForm.additionalProperties !== null) {
-      schema.additionalProperties = classForm.additionalProperties;
-    } else {
-      delete schema.additionalProperties;
-    }
-
-    try {
-      let result;
-      if (classDialog.mode === 'add') {
-        result = await createClass(selectedVersionId!, classForm.name, classForm.description || null, schema);
-      } else if (classDialog.selectedClass) {
-        result = await updateClass(classDialog.selectedClass.id, classForm.name, classForm.description || null, schema);
-      }
-
-      const response = JSON.parse(result!);
-      if (!response.success) {
-        setClassForm(prev => ({ ...prev, error: response.error || 'Failed to save class' }));
-        return;
-      }
-
-      setClassDialog({ open: false, mode: 'add', selectedClass: null });
-      setRefreshKey(prev => prev + 1);
-      triggerCanvasRefresh();
-    } catch (error) {
-      console.error('Error saving class:', error);
-      setClassForm(prev => ({ ...prev, error: 'An error occurred while saving the class' }));
-    }
-  };
 
   // Property handlers
   const handlePropertyAdd = async () => {
@@ -333,33 +215,20 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     onPropertySelect: (propertyItem) => console.log('Property selected:', propertyItem),
   };
 
-  // Render composition chips
-  const renderCompositionChips = (items: string[], color: string, onDelete: (index: number) => void) => (
-    items.length > 0 && (
-      <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-        {items.map((item, index) => (
-          <Chip key={index} label={item} size="small" onDelete={() => onDelete(index)}
-                sx={{ bgcolor: `${color}.light`, color: `${color}.contrastText`, '& .MuiChip-deleteIcon': { color: `${color}.contrastText`, '&:hover': { color: `${color}.dark` } } }} />
-        ))}
-      </Box>
-    )
-  );
-
-  // Render composition selector
-  const renderCompositionSelector = (label: string, description: string, items: string[], setItems: (items: string[]) => void, color: string) => (
-    <Box sx={{ mb: 2 }}>
-      <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>{label}</Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>{description}</Typography>
-      <TextField select size="small" fullWidth value="" SelectProps={{ native: true }}
-                 onChange={(e) => { const value = e.target.value; if (value && !items.includes(value)) setItems([...items, value]); }}>
-        <option value="">Select a class...</option>
-        {classes.filter(c => c.name !== classForm.name).map((cls) => (
-          <option key={cls.id} value={cls.name}>{cls.name}</option>
-        ))}
-      </TextField>
-      {renderCompositionChips(items, color, (index) => setItems(items.filter((_, i) => i !== index)))}
-    </Box>
-  );
+  // Convert classes to nodes format expected by ClassEditDialog
+  const classNodes = React.useMemo(() => {
+    return classes.map(cls => ({
+      id: cls.id,
+      type: 'classNode',
+      position: { x: 0, y: 0 },
+      data: {
+        id: cls.id,
+        name: cls.name,
+        description: cls.description,
+        schema: cls.schema
+      }
+    }));
+  }, [classes]);
 
   return (
     <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
@@ -373,298 +242,21 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       </main>
 
       {/* Class Dialog */}
-      <Dialog
+      <ClassEditDialog
         open={classDialog.open}
-        onClose={() => setClassDialog({ open: false, mode: 'add', selectedClass: null })}
-        maxWidth="md"
-        fullWidth
-        slotProps={{
-          paper: {
-            sx: {
-              height: classDialog.mode === 'add' ? 'auto' : '80vh',
-              maxHeight: '700px',
-            }
-          }
+        onClose={() => {
+          setClassDialog({ open: false, selectedClass: null });
         }}
-      >
-        <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
-          {classDialog.mode === 'add' ? 'Add Class' : 'Edit Class'}
-        </DialogTitle>
-
-        {/* Tabs - only show for edit mode */}
-        {classDialog.mode === 'edit' && classDialog.selectedClass && (
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Tabs value={classDialogTab} onChange={(_, newValue) => setClassDialogTab(newValue)}>
-              <Tab label="Edit" />
-              <Tab label="JSON" />
-              <Tab label="YAML" />
-              <Tab label="Example" />
-            </Tabs>
-          </Box>
-        )}
-
-        <DialogContent sx={{ p: classDialogTab === 0 || classDialog.mode === 'add' ? 3 : 0, overflow: classDialogTab === 0 || classDialog.mode === 'add' ? 'auto' : 'hidden' }}>
-          {/* Tab 0: Edit Form (always shown for add mode, only shown when tab=0 for edit mode) */}
-          {(classDialog.mode === 'add' || classDialogTab === 0) && (
-            <Box>
-              {classForm.error && <Alert severity="error" sx={{ mb: 2 }}>{classForm.error}</Alert>}
-
-              <TextField autoFocus margin="dense" label="Class Name" fullWidth required value={classForm.name}
-                     onChange={(e) => setClassForm(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') }))}
-                     helperText="Only letters, numbers, and underscores are allowed; recommend PascalCase class names." sx={{ mb: 2 }} />
-
-          <TextField margin="dense" label="Description" fullWidth multiline rows={2} value={classForm.description}
-                     onChange={(e) => setClassForm(prev => ({ ...prev, description: e.target.value }))} sx={{ mb: 3 }} />
-
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Composition/Inheritance (Optional)</Typography>
-
-          {renderCompositionSelector("allOf (Inheritance)", "Must match all listed schemas", classForm.allOf,
-            (items) => setClassForm(prev => ({ ...prev, allOf: items })), "primary")}
-
-          {renderCompositionSelector("anyOf (Alternatives)", "Must match at least one listed schema", classForm.anyOf,
-            (items) => setClassForm(prev => ({ ...prev, anyOf: items })), "info")}
-
-          {renderCompositionSelector("oneOf (Exclusive)", "Must match exactly one listed schema", classForm.oneOf,
-            (items) => setClassForm(prev => ({ ...prev, oneOf: items })), "secondary")}
-
-          {/* Discriminator and Additional Properties sections remain similar but condensed */}
-          {(classForm.allOf.length > 0 || classForm.anyOf.length > 0 || classForm.oneOf.length > 0) && (
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Discriminator (Optional)</Typography>
-              <TextField margin="dense" label="Discriminator Property Name" fullWidth placeholder="e.g., type, petType, kind"
-                         value={classForm.discriminatorProperty} onChange={(e) => setClassForm(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
-                         helperText="Property name that indicates which schema variant to use for polymorphic objects.  This is used for (de)serialization operations."
-                         sx={{ mb: 2 }} />
-              {classForm.discriminatorProperty && (
-                <FormControlLabel control={<Checkbox checked={classForm.discriminatorUseAuto}
-                                                     onChange={(e) => setClassForm(prev => ({ ...prev, discriminatorUseAuto: e.target.checked }))} />}
-                                  label="Use automatic mapping" />
-              )}
-            </Box>
-          )}
-
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Additional Properties</Typography>
-            <RadioGroup value={classForm.additionalProperties === null ? 'default' : classForm.additionalProperties === true ? 'allow' : 'disallow'}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setClassForm(prev => ({ ...prev, additionalProperties: value === 'default' ? null : value === 'allow' }));
-                        }}>
-              <FormControlLabel value="default" control={<Radio />} label="Not specified (default behavior - property omitted)" />
-              <FormControlLabel value="allow" control={<Radio />} label="Allow additional properties (set true)" />
-              <FormControlLabel value="disallow" control={<Radio />} label="Disallow additional properties (set false)" />
-            </RadioGroup>
-          </Box>
-            </Box>
-          )}
-
-          {/* View tabs content (only for edit mode) */}
-          {classDialog.mode === 'edit' && classDialog.selectedClass && classDialogTab > 0 && (() => {
-            // Generate OpenAPI spec for view tabs
-            const allClasses = classes.map(cls => ({
-              id: cls.id,
-              name: cls.name,
-              description: cls.description,
-              properties: [],
-              schema: cls.schema
-            }));
-
-            const openApiDoc = generateClassOpenApiSpec(classDialog.selectedClass, allClasses, {
-              title: `${classDialog.selectedClass.name} Schema`,
-              version: '1.0.0',
-              description: 'OpenAPI 3.1.0 schema definition'
-            });
-
-            const classSchema = openApiDoc.components.schemas[classDialog.selectedClass.name];
-
-            // Helper to resolve $ref references
-            const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set()): any => {
-              if (!schema || typeof schema !== 'object') return schema;
-              if (schema.$ref && typeof schema.$ref === 'string') {
-                const refName = schema.$ref.split('/').pop();
-                if (visited.has(refName!)) {
-                  return { type: 'object', description: `Circular reference to ${refName}` };
-                }
-                const referencedSchema = schemas[refName!];
-                if (referencedSchema) {
-                  const newVisited = new Set(visited);
-                  newVisited.add(refName!);
-                  return resolveRefs(referencedSchema, schemas, newVisited);
-                }
-                return schema;
-              }
-              if (Array.isArray(schema.allOf)) {
-                const merged: any = {};
-                const requiredSet = new Set<string>();
-                schema.allOf.forEach((subSchema: any) => {
-                  const resolved = resolveRefs(subSchema, schemas, visited);
-                  const { required: resolvedRequired, properties: resolvedProperties, ...resolvedRest } = resolved;
-                  Object.assign(merged, resolvedRest);
-                  if (resolvedProperties) {
-                    merged.properties = { ...merged.properties, ...resolvedProperties };
-                  }
-                  if (resolvedRequired) {
-                    resolvedRequired.forEach((field: string) => requiredSet.add(field));
-                  }
-                });
-                if (requiredSet.size > 0) {
-                  merged.required = Array.from(requiredSet);
-                }
-                const { allOf, required: restRequired, properties: restProperties, ...rest } = schema;
-                if (restProperties) {
-                  merged.properties = { ...merged.properties, ...restProperties };
-                }
-                if (restRequired) {
-                  restRequired.forEach((field: string) => requiredSet.add(field));
-                  merged.required = Array.from(requiredSet);
-                }
-                return { ...merged, ...rest };
-              }
-              if (Array.isArray(schema.anyOf)) {
-                return { ...schema, anyOf: schema.anyOf.map((s: any) => resolveRefs(s, schemas, visited)) };
-              }
-              if (Array.isArray(schema.oneOf)) {
-                return { ...schema, oneOf: schema.oneOf.map((s: any) => resolveRefs(s, schemas, visited)) };
-              }
-              const resolved: any = Array.isArray(schema) ? [] : {};
-              for (const key in schema) {
-                if (schema.hasOwnProperty(key)) {
-                  const value = schema[key];
-                  if (value && typeof value === 'object') {
-                    resolved[key] = resolveRefs(value, schemas, visited);
-                  } else {
-                    resolved[key] = value;
-                  }
-                }
-              }
-              return resolved;
-            };
-
-            let schemaContent: string = '';
-            if (classDialogTab === 1) {
-              schemaContent = JSON.stringify(openApiDoc, null, 2);
-            } else if (classDialogTab === 2) {
-              schemaContent = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
-            } else if (classDialogTab === 3) {
-              try {
-                const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
-                jsf.option({
-                  random: () => {
-                    const seed = Math.random() * (exampleRefreshKey + 1);
-                    return seed - Math.floor(seed);
-                  }
-                });
-                const fakeData = jsf.generate(resolvedSchema);
-                schemaContent = JSON.stringify(fakeData, null, 2);
-              } catch (error) {
-                console.error('Error generating fake data:', error);
-                schemaContent = JSON.stringify({
-                  error: 'Could not generate example data',
-                  message: error instanceof Error ? error.message : String(error)
-                }, null, 2);
-              }
-            }
-
-            const handleCopy = () => {
-              navigator.clipboard.writeText(schemaContent);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            };
-
-            const handleExport = () => {
-              let filenameSuffix: string;
-              let mimeType: string;
-              let extension: string;
-              if (classDialogTab === 3) {
-                filenameSuffix = 'example';
-                mimeType = 'application/json';
-                extension = 'json';
-              } else if (classDialogTab === 2) {
-                filenameSuffix = 'schema';
-                mimeType = 'text/yaml';
-                extension = 'yaml';
-              } else {
-                filenameSuffix = 'schema';
-                mimeType = 'application/json';
-                extension = 'json';
-              }
-              const blob = new Blob([schemaContent], { type: mimeType });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `${classDialog.selectedClass!.name.toLowerCase()}-${filenameSuffix}.${extension}`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(url);
-            };
-
-            return (
-              <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ display: 'flex', gap: 1, p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                  {classDialogTab === 3 && (
-                    <Button
-                      size="small"
-                      startIcon={<RefreshCw size={16} />}
-                      onClick={() => setExampleRefreshKey(prev => prev + 1)}
-                      variant="outlined"
-                      title="Generate new example"
-                    >
-                      Refresh
-                    </Button>
-                  )}
-                  <Button
-                    size="small"
-                    startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
-                    onClick={handleCopy}
-                    variant="outlined"
-                    disabled={copied}
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </Button>
-                  <Button
-                    size="small"
-                    startIcon={<Download size={16} />}
-                    onClick={handleExport}
-                    variant="contained"
-                  >
-                    Export
-                  </Button>
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Editor
-                    key={classDialogTab === 3 ? `example-${exampleRefreshKey}` : `tab-${classDialogTab}`}
-                    height="100%"
-                    language={classDialogTab === 2 ? 'yaml' : 'json'}
-                    value={schemaContent}
-                    theme="vs-dark"
-                    options={{
-                      readOnly: true,
-                      minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      fontSize: 13,
-                      wordWrap: 'on',
-                      lineNumbers: 'on',
-                      renderWhitespace: 'none',
-                      folding: true
-                    }}
-                  />
-                </Box>
-              </Box>
-            );
-          })()}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClassDialog({ open: false, mode: 'add', selectedClass: null })}>
-            {classDialog.mode === 'edit' && classDialogTab > 0 ? 'Close' : 'Cancel'}
-          </Button>
-          {(classDialog.mode === 'add' || classDialogTab === 0) && (
-            <Button onClick={handleClassSubmit} variant="contained">
-              {classDialog.mode === 'add' ? 'Add' : 'Save'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+        editingClassData={classDialog.selectedClass}
+        nodes={classNodes}
+        isReadOnly={isReadOnly}
+        onSave={() => {
+          setRefreshKey(prev => prev + 1);
+          triggerCanvasRefresh();
+        }}
+        projectId={selectedProjectId || ''}
+        projectTags={projectTags}
+      />
 
       {/* Property Dialog */}
       <PropertyDialog open={propertyDialog.open} onClose={() => setPropertyDialog({ open: false, mode: 'add', selectedProperty: null })}
