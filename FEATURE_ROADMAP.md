@@ -4,6 +4,16 @@
 > 
 > **Last Updated**: December 7, 2025
 
+## Recent Implementations
+
+### December 7, 2025
+- ✅ **TypeScript DTO Generation** - Added TypeScript interface/type generation to the Studio's Generate tab alongside Python
+  - Full support for composition (allOf, oneOf, anyOf)
+  - Nested object interfaces
+  - JSDoc comments with constraints
+  - Language switching with cached generation
+  - See: `/objectified-ui/docs/TYPESCRIPT_DTO_GENERATION.md`
+
 ---
 
 ## Table of Contents
@@ -579,8 +589,10 @@
 
 **Schema-to-Code**
 - Generate code from schemas in multiple languages:
-  - **TypeScript**: Interfaces, types, Zod validators
-  - **Python**: Pydantic models, dataclasses, SQLAlchemy models
+  - **TypeScript**: ✅ **IMPLEMENTED** - Interfaces, types with full composition support
+  - **Python**: ✅ **IMPLEMENTED** - Pydantic models with validation and constraints
+  - **TypeScript (Extended)**: Zod validators, runtime type checking
+  - **Python (Extended)**: Dataclasses, SQLAlchemy models
   - **Java**: POJOs, Records, JPA entities
   - **C#**: Classes, records, EF Core models
   - **Go**: Structs with JSON tags

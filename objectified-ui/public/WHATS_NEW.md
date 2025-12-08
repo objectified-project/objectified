@@ -42,6 +42,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Optional fields with proper defaults
     - Field descriptions for documentation
     - Copy to clipboard and export to file functionality
+  - Generates TypeScript
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
