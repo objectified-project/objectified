@@ -9,8 +9,6 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Radio from '@mui/material/Radio';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
 import { updateClassProperty } from '../../../../../lib/db/helper';
@@ -39,7 +37,6 @@ interface Props {
 
 export default function ClassPropertyEditDialog({ open, onClose, editingClassProperty, onSaved, allClassProperties, existingClassNames = [] }: Props) {
   const [editPropName, setEditPropName] = useState('');
-  const [editPropAdditionalProperties, setEditPropAdditionalProperties] = useState<'default' | 'true' | 'false'>('default');
   const [editPropertyError, setEditPropertyError] = useState('');
   const [extractDialogOpen, setExtractDialogOpen] = useState(false);
 
@@ -104,17 +101,14 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       ? JSON.parse(editingClassProperty.data)
       : (editingClassProperty.data || {});
 
-    // Handle additionalProperties - relevant for direct object or array items object
-    const isArrayInlineObject = propData.type === 'array' && propData.items && propData.items.type === 'object' && !propData.items.$ref;
-    const additionalPropsSource = isArrayInlineObject ? propData.items : propData;
-    if (additionalPropsSource.hasOwnProperty('additionalProperties')) {
-      setEditPropAdditionalProperties(additionalPropsSource.additionalProperties === false ? 'false' : 'true');
-    } else {
-      setEditPropAdditionalProperties('default');
-    }
-
     // Get the actual schema (handle array types)
     const schema = propData.type === 'array' ? (propData.items || {}) : propData;
+
+    // Determine additionalProperties value
+    let additionalPropsValue: 'default' | 'true' | 'false' = 'default';
+    if (schema.hasOwnProperty('additionalProperties')) {
+      additionalPropsValue = schema.additionalProperties === false ? 'false' : 'true';
+    }
 
     // Populate form data
     setFormData({
@@ -146,6 +140,9 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       // Common constraints
       default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
       enum: schema.enum || [],
+
+      // Object constraints
+      additionalProperties: additionalPropsValue,
     });
 
     setEditPropertyError('');
@@ -190,10 +187,9 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       const targetSchema = isArray ? (updatedData.items || {}) : updatedData;
 
       // Handle additionalProperties field (apply to direct object or array items object)
-      const isArrayInlineObject = isArray && targetSchema && targetSchema.type === 'object' && !targetSchema.$ref;
-      if (editPropAdditionalProperties === 'true') {
+      if (formData.additionalProperties === 'true') {
         targetSchema.additionalProperties = true;
-      } else if (editPropAdditionalProperties === 'false') {
+      } else if (formData.additionalProperties === 'false') {
         targetSchema.additionalProperties = false;
       } else {
         delete targetSchema.additionalProperties;
@@ -345,83 +341,6 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
           sx={{ mb: 2 }}
         />
 
-        {/* Show additionalProperties control for object types or arrays with inline object items */}
-        {editingClassProperty && (() => {
-          const propData = typeof editingClassProperty.data === 'string'
-            ? JSON.parse(editingClassProperty.data)
-            : (editingClassProperty.data || {});
-          const isDirectObject = propData.type === 'object' && !propData.$ref;
-          const isArrayInlineObject = propData.type === 'array' && propData.items && propData.items.type === 'object' && !propData.items.$ref;
-
-          if (isDirectObject || isArrayInlineObject) {
-            return (
-              <>
-                <Typography variant="subtitle2" sx={{ mt: 3, mb: 1 }}>
-                  Object Schema Settings
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Additional Properties
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, ml: 2 }}>
-                    <FormControlLabel
-                      control={
-                        <Radio
-                          checked={editPropAdditionalProperties === 'default'}
-                          onChange={() => setEditPropAdditionalProperties('default')}
-                          value="default"
-                        />
-                      }
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <span>Default</span>
-                          <Typography variant="caption" color="text.secondary">
-                            - Use JSON Schema default (allows additional properties)
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                    <FormControlLabel
-                      control={
-                        <Radio
-                          checked={editPropAdditionalProperties === 'true'}
-                          onChange={() => setEditPropAdditionalProperties('true')}
-                          value="true"
-                        />
-                      }
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <span>Allow Additional</span>
-                          <Typography variant="caption" color="text.secondary">
-                            - Explicitly allow any additional properties
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                    <FormControlLabel
-                      control={
-                        <Radio
-                          checked={editPropAdditionalProperties === 'false'}
-                          onChange={() => setEditPropAdditionalProperties('false')}
-                          value="false"
-                        />
-                      }
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <span>Strict Schema</span>
-                          <Typography variant="caption" color="text.secondary">
-                            - Only defined properties allowed (additionalProperties: false)
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </Box>
-                </Box>
-              </>
-            );
-          }
-          return null;
-        })()}
 
         {/* Constraints Section */}
         {editingClassProperty && (() => {

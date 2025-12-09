@@ -5,9 +5,9 @@ import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
+import Radio from '@mui/material/Radio';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import Chip from '@mui/material/Chip';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
@@ -15,12 +15,9 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import Collapse from '@mui/material/Collapse';
 import {
   DndContext,
   closestCenter,
@@ -72,6 +69,9 @@ export interface PropertyFormData {
   writeOnly?: boolean;
   deprecated?: boolean;
   example?: string;
+
+  // Object constraints
+  additionalProperties?: 'default' | 'true' | 'false';
 }
 
 interface SortableEnumItemProps {
@@ -184,7 +184,6 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 }) => {
   const [enumInput, setEnumInput] = React.useState('');
   const [enumError, setEnumError] = React.useState('');
-  const [objectPropsExpanded, setObjectPropsExpanded] = React.useState(false);
 
   // DnD sensors for enum reordering
   const sensors = useSensors(
@@ -424,128 +423,6 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           helperText="Optional description for the property"
           sx={{ mb: 2 }}
         />
-
-        {/* Object Properties Section */}
-        {baseType === 'object' && (
-          <Box sx={{ mb: 2 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                p: 1.5,
-                bgcolor: 'action.hover',
-                borderRadius: 1,
-                cursor: nestedProperties && nestedProperties.length > 0 ? 'pointer' : 'default',
-              }}
-              onClick={() => {
-                if (nestedProperties && nestedProperties.length > 0) {
-                  setObjectPropsExpanded(!objectPropsExpanded);
-                }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                  Object Properties
-                </Typography>
-                <Chip
-                  label={nestedProperties ? nestedProperties.length : 0}
-                  size="small"
-                  color={nestedProperties && nestedProperties.length > 0 ? 'primary' : 'default'}
-                  sx={{ height: 20, fontSize: '0.75rem' }}
-                />
-              </Box>
-              {nestedProperties && nestedProperties.length > 0 && (
-                <IconButton size="small" sx={{ p: 0 }}>
-                  {objectPropsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-              )}
-            </Box>
-
-            {isArray && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 1 }}>
-                This object type is the item type of an array
-              </Typography>
-            )}
-
-            {nestedProperties && nestedProperties.length > 0 && (
-              <Collapse in={objectPropsExpanded}>
-                <Box sx={{ mt: 2, pl: 2, borderLeft: 2, borderColor: 'divider' }}>
-                  <List dense>
-                    {nestedProperties.map((prop) => {
-                      const propData = typeof prop.data === 'string'
-                        ? JSON.parse(prop.data)
-                        : (prop.data || {});
-
-                      // Determine type display
-                      let typeDisplay = propData.type || 'any';
-                      if (propData.$ref) {
-                        const refParts = propData.$ref.split('/');
-                        typeDisplay = refParts[refParts.length - 1] || propData.$ref;
-                      } else if (propData.type === 'array' && propData.items) {
-                        if (propData.items.$ref) {
-                          const refParts = propData.items.$ref.split('/');
-                          typeDisplay = `${refParts[refParts.length - 1] || propData.items.$ref}[]`;
-                        } else {
-                          typeDisplay = `${propData.items.type || 'any'}[]`;
-                        }
-                      }
-
-                      return (
-                        <ListItem
-                          key={prop.id}
-                          sx={{
-                            py: 0.5,
-                            px: 1,
-                            bgcolor: 'background.paper',
-                            borderRadius: 0.5,
-                            mb: 0.5,
-                          }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontFamily: 'monospace', fontWeight: 500 }}
-                                >
-                                  {prop.name}
-                                </Typography>
-                                <Chip
-                                  label={typeDisplay}
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{ height: 18, fontSize: '0.7rem' }}
-                                />
-                              </Box>
-                            }
-                            secondary={
-                              prop.description && (
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ display: 'block', mt: 0.5 }}
-                                >
-                                  {prop.description}
-                                </Typography>
-                              )
-                            }
-                          />
-                        </ListItem>
-                      );
-                    })}
-                  </List>
-                </Box>
-              </Collapse>
-            )}
-
-            {(!nestedProperties || nestedProperties.length === 0) && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, ml: 1 }}>
-                No properties defined for this object
-              </Typography>
-            )}
-          </Box>
-        )}
 
         {/* Default Value */}
         <TextField
@@ -928,6 +805,71 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               </List>
             </DndContext>
           )}
+          </Box>
+        )}
+
+        {/* Object Schema Settings */}
+        {baseType === 'object' && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Schema Settings
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Additional Properties
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, ml: 1 }}>
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Radio
+                      checked={data.additionalProperties === 'default'}
+                      onChange={() => onChange('additionalProperties', 'default')}
+                      value="default"
+                      size={size === 'small' ? 'small' : 'medium'}
+                    />
+                  }
+                  label="Default"
+                  sx={{ mb: 0.5 }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+                  Use JSON Schema default (allows additional properties)
+                </Typography>
+              </Box>
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Radio
+                      checked={data.additionalProperties === 'true'}
+                      onChange={() => onChange('additionalProperties', 'true')}
+                      value="true"
+                      size={size === 'small' ? 'small' : 'medium'}
+                    />
+                  }
+                  label="Allow Additional"
+                  sx={{ mb: 0.5 }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+                  Explicitly allow any additional properties
+                </Typography>
+              </Box>
+              <Box>
+                <FormControlLabel
+                  control={
+                    <Radio
+                      checked={data.additionalProperties === 'false'}
+                      onChange={() => onChange('additionalProperties', 'false')}
+                      value="false"
+                      size={size === 'small' ? 'small' : 'medium'}
+                    />
+                  }
+                  label="Strict Schema"
+                  sx={{ mb: 0.5 }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
+                  Only defined properties allowed (additionalProperties: false)
+                </Typography>
+              </Box>
+            </Box>
           </Box>
         )}
       </Box>
