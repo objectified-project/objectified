@@ -255,6 +255,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           triggerCanvasRefresh();
         }}
         projectId={selectedProjectId || ''}
+        versionId={selectedVersionId || ''}
         projectTags={projectTags}
       />
 

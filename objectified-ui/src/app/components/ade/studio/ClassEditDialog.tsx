@@ -22,7 +22,7 @@ import { Copy, Download, RefreshCw, Check, Tag as TagIcon } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
-import { updateClass, assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
+import { createClass, updateClass, assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
 import Chip from '@mui/material/Chip';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -43,10 +43,11 @@ interface ClassEditDialogProps {
   isReadOnly?: boolean;
   onSave?: () => void;
   projectId?: string;
+  versionId?: string;
   projectTags?: any[];
 }
 
-const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', projectTags = [] }: ClassEditDialogProps) => {
+const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', versionId = '', projectTags = [] }: ClassEditDialogProps) => {
   const [tabValue, setTabValue] = useState(0);
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -68,71 +69,91 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
   // Reset view and form when dialog opens
   useEffect(() => {
-    if (open && editingClassData) {
+    if (open) {
       setTabValue(0);
       setExampleRefreshKey(0);
 
-      // Parse schema to populate form
-      const schema = typeof editingClassData.schema === 'string'
-        ? JSON.parse(editingClassData.schema)
-        : editingClassData.schema || {};
+      if (editingClassData) {
+        // Edit mode - populate form with existing class data
+        const schema = typeof editingClassData.schema === 'string'
+          ? JSON.parse(editingClassData.schema)
+          : editingClassData.schema || {};
 
-      const allOf = schema.allOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
-      const anyOf = schema.anyOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
-      const oneOf = schema.oneOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+        const allOf = schema.allOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+        const anyOf = schema.anyOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+        const oneOf = schema.oneOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
 
-      // Load tags for this class
-      const loadTags = async () => {
-        try {
-          const result = await getTagsForClass(editingClassData.id);
-          const classTags = JSON.parse(result);
-          const tagIds = classTags.map((ct: any) => ct.tag_id);
+        // Load tags for this class
+        const loadTags = async () => {
+          try {
+            const result = await getTagsForClass(editingClassData.id);
+            const classTags = JSON.parse(result);
+            const tagIds = classTags.map((ct: any) => ct.tag_id);
 
-          setFormData({
-            name: editingClassData.name || '',
-            description: editingClassData.description || '',
-            allOf,
-            anyOf,
-            oneOf,
-            discriminatorProperty: schema.discriminator?.propertyName || '',
-            discriminatorUseAuto: !schema.discriminator?.mapping,
-            additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
-            selectedTags: tagIds,
-            error: ''
-          });
-        } catch (error) {
-          console.error('Error loading tags:', error);
-          setFormData({
-            name: editingClassData.name || '',
-            description: editingClassData.description || '',
-            allOf,
-            anyOf,
-            oneOf,
-            discriminatorProperty: schema.discriminator?.propertyName || '',
-            discriminatorUseAuto: !schema.discriminator?.mapping,
-            additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
-            selectedTags: [],
-            error: ''
-          });
-        }
-      };
+            setFormData({
+              name: editingClassData.name || '',
+              description: editingClassData.description || '',
+              allOf,
+              anyOf,
+              oneOf,
+              discriminatorProperty: schema.discriminator?.propertyName || '',
+              discriminatorUseAuto: !schema.discriminator?.mapping,
+              additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+              selectedTags: tagIds,
+              error: ''
+            });
+          } catch (error) {
+            console.error('Error loading tags:', error);
+            setFormData({
+              name: editingClassData.name || '',
+              description: editingClassData.description || '',
+              allOf,
+              anyOf,
+              oneOf,
+              discriminatorProperty: schema.discriminator?.propertyName || '',
+              discriminatorUseAuto: !schema.discriminator?.mapping,
+              additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+              selectedTags: [],
+              error: ''
+            });
+          }
+        };
 
-      loadTags();
+        loadTags();
+      } else {
+        // Add mode - reset form to empty state
+        setFormData({
+          name: '',
+          description: '',
+          allOf: [],
+          anyOf: [],
+          oneOf: [],
+          discriminatorProperty: '',
+          discriminatorUseAuto: true,
+          additionalProperties: null,
+          selectedTags: [],
+          error: ''
+        });
+      }
     }
   }, [open, editingClassData]);
-
-  if (!editingClassData) return null;
 
   // Get all available class names for composition selectors (excluding current class)
   const availableClasses = nodes
     .map(node => node.data)
-    .filter(data => data && data.name && data.name !== editingClassData.name)
+    .filter(data => data && data.name && (!editingClassData || data.name !== editingClassData.name))
     .map(data => data.name);
 
   // Save handler
   const handleSave = async () => {
     if (!formData.name.trim()) {
       setFormData(prev => ({ ...prev, error: 'Class name is required' }));
+      return;
+    }
+
+    // For create mode, versionId is required
+    if (!editingClassData && !versionId) {
+      setFormData(prev => ({ ...prev, error: 'Version ID is required to create a class' }));
       return;
     }
 
@@ -171,12 +192,35 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         schema.additionalProperties = formData.additionalProperties;
       }
 
-      const result = await updateClass(
-        editingClassData.id,
-        formData.name,
-        formData.description || null,
-        schema
-      );
+      let result: string;
+      let classId: string;
+
+      if (editingClassData) {
+        // Update existing class
+        result = await updateClass(
+          editingClassData.id,
+          formData.name,
+          formData.description || null,
+          schema
+        );
+        classId = editingClassData.id;
+      } else {
+        // Create new class
+        result = await createClass(
+          versionId!,
+          formData.name,
+          formData.description || null,
+          schema
+        );
+        const response = JSON.parse(result);
+        if (response.success && response.class) {
+          classId = response.class.id;
+        } else {
+          setFormData(prev => ({ ...prev, error: response.error || 'Failed to create class' }));
+          setSaving(false);
+          return;
+        }
+      }
 
       const response = JSON.parse(result);
       if (!response.success) {
@@ -186,10 +230,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       }
 
       // Update tag assignments
-      if (projectId) {
+      if (projectId && classId!) {
         try {
           // Get current tags
-          const currentTagsResult = await getTagsForClass(editingClassData.id);
+          const currentTagsResult = await getTagsForClass(classId);
           const currentTags = JSON.parse(currentTagsResult);
           const currentTagIds = currentTags.map((ct: any) => ct.tag_id);
 
@@ -199,12 +243,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
           // Add new tags
           for (const tagId of tagsToAdd) {
-            await assignTagToClass(editingClassData.id, tagId);
+            await assignTagToClass(classId, tagId);
           }
 
           // Remove old tags
           for (const tagId of tagsToRemove) {
-            await removeTagFromClass(editingClassData.id, tagId);
+            await removeTagFromClass(classId, tagId);
           }
         } catch (error) {
           console.error('Error updating tags:', error);
@@ -263,14 +307,22 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
   // Generate OpenAPI spec using the consolidated utility
   const allClasses = nodes.map(node => node.data).filter(data => data && data.name);
-  const openApiDoc = generateClassOpenApiSpec(editingClassData, allClasses, {
-    title: `${editingClassData.name} Schema`,
+
+  // Use a temporary class object for preview when adding (based on current form state)
+  const previewClassData = editingClassData || {
+    name: formData.name || 'NewClass',
+    description: formData.description,
+    schema: { type: 'object', properties: {} }
+  };
+
+  const openApiDoc = generateClassOpenApiSpec(previewClassData, allClasses, {
+    title: `${previewClassData.name} Schema`,
     version: '1.0.0',
     description: 'OpenAPI 3.1.0 schema definition'
   });
 
   // Get the class schema from the generated OpenAPI doc
-  const classSchema = openApiDoc.components.schemas[editingClassData.name];
+  const classSchema = openApiDoc.components.schemas[previewClassData.name];
 
   // Helper function to resolve $ref references in a schema
   const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set(), path: string = ''): any => {
@@ -479,7 +531,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${editingClassData.name.toLowerCase()}-${filenameSuffix}.${extension}`;
+    link.download = `${previewClassData.name.toLowerCase()}-${filenameSuffix}.${extension}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -505,7 +557,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="h6" component="span">
-              {isReadOnly ? 'View Class: ' : 'Edit Class: '}{formData.name || editingClassData.name}
+              {!editingClassData ? 'Add Class' : isReadOnly ? `View Class: ${formData.name || editingClassData.name}` : `Edit Class: ${formData.name || editingClassData.name}`}
             </Typography>
             {isReadOnly && (
               <Typography
