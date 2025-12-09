@@ -547,8 +547,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       slotProps={{
         paper: {
           sx: {
-            height: '80vh',
-            maxHeight: '700px',
+            height: '90vh',
+            maxHeight: '900px',
           }
         }
       }}
