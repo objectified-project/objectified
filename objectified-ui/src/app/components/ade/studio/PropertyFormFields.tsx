@@ -525,6 +525,21 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
           Constraints
         </Typography>
+
+        {/* No constraints message for boolean and null types */}
+        {(baseType === 'boolean' || baseType === 'null') && (
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+              No additional constraints
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {baseType === 'boolean'
+                ? 'Boolean types have no additional constraints (values are true or false)'
+                : 'Null type has no additional constraints (value is always null)'}
+            </Typography>
+          </Box>
+        )}
+
         {/* String Constraints */}
         {baseType === 'string' && (
           <Box sx={{ mb: 2 }}>
