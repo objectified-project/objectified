@@ -38,8 +38,8 @@ export interface PropertyItem {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
-  exclusiveMinimum?: boolean;
-  exclusiveMaximum?: boolean;
+  exclusiveMinimum?: number; // OpenAPI 3.1: numeric value, not boolean
+  exclusiveMaximum?: number; // OpenAPI 3.1: numeric value, not boolean
   multipleOf?: number;
   minItems?: number;
   maxItems?: number;
@@ -104,23 +104,51 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         setPropertyType(property.type || 'string');
       }
 
+      // Determine minimum type (inclusive vs exclusive)
+      // For array types, check inside items; for non-array, check at root level
+      let minimumValue = '';
+      let minimumType: 'inclusive' | 'exclusive' | undefined;
+      const minMaxSource = isArray && (property as any).items ? (property as any).items : property;
+
+      if (minMaxSource.exclusiveMinimum !== undefined) {
+        minimumValue = minMaxSource.exclusiveMinimum.toString();
+        minimumType = 'exclusive';
+      } else if (minMaxSource.minimum !== undefined) {
+        minimumValue = minMaxSource.minimum.toString();
+        minimumType = 'inclusive';
+      }
+
+      // Determine maximum type (inclusive vs exclusive)
+      let maximumValue = '';
+      let maximumType: 'inclusive' | 'exclusive' | undefined;
+      if (minMaxSource.exclusiveMaximum !== undefined) {
+        maximumValue = minMaxSource.exclusiveMaximum.toString();
+        maximumType = 'exclusive';
+      } else if (minMaxSource.maximum !== undefined) {
+        maximumValue = minMaxSource.maximum.toString();
+        maximumType = 'inclusive';
+      }
+
       setFormData({
         title: property.title || '',
         description: property.description || '',
-        format: property.format || '',
-        pattern: property.pattern || '',
-        minLength: property.minLength?.toString() || '',
-        maxLength: property.maxLength?.toString() || '',
-        minimum: property.minimum?.toString() || '',
-        maximum: property.maximum?.toString() || '',
-        exclusiveMinimum: property.exclusiveMinimum || false,
-        exclusiveMaximum: property.exclusiveMaximum || false,
-        multipleOf: property.multipleOf?.toString() || '',
+        // For array types, these come from items; for non-array, from root
+        format: minMaxSource.format || '',
+        pattern: minMaxSource.pattern || '',
+        minLength: minMaxSource.minLength?.toString() || '',
+        maxLength: minMaxSource.maxLength?.toString() || '',
+        minimum: minimumValue,
+        maximum: maximumValue,
+        minimumType: minimumType,
+        maximumType: maximumType,
+        multipleOf: minMaxSource.multipleOf?.toString() || '',
+        // Array-specific constraints come from root
         minItems: property.minItems?.toString() || '',
         maxItems: property.maxItems?.toString() || '',
         uniqueItems: property.uniqueItems || false,
-        enum: property.enum || [],
-        default: property.default?.toString() || '',
+        // Enum and default come from items for array types
+        enum: minMaxSource.enum || [],
+        default: minMaxSource.default?.toString() || '',
         required: property.required || false,
       });
       setPropertyError('');
@@ -155,18 +183,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       if (formData.pattern) itemsSchema.pattern = formData.pattern;
       if (formData.minLength) itemsSchema.minLength = parseInt(formData.minLength);
       if (formData.maxLength) itemsSchema.maxLength = parseInt(formData.maxLength);
-      if (formData.minimum) {
-        if (formData.exclusiveMinimum) {
-          itemsSchema.exclusiveMinimum = parseFloat(formData.minimum);
-        } else {
-          itemsSchema.minimum = parseFloat(formData.minimum);
+      if (formData.minimum && formData.minimum.trim()) {
+        const minValue = parseFloat(formData.minimum);
+        if (!isNaN(minValue)) {
+          if (formData.minimumType === 'exclusive') {
+            itemsSchema.exclusiveMinimum = minValue;
+          } else {
+            itemsSchema.minimum = minValue;
+          }
         }
       }
-      if (formData.maximum) {
-        if (formData.exclusiveMaximum) {
-          itemsSchema.exclusiveMaximum = parseFloat(formData.maximum);
-        } else {
-          itemsSchema.maximum = parseFloat(formData.maximum);
+      if (formData.maximum && formData.maximum.trim()) {
+        const maxValue = parseFloat(formData.maximum);
+        if (!isNaN(maxValue)) {
+          if (formData.maximumType === 'exclusive') {
+            itemsSchema.exclusiveMaximum = maxValue;
+          } else {
+            itemsSchema.maximum = maxValue;
+          }
         }
       }
       if (formData.multipleOf) itemsSchema.multipleOf = parseFloat(formData.multipleOf);
@@ -180,18 +214,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       if (formData.pattern) schema.pattern = formData.pattern;
       if (formData.minLength) schema.minLength = parseInt(formData.minLength);
       if (formData.maxLength) schema.maxLength = parseInt(formData.maxLength);
-      if (formData.minimum) {
-        if (formData.exclusiveMinimum) {
-          schema.exclusiveMinimum = parseFloat(formData.minimum);
-        } else {
-          schema.minimum = parseFloat(formData.minimum);
+      if (formData.minimum && formData.minimum.trim()) {
+        const minValue = parseFloat(formData.minimum);
+        if (!isNaN(minValue)) {
+          if (formData.minimumType === 'exclusive') {
+            schema.exclusiveMinimum = minValue;
+          } else {
+            schema.minimum = minValue;
+          }
         }
       }
-      if (formData.maximum) {
-        if (formData.exclusiveMaximum) {
-          schema.exclusiveMaximum = parseFloat(formData.maximum);
-        } else {
-          schema.maximum = parseFloat(formData.maximum);
+      if (formData.maximum && formData.maximum.trim()) {
+        const maxValue = parseFloat(formData.maximum);
+        if (!isNaN(maxValue)) {
+          if (formData.maximumType === 'exclusive') {
+            schema.exclusiveMaximum = maxValue;
+          } else {
+            schema.maximum = maxValue;
+          }
         }
       }
       if (formData.multipleOf) schema.multipleOf = parseFloat(formData.multipleOf);
@@ -237,18 +277,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         if (formData.pattern) itemsSchema.pattern = formData.pattern;
         if (formData.minLength) itemsSchema.minLength = parseInt(formData.minLength);
         if (formData.maxLength) itemsSchema.maxLength = parseInt(formData.maxLength);
-        if (formData.minimum) {
-          if (formData.exclusiveMinimum) {
-            itemsSchema.exclusiveMinimum = parseFloat(formData.minimum);
-          } else {
-            itemsSchema.minimum = parseFloat(formData.minimum);
+        if (formData.minimum && formData.minimum.trim()) {
+          const minValue = parseFloat(formData.minimum);
+          if (!isNaN(minValue)) {
+            if (formData.minimumType === 'exclusive') {
+              itemsSchema.exclusiveMinimum = minValue;
+            } else {
+              itemsSchema.minimum = minValue;
+            }
           }
         }
-        if (formData.maximum) {
-          if (formData.exclusiveMaximum) {
-            itemsSchema.exclusiveMaximum = parseFloat(formData.maximum);
-          } else {
-            itemsSchema.maximum = parseFloat(formData.maximum);
+        if (formData.maximum && formData.maximum.trim()) {
+          const maxValue = parseFloat(formData.maximum);
+          if (!isNaN(maxValue)) {
+            if (formData.maximumType === 'exclusive') {
+              itemsSchema.exclusiveMaximum = maxValue;
+            } else {
+              itemsSchema.maximum = maxValue;
+            }
           }
         }
         if (formData.multipleOf) itemsSchema.multipleOf = parseFloat(formData.multipleOf);
@@ -262,18 +308,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         if (formData.pattern) dataObject.pattern = formData.pattern;
         if (formData.minLength) dataObject.minLength = parseInt(formData.minLength);
         if (formData.maxLength) dataObject.maxLength = parseInt(formData.maxLength);
-        if (formData.minimum) {
-          if (formData.exclusiveMinimum) {
-            dataObject.exclusiveMinimum = parseFloat(formData.minimum);
-          } else {
-            dataObject.minimum = parseFloat(formData.minimum);
+        if (formData.minimum && formData.minimum.trim()) {
+          const minValue = parseFloat(formData.minimum);
+          if (!isNaN(minValue)) {
+            if (formData.minimumType === 'exclusive') {
+              dataObject.exclusiveMinimum = minValue;
+            } else {
+              dataObject.minimum = minValue;
+            }
           }
         }
-        if (formData.maximum) {
-          if (formData.exclusiveMaximum) {
-            dataObject.exclusiveMaximum = parseFloat(formData.maximum);
-          } else {
-            dataObject.maximum = parseFloat(formData.maximum);
+        if (formData.maximum && formData.maximum.trim()) {
+          const maxValue = parseFloat(formData.maximum);
+          if (!isNaN(maxValue)) {
+            if (formData.maximumType === 'exclusive') {
+              dataObject.exclusiveMaximum = maxValue;
+            } else {
+              dataObject.maximum = maxValue;
+            }
           }
         }
         if (formData.multipleOf) dataObject.multipleOf = parseFloat(formData.multipleOf);

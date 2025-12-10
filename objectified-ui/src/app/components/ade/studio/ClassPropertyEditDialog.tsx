@@ -125,11 +125,11 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       pattern: schema.pattern || '',
       format: schema.format || '',
 
-      // Number constraints
-      minimum: schema.minimum?.toString() || '',
-      maximum: schema.maximum?.toString() || '',
-      exclusiveMinimum: !!schema.exclusiveMinimum,
-      exclusiveMaximum: !!schema.exclusiveMaximum,
+      // Number constraints - detect inclusive vs exclusive
+      minimum: (schema.exclusiveMinimum !== undefined ? schema.exclusiveMinimum : schema.minimum)?.toString() || '',
+      maximum: (schema.exclusiveMaximum !== undefined ? schema.exclusiveMaximum : schema.maximum)?.toString() || '',
+      minimumType: schema.exclusiveMinimum !== undefined ? 'exclusive' as const : (schema.minimum !== undefined ? 'inclusive' as const : undefined),
+      maximumType: schema.exclusiveMaximum !== undefined ? 'exclusive' as const : (schema.maximum !== undefined ? 'inclusive' as const : undefined),
       multipleOf: schema.multipleOf?.toString() || '',
 
       // Array constraints
@@ -208,27 +208,33 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       if (formData.format) targetSchema.format = formData.format;
       else delete targetSchema.format;
 
-      // Number constraints
-      if (formData.minimum) {
-        if (formData.exclusiveMinimum) {
-          targetSchema.exclusiveMinimum = parseFloat(formData.minimum);
-          delete targetSchema.minimum;
-        } else {
-          targetSchema.minimum = parseFloat(formData.minimum);
-          delete targetSchema.exclusiveMinimum;
+      // Number constraints - OpenAPI 3.1 style (numeric exclusive values)
+      if (formData.minimum && formData.minimum.trim()) {
+        const minValue = parseFloat(formData.minimum);
+        if (!isNaN(minValue)) {
+          if (formData.minimumType === 'exclusive') {
+            targetSchema.exclusiveMinimum = minValue;
+            delete targetSchema.minimum;
+          } else {
+            targetSchema.minimum = minValue;
+            delete targetSchema.exclusiveMinimum;
+          }
         }
       } else {
         delete targetSchema.minimum;
         delete targetSchema.exclusiveMinimum;
       }
 
-      if (formData.maximum) {
-        if (formData.exclusiveMaximum) {
-          targetSchema.exclusiveMaximum = parseFloat(formData.maximum);
-          delete targetSchema.maximum;
-        } else {
-          targetSchema.maximum = parseFloat(formData.maximum);
-          delete targetSchema.exclusiveMaximum;
+      if (formData.maximum && formData.maximum.trim()) {
+        const maxValue = parseFloat(formData.maximum);
+        if (!isNaN(maxValue)) {
+          if (formData.maximumType === 'exclusive') {
+            targetSchema.exclusiveMaximum = maxValue;
+            delete targetSchema.maximum;
+          } else {
+            targetSchema.maximum = maxValue;
+            delete targetSchema.exclusiveMaximum;
+          }
         }
       } else {
         delete targetSchema.maximum;

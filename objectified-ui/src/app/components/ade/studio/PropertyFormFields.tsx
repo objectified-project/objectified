@@ -50,8 +50,8 @@ export interface PropertyFormData {
   // Number constraints
   minimum?: string;
   maximum?: string;
-  exclusiveMinimum?: boolean;
-  exclusiveMaximum?: boolean;
+  minimumType?: 'inclusive' | 'exclusive'; // OpenAPI 3.1: determines whether to use minimum or exclusiveMinimum
+  maximumType?: 'inclusive' | 'exclusive'; // OpenAPI 3.1: determines whether to use maximum or exclusiveMaximum
   multipleOf?: string;
 
   // Array constraints
@@ -237,9 +237,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
         case 'number':
           if (data.minimum) {
-            exampleValue = parseFloat(data.minimum) + (data.exclusiveMinimum ? 0.1 : 0);
+            exampleValue = parseFloat(data.minimum) + (data.minimumType === 'exclusive' ? 0.1 : 0);
           } else if (data.maximum) {
-            exampleValue = parseFloat(data.maximum) - (data.exclusiveMaximum ? 0.1 : 0);
+            exampleValue = parseFloat(data.maximum) - (data.maximumType === 'exclusive' ? 0.1 : 0);
           } else {
             exampleValue = 42.5;
           }
@@ -247,9 +247,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
         case 'integer':
           if (data.minimum) {
-            exampleValue = Math.ceil(parseFloat(data.minimum) + (data.exclusiveMinimum ? 1 : 0));
+            exampleValue = Math.ceil(parseFloat(data.minimum) + (data.minimumType === 'exclusive' ? 1 : 0));
           } else if (data.maximum) {
-            exampleValue = Math.floor(parseFloat(data.maximum) - (data.exclusiveMaximum ? 1 : 0));
+            exampleValue = Math.floor(parseFloat(data.maximum) - (data.maximumType === 'exclusive' ? 1 : 0));
           } else {
             exampleValue = 42;
           }
@@ -603,20 +603,40 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   size={size}
                   fullWidth
                   value={data.minimum || ''}
-                  onChange={(e) => onChange('minimum', e.target.value)}
+                  onChange={(e) => {
+                    onChange('minimum', e.target.value);
+                    // Set default type if not already set, clear if value is empty
+                    if (e.target.value && !data.minimumType) {
+                      onChange('minimumType', 'inclusive');
+                    } else if (!e.target.value) {
+                      onChange('minimumType', undefined);
+                    }
+                  }}
                 />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={data.exclusiveMinimum || false}
-                      onChange={(e) => onChange('exclusiveMinimum', e.target.checked)}
-                      disabled={!data.minimum}
-                      size={size}
-                    />
-                  }
-                  label={<Typography>Exclusive Minimum</Typography>}
-                  sx={{ mt: 0.5 }}
-                />
+                <Box sx={{ ml: 1, mt: 0.5 }}>
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.minimumType === 'inclusive' || !data.minimumType}
+                        onChange={() => onChange('minimumType', 'inclusive')}
+                        disabled={!data.minimum}
+                        size={size}
+                      />
+                    }
+                    label={<Typography variant="body2">Inclusive (≥)</Typography>}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.minimumType === 'exclusive'}
+                        onChange={() => onChange('minimumType', 'exclusive')}
+                        disabled={!data.minimum}
+                        size={size}
+                      />
+                    }
+                    label={<Typography variant="body2">Exclusive (&gt;)</Typography>}
+                  />
+                </Box>
               </Box>
               <Box>
                 <TextField
@@ -625,20 +645,40 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   size={size}
                   fullWidth
                   value={data.maximum || ''}
-                  onChange={(e) => onChange('maximum', e.target.value)}
+                  onChange={(e) => {
+                    onChange('maximum', e.target.value);
+                    // Set default type if not already set, clear if value is empty
+                    if (e.target.value && !data.maximumType) {
+                      onChange('maximumType', 'inclusive');
+                    } else if (!e.target.value) {
+                      onChange('maximumType', undefined);
+                    }
+                  }}
                 />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={data.exclusiveMaximum || false}
-                      onChange={(e) => onChange('exclusiveMaximum', e.target.checked)}
-                      disabled={!data.maximum}
-                      size={size}
-                    />
-                  }
-                  label={<Typography>Exclusive Maximum</Typography>}
-                  sx={{ mt: 0.5 }}
-                />
+                <Box sx={{ ml: 1, mt: 0.5 }}>
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.maximumType === 'inclusive' || !data.maximumType}
+                        onChange={() => onChange('maximumType', 'inclusive')}
+                        disabled={!data.maximum}
+                        size={size}
+                      />
+                    }
+                    label={<Typography variant="body2">Inclusive (≤)</Typography>}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.maximumType === 'exclusive'}
+                        onChange={() => onChange('maximumType', 'exclusive')}
+                        disabled={!data.maximum}
+                        size={size}
+                      />
+                    }
+                    label={<Typography variant="body2">Exclusive (&lt;)</Typography>}
+                  />
+                </Box>
               </Box>
             </Box>
 

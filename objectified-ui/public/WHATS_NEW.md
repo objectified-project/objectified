@@ -8,6 +8,12 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Even more look and feel improvements
 - Properties form and editor have an improved layout
+- Properties options have been improved:
+  - Numeric constraints now use OpenAPI 3.1 / JSON Schema draft 2020-12 format
+  - Added radio button options for minimum/maximum constraints:
+    - **Inclusive (≥/≤)** - Value can equal the boundary (uses `minimum`/`maximum`)
+    - **Exclusive (>/<)** - Value must be strictly greater/less than boundary (uses `exclusiveMinimum`/`exclusiveMaximum`)
+  - Constraints are properly saved and loaded for both simple and array types
 - Fixed Mermaid PNG generation issue
 - Property enumerations can now be:
   - Sorted in ascending or descending order

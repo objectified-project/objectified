@@ -38,8 +38,8 @@ export interface PropertyItem {
   maxLength?: number;
   minimum?: number;
   maximum?: number;
-  exclusiveMinimum?: boolean;
-  exclusiveMaximum?: boolean;
+  exclusiveMinimum?: number; // OpenAPI 3.1: numeric value, not boolean
+  exclusiveMaximum?: number; // OpenAPI 3.1: numeric value, not boolean
   multipleOf?: number;
   minItems?: number;
   maxItems?: number;
