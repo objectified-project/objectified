@@ -32,6 +32,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Generate tab now generates:
   - Python Code with Pydantic models
   - TypeScript interfaces
+  - GraphQL Type Definitions
   - SQL DDL Statements with dialects in
     - PostgreSQL
     - MySQL

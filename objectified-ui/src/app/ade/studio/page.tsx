@@ -18,6 +18,7 @@ import { generateJsonSchema } from '../../utils/jsonschema';
 import { generatePythonDTOs } from '../../utils/python-dto';
 import { generateTypeScriptDTOs } from '../../utils/typescript-dto';
 import { generateSQL } from '../../utils/sql-generator';
+import { generateGraphQL } from '../../utils/graphql-generator';
 import { useDialog } from '../../components/providers/DialogProvider';
 import {
   ReactFlow,
@@ -113,7 +114,8 @@ const StudioContent = () => {
   const [generatedPythonCode, setGeneratedPythonCode] = useState<string>('');
   const [generatedTypeScriptCode, setGeneratedTypeScriptCode] = useState<string>('');
   const [generatedSQLCode, setGeneratedSQLCode] = useState<string>('');
-  const [generateLanguage, setGenerateLanguage] = useState<'python' | 'typescript' | 'sql'>('python');
+  const [generatedGraphQLCode, setGeneratedGraphQLCode] = useState<string>('');
+  const [generateLanguage, setGenerateLanguage] = useState<'python' | 'typescript' | 'sql' | 'graphql'>('python');
   const [sqlDialect, setSqlDialect] = useState<'postgresql' | 'mysql' | 'sqlserver' | 'oracle' | 'sqlite'>('postgresql');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
@@ -321,16 +323,29 @@ const StudioContent = () => {
         namingConvention: 'snake_case'
       });
 
+      // Generate GraphQL Schema
+      const graphqlCode = generateGraphQL(classesWithProperties, {
+        projectName: currentProject?.name,
+        version: currentVersion?.version_id,
+        description: `GraphQL Schema for ${currentProject?.name || 'API'}`,
+        includeQueries: true,
+        includeMutations: true,
+        includeInputTypes: true
+      });
+
       // Cache all versions
       setGeneratedPythonCode(pythonCode);
       setGeneratedTypeScriptCode(typeScriptCode);
       setGeneratedSQLCode(sqlCode);
+      setGeneratedGraphQLCode(graphqlCode);
 
       // Set generated code based on current language selection
       if (generateLanguage === 'typescript') {
         setGeneratedCode(typeScriptCode);
       } else if (generateLanguage === 'sql') {
         setGeneratedCode(sqlCode);
+      } else if (generateLanguage === 'graphql') {
+        setGeneratedCode(graphqlCode);
       } else {
         setGeneratedCode(pythonCode);
       }
@@ -1683,17 +1698,27 @@ const StudioContent = () => {
               includeDropStatements: false,
               namingConvention: 'snake_case'
             });
+            const graphqlCode = generateGraphQL(classesWithProperties, {
+              projectName: currentProject?.name,
+              version: currentVersion?.version_id,
+              includeQueries: true,
+              includeMutations: true,
+              includeInputTypes: true
+            });
 
             // Cache all versions
             setGeneratedPythonCode(pythonCode);
             setGeneratedTypeScriptCode(typeScriptCode);
             setGeneratedSQLCode(sqlCode);
+            setGeneratedGraphQLCode(graphqlCode);
 
             // Set generated code based on current language selection
             if (generateLanguage === 'typescript') {
               setGeneratedCode(typeScriptCode);
             } else if (generateLanguage === 'sql') {
               setGeneratedCode(sqlCode);
+            } else if (generateLanguage === 'graphql') {
+              setGeneratedCode(graphqlCode);
             } else {
               setGeneratedCode(pythonCode);
             }
@@ -1727,13 +1752,15 @@ const StudioContent = () => {
         setGeneratedCode(generatedTypeScriptCode);
       } else if (generateLanguage === 'sql' && generatedSQLCode) {
         setGeneratedCode(generatedSQLCode);
+      } else if (generateLanguage === 'graphql' && generatedGraphQLCode) {
+        setGeneratedCode(generatedGraphQLCode);
       } else if (generateLanguage === 'python' && generatedPythonCode) {
         setGeneratedCode(generatedPythonCode);
       }
 
       previousLanguageRef.current = generateLanguage;
     }
-  }, [generateLanguage, generatedPythonCode, generatedTypeScriptCode, generatedSQLCode]);
+  }, [generateLanguage, generatedPythonCode, generatedTypeScriptCode, generatedSQLCode, generatedGraphQLCode]);
 
   // Regenerate SQL when dialect changes or when switching to SQL language
   useEffect(() => {
@@ -2470,12 +2497,16 @@ const StudioContent = () => {
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                       {generateLanguage === 'sql'
                         ? `Generated SQL DDL - ${sqlDialect.toUpperCase()}`
+                        : generateLanguage === 'graphql'
+                        ? 'Generated GraphQL Schema'
                         : `Generated DTOs - ${generateLanguage === 'python' ? 'Python' : 'TypeScript'}`
                       }
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {generateLanguage === 'sql'
                         ? `Database schema for ${selectedProject?.name} v${selectedVersion?.version_id}`
+                        : generateLanguage === 'graphql'
+                        ? `GraphQL API schema for ${selectedProject?.name} v${selectedVersion?.version_id}`
                         : `Data Type Objects for ${selectedProject?.name} v${selectedVersion?.version_id}`
                       }
                     </p>
@@ -2485,12 +2516,13 @@ const StudioContent = () => {
                   <div className="flex items-center gap-2">
                     <select
                       value={generateLanguage}
-                      onChange={(e) => setGenerateLanguage(e.target.value as 'python' | 'typescript' | 'sql')}
+                      onChange={(e) => setGenerateLanguage(e.target.value as 'python' | 'typescript' | 'sql' | 'graphql')}
                       className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="python">Python</option>
                       <option value="typescript">TypeScript</option>
                       <option value="sql">SQL</option>
+                      <option value="graphql">GraphQL</option>
                     </select>
 
                     {/* SQL Dialect Selector - only show when SQL is selected */}
@@ -2536,6 +2568,8 @@ const StudioContent = () => {
                         filename = 'schema.py';
                       } else if (generateLanguage === 'typescript') {
                         filename = 'schema.ts';
+                      } else if (generateLanguage === 'graphql') {
+                        filename = 'schema.graphql';
                       } else {
                         filename = `schema_${sqlDialect}.sql`;
                       }
@@ -2574,6 +2608,7 @@ const StudioContent = () => {
                 language={
                   generateLanguage === 'typescript' ? 'typescript'
                   : generateLanguage === 'sql' ? 'sql'
+                  : generateLanguage === 'graphql' ? 'graphql'
                   : 'python'
                 }
                 value={
@@ -2582,6 +2617,8 @@ const StudioContent = () => {
                     ? '// No classes defined\n// Add classes to the canvas to generate DTOs'
                     : generateLanguage === 'sql'
                     ? '-- No classes defined\n-- Add classes to the canvas to generate SQL DDL'
+                    : generateLanguage === 'graphql'
+                    ? '# No classes defined\n# Add classes to the canvas to generate GraphQL schema'
                     : '# No classes defined\n# Add classes to the canvas to generate DTOs')
                 }
                 theme="vs-dark"
