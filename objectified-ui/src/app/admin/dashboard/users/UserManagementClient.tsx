@@ -5,15 +5,15 @@ import {
   Users,
   UserPlus,
   UserCheck,
-  UserX,
   Mail,
   Calendar,
-  Shield,
   Trash2,
   CheckCircle,
   XCircle,
   RefreshCw,
   AlertCircle,
+  MoreVertical,
+  Power,
 } from 'lucide-react';
 import {
   getAllUsers,
@@ -67,6 +67,8 @@ export default function UserManagementClient() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'users' | 'signups'>('signups');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [openSignupDropdown, setOpenSignupDropdown] = useState<string | null>(null);
+  const [openUserDropdown, setOpenUserDropdown] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -408,20 +410,47 @@ export default function UserManagementClient() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleCreateUserFromSignup(signup)}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors mr-2"
-                        >
-                          <UserCheck className="w-4 h-4" />
-                          Create User
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSignup(signup.email_address)}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </button>
+                        <div className="relative inline-block">
+                          <button
+                            onClick={() => setOpenSignupDropdown(openSignupDropdown === signup.email_address ? null : signup.email_address)}
+                            className="p-2 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+
+                          {openSignupDropdown === signup.email_address && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setOpenSignupDropdown(null)}
+                              />
+                              <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => {
+                                      setOpenSignupDropdown(null);
+                                      handleCreateUserFromSignup(signup);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-green-400 hover:text-green-300 transition-colors"
+                                  >
+                                    <UserCheck className="w-4 h-4" />
+                                    Create User
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setOpenSignupDropdown(null);
+                                      handleDeleteSignup(signup.email_address);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete Signup
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -509,36 +538,74 @@ export default function UserManagementClient() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="relative inline-block">
                           <button
-                            onClick={() => handleToggleUserVerified(user)}
-                            className={`p-2 rounded transition-colors ${
-                              user.verified
-                                ? 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400'
-                                : 'bg-green-600/20 hover:bg-green-600/30 text-green-400'
-                            }`}
-                            title={user.verified ? 'Unverify' : 'Verify'}
+                            onClick={() => setOpenUserDropdown(openUserDropdown === user.id ? null : user.id)}
+                            className="p-2 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
                           >
-                            {user.verified ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                            <MoreVertical className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleToggleUserEnabled(user)}
-                            className={`p-2 rounded transition-colors ${
-                              user.enabled
-                                ? 'bg-gray-600/20 hover:bg-gray-600/30 text-gray-400'
-                                : 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-400'
-                            }`}
-                            title={user.enabled ? 'Disable' : 'Enable'}
-                          >
-                            <Shield className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            className="p-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded transition-colors"
-                            title="Delete User"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+
+                          {openUserDropdown === user.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setOpenUserDropdown(null)}
+                              />
+                              <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => {
+                                      setOpenUserDropdown(null);
+                                      handleToggleUserVerified(user);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                  >
+                                    {user.verified ? (
+                                      <>
+                                        <XCircle className="w-4 h-4 text-yellow-400" />
+                                        Mark Unverified
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="w-4 h-4 text-green-400" />
+                                        Mark Verified
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setOpenUserDropdown(null);
+                                      handleToggleUserEnabled(user);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                  >
+                                    {user.enabled ? (
+                                      <>
+                                        <Power className="w-4 h-4 text-orange-400" />
+                                        Disable User
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Power className="w-4 h-4 text-blue-400" />
+                                        Enable User
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setOpenUserDropdown(null);
+                                      handleDeleteUser(user);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete User
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

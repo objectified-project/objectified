@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Building2,
   Users,
@@ -12,14 +12,14 @@ import {
   AlertCircle,
   Plus,
   X,
-  Mail,
-  UserCheck,
   UserX,
   ShieldCheck,
   ShieldX,
+  MoreVertical,
+  Edit,
+  Power,
 } from 'lucide-react';
 import {
-  getAllTenants,
   getTenantStats,
   getTenantUsers,
   createTenant,
@@ -74,7 +74,19 @@ export default function TenantManagementClient() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAddUserDialog, setShowAddUserDialog] = useState(false);
-  const [newTenant, setNewTenant] = useState({ name: '', description: '', slug: '' });
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [openTenantDropdown, setOpenTenantDropdown] = useState<string | null>(null);
+  const [openUserDropdown, setOpenUserDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [renamingTenant, setRenamingTenant] = useState<Tenant | null>(null);
+  const [renameData, setRenameData] = useState({ name: '', description: '', slug: '' });
+  const [newTenant, setNewTenant] = useState({
+    name: '',
+    description: '',
+    slug: '',
+    initialUserId: '',
+    makeAdmin: false
+  });
 
   useEffect(() => {
     loadTenants();
@@ -152,9 +164,29 @@ export default function TenantManagementClient() {
       const data = JSON.parse(result);
 
       if (data.success) {
-        showMessage('success', 'Tenant created successfully');
+        const tenantId = data.tenant.id;
+
+        // Add initial user if selected
+        if (newTenant.initialUserId) {
+          try {
+            await addUserToTenant(tenantId, newTenant.initialUserId);
+
+            // Make admin if requested
+            if (newTenant.makeAdmin) {
+              await addTenantAdministrator(tenantId, newTenant.initialUserId);
+            }
+
+            showMessage('success', `Tenant created successfully${newTenant.makeAdmin ? ' with admin user' : ' with user'}`);
+          } catch (userError) {
+            console.error('Error adding user to tenant:', userError);
+            showMessage('success', 'Tenant created but failed to add user');
+          }
+        } else {
+          showMessage('success', 'Tenant created successfully');
+        }
+
         setShowCreateDialog(false);
-        setNewTenant({ name: '', description: '', slug: '' });
+        setNewTenant({ name: '', description: '', slug: '', initialUserId: '', makeAdmin: false });
         await loadTenants();
       } else {
         showMessage('error', data.error || 'Failed to create tenant');
@@ -182,6 +214,51 @@ export default function TenantManagementClient() {
     } catch (error) {
       console.error('Error updating tenant:', error);
       showMessage('error', 'Failed to update tenant');
+    }
+  };
+
+  const handleOpenRenameDialog = (tenant: Tenant) => {
+    setRenamingTenant(tenant);
+    setRenameData({
+      name: tenant.name,
+      description: tenant.description || '',
+      slug: tenant.slug
+    });
+    setShowRenameDialog(true);
+  };
+
+  const handleRenameTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renamingTenant) return;
+
+    try {
+      const result = await updateTenant(renamingTenant.id, {
+        name: renameData.name,
+        description: renameData.description,
+        slug: renameData.slug
+      });
+      const data = JSON.parse(result);
+
+      if (data.success) {
+        showMessage('success', 'Tenant renamed successfully');
+        setShowRenameDialog(false);
+        setRenamingTenant(null);
+        setRenameData({ name: '', description: '', slug: '' });
+        await loadTenants();
+        if (selectedTenant?.id === renamingTenant.id) {
+          setSelectedTenant({
+            ...selectedTenant,
+            name: renameData.name,
+            description: renameData.description,
+            slug: renameData.slug
+          });
+        }
+      } else {
+        showMessage('error', data.error || 'Failed to rename tenant');
+      }
+    } catch (error) {
+      console.error('Error renaming tenant:', error);
+      showMessage('error', 'Failed to rename tenant');
     }
   };
 
@@ -282,14 +359,6 @@ export default function TenantManagementClient() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   return (
@@ -434,31 +503,76 @@ export default function TenantManagementClient() {
                           <h4 className="text-white font-medium">{tenant.name}</h4>
                           <p className="text-gray-400 text-sm mt-1">{tenant.slug}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="relative">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleToggleTenantEnabled(tenant);
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setDropdownPosition({
+                                top: rect.bottom + 4,
+                                right: window.innerWidth - rect.right
+                              });
+                              setOpenTenantDropdown(openTenantDropdown === tenant.id ? null : tenant.id);
                             }}
-                            className={`p-1 rounded transition-colors ${
-                              tenant.enabled
-                                ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                                : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
-                            }`}
-                            title={tenant.enabled ? 'Disable' : 'Enable'}
+                            className="p-1 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                            title="Actions"
                           >
-                            {tenant.enabled ? <CheckCircle className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                            <MoreVertical className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteTenant(tenant);
-                            }}
-                            className="p-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded transition-colors"
-                            title="Delete Tenant"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+
+                          {openTenantDropdown === tenant.id && dropdownPosition && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenTenantDropdown(null);
+                                }}
+                              />
+                              <div
+                                className="fixed w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20"
+                                style={{
+                                  top: `${dropdownPosition.top}px`,
+                                  right: `${dropdownPosition.right}px`
+                                }}>
+                                <div className="py-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenTenantDropdown(null);
+                                      handleOpenRenameDialog(tenant);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                  >
+                                    <Edit className="w-4 h-4 text-blue-400" />
+                                    Edit Tenant
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenTenantDropdown(null);
+                                      handleToggleTenantEnabled(tenant);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                  >
+                                    <Power className={`w-4 h-4 ${tenant.enabled ? 'text-orange-400' : 'text-green-400'}`} />
+                                    {tenant.enabled ? 'Disable Tenant' : 'Enable Tenant'}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenTenantDropdown(null);
+                                      handleDeleteTenant(tenant);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete Tenant
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -527,25 +641,74 @@ export default function TenantManagementClient() {
                             <p className="text-gray-400 text-sm truncate">{user.email}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="relative flex-shrink-0">
                           <button
-                            onClick={() => handleToggleAdmin(user)}
-                            className={`p-1 rounded transition-colors ${
-                              user.is_admin
-                                ? 'bg-orange-600/20 text-orange-400 hover:bg-orange-600/30'
-                                : 'bg-gray-600/20 text-gray-400 hover:bg-gray-600/30'
-                            }`}
-                            title={user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setDropdownPosition({
+                                top: rect.bottom + 4,
+                                right: window.innerWidth - rect.right
+                              });
+                              setOpenUserDropdown(openUserDropdown === user.id ? null : user.id);
+                            }}
+                            className="p-1 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                            title="Actions"
                           >
-                            {user.is_admin ? <ShieldX className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                            <MoreVertical className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleRemoveUser(user)}
-                            className="p-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded transition-colors"
-                            title="Remove User"
-                          >
-                            <UserX className="w-4 h-4" />
-                          </button>
+
+                          {openUserDropdown === user.id && dropdownPosition && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenUserDropdown(null);
+                                }}
+                              />
+                              <div
+                                className="fixed w-52 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20"
+                                style={{
+                                  top: `${dropdownPosition.top}px`,
+                                  right: `${dropdownPosition.right}px`
+                                }}>
+                                <div className="py-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenUserDropdown(null);
+                                      handleToggleAdmin(user);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-gray-300 hover:text-white transition-colors"
+                                  >
+                                    {user.is_admin ? (
+                                      <>
+                                        <ShieldX className="w-4 h-4 text-orange-400" />
+                                        Remove Admin Rights
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ShieldCheck className="w-4 h-4 text-green-400" />
+                                        Make Administrator
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenUserDropdown(null);
+                                      handleRemoveUser(user);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-800 flex items-center gap-3 text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    <UserX className="w-4 h-4" />
+                                    Remove from Tenant
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -616,6 +779,46 @@ export default function TenantManagementClient() {
                   placeholder="Description of the tenant..."
                 />
               </div>
+
+              {/* Initial User Selection */}
+              <div className="border-t border-gray-700 pt-4">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Initial User (Optional)
+                </label>
+                <select
+                  value={newTenant.initialUserId}
+                  onChange={(e) => setNewTenant({ ...newTenant, initialUserId: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+                >
+                  <option value="">-- No initial user --</option>
+                  {allUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-gray-500 text-xs mt-1">
+                  Add a user to this tenant immediately upon creation
+                </p>
+              </div>
+
+              {/* Make Admin Checkbox */}
+              {newTenant.initialUserId && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="makeAdmin"
+                    checked={newTenant.makeAdmin}
+                    onChange={(e) => setNewTenant({ ...newTenant, makeAdmin: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-700 bg-gray-900 text-red-600 focus:ring-2 focus:ring-red-600 focus:ring-offset-0"
+                  />
+                  <label htmlFor="makeAdmin" className="text-sm text-gray-300 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-orange-400" />
+                    Make this user a tenant administrator
+                  </label>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -629,6 +832,91 @@ export default function TenantManagementClient() {
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                 >
                   Create Tenant
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Tenant Dialog */}
+      {showRenameDialog && renamingTenant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-md w-full">
+            <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Edit Tenant</h3>
+              <button
+                onClick={() => {
+                  setShowRenameDialog(false);
+                  setRenamingTenant(null);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRenameTenant} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Tenant Name *
+                </label>
+                <input
+                  type="text"
+                  value={renameData.name}
+                  onChange={(e) => {
+                    setRenameData({
+                      ...renameData,
+                      name: e.target.value,
+                      slug: renameData.slug || generateSlug(e.target.value),
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
+                  placeholder="Acme Corporation"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Slug *
+                </label>
+                <input
+                  type="text"
+                  value={renameData.slug}
+                  onChange={(e) => setRenameData({ ...renameData, slug: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600"
+                  placeholder="acme-corporation"
+                  required
+                  pattern="[a-z0-9-]+"
+                  title="Only lowercase letters, numbers, and hyphens"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={renameData.description}
+                  onChange={(e) => setRenameData({ ...renameData, description: e.target.value })}
+                  className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 min-h-[80px]"
+                  placeholder="Description of the tenant..."
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRenameDialog(false);
+                    setRenamingTenant(null);
+                  }}
+                  className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>
