@@ -19,6 +19,7 @@ import { generatePythonDTOs } from '../../utils/python-dto';
 import { generateTypeScriptDTOs } from '../../utils/typescript-dto';
 import { generateSQL } from '../../utils/sql-generator';
 import { generateGraphQL } from '../../utils/graphql-generator';
+import { generateScala } from '../../utils/scala-generator';
 import { useDialog } from '../../components/providers/DialogProvider';
 import {
   ReactFlow,
@@ -115,8 +116,10 @@ const StudioContent = () => {
   const [generatedTypeScriptCode, setGeneratedTypeScriptCode] = useState<string>('');
   const [generatedSQLCode, setGeneratedSQLCode] = useState<string>('');
   const [generatedGraphQLCode, setGeneratedGraphQLCode] = useState<string>('');
-  const [generateLanguage, setGenerateLanguage] = useState<'python' | 'typescript' | 'sql' | 'graphql'>('python');
+  const [generatedScalaCode, setGeneratedScalaCode] = useState<string>('');
+  const [generateLanguage, setGenerateLanguage] = useState<'python' | 'typescript' | 'sql' | 'graphql' | 'scala'>('python');
   const [sqlDialect, setSqlDialect] = useState<'postgresql' | 'mysql' | 'sqlserver' | 'oracle' | 'sqlite'>('postgresql');
+  const [scalaCodecLibrary, setScalaCodecLibrary] = useState<'play-json' | 'circe' | 'none'>('play-json');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const [currentTenantName, setCurrentTenantName] = useState<string>('');
@@ -1705,12 +1708,17 @@ const StudioContent = () => {
               includeMutations: true,
               includeInputTypes: true
             });
+            const scalaCode = generateScala(classesWithProperties, scalaCodecLibrary, {
+              packageName: 'com.example.models',
+              includeCompanionObjects: true
+            });
 
             // Cache all versions
             setGeneratedPythonCode(pythonCode);
             setGeneratedTypeScriptCode(typeScriptCode);
             setGeneratedSQLCode(sqlCode);
             setGeneratedGraphQLCode(graphqlCode);
+            setGeneratedScalaCode(scalaCode);
 
             // Set generated code based on current language selection
             if (generateLanguage === 'typescript') {
@@ -1719,6 +1727,8 @@ const StudioContent = () => {
               setGeneratedCode(sqlCode);
             } else if (generateLanguage === 'graphql') {
               setGeneratedCode(graphqlCode);
+            } else if (generateLanguage === 'scala') {
+              setGeneratedCode(scalaCode);
             } else {
               setGeneratedCode(pythonCode);
             }
@@ -1802,6 +1812,46 @@ const StudioContent = () => {
 
     generateSQLCode();
   }, [sqlDialect, generateLanguage, loadedClasses, selectedVersionId]);
+
+  // Regenerate Scala when codec library changes
+  useEffect(() => {
+    const generateScalaCode = async () => {
+      if (generateLanguage === 'scala' && selectedVersionId) {
+        try {
+          let classesToUse = loadedClasses;
+
+          // If loadedClasses is empty, fetch classes directly
+          if (classesToUse.length === 0) {
+            console.log('[Scala Effect] Classes not loaded, fetching...');
+            const classesResult = await getClassesForVersion(selectedVersionId);
+            const classesData = JSON.parse(classesResult);
+
+            classesToUse = await Promise.all(
+              classesData.map(async (cls: any) => {
+                const propsResult = await getPropertiesForClass(cls.id);
+                const properties = JSON.parse(propsResult);
+                return { ...cls, properties };
+              })
+            );
+            console.log('[Scala Effect] Fetched', classesToUse.length, 'classes');
+          }
+
+          console.log('[Scala Effect] Generating with codec:', scalaCodecLibrary, '| Classes:', classesToUse.length);
+          const scalaCode = generateScala(classesToUse, scalaCodecLibrary, {
+            packageName: 'com.example.models',
+            includeCompanionObjects: true
+          });
+          console.log('[Scala Effect] Generated:', scalaCode.length, 'chars');
+          setGeneratedScalaCode(scalaCode);
+          setGeneratedCode(scalaCode);
+        } catch (error) {
+          console.error('[Scala Effect] Error:', error);
+        }
+      }
+    };
+
+    generateScalaCode();
+  }, [scalaCodecLibrary, generateLanguage, loadedClasses, selectedVersionId]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -2499,6 +2549,8 @@ const StudioContent = () => {
                         ? `Generated SQL DDL - ${sqlDialect.toUpperCase()}`
                         : generateLanguage === 'graphql'
                         ? 'Generated GraphQL Schema'
+                        : generateLanguage === 'scala'
+                        ? `Generated Scala - ${scalaCodecLibrary === 'play-json' ? 'Play JSON' : scalaCodecLibrary === 'circe' ? 'Circe' : 'No Codec'}`
                         : `Generated DTOs - ${generateLanguage === 'python' ? 'Python' : 'TypeScript'}`
                       }
                     </h3>
@@ -2507,6 +2559,8 @@ const StudioContent = () => {
                         ? `Database schema for ${selectedProject?.name} v${selectedVersion?.version_id}`
                         : generateLanguage === 'graphql'
                         ? `GraphQL API schema for ${selectedProject?.name} v${selectedVersion?.version_id}`
+                        : generateLanguage === 'scala'
+                        ? `Scala case classes for ${selectedProject?.name} v${selectedVersion?.version_id}`
                         : `Data Type Objects for ${selectedProject?.name} v${selectedVersion?.version_id}`
                       }
                     </p>
@@ -2516,13 +2570,14 @@ const StudioContent = () => {
                   <div className="flex items-center gap-2">
                     <select
                       value={generateLanguage}
-                      onChange={(e) => setGenerateLanguage(e.target.value as 'python' | 'typescript' | 'sql' | 'graphql')}
+                      onChange={(e) => setGenerateLanguage(e.target.value as 'python' | 'typescript' | 'sql' | 'graphql' | 'scala')}
                       className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="python">Python</option>
                       <option value="typescript">TypeScript</option>
                       <option value="sql">SQL</option>
                       <option value="graphql">GraphQL</option>
+                      <option value="scala">Scala</option>
                     </select>
 
                     {/* SQL Dialect Selector - only show when SQL is selected */}
@@ -2537,6 +2592,19 @@ const StudioContent = () => {
                         <option value="sqlserver">SQL Server</option>
                         <option value="oracle">Oracle</option>
                         <option value="sqlite">SQLite</option>
+                      </select>
+                    )}
+
+                    {/* Scala Codec Library Selector - only show when Scala is selected */}
+                    {generateLanguage === 'scala' && (
+                      <select
+                        value={scalaCodecLibrary}
+                        onChange={(e) => setScalaCodecLibrary(e.target.value as any)}
+                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="play-json">Play JSON</option>
+                        <option value="circe">Circe</option>
+                        <option value="none">No Codec</option>
                       </select>
                     )}
                   </div>
@@ -2570,6 +2638,8 @@ const StudioContent = () => {
                         filename = 'schema.ts';
                       } else if (generateLanguage === 'graphql') {
                         filename = 'schema.graphql';
+                      } else if (generateLanguage === 'scala') {
+                        filename = 'Models.scala';
                       } else {
                         filename = `schema_${sqlDialect}.sql`;
                       }
@@ -2609,6 +2679,7 @@ const StudioContent = () => {
                   generateLanguage === 'typescript' ? 'typescript'
                   : generateLanguage === 'sql' ? 'sql'
                   : generateLanguage === 'graphql' ? 'graphql'
+                  : generateLanguage === 'scala' ? 'scala'
                   : 'python'
                 }
                 value={
@@ -2619,6 +2690,8 @@ const StudioContent = () => {
                     ? '-- No classes defined\n-- Add classes to the canvas to generate SQL DDL'
                     : generateLanguage === 'graphql'
                     ? '# No classes defined\n# Add classes to the canvas to generate GraphQL schema'
+                    : generateLanguage === 'scala'
+                    ? '// No classes defined\n// Add classes to the canvas to generate Scala case classes'
                     : '# No classes defined\n# Add classes to the canvas to generate DTOs')
                 }
                 theme="vs-dark"

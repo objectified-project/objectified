@@ -33,6 +33,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Python Code with Pydantic models
   - TypeScript interfaces
   - GraphQL Type Definitions
+  - Scala Case Classes with codec libraries:
+    - Play JSON
+    - Circe
+    - No Codec (plain case classes)
   - SQL DDL Statements with dialects in
     - PostgreSQL
     - MySQL
