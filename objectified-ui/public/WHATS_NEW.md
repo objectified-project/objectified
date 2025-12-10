@@ -14,6 +14,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Adds multipleOf constraint for numeric properties
   - All property constraints are now properly preserved when dragging properties to classes
   - Boolean and null types now show "No additional constraints" message in the Constraints section
+  - Array types now support "contains" schema
 - Fixed Mermaid PNG generation issue
 - Property enumerations can now be:
   - Sorted in ascending or descending order

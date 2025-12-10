@@ -58,6 +58,7 @@ export interface PropertyFormData {
   minItems?: string;
   maxItems?: string;
   uniqueItems?: boolean;
+  contains?: string; // OpenAPI 3.1: JSON Schema that at least one array item must match
 
   // Common constraints
   enum?: string[];
@@ -748,6 +749,22 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }
               label="Unique Items (no duplicates)"
             />
+
+            <TextField
+              label="Contains (JSON Schema)"
+              size={size}
+              fullWidth
+              multiline
+              rows={3}
+              value={data.contains || ''}
+              onChange={(e) => onChange('contains', e.target.value)}
+              placeholder='{"type": "string", "minLength": 5}'
+              helperText="OpenAPI 3.1: JSON Schema that at least one item must match"
+              sx={{ mt: 2 }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, ml: 0.5 }}>
+              Example: Require at least one item to be a string with minimum length 5
+            </Typography>
           </Box>
         )}
 

@@ -158,6 +158,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         minItems: property.minItems?.toString() || '',
         maxItems: property.maxItems?.toString() || '',
         uniqueItems: property.uniqueItems || false,
+        contains: (property as any).contains ? JSON.stringify((property as any).contains, null, 2) : '',
         // Enum and default come from items for array types
         enum: minMaxSource.enum || [],
         default: minMaxSource.default?.toString() || '',
@@ -205,6 +206,15 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       if (formData.minItems) schema.minItems = parseInt(formData.minItems);
       if (formData.maxItems) schema.maxItems = parseInt(formData.maxItems);
       if (formData.uniqueItems) schema.uniqueItems = true;
+
+      // Handle contains schema (OpenAPI 3.1)
+      if (formData.contains && formData.contains.trim()) {
+        try {
+          schema.contains = JSON.parse(formData.contains);
+        } catch (e) {
+          schema.contains = { type: formData.contains };
+        }
+      }
 
       const itemsSchema: any = {
         type: propertyType
@@ -350,6 +360,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         else delete dataObject.maxItems;
         if (formData.uniqueItems) dataObject.uniqueItems = true;
         else delete dataObject.uniqueItems;
+
+        // Handle contains schema (OpenAPI 3.1)
+        if (formData.contains && formData.contains.trim()) {
+          try {
+            dataObject.contains = JSON.parse(formData.contains);
+          } catch (e) {
+            // If not valid JSON, treat as a simple type string
+            dataObject.contains = { type: formData.contains };
+          }
+        } else {
+          delete dataObject.contains;
+        }
 
         // Preserve original items schema if it exists
         const originalItems = originalData.items || {};

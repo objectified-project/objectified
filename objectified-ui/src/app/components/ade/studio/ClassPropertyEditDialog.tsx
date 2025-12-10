@@ -136,6 +136,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       minItems: propData.minItems?.toString() || '',
       maxItems: propData.maxItems?.toString() || '',
       uniqueItems: !!propData.uniqueItems,
+      contains: propData.contains ? JSON.stringify(propData.contains, null, 2) : '',
 
       // Common constraints
       default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
@@ -260,6 +261,18 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
         if (formData.uniqueItems) updatedData.uniqueItems = true;
         else delete updatedData.uniqueItems;
+
+        // Handle contains schema (OpenAPI 3.1)
+        if (formData.contains && formData.contains.trim()) {
+          try {
+            updatedData.contains = JSON.parse(formData.contains);
+          } catch (e) {
+            // If not valid JSON, treat as a simple type string
+            updatedData.contains = { type: formData.contains };
+          }
+        } else {
+          delete updatedData.contains;
+        }
       }
 
       // Enum values
