@@ -137,6 +137,8 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       maxItems: propData.maxItems?.toString() || '',
       uniqueItems: !!propData.uniqueItems,
       contains: propData.contains ? JSON.stringify(propData.contains, null, 2) : '',
+      minContains: propData.minContains?.toString() || '',
+      maxContains: propData.maxContains?.toString() || '',
 
       // Common constraints
       default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
@@ -270,8 +272,29 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
             // If not valid JSON, treat as a simple type string
             updatedData.contains = { type: formData.contains };
           }
+
+          // Handle minContains and maxContains (only valid when contains is set)
+          if (formData.minContains) {
+            const minContainsValue = parseInt(formData.minContains);
+            if (!isNaN(minContainsValue) && minContainsValue >= 1) {
+              updatedData.minContains = minContainsValue;
+            }
+          } else {
+            delete updatedData.minContains;
+          }
+
+          if (formData.maxContains) {
+            const maxContainsValue = parseInt(formData.maxContains);
+            if (!isNaN(maxContainsValue) && maxContainsValue >= 1) {
+              updatedData.maxContains = maxContainsValue;
+            }
+          } else {
+            delete updatedData.maxContains;
+          }
         } else {
           delete updatedData.contains;
+          delete updatedData.minContains;
+          delete updatedData.maxContains;
         }
       }
 

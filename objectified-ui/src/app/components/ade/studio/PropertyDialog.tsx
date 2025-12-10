@@ -159,6 +159,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         maxItems: property.maxItems?.toString() || '',
         uniqueItems: property.uniqueItems || false,
         contains: (property as any).contains ? JSON.stringify((property as any).contains, null, 2) : '',
+        minContains: (property as any).minContains?.toString() || '',
+        maxContains: (property as any).maxContains?.toString() || '',
         // Enum and default come from items for array types
         enum: minMaxSource.enum || [],
         default: minMaxSource.default?.toString() || '',
@@ -213,6 +215,20 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           schema.contains = JSON.parse(formData.contains);
         } catch (e) {
           schema.contains = { type: formData.contains };
+        }
+
+        // Add minContains and maxContains if set
+        if (formData.minContains) {
+          const minContainsValue = parseInt(formData.minContains);
+          if (!isNaN(minContainsValue) && minContainsValue >= 1) {
+            schema.minContains = minContainsValue;
+          }
+        }
+        if (formData.maxContains) {
+          const maxContainsValue = parseInt(formData.maxContains);
+          if (!isNaN(maxContainsValue) && maxContainsValue >= 1) {
+            schema.maxContains = maxContainsValue;
+          }
         }
       }
 
@@ -369,8 +385,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             // If not valid JSON, treat as a simple type string
             dataObject.contains = { type: formData.contains };
           }
+
+          // Handle minContains and maxContains (only valid when contains is set)
+          if (formData.minContains) {
+            const minContainsValue = parseInt(formData.minContains);
+            if (!isNaN(minContainsValue) && minContainsValue >= 1) {
+              dataObject.minContains = minContainsValue;
+            }
+          }
+          if (formData.maxContains) {
+            const maxContainsValue = parseInt(formData.maxContains);
+            if (!isNaN(maxContainsValue) && maxContainsValue >= 1) {
+              dataObject.maxContains = maxContainsValue;
+            }
+          }
         } else {
           delete dataObject.contains;
+          delete dataObject.minContains;
+          delete dataObject.maxContains;
         }
 
         // Preserve original items schema if it exists

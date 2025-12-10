@@ -59,6 +59,8 @@ export interface PropertyFormData {
   maxItems?: string;
   uniqueItems?: boolean;
   contains?: string; // OpenAPI 3.1: JSON Schema that at least one array item must match
+  minContains?: string; // OpenAPI 3.1: Minimum number of items that must match contains schema
+  maxContains?: string; // OpenAPI 3.1: Maximum number of items that must match contains schema
 
   // Common constraints
   enum?: string[];
@@ -757,7 +759,14 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               multiline
               rows={3}
               value={data.contains || ''}
-              onChange={(e) => onChange('contains', e.target.value)}
+              onChange={(e) => {
+                onChange('contains', e.target.value);
+                // Clear minContains/maxContains if contains is cleared
+                if (!e.target.value.trim()) {
+                  onChange('minContains', undefined);
+                  onChange('maxContains', undefined);
+                }
+              }}
               placeholder='{"type": "string", "minLength": 5}'
               helperText="OpenAPI 3.1: JSON Schema that at least one item must match"
               sx={{ mt: 2 }}
@@ -765,6 +774,32 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, ml: 0.5 }}>
               Example: Require at least one item to be a string with minimum length 5
             </Typography>
+
+            {/* minContains and maxContains - only shown when contains is set */}
+            {data.contains && data.contains.trim() && (
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
+                <TextField
+                  label="Min Contains"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.minContains || ''}
+                  onChange={(e) => onChange('minContains', e.target.value)}
+                  inputProps={{ min: 1 }}
+                  helperText="Minimum matching items"
+                />
+                <TextField
+                  label="Max Contains"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.maxContains || ''}
+                  onChange={(e) => onChange('maxContains', e.target.value)}
+                  inputProps={{ min: 1 }}
+                  helperText="Maximum matching items"
+                />
+              </Box>
+            )}
           </Box>
         )}
 
