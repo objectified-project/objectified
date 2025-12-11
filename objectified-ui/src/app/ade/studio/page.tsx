@@ -296,7 +296,7 @@ const StudioContent = () => {
       // Regenerate OpenAPI spec
       const currentProject = projects.find(p => p.id === selectedProjectId);
       const currentVersion = versions.find(v => v.id === selectedVersionId);
-      const spec = generateOpenApiSpec(classesWithProperties, {
+      const spec = await generateOpenApiSpec(classesWithProperties, {
         projectName: currentProject?.name,
         version: currentVersion?.version_id
       });
@@ -1616,7 +1616,7 @@ const StudioContent = () => {
         // Generate OpenAPI specification
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
-        const spec = generateOpenApiSpec(classesWithProperties, {
+        const spec = await generateOpenApiSpec(classesWithProperties, {
           projectName: currentProject?.name,
           version: currentVersion?.version_id
         });
@@ -1749,7 +1749,7 @@ const StudioContent = () => {
 
           if (viewMode === 'code') {
             // Generate fresh OpenAPI specification
-            const spec = generateOpenApiSpec(classesWithProperties, {
+            const spec = await generateOpenApiSpec(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id
             });

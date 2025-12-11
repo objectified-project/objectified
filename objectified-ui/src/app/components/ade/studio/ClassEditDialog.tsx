@@ -52,6 +52,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [openApiDoc, setOpenApiDoc] = useState<any>(null);
+  const [loadingOpenApiDoc, setLoadingOpenApiDoc] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -138,6 +140,75 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     }
   }, [open, editingClassData]);
 
+  // Helper function to build schema from form data
+  const buildSchemaFromFormData = () => {
+    const schema: any = { type: 'object', properties: {} };
+
+    // Add composition types
+    if (formData.allOf.length > 0) {
+      schema.allOf = formData.allOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
+    }
+    if (formData.anyOf.length > 0) {
+      schema.anyOf = formData.anyOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
+    }
+    if (formData.oneOf.length > 0) {
+      schema.oneOf = formData.oneOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
+    }
+
+    // Add discriminator if specified
+    if (formData.discriminatorProperty && (formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0)) {
+      schema.discriminator = { propertyName: formData.discriminatorProperty };
+      if (!formData.discriminatorUseAuto) {
+        schema.discriminator.mapping = {};
+        const list = formData.allOf.length > 0 ? formData.allOf : formData.anyOf.length > 0 ? formData.anyOf : formData.oneOf;
+        list.forEach((name: string) => {
+          schema.discriminator.mapping[name] = `#/components/schemas/${name}`;
+        });
+      }
+    }
+
+    // Add additionalProperties if set
+    if (formData.additionalProperties !== null) {
+      schema.additionalProperties = formData.additionalProperties;
+    }
+
+    return schema;
+  };
+
+  // Generate OpenAPI doc asynchronously
+  useEffect(() => {
+    const generateOpenApiDocAsync = async () => {
+      if (!open) return;
+
+      setLoadingOpenApiDoc(true);
+      try {
+        const allClasses = nodes.map(node => node.data).filter(data => data && data.name);
+
+        const previewClassData = editingClassData || {
+          name: formData.name || 'NewClass',
+          description: formData.description,
+          schema: buildSchemaFromFormData()
+        };
+
+        const doc = await generateClassOpenApiSpec(previewClassData, allClasses, {
+          title: `${previewClassData.name} Schema`,
+          version: '1.0.0',
+          description: 'OpenAPI 3.1.0 schema definition'
+        });
+
+        setOpenApiDoc(doc);
+      } catch (error) {
+        console.error('Failed to generate OpenAPI doc:', error);
+        setOpenApiDoc(null);
+      } finally {
+        setLoadingOpenApiDoc(false);
+      }
+    };
+
+    generateOpenApiDocAsync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingClassData, formData.name, formData.description, formData.allOf, formData.anyOf, formData.oneOf, formData.discriminatorProperty, formData.discriminatorUseAuto, formData.additionalProperties, nodes]);
+
   // Get all available class names for composition selectors (excluding current class)
   const availableClasses = nodes
     .map(node => node.data)
@@ -162,35 +233,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
     try {
       // Build schema from form data
-      const schema: any = { type: 'object', properties: {} };
-
-      // Add composition types
-      if (formData.allOf.length > 0) {
-        schema.allOf = formData.allOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
-      }
-      if (formData.anyOf.length > 0) {
-        schema.anyOf = formData.anyOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
-      }
-      if (formData.oneOf.length > 0) {
-        schema.oneOf = formData.oneOf.map(name => ({ $ref: `#/components/schemas/${name}` }));
-      }
-
-      // Add discriminator if specified
-      if (formData.discriminatorProperty && (formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0)) {
-        schema.discriminator = { propertyName: formData.discriminatorProperty };
-        if (!formData.discriminatorUseAuto) {
-          schema.discriminator.mapping = {};
-          const list = formData.allOf.length > 0 ? formData.allOf : formData.anyOf.length > 0 ? formData.anyOf : formData.oneOf;
-          list.forEach((name: string) => {
-            schema.discriminator.mapping[name] = `#/components/schemas/${name}`;
-          });
-        }
-      }
-
-      // Add additionalProperties
-      if (formData.additionalProperties !== null) {
-        schema.additionalProperties = formData.additionalProperties;
-      }
+      const schema = buildSchemaFromFormData();
 
       let result: string;
       let classId: string;
@@ -305,24 +348,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     </Box>
   );
 
-  // Generate OpenAPI spec using the consolidated utility
-  const allClasses = nodes.map(node => node.data).filter(data => data && data.name);
-
-  // Use a temporary class object for preview when adding (based on current form state)
+  // Get the preview class data for display
   const previewClassData = editingClassData || {
     name: formData.name || 'NewClass',
     description: formData.description,
     schema: { type: 'object', properties: {} }
   };
 
-  const openApiDoc = generateClassOpenApiSpec(previewClassData, allClasses, {
-    title: `${previewClassData.name} Schema`,
-    version: '1.0.0',
-    description: 'OpenAPI 3.1.0 schema definition'
-  });
-
-  // Get the class schema from the generated OpenAPI doc
-  const classSchema = openApiDoc.components.schemas[previewClassData.name];
+  // Get the class schema from the generated OpenAPI doc (with null check)
+  const classSchema = openApiDoc?.components?.schemas?.[previewClassData.name];
 
   // Helper function to resolve $ref references in a schema
   const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set(), path: string = ''): any => {
@@ -432,7 +466,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   // Generate schema content based on current tab
   let schemaContent: string = '';
 
-  if (tabValue === 1) {
+  if (loadingOpenApiDoc || !openApiDoc) {
+    schemaContent = '// Loading schema...';
+  } else if (tabValue === 1) {
     // JSON view
     schemaContent = JSON.stringify(openApiDoc, null, 2);
   } else if (tabValue === 2) {
@@ -470,6 +506,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   }
 
   const handleCopy = () => {
+    if (!openApiDoc) return;
+
     let content: string;
     if (tabValue === 3) {
       // Example view
@@ -495,6 +533,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   };
 
   const handleExport = () => {
+    if (!openApiDoc) return;
+
     let content: string;
     let filenameSuffix: string;
     let mimeType: string;
@@ -780,7 +820,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
                 onClick={handleCopy}
                 variant="outlined"
-                disabled={copied}
+                disabled={copied || loadingOpenApiDoc || !openApiDoc}
               >
                 {copied ? 'Copied' : 'Copy'}
               </Button>
@@ -789,6 +829,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 startIcon={<Download size={16} />}
                 onClick={handleExport}
                 variant="contained"
+                disabled={loadingOpenApiDoc || !openApiDoc}
               >
                 Export
               </Button>
@@ -823,7 +864,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
                 onClick={handleCopy}
                 variant="outlined"
-                disabled={copied}
+                disabled={copied || loadingOpenApiDoc || !openApiDoc}
               >
                 {copied ? 'Copied' : 'Copy'}
               </Button>
@@ -832,6 +873,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 startIcon={<Download size={16} />}
                 onClick={handleExport}
                 variant="contained"
+                disabled={loadingOpenApiDoc || !openApiDoc}
               >
                 Export
               </Button>
@@ -867,6 +909,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 onClick={() => setExampleRefreshKey(prev => prev + 1)}
                 variant="outlined"
                 title="Generate new example"
+                disabled={loadingOpenApiDoc || !openApiDoc}
               >
                 Refresh
               </Button>
@@ -875,7 +918,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 startIcon={copied ? <Check size={16} /> : <Copy size={16} />}
                 onClick={handleCopy}
                 variant="outlined"
-                disabled={copied}
+                disabled={copied || loadingOpenApiDoc || !openApiDoc}
               >
                 {copied ? 'Copied' : 'Copy'}
               </Button>
@@ -884,6 +927,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 startIcon={<Download size={16} />}
                 onClick={handleExport}
                 variant="contained"
+                disabled={loadingOpenApiDoc || !openApiDoc}
               >
                 Export
               </Button>

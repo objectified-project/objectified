@@ -1,9 +1,13 @@
 /**
  * OpenAPI Specification Generator Utilities
  *
- * Consolidates OpenAPI 3.1.0 specification generation logic for reuse across
+ * Consolidates OpenAPI specification generation logic for reuse across
  * the application. Builds complete schemas from class definitions and their properties.
+ * Uses Handlebars templates for flexible versioning support.
  */
+
+import { renderTemplate } from './template-loader';
+import { getOpenAPIVersionConfig, DEFAULT_OPENAPI_VERSION } from './openapi-versions';
 
 /**
  * Extracts class name from a JSON Schema $ref string
@@ -216,19 +220,20 @@ export function buildClassSchema(classData: any): any {
 }
 
 /**
- * Generates a complete OpenAPI 3.1.0 specification from class definitions
- * @param classes - Array of class data objects with properties
+ * Generates a complete OpenAPI specification from all classes
+ * @param classes - Array of class definitions
  * @param options - Optional metadata for the spec
- * @returns OpenAPI document as a JSON string
+ * @returns OpenAPI spec as JSON string
  */
-export function generateOpenApiSpec(
+export async function generateOpenApiSpec(
   classes: any[],
   options?: {
     projectName?: string;
     version?: string;
     description?: string;
+    openapiVersion?: string;
   }
-): string {
+): Promise<string> {
   const schemas: any = {};
 
   // Build schema for each class
@@ -236,19 +241,25 @@ export function generateOpenApiSpec(
     schemas[cls.name] = buildClassSchema(cls);
   });
 
-  const openApiDoc = {
-    openapi: '3.1.0',
+  // Get OpenAPI version configuration
+  const versionConfig = getOpenAPIVersionConfig(options?.openapiVersion);
+
+  // Prepare template data
+  const templateData = {
+    openapi: versionConfig.version,
     info: {
       title: options?.projectName || 'API Schema',
       version: options?.version || '1.0.0',
-      description: options?.description || 'Generated OpenAPI 3.1.0 specification from Objectified Studio'
+      description: options?.description || `Generated OpenAPI ${versionConfig.version} specification from Objectified Studio`
     },
-    components: {
-      schemas
-    }
+    schemas
   };
 
-  return JSON.stringify(openApiDoc, null, 2);
+  // Render using Handlebars template
+  const rendered = await renderTemplate(versionConfig.templateFile, templateData);
+
+  // Parse and re-stringify to ensure valid JSON and proper formatting
+  return JSON.stringify(JSON.parse(rendered), null, 2);
 }
 
 /**
@@ -256,17 +267,18 @@ export function generateOpenApiSpec(
  * @param classData - The primary class to generate spec for
  * @param allClasses - All available classes (to resolve references)
  * @param options - Optional metadata for the spec
- * @returns OpenAPI document as an object (not stringified)
+ * @returns OpenAPI spec as object
  */
-export function generateClassOpenApiSpec(
+export async function generateClassOpenApiSpec(
   classData: any,
   allClasses: any[],
   options?: {
     title?: string;
     version?: string;
     description?: string;
+    openapiVersion?: string;
   }
-): any {
+): Promise<any> {
   const referencedClasses = new Set<string>();
 
   // Find all referenced classes in the primary class
@@ -339,15 +351,23 @@ export function generateClassOpenApiSpec(
     }
   }
 
-  return {
-    openapi: '3.1.0',
+  // Get OpenAPI version configuration
+  const versionConfig = getOpenAPIVersionConfig(options?.openapiVersion);
+
+  // Prepare template data
+  const templateData = {
+    openapi: versionConfig.version,
     info: {
       title: options?.title || `${classData.name} Schema`,
       version: options?.version || '1.0.0',
-      description: options?.description || 'OpenAPI 3.1.0 schema definition'
+      description: options?.description || `OpenAPI ${versionConfig.version} schema definition`
     },
-    components: {
-      schemas
-    }
+    schemas
   };
+
+  // Render using Handlebars template
+  const rendered = await renderTemplate(versionConfig.templateFile, templateData);
+
+  // Parse and return as object
+  return JSON.parse(rendered);
 }

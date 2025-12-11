@@ -1,0 +1,15 @@
+{
+  "openapi": "{{openapi}}",
+  "info": {
+    "title": "{{info.title}}",
+    "version": "{{info.version}}"{{#if info.description}},
+    "description": "{{info.description}}"{{/if}}
+  },
+  "components": {
+    "schemas": {
+{{#each schemas}}
+      "{{@key}}": {{{json this}}}{{#unless @last}},{{/unless}}
+{{/each}}
+    }
+  }
+}
