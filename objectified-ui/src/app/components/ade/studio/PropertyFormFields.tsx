@@ -35,6 +35,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { RegexTester } from './RegexTester';
+import { PrefixItemsEditor } from './PrefixItemsEditor';
 
 export interface PropertyFormData {
   // Basic fields
@@ -61,6 +62,11 @@ export interface PropertyFormData {
   contains?: string; // OpenAPI 3.1: JSON Schema that at least one array item must match
   minContains?: string; // OpenAPI 3.1: Minimum number of items that must match contains schema
   maxContains?: string; // OpenAPI 3.1: Maximum number of items that must match contains schema
+
+  // Tuple mode (OpenAPI 3.1)
+  tupleMode?: boolean; // Toggle for tuple mode with prefixItems
+  prefixItems?: any[]; // OpenAPI 3.1: Array of schemas for specific positions
+  itemsSchema?: string; // JSON string of items schema for positions beyond prefix
 
   // Common constraints
   enum?: string[];
@@ -529,6 +535,19 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           Constraints
         </Typography>
 
+        {/* Tuple mode message - constraints are per-position */}
+        {data.tupleMode && isArray && (
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'info.main', color: 'info.contrastText', borderRadius: 1, opacity: 0.9 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+              Tuple Mode Active
+            </Typography>
+            <Typography variant="caption" sx={{ display: 'block' }}>
+              Item-level constraints are defined per-position in the Tuple Mode section below.
+              Each position in the tuple can have its own type and constraints.
+            </Typography>
+          </Box>
+        )}
+
         {/* No constraints message for boolean and null types */}
         {(baseType === 'boolean' || baseType === 'null') && (
           <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
@@ -544,7 +563,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         )}
 
         {/* String Constraints */}
-        {baseType === 'string' && (
+        {baseType === 'string' && !data.tupleMode && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               String Constraints
@@ -602,7 +621,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         )}
 
         {/* Number/Integer Constraints */}
-        {(baseType === 'number' || baseType === 'integer') && (
+        {(baseType === 'number' || baseType === 'integer') && !data.tupleMode && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Numeric Constraints
@@ -800,6 +819,70 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 />
               </Box>
             )}
+
+            {/* Tuple Mode - OpenAPI 3.1 prefixItems */}
+            <Box sx={{ mt: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={data.tupleMode || false}
+                    onChange={(e) => {
+                      onChange('tupleMode', e.target.checked);
+                      if (!e.target.checked) {
+                        // Clear prefixItems when disabling tuple mode
+                        onChange('prefixItems', undefined);
+                      } else if (!data.prefixItems) {
+                        // Initialize with empty array when enabling
+                        onChange('prefixItems', []);
+                      }
+                    }}
+                    size={size}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Tuple Mode (prefixItems)
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      OpenAPI 3.1: Define ordered schemas for specific positions
+                    </Typography>
+                  </Box>
+                }
+              />
+
+              {data.tupleMode && (
+                <Box sx={{ mt: 2 }}>
+                  <PrefixItemsEditor
+                    value={data.prefixItems || []}
+                    onChange={(items) => onChange('prefixItems', items)}
+                  />
+
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Items Schema (for positions beyond prefix)
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      size={size}
+                      value={data.itemsSchema || ''}
+                      onChange={(e) => onChange('itemsSchema', e.target.value)}
+                      placeholder='{"type": "string"}'
+                      helperText="JSON Schema for items beyond the defined prefix positions"
+                      sx={{
+                        fontFamily: 'monospace',
+                        '& textarea': {
+                          fontFamily: 'monospace',
+                          fontSize: '0.875rem',
+                        },
+                      }}
+                    />
+                  </Box>
+                </Box>
+              )}
+            </Box>
           </Box>
         )}
 

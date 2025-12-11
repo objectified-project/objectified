@@ -16,6 +16,13 @@ We continue to improve the platform based on your feedback with improvements and
   - Boolean and null types now show "No additional constraints" message in the Constraints section
   - Array types now support "contains" schema
   - Added "minContains" and "maxContains" fields - specify minimum/maximum number of items that must match the contains schema
+  - prefixItems:
+    - Define ordered schemas for specific array positions (e.g., `[string, number, boolean]`)
+    - Enable "Tuple Mode" checkbox in array properties
+    - Add/remove/reorder prefix items with drag-and-drop
+    - Each position can have its own type and constraints
+    - Control additional items beyond prefix with custom schema
+    - Perfect for coordinates, CSV-like data, function arguments, and database rows
 - Fixed Mermaid PNG generation issue
 - Property enumerations can now be:
   - Sorted in ascending or descending order

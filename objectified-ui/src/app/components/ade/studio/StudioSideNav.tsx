@@ -53,6 +53,10 @@ export interface PropertyItem {
   deprecated?: boolean;
   example?: any;
   additionalProperties?: boolean | any;
+  // Tuple mode (OpenAPI 3.1)
+  tupleMode?: boolean;
+  prefixItems?: any[]; // OpenAPI 3.1: Array of schemas for specific positions
+  items?: any; // Schema for items beyond prefix positions
 }
 
 export interface StudioSideNavCallbacks {

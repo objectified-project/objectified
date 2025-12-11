@@ -53,6 +53,10 @@ export interface PropertyItem {
   deprecated?: boolean;
   example?: any;
   additionalProperties?: boolean | any;
+  // Tuple mode (OpenAPI 3.1)
+  tupleMode?: boolean;
+  prefixItems?: any[]; // OpenAPI 3.1: Array of schemas for specific positions
+  items?: any; // Schema for items beyond prefix positions
 }
 
 interface PropertyDialogProps {
@@ -93,9 +97,15 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       const isArray = property.type === 'array';
       setPropertyIsArray(isArray);
 
+      // Check if tuple mode is active (prefixItems exists)
+      const hasTupleMode = (property as any).prefixItems && Array.isArray((property as any).prefixItems);
+
       // Determine the actual type
       // Note: Actual $ref values (class references) are managed via canvas connections
-      if (isArray && (property as any).items) {
+      if (isArray && hasTupleMode) {
+        // Tuple mode: set a default type (constraints are per-position in prefixItems)
+        setPropertyType('string');
+      } else if (isArray && (property as any).items && typeof (property as any).items === 'object') {
         const items = (property as any).items;
         if (items.$ref) {
           // Has a $ref - this is a reference type
@@ -111,10 +121,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       }
 
       // Determine minimum type (inclusive vs exclusive)
-      // For array types, check inside items; for non-array, check at root level
+      // For array types with tuple mode, skip item constraints (defined per-position)
+      // For regular arrays, check inside items; for non-array, check at root level
       let minimumValue = '';
       let minimumType: 'inclusive' | 'exclusive' | undefined;
-      const minMaxSource = isArray && (property as any).items ? (property as any).items : property;
+      const minMaxSource = (isArray && !hasTupleMode && (property as any).items && typeof (property as any).items === 'object')
+        ? (property as any).items
+        : property;
 
       if (minMaxSource.exclusiveMinimum !== undefined) {
         minimumValue = minMaxSource.exclusiveMinimum.toString();
@@ -161,6 +174,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         contains: (property as any).contains ? JSON.stringify((property as any).contains, null, 2) : '',
         minContains: (property as any).minContains?.toString() || '',
         maxContains: (property as any).maxContains?.toString() || '',
+        // Tuple mode (OpenAPI 3.1)
+        tupleMode: hasTupleMode,
+        prefixItems: (property as any).prefixItems || [],
+        itemsSchema: hasTupleMode && (property as any).items !== undefined ?
+          (typeof (property as any).items === 'object' ?
+            JSON.stringify((property as any).items, null, 2) :
+            String((property as any).items)) : '',
         // Enum and default come from items for array types
         enum: minMaxSource.enum || [],
         default: minMaxSource.default?.toString() || '',
@@ -232,52 +252,69 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         }
       }
 
-      const itemsSchema: any = {
-        type: propertyType
-      };
-      if (formData.format) itemsSchema.format = formData.format;
-      if (formData.pattern) itemsSchema.pattern = formData.pattern;
-      if (formData.minLength) itemsSchema.minLength = parseInt(formData.minLength);
-      if (formData.maxLength) itemsSchema.maxLength = parseInt(formData.maxLength);
-      if (formData.minimum && formData.minimum.trim()) {
-        const minValue = parseFloat(formData.minimum);
-        if (!isNaN(minValue)) {
-          if (formData.minimumType === 'exclusive') {
-            itemsSchema.exclusiveMinimum = minValue;
-          } else {
-            itemsSchema.minimum = minValue;
+      // Handle Tuple Mode (OpenAPI 3.1 prefixItems)
+      if (formData.tupleMode && formData.prefixItems && formData.prefixItems.length > 0) {
+        schema.prefixItems = formData.prefixItems;
+
+        // Handle items schema for positions beyond prefix
+        if (formData.itemsSchema && formData.itemsSchema.trim()) {
+          try {
+            schema.items = JSON.parse(formData.itemsSchema);
+          } catch (e) {
+            schema.items = { type: formData.itemsSchema };
+          }
+        } else {
+          schema.items = true;
+        }
+      } else {
+        // Not in tuple mode - use regular items schema
+        const itemsSchema: any = {
+          type: propertyType
+        };
+        if (formData.format) itemsSchema.format = formData.format;
+        if (formData.pattern) itemsSchema.pattern = formData.pattern;
+        if (formData.minLength) itemsSchema.minLength = parseInt(formData.minLength);
+        if (formData.maxLength) itemsSchema.maxLength = parseInt(formData.maxLength);
+        if (formData.minimum && formData.minimum.trim()) {
+          const minValue = parseFloat(formData.minimum);
+          if (!isNaN(minValue)) {
+            if (formData.minimumType === 'exclusive') {
+              itemsSchema.exclusiveMinimum = minValue;
+            } else {
+              itemsSchema.minimum = minValue;
+            }
           }
         }
-      }
-      if (formData.maximum && formData.maximum.trim()) {
-        const maxValue = parseFloat(formData.maximum);
-        if (!isNaN(maxValue)) {
-          if (formData.maximumType === 'exclusive') {
-            itemsSchema.exclusiveMaximum = maxValue;
-          } else {
-            itemsSchema.maximum = maxValue;
+        if (formData.maximum && formData.maximum.trim()) {
+          const maxValue = parseFloat(formData.maximum);
+          if (!isNaN(maxValue)) {
+            if (formData.maximumType === 'exclusive') {
+              itemsSchema.exclusiveMaximum = maxValue;
+            } else {
+              itemsSchema.maximum = maxValue;
+            }
           }
         }
-      }
-      if (formData.multipleOf && formData.multipleOf.trim()) {
-        const multipleOfValue = parseFloat(formData.multipleOf);
-        if (!isNaN(multipleOfValue) && multipleOfValue > 0) {
-          itemsSchema.multipleOf = multipleOfValue;
+        if (formData.multipleOf && formData.multipleOf.trim()) {
+          const multipleOfValue = parseFloat(formData.multipleOf);
+          if (!isNaN(multipleOfValue) && multipleOfValue > 0) {
+            itemsSchema.multipleOf = multipleOfValue;
+          }
         }
-      }
-      if (formData.enum && formData.enum.length > 0) itemsSchema.enum = formData.enum;
-      if (formData.default) itemsSchema.default = formData.default;
+        if (formData.enum && formData.enum.length > 0) itemsSchema.enum = formData.enum;
+        if (formData.default) itemsSchema.default = formData.default;
 
-      // Handle additionalProperties for array items that are objects
-      if (propertyType === 'object') {
-        if (formData.additionalProperties === 'true') {
-          itemsSchema.additionalProperties = true;
-        } else if (formData.additionalProperties === 'false') {
-          itemsSchema.additionalProperties = false;
+        // Handle additionalProperties for array items that are objects
+        if (propertyType === 'object') {
+          if (formData.additionalProperties === 'true') {
+            itemsSchema.additionalProperties = true;
+          } else if (formData.additionalProperties === 'false') {
+            itemsSchema.additionalProperties = false;
+          }
         }
-      }
 
-      schema.items = itemsSchema;
+        schema.items = itemsSchema;
+      }
     } else {
       schema.type = propertyType;
       if (formData.format) schema.format = formData.format;
@@ -405,12 +442,32 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           delete dataObject.maxContains;
         }
 
-        // Preserve original items schema if it exists
-        const originalItems = originalData.items || {};
-        const itemsSchema: any = {
-          ...originalItems, // Preserve ALL original item fields
-          type: propertyType
-        };
+        // Handle Tuple Mode (OpenAPI 3.1 prefixItems)
+        if (formData.tupleMode && formData.prefixItems && formData.prefixItems.length > 0) {
+          dataObject.prefixItems = formData.prefixItems;
+
+          // Handle items schema for positions beyond prefix
+          if (formData.itemsSchema && formData.itemsSchema.trim()) {
+            try {
+              dataObject.items = JSON.parse(formData.itemsSchema);
+            } catch (e) {
+              // If not valid JSON, treat as a simple type
+              dataObject.items = { type: formData.itemsSchema };
+            }
+          } else {
+            // Default to allowing any type for items beyond prefix
+            dataObject.items = true;
+          }
+        } else {
+          // Not in tuple mode - use regular items schema
+          delete dataObject.prefixItems;
+
+          // Preserve original items schema if it exists
+          const originalItems = originalData.items || {};
+          const itemsSchema: any = {
+            ...originalItems, // Preserve ALL original item fields
+            type: propertyType
+          };
         if (formData.format) itemsSchema.format = formData.format;
         else delete itemsSchema.format;
         if (formData.pattern) itemsSchema.pattern = formData.pattern;
@@ -467,16 +524,17 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         if (formData.default) itemsSchema.default = formData.default;
         else delete itemsSchema.default;
 
-        // Handle additionalProperties for array items that are objects
-        if (propertyType === 'object') {
-          if (formData.additionalProperties === 'true') {
-            itemsSchema.additionalProperties = true;
-          } else if (formData.additionalProperties === 'false') {
-            itemsSchema.additionalProperties = false;
+          // Handle additionalProperties for array items that are objects
+          if (propertyType === 'object') {
+            if (formData.additionalProperties === 'true') {
+              itemsSchema.additionalProperties = true;
+            } else if (formData.additionalProperties === 'false') {
+              itemsSchema.additionalProperties = false;
+            }
           }
-        }
 
-        dataObject.items = itemsSchema;
+          dataObject.items = itemsSchema;
+        }
       } else {
         dataObject.type = propertyType;
         if (formData.format) dataObject.format = formData.format;

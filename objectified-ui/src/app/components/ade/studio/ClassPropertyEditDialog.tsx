@@ -140,6 +140,14 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       minContains: propData.minContains?.toString() || '',
       maxContains: propData.maxContains?.toString() || '',
 
+      // Tuple mode (OpenAPI 3.1)
+      tupleMode: propData.prefixItems && Array.isArray(propData.prefixItems) ? true : false,
+      prefixItems: propData.prefixItems || [],
+      itemsSchema: propData.prefixItems && propData.items !== undefined ?
+        (typeof propData.items === 'object' ?
+          JSON.stringify(propData.items, null, 2) :
+          String(propData.items)) : '',
+
       // Common constraints
       default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
       enum: schema.enum || [],
@@ -296,6 +304,29 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
           delete updatedData.minContains;
           delete updatedData.maxContains;
         }
+
+        // Handle Tuple Mode (OpenAPI 3.1 prefixItems)
+        if (formData.tupleMode && formData.prefixItems && formData.prefixItems.length > 0) {
+          updatedData.prefixItems = formData.prefixItems;
+
+          // Handle items schema for positions beyond prefix
+          if (formData.itemsSchema && formData.itemsSchema.trim()) {
+            try {
+              updatedData.items = JSON.parse(formData.itemsSchema);
+            } catch (e) {
+              // If not valid JSON, treat as boolean or simple type
+              updatedData.items = formData.itemsSchema === 'true' ? true :
+                                  formData.itemsSchema === 'false' ? false :
+                                  { type: formData.itemsSchema };
+            }
+          } else {
+            // Default to allowing any type for items beyond prefix
+            updatedData.items = true;
+          }
+        } else {
+          // Not in tuple mode - delete prefixItems if present
+          delete updatedData.prefixItems;
+        }
       }
 
       // Enum values
@@ -313,8 +344,8 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         delete targetSchema.default;
       }
 
-      // Update items if it's an array
-      if (isArray) {
+      // Update items if it's an array (but not if tuple mode is active - already set above)
+      if (isArray && !formData.tupleMode) {
         updatedData.items = targetSchema;
         // Ensure additionalProperties isn't left on the array level
         delete updatedData.additionalProperties;

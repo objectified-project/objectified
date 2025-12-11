@@ -579,16 +579,16 @@
 
 **Schema-to-Code**
 - Generate code from schemas in multiple languages:
-  - **TypeScript**: ✅ **IMPLEMENTED** - Interfaces, types with full composition support
-  - **Python**: ✅ **IMPLEMENTED** - Pydantic models with validation and constraints
+  - ✅ **TypeScript**: Interfaces, types with full composition support
+  - ✅ **Python**: Pydantic models with validation and constraints
   - **TypeScript (Extended)**: Zod validators, runtime type checking
   - **Python (Extended)**: Dataclasses, SQLAlchemy models
   - **Java**: POJOs, Records, JPA entities
   - **C#**: Classes, records, EF Core models
   - **Go**: Structs with JSON tags
   - **Rust**: Structs with Serde
-  - **GraphQL**: SDL schema definitions
-  - **SQL**: ✅ DDL CREATE TABLE statements
+  - ✅ **GraphQL**: SDL schema definitions
+  - ✅ **SQL**: DDL CREATE TABLE statements
 - Customizable generation templates
 - Code generation settings per language:
   - Naming conventions (camelCase, snake_case, PascalCase)
@@ -605,18 +605,6 @@
 - Support for all major languages
 - Download as package/library
 - NPM/PyPI/Maven publishing integration
-
-**Database Schema Generation**
-- Generate SQL DDL from schemas:
-  - ✅ PostgreSQL
-  - ✅ MySQL
-  - ✅ SQL Server
-  - ✅ Oracle
-  - ✅ SQLite
-- ✅ Include indexes, constraints, foreign keys
-- Generate migration scripts (up/down)
-- Alembic/Flyway/Liquibase format
-- Database diff tool (compare schemas)
 
 ### Testing & Validation
 
@@ -747,6 +735,18 @@
   - Enum values
   - Format (date, email, uuid, etc.)
   - Custom validators
+- **OpenAPI 3.1 Array Features** ✅ IMPLEMENTED:
+  - **Tuple Mode (prefixItems)**: Define ordered schemas for specific array positions
+    - Enable/disable tuple mode with checkbox toggle
+    - Add, remove, and reorder prefix items with drag-and-drop
+    - Each position has its own JSON schema definition
+    - Visual editor with type selection and JSON editing
+    - Items beyond prefix use the regular items schema
+    - Example: `[string, number, boolean]` for heterogeneous arrays
+  - **Contains Schema**: Specify that at least one array item must match a schema
+  - **minContains/maxContains**: Control how many items must match the contains schema
+  - **Exclusive Min/Max**: Radio buttons for inclusive (≥) vs exclusive (>) boundaries
+  - **multipleOf**: Numeric constraint for values that must be multiples
 - **Documentation**: 
   - Rich text descriptions
   - Examples

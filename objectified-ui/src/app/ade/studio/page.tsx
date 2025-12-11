@@ -517,6 +517,12 @@ const StudioContent = () => {
           maxItems: propertyData.maxItems,
           uniqueItems: propertyData.uniqueItems,
           items: propertyData.items,
+          // OpenAPI 3.1 array features
+          contains: propertyData.contains,
+          minContains: propertyData.minContains,
+          maxContains: propertyData.maxContains,
+          tupleMode: propertyData.tupleMode,
+          prefixItems: propertyData.prefixItems,
           enum: propertyData.enum,
           default: propertyData.default,
           required: propertyData.required,
