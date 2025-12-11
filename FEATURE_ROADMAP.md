@@ -580,9 +580,28 @@
 **Schema-to-Code**
 - Generate code from schemas in multiple languages:
   - ✅ **TypeScript**: Interfaces, types with full composition support
-  - ✅ **Python**: Pydantic models with validation and constraints
+  - ✅ **Python - Pydantic**: Models with validation and constraints
+  - ✅ **Python - Dataclasses**: Native Python dataclasses with type hints
+    - Standard library dataclasses (Python 3.7+)
+    - Optional field defaults and factories
+    - JSON serialization/deserialization support
+    - Immutable (frozen) option
+    - Post-init validation hooks
+    - Inheritance and composition support
+  - ✅ **Python - SQLAlchemy**: ORM models for database mapping
+    - SQLAlchemy 2.0+ declarative models
+    - Automatic table name generation
+    - Primary key and foreign key constraints
+    - Relationship mappings (one-to-many, many-to-many)
+    - Column types from OpenAPI formats
+    - Indexes and unique constraints
+    - Alembic migration generation support
+    - Optional type hints for mypy compatibility
+  - ✅ **Python - Mixed**: Combine multiple approaches
+    - Pydantic + SQLAlchemy hybrid models
+    - Dataclasses with validation decorators
+    - Choose per-class basis
   - **TypeScript (Extended)**: Zod validators, runtime type checking
-  - **Python (Extended)**: Dataclasses, SQLAlchemy models
   - **Java**: POJOs, Records, JPA entities
   - **C#**: Classes, records, EF Core models
   - **Go**: Structs with JSON tags
@@ -598,6 +617,112 @@
 - Preview generated code before download
 - Download as single file or project structure
 - Generate with tests/mocks included
+
+**Python Code Generation Options**
+
+*Pydantic Models (Current)*
+- Full OpenAPI constraint validation
+- JSON schema compliance
+- Field validators and root validators
+- Computed fields and properties
+- Example output:
+  ```python
+  from pydantic import BaseModel, Field, field_validator
+  from typing import Optional
+  
+  class User(BaseModel):
+      id: int = Field(..., description="User ID")
+      name: str = Field(..., min_length=1, max_length=100)
+      email: Optional[str] = Field(None, pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')
+      
+      @field_validator('email')
+      def validate_email(cls, v):
+          # Custom validation logic
+          return v
+  ```
+
+*Dataclasses*
+- Lightweight, standard library approach
+- No external dependencies
+- Type hints for IDE support
+- Optional JSON serialization helpers
+- Configuration options:
+  - Frozen (immutable) classes
+  - Field defaults and factories
+  - Slots for memory optimization
+  - Post-init validation
+- Example output:
+  ```python
+  from dataclasses import dataclass, field
+  from typing import Optional
+  
+  @dataclass(frozen=True)
+  class User:
+      id: int
+      name: str
+      email: Optional[str] = None
+      
+      def __post_init__(self):
+          if self.name and len(self.name) > 100:
+              raise ValueError("Name too long")
+  ```
+
+*SQLAlchemy Models*
+- Database-first ORM approach
+- Automatic relationship mapping
+- Migration support via Alembic
+- Configuration options:
+  - Table names (auto-generated or custom)
+  - Index creation
+  - Cascade rules
+  - Lazy loading strategies
+- Example output:
+  ```python
+  from sqlalchemy import Column, Integer, String, ForeignKey
+  from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
+  
+  class Base(DeclarativeBase):
+      pass
+  
+  class User(Base):
+      __tablename__ = 'users'
+      
+      id: Mapped[int] = mapped_column(primary_key=True)
+      name: Mapped[str] = mapped_column(String(100), nullable=False)
+      email: Mapped[str | None] = mapped_column(String(255))
+      
+      posts: Mapped[list["Post"]] = relationship(back_populates="author")
+  ```
+
+*Hybrid Models (Pydantic + SQLAlchemy)*
+- Best of both worlds
+- Database persistence + validation
+- Use Pydantic for API, SQLAlchemy for DB
+- Example output:
+  ```python
+  from sqlalchemy.orm import DeclarativeBase, Mapped
+  from pydantic import BaseModel, ConfigDict
+  
+  # SQLAlchemy Model
+  class UserDB(Base):
+      __tablename__ = 'users'
+      id: Mapped[int] = mapped_column(primary_key=True)
+      name: Mapped[str]
+  
+  # Pydantic Model
+  class User(BaseModel):
+      model_config = ConfigDict(from_attributes=True)
+      id: int
+      name: str
+  ```
+
+*Generation Settings*
+- Choose model type per schema/class
+- Bulk generation with consistent style
+- Include type stubs (.pyi files)
+- Generate unit tests
+- Create requirements.txt/pyproject.toml
+- Add mypy/pylint configuration
 
 **OpenAPI Client Generation**
 - One-click client SDK generation
@@ -1153,7 +1278,7 @@
 - GraphQL SDL
 - AsyncAPI
 - TypeScript types
-- Python models
+- Python models (Pydantic, Dataclasses, SQLAlchemy)
 - Java classes
 - C# classes
 - Go structs
