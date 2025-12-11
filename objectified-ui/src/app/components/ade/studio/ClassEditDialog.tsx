@@ -362,6 +362,43 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set(), path: string = ''): any => {
     if (!schema || typeof schema !== 'object') return schema;
 
+    // Preprocess: Convert prefixItems to items array format for json-schema-faker compatibility
+    // json-schema-faker doesn't support prefixItems (JSON Schema 2020-12), so we convert it
+    if (schema.prefixItems && Array.isArray(schema.prefixItems)) {
+      const processedSchema = { ...schema };
+
+      // If items is true or an empty object, it means "allow any additional items"
+      // For json-schema-faker, we'll use the prefixItems as a tuple
+      if (schema.items === true || (schema.items && Object.keys(schema.items).length === 0)) {
+        // Use prefixItems as items for tuple generation
+        processedSchema.items = schema.prefixItems;
+        delete processedSchema.prefixItems;
+
+        // Set minItems and maxItems to match prefixItems length for consistent generation
+        if (!processedSchema.minItems) {
+          processedSchema.minItems = schema.prefixItems.length;
+        }
+        if (!processedSchema.maxItems) {
+          processedSchema.maxItems = schema.prefixItems.length;
+        }
+      } else if (schema.items) {
+        // If there's both prefixItems and items, merge them
+        // This is tricky - for now, just use prefixItems as the tuple
+        processedSchema.items = schema.prefixItems;
+        delete processedSchema.prefixItems;
+        processedSchema.minItems = schema.prefixItems.length;
+        processedSchema.maxItems = schema.prefixItems.length;
+      } else {
+        // No items specified, use prefixItems as items
+        processedSchema.items = schema.prefixItems;
+        delete processedSchema.prefixItems;
+        processedSchema.minItems = schema.prefixItems.length;
+        processedSchema.maxItems = schema.prefixItems.length;
+      }
+
+      schema = processedSchema;
+    }
+
     // Handle $ref
     if (schema.$ref && typeof schema.$ref === 'string') {
       const refPath = schema.$ref.split('/');

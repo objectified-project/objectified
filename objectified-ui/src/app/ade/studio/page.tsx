@@ -15,14 +15,6 @@ import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import { generateOpenApiSpec } from '../../utils/openapi';
 import { generateArazzoSpec } from '../../utils/arazzo';
 import { generateJsonSchema } from '../../utils/jsonschema';
-import { generatePythonDTOs } from '../../utils/python-dto';
-import { generatePythonDataclasses } from '../../utils/python-dataclass';
-import { generateSQLAlchemyModels } from '../../utils/python-sqlalchemy';
-import { generateTypeScriptDTOs } from '../../utils/typescript-dto';
-import { generateJavaPojos } from '../../utils/java-pojo';
-import { generateSQL } from '../../utils/sql-generator';
-import { generateGraphQL } from '../../utils/graphql-generator';
-import { generateScala } from '../../utils/scala-generator';
 import { useDialog } from '../../components/providers/DialogProvider';
 import {
   ReactFlow,
@@ -81,7 +73,7 @@ interface Version {
   published: boolean;
 }
 
-type ViewMode = 'canvas' | 'code' | 'generate' | 'mermaid';
+type ViewMode = 'canvas' | 'code' | 'mermaid';
 
 const StudioContent = () => {
   const { data: session } = useSession();
@@ -104,7 +96,7 @@ const StudioContent = () => {
   const [codeFormat, setCodeFormat] = useState<'json' | 'yaml'>('json');
   const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'arazzo' | 'jsonschema'>('openapi');
 
-  // Sample OpenAPI spec - will be replaced with actual data from project/version
+  // OpenAPI, Arazzo, and JSON Schema specs
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
   const [arazzoSpec, setArazzoSpec] = useState<string>('');
   const [jsonSchemaSpec, setJsonSchemaSpec] = useState<string>('');
@@ -113,19 +105,6 @@ const StudioContent = () => {
   const [mermaidSvgReady, setMermaidSvgReady] = useState(false);
   const mermaidPreviewRef = useRef<MermaidPreviewRef>(null);
 
-  // Generate tab state
-  const [generatedCode, setGeneratedCode] = useState<string>('');
-  const [generatedPythonCode, setGeneratedPythonCode] = useState<string>('');
-  const [generatedTypeScriptCode, setGeneratedTypeScriptCode] = useState<string>('');
-  const [generatedJavaCode, setGeneratedJavaCode] = useState<string>('');
-  const [generatedSQLCode, setGeneratedSQLCode] = useState<string>('');
-  const [generatedGraphQLCode, setGeneratedGraphQLCode] = useState<string>('');
-  const [generatedScalaCode, setGeneratedScalaCode] = useState<string>('');
-  const [generateLanguage, setGenerateLanguage] = useState<'python' | 'typescript' | 'java' | 'sql' | 'graphql' | 'scala'>('python');
-  const [pythonModelType, setPythonModelType] = useState<'pydantic' | 'dataclass' | 'sqlalchemy'>('pydantic');
-  const [javaStyle, setJavaStyle] = useState<'pojo' | 'lombok' | 'record'>('pojo');
-  const [sqlDialect, setSqlDialect] = useState<'postgresql' | 'mysql' | 'sqlserver' | 'oracle' | 'sqlite'>('postgresql');
-  const [scalaCodecLibrary, setScalaCodecLibrary] = useState<'play-json' | 'circe' | 'none'>('play-json');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const [currentTenantName, setCurrentTenantName] = useState<string>('');
@@ -162,12 +141,10 @@ const StudioContent = () => {
   // Canvas loading state
   const [isLoadingCanvas, setIsLoadingCanvas] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
-  const [loadedClasses, setLoadedClasses] = useState<any[]>([]);
 
   // Copy button states
   const [codeCopied, setCodeCopied] = useState(false);
   const [mermaidCopied, setMermaidCopied] = useState(false);
-  const [generateCopied, setGenerateCopied] = useState(false);
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -287,98 +264,6 @@ const StudioContent = () => {
         setEdges(newEdges);
       }
       setNodes(finalNodes);
-
-      // Store classes for SQL regeneration
-      setLoadedClasses(classesWithProperties);
-
-      setLoadingMessage('Regenerating OpenAPI specification...');
-
-      // Regenerate OpenAPI spec
-      const currentProject = projects.find(p => p.id === selectedProjectId);
-      const currentVersion = versions.find(v => v.id === selectedVersionId);
-      const spec = await generateOpenApiSpec(classesWithProperties, {
-        projectName: currentProject?.name,
-        version: currentVersion?.version_id
-      });
-      setOpenApiSpec(spec);
-
-      // Generate Arazzo spec
-      const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
-        projectName: currentProject?.name,
-        version: currentVersion?.version_id
-      });
-      setArazzoSpec(arazzoSpecContent);
-
-      // Generate JSON Schema spec
-      const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
-        projectName: currentProject?.name,
-        version: currentVersion?.version_id
-      });
-      setJsonSchemaSpec(jsonSchemaContent);
-
-      // Generate DTOs for both languages
-      const dtoOptions = {
-        projectName: currentProject?.name,
-        version: currentVersion?.version_id,
-        description: `Data Type Objects for ${currentProject?.name || 'API'}`
-      };
-
-      // Generate Python code based on selected model type
-      let pythonCode: string;
-      if (pythonModelType === 'dataclass') {
-        pythonCode = generatePythonDataclasses(classesWithProperties, {
-          ...dtoOptions,
-          frozen: false,
-          slots: false,
-          includeValidation: true,
-          includeJsonHelpers: true
-        });
-      } else if (pythonModelType === 'sqlalchemy') {
-        pythonCode = generateSQLAlchemyModels(classesWithProperties, {
-          ...dtoOptions,
-          includeRelationships: true,
-          databaseType: sqlDialect === 'postgresql' ? 'postgresql' : sqlDialect === 'mysql' ? 'mysql' : 'sqlite',
-          customTableNames: false,
-          includeIndexes: true
-        });
-      } else {
-        pythonCode = generatePythonDTOs(classesWithProperties, dtoOptions);
-      }
-      const typeScriptCode = generateTypeScriptDTOs(classesWithProperties, dtoOptions);
-
-      // Generate SQL DDL
-      const sqlCode = generateSQL(classesWithProperties, sqlDialect, {
-        includeComments: true,
-        includeDropStatements: false,
-        namingConvention: 'snake_case'
-      });
-
-      // Generate GraphQL Schema
-      const graphqlCode = generateGraphQL(classesWithProperties, {
-        projectName: currentProject?.name,
-        version: currentVersion?.version_id,
-        description: `GraphQL Schema for ${currentProject?.name || 'API'}`,
-        includeQueries: true,
-        includeMutations: true,
-        includeInputTypes: true
-      });
-
-      // Cache all versions
-      setGeneratedPythonCode(pythonCode);
-      setGeneratedTypeScriptCode(typeScriptCode);
-      setGeneratedSQLCode(sqlCode);
-      setGeneratedGraphQLCode(graphqlCode);
-
-      // Set generated code based on current language selection
-      if (generateLanguage === 'typescript') {
-        setGeneratedCode(typeScriptCode);
-      } else if (generateLanguage === 'sql') {
-        setGeneratedCode(sqlCode);
-      } else if (generateLanguage === 'graphql') {
-        setGeneratedCode(graphqlCode);
-      } else {
-        setGeneratedCode(pythonCode);
-      }
     } catch (error) {
       console.error('Failed to reload classes:', error);
     } finally {
@@ -1611,93 +1496,6 @@ const StudioContent = () => {
         setNodes(finalNodes);
         setEdges(newEdges);
 
-        setLoadingMessage('Generating OpenAPI specification...');
-
-        // Generate OpenAPI specification
-        const currentProject = projects.find(p => p.id === selectedProjectId);
-        const currentVersion = versions.find(v => v.id === selectedVersionId);
-        const spec = await generateOpenApiSpec(classesWithProperties, {
-          projectName: currentProject?.name,
-          version: currentVersion?.version_id
-        });
-        setOpenApiSpec(spec);
-
-        // Generate Arazzo specification
-        const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
-          projectName: currentProject?.name,
-          version: currentVersion?.version_id
-        });
-        setArazzoSpec(arazzoSpecContent);
-
-        // Generate JSON Schema specification
-        const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
-          projectName: currentProject?.name,
-          version: currentVersion?.version_id
-        });
-        setJsonSchemaSpec(jsonSchemaContent);
-
-        // Generate DTOs for both languages
-        const dtoOptions = {
-          projectName: currentProject?.name,
-          version: currentVersion?.version_id,
-          description: `Data Type Objects for ${currentProject?.name || 'API'}`
-        };
-
-        // Generate Python code based on selected model type
-        let pythonCode: string;
-        if (pythonModelType === 'dataclass') {
-          pythonCode = generatePythonDataclasses(classesWithProperties, {
-            ...dtoOptions,
-            frozen: false,
-            slots: false,
-            includeValidation: true,
-            includeJsonHelpers: true
-          });
-        } else if (pythonModelType === 'sqlalchemy') {
-          pythonCode = generateSQLAlchemyModels(classesWithProperties, {
-            ...dtoOptions,
-            includeRelationships: true,
-            databaseType: sqlDialect === 'postgresql' ? 'postgresql' : sqlDialect === 'mysql' ? 'mysql' : 'sqlite',
-            customTableNames: false,
-            includeIndexes: true
-          });
-        } else {
-          pythonCode = generatePythonDTOs(classesWithProperties, dtoOptions);
-        }
-
-        const typeScriptCode = generateTypeScriptDTOs(classesWithProperties, dtoOptions);
-
-        // Generate Java code based on selected style
-        const javaCode = generateJavaPojos(classesWithProperties, {
-          ...dtoOptions,
-          packageName: 'com.example.models',
-          useLombok: javaStyle === 'lombok',
-          useRecords: javaStyle === 'record',
-          useBuilder: javaStyle === 'lombok',
-          includeValidation: true,
-          validationProvider: 'jakarta',
-          includeJackson: true
-        });
-
-        // Cache all versions
-        setGeneratedPythonCode(pythonCode);
-        setGeneratedTypeScriptCode(typeScriptCode);
-        setGeneratedJavaCode(javaCode);
-
-        // Set generated code based on current language selection
-        if (generateLanguage === 'typescript') {
-          setGeneratedCode(typeScriptCode);
-        } else if (generateLanguage === 'java') {
-          setGeneratedCode(javaCode);
-        } else {
-          setGeneratedCode(pythonCode);
-        }
-
-        setLoadingMessage('Generating Mermaid diagram...');
-
-        // Generate Mermaid diagram
-        const mermaid = generateMermaidDiagram(classesWithProperties);
-        setMermaidCode(mermaid);
 
         setLoadingMessage('Fitting view to canvas...');
 
@@ -1720,378 +1518,63 @@ const StudioContent = () => {
     loadClasses();
   }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, autoLayoutEnabled, setNodes, setEdges, fitView, projects, versions]);
 
-  // Regenerate OpenAPI spec, Python DTOs, and Mermaid when switching views
+  // Generate specs on-demand when switching views or when canvas changes
   useEffect(() => {
-    const regenerateSpec = async () => {
-      if ((viewMode === 'code' || viewMode === 'generate' || viewMode === 'mermaid') && selectedVersionId) {
-        try {
-          // Reload classes from database to get latest state
-          const result = await getClassesForVersion(selectedVersionId);
-          const classesData = JSON.parse(result);
+    const generateSpec = async () => {
+      if (!selectedVersionId || nodes.length === 0) return;
 
-          // Load properties and tags for each class
-          const classesWithProperties = await Promise.all(
-            classesData.map(async (cls: any) => {
-              const propsResult = await getPropertiesForClass(cls.id);
-              const properties = JSON.parse(propsResult);
+      try {
+        // Convert current nodes to classes format
+        const classesWithProperties = nodes.map(node => ({
+          id: node.id,
+          name: (node.data as any).name,
+          description: (node.data as any).description,
+          properties: (node.data as any).properties || [],
+          schema: (node.data as any).schema,
+          tags: (node.data as any).tags || []
+        }));
 
-              // Load tags for this class
-              const tagsResult = await getTagsForClass(cls.id);
-              const tags = JSON.parse(tagsResult);
+        // Get current project and version for metadata
+        const currentProject = projects.find(p => p.id === selectedProjectId);
+        const currentVersion = versions.find(v => v.id === selectedVersionId);
 
-              return { ...cls, properties, tags };
-            })
-          );
-
-          // Get current project and version for metadata
-          const currentProject = projects.find(p => p.id === selectedProjectId);
-          const currentVersion = versions.find(v => v.id === selectedVersionId);
-
-          if (viewMode === 'code') {
-            // Generate fresh OpenAPI specification
+        if (viewMode === 'code') {
+          // Generate only the selected spec format
+          if (codeDisplayFormat === 'openapi') {
             const spec = await generateOpenApiSpec(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id
             });
             setOpenApiSpec(spec);
-
-            // Generate fresh Arazzo specification
+            console.log('Generated OpenAPI spec');
+          } else if (codeDisplayFormat === 'arazzo') {
             const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id
             });
             setArazzoSpec(arazzoSpecContent);
-
-            // Generate fresh JSON Schema specification
+            console.log('Generated Arazzo spec');
+          } else if (codeDisplayFormat === 'jsonschema') {
             const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id
             });
             setJsonSchemaSpec(jsonSchemaContent);
-            console.log('Regenerated OpenAPI, Arazzo, and JSON Schema specs for view mode:', viewMode);
-          } else if (viewMode === 'generate') {
-            // Generate fresh DTOs for all languages
-            const dtoOptions = {
-              projectName: currentProject?.name,
-              version: currentVersion?.version_id,
-              description: `Data Type Objects for ${currentProject?.name || 'API'}`
-            };
-
-            // Generate Python code based on selected model type
-            let pythonCode: string;
-            if (pythonModelType === 'dataclass') {
-              pythonCode = generatePythonDataclasses(classesWithProperties, {
-                ...dtoOptions,
-                frozen: false,
-                slots: false,
-                includeValidation: true,
-                includeJsonHelpers: true
-              });
-            } else if (pythonModelType === 'sqlalchemy') {
-              pythonCode = generateSQLAlchemyModels(classesWithProperties, {
-                ...dtoOptions,
-                includeRelationships: true,
-                databaseType: sqlDialect === 'postgresql' ? 'postgresql' : sqlDialect === 'mysql' ? 'mysql' : 'sqlite',
-                customTableNames: false,
-                includeIndexes: true
-              });
-            } else {
-              pythonCode = generatePythonDTOs(classesWithProperties, dtoOptions);
-            }
-            const typeScriptCode = generateTypeScriptDTOs(classesWithProperties, dtoOptions);
-
-            // Generate Java code based on selected style
-            const javaCode = generateJavaPojos(classesWithProperties, {
-              ...dtoOptions,
-              packageName: 'com.example.models',
-              useLombok: javaStyle === 'lombok',
-              useRecords: javaStyle === 'record',
-              useBuilder: javaStyle === 'lombok',
-              includeValidation: true,
-              validationProvider: 'jakarta',
-              includeJackson: true
-            });
-
-            const sqlCode = generateSQL(classesWithProperties, sqlDialect, {
-              includeComments: true,
-              includeDropStatements: false,
-              namingConvention: 'snake_case'
-            });
-            const graphqlCode = generateGraphQL(classesWithProperties, {
-              projectName: currentProject?.name,
-              version: currentVersion?.version_id,
-              includeQueries: true,
-              includeMutations: true,
-              includeInputTypes: true
-            });
-            const scalaCode = generateScala(classesWithProperties, scalaCodecLibrary, {
-              packageName: 'com.example.models',
-              includeCompanionObjects: true
-            });
-
-            // Cache all versions
-            setGeneratedPythonCode(pythonCode);
-            setGeneratedTypeScriptCode(typeScriptCode);
-            setGeneratedJavaCode(javaCode);
-            setGeneratedSQLCode(sqlCode);
-            setGeneratedGraphQLCode(graphqlCode);
-            setGeneratedScalaCode(scalaCode);
-
-            // Set generated code based on current language selection
-            if (generateLanguage === 'typescript') {
-              setGeneratedCode(typeScriptCode);
-            } else if (generateLanguage === 'java') {
-              setGeneratedCode(javaCode);
-            } else if (generateLanguage === 'sql') {
-              setGeneratedCode(sqlCode);
-            } else if (generateLanguage === 'graphql') {
-              setGeneratedCode(graphqlCode);
-            } else if (generateLanguage === 'scala') {
-              setGeneratedCode(scalaCode);
-            } else {
-              setGeneratedCode(pythonCode);
-            }
-            console.log('Regenerated DTOs for view mode:', viewMode, 'language:', generateLanguage);
-          } else if (viewMode === 'mermaid') {
-            // Generate fresh Mermaid diagram
-            const mermaid = generateMermaidDiagram(classesWithProperties);
-            setMermaidCode(mermaid);
-            console.log('Regenerated Mermaid diagram for view mode:', viewMode);
+            console.log('Generated JSON Schema');
           }
-        } catch (error) {
-          console.error('Failed to regenerate content:', error);
+        } else if (viewMode === 'mermaid') {
+          // Generate fresh Mermaid diagram
+          const mermaid = generateMermaidDiagram(classesWithProperties);
+          setMermaidCode(mermaid);
+          console.log('Generated Mermaid diagram');
         }
+      } catch (error) {
+        console.error('Failed to generate content:', error);
       }
     };
 
-    regenerateSpec();
-  }, [viewMode, selectedVersionId, selectedProjectId, projects, versions, generateLanguage, pythonModelType, javaStyle, sqlDialect, scalaCodecLibrary]);
-
-  // Update generated code when language changes (use cached versions)
-  // Note: This effect only runs when switching between languages (python/typescript/java/sql/etc)
-  // It does NOT run when dialect/style changes - those are handled by separate effects
-  const previousLanguageRef = useRef(generateLanguage);
-
-  useEffect(() => {
-    // Only switch code if language actually changed (not on initial mount or dialect changes)
-    if (previousLanguageRef.current !== generateLanguage) {
-      console.log('Language changed from', previousLanguageRef.current, 'to', generateLanguage);
-
-      if (generateLanguage === 'typescript' && generatedTypeScriptCode) {
-        setGeneratedCode(generatedTypeScriptCode);
-      } else if (generateLanguage === 'java' && generatedJavaCode) {
-        setGeneratedCode(generatedJavaCode);
-      } else if (generateLanguage === 'sql' && generatedSQLCode) {
-        setGeneratedCode(generatedSQLCode);
-      } else if (generateLanguage === 'graphql' && generatedGraphQLCode) {
-        setGeneratedCode(generatedGraphQLCode);
-      } else if (generateLanguage === 'python' && generatedPythonCode) {
-        setGeneratedCode(generatedPythonCode);
-      }
-
-      previousLanguageRef.current = generateLanguage;
-    }
-  }, [generateLanguage, generatedPythonCode, generatedTypeScriptCode, generatedJavaCode, generatedSQLCode, generatedGraphQLCode]);
-
-  // Regenerate SQL when dialect changes or when switching to SQL language
-  useEffect(() => {
-    const generateSQLCode = async () => {
-      if (generateLanguage === 'sql' && selectedVersionId) {
-        try {
-          let classesToUse = loadedClasses;
-
-          // If loadedClasses is empty, fetch classes directly
-          if (classesToUse.length === 0) {
-            console.log('[SQL Effect] Classes not loaded, fetching...');
-            const classesResult = await getClassesForVersion(selectedVersionId);
-            const classesData = JSON.parse(classesResult);
-
-            classesToUse = await Promise.all(
-              classesData.map(async (cls: any) => {
-                const propsResult = await getPropertiesForClass(cls.id);
-                const properties = JSON.parse(propsResult);
-                return { ...cls, properties };
-              })
-            );
-            console.log('[SQL Effect] Fetched', classesToUse.length, 'classes');
-          }
-
-          console.log('[SQL Effect] Generating with dialect:', sqlDialect, '| Classes:', classesToUse.length);
-          const sqlCode = generateSQL(classesToUse, sqlDialect, {
-            includeComments: true,
-            includeDropStatements: false,
-            namingConvention: 'snake_case'
-          });
-          console.log('[SQL Effect] Generated:', sqlCode.length, 'chars | Dialect:', sqlCode.substring(30, 60));
-          setGeneratedSQLCode(sqlCode);
-          setGeneratedCode(sqlCode);
-        } catch (error) {
-          console.error('[SQL Effect] Error:', error);
-        }
-      }
-    };
-
-    generateSQLCode();
-  }, [sqlDialect, generateLanguage, loadedClasses, selectedVersionId]);
-
-  // Regenerate Scala when codec library changes
-  useEffect(() => {
-    const generateScalaCode = async () => {
-      if (generateLanguage === 'scala' && selectedVersionId) {
-        try {
-          let classesToUse = loadedClasses;
-
-          // If loadedClasses is empty, fetch classes directly
-          if (classesToUse.length === 0) {
-            console.log('[Scala Effect] Classes not loaded, fetching...');
-            const classesResult = await getClassesForVersion(selectedVersionId);
-            const classesData = JSON.parse(classesResult);
-
-            classesToUse = await Promise.all(
-              classesData.map(async (cls: any) => {
-                const propsResult = await getPropertiesForClass(cls.id);
-                const properties = JSON.parse(propsResult);
-                return { ...cls, properties };
-              })
-            );
-            console.log('[Scala Effect] Fetched', classesToUse.length, 'classes');
-          }
-
-          console.log('[Scala Effect] Generating with codec:', scalaCodecLibrary, '| Classes:', classesToUse.length);
-          const scalaCode = generateScala(classesToUse, scalaCodecLibrary, {
-            packageName: 'com.example.models',
-            includeCompanionObjects: true
-          });
-          console.log('[Scala Effect] Generated:', scalaCode.length, 'chars');
-          setGeneratedScalaCode(scalaCode);
-          setGeneratedCode(scalaCode);
-        } catch (error) {
-          console.error('[Scala Effect] Error:', error);
-        }
-      }
-    };
-
-    generateScalaCode();
-  }, [scalaCodecLibrary, generateLanguage, loadedClasses, selectedVersionId]);
-
-  // Regenerate Python when model type changes
-  useEffect(() => {
-    const generatePythonCode = async () => {
-      if (generateLanguage === 'python' && selectedVersionId) {
-        try {
-          let classesToUse = loadedClasses;
-
-          // If loadedClasses is empty, fetch classes directly
-          if (classesToUse.length === 0) {
-            console.log('[Python Effect] Classes not loaded, fetching...');
-            const classesResult = await getClassesForVersion(selectedVersionId);
-            const classesData = JSON.parse(classesResult);
-
-            classesToUse = await Promise.all(
-              classesData.map(async (cls: any) => {
-                const propsResult = await getPropertiesForClass(cls.id);
-                const properties = JSON.parse(propsResult);
-                return { ...cls, properties };
-              })
-            );
-            console.log('[Python Effect] Fetched', classesToUse.length, 'classes');
-          }
-
-          console.log('[Python Effect] Generating with model type:', pythonModelType, '| Classes:', classesToUse.length);
-
-          const currentProject = projects.find(p => p.id === selectedProjectId);
-          const currentVersion = versions.find(v => v.id === selectedVersionId);
-          const dtoOptions = {
-            projectName: currentProject?.name,
-            version: currentVersion?.version_id,
-            description: `Data Type Objects for ${currentProject?.name || 'API'}`
-          };
-
-          let pythonCode: string;
-          if (pythonModelType === 'dataclass') {
-            pythonCode = generatePythonDataclasses(classesToUse, {
-              ...dtoOptions,
-              frozen: false,
-              slots: false,
-              includeValidation: true,
-              includeJsonHelpers: true
-            });
-          } else if (pythonModelType === 'sqlalchemy') {
-            pythonCode = generateSQLAlchemyModels(classesToUse, {
-              ...dtoOptions,
-              includeRelationships: true,
-              databaseType: sqlDialect === 'postgresql' ? 'postgresql' : sqlDialect === 'mysql' ? 'mysql' : 'sqlite',
-              customTableNames: false,
-              includeIndexes: true
-            });
-          } else {
-            pythonCode = generatePythonDTOs(classesToUse, dtoOptions);
-          }
-
-          console.log('[Python Effect] Generated:', pythonCode.length, 'chars');
-          setGeneratedPythonCode(pythonCode);
-          setGeneratedCode(pythonCode);
-        } catch (error) {
-          console.error('[Python Effect] Error:', error);
-        }
-      }
-    };
-
-    generatePythonCode();
-  }, [pythonModelType, generateLanguage, loadedClasses, selectedVersionId, selectedProjectId, projects, versions, sqlDialect]);
-
-  // Regenerate Java when style changes
-  useEffect(() => {
-    const generateJavaCode = async () => {
-      if (generateLanguage === 'java' && selectedVersionId) {
-        try {
-          let classesToUse = loadedClasses;
-
-          // If loadedClasses is empty, fetch classes directly
-          if (classesToUse.length === 0) {
-            console.log('[Java Effect] Classes not loaded, fetching...');
-            const classesResult = await getClassesForVersion(selectedVersionId);
-            const classesData = JSON.parse(classesResult);
-
-            classesToUse = await Promise.all(
-              classesData.map(async (cls: any) => {
-                const propsResult = await getPropertiesForClass(cls.id);
-                const properties = JSON.parse(propsResult);
-                return { ...cls, properties };
-              })
-            );
-            console.log('[Java Effect] Fetched', classesToUse.length, 'classes');
-          }
-
-          console.log('[Java Effect] Generating with style:', javaStyle, '| Classes:', classesToUse.length);
-
-          const currentProject = projects.find(p => p.id === selectedProjectId);
-          const currentVersion = versions.find(v => v.id === selectedVersionId);
-
-          const javaCode = generateJavaPojos(classesToUse, {
-            projectName: currentProject?.name,
-            version: currentVersion?.version_id,
-            description: `Data Objects for ${currentProject?.name || 'API'}`,
-            packageName: 'com.example.models',
-            useLombok: javaStyle === 'lombok',
-            useRecords: javaStyle === 'record',
-            useBuilder: javaStyle === 'lombok',
-            includeValidation: true,
-            validationProvider: 'jakarta',
-            includeJackson: true
-          });
-
-          console.log('[Java Effect] Generated:', javaCode.length, 'chars');
-          setGeneratedJavaCode(javaCode);
-          setGeneratedCode(javaCode);
-        } catch (error) {
-          console.error('[Java Effect] Error:', error);
-        }
-      }
-    };
-
-    generateJavaCode();
-  }, [javaStyle, generateLanguage, loadedClasses, selectedVersionId, selectedProjectId, projects, versions]);
+    generateSpec();
+  }, [viewMode, codeDisplayFormat, selectedVersionId, selectedProjectId, projects, versions, nodes]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -2320,16 +1803,6 @@ const StudioContent = () => {
                   }`}
                 >
                   Code
-                </button>
-                <button
-                  onClick={() => setViewMode('generate')}
-                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
-                    viewMode === 'generate'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  Generate
                 </button>
                 <button
                   onClick={() => setViewMode('mermaid')}
@@ -2758,215 +2231,6 @@ const StudioContent = () => {
                     ? specContent
                     : YAML.stringify(JSON.parse(specContent));
                 })()}
-                theme="vs-dark"
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: true },
-                  scrollBeyondLastLine: false,
-                  fontSize: 13,
-                  lineNumbers: 'on',
-                  renderWhitespace: 'selection',
-                  automaticLayout: true,
-                  wordWrap: 'on',
-                  folding: true,
-                  formatOnPaste: true,
-                  formatOnType: true,
-                  contextmenu: true,
-                  selectOnLineNumbers: true,
-                }}
-              />
-            </div>
-          </div>
-        ) : viewMode === 'generate' ? (
-          // Monaco Editor Generate View - DTO Generation
-          <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {generateLanguage === 'sql'
-                        ? `Generated SQL DDL - ${sqlDialect.toUpperCase()}`
-                        : generateLanguage === 'graphql'
-                        ? 'Generated GraphQL Schema'
-                        : generateLanguage === 'scala'
-                        ? `Generated Scala - ${scalaCodecLibrary === 'play-json' ? 'Play JSON' : scalaCodecLibrary === 'circe' ? 'Circe' : 'No Codec'}`
-                        : generateLanguage === 'python'
-                        ? `Generated Python - ${pythonModelType === 'pydantic' ? 'Pydantic' : pythonModelType === 'dataclass' ? 'Dataclasses' : 'SQLAlchemy'}`
-                        : generateLanguage === 'java'
-                        ? `Generated Java - ${javaStyle === 'pojo' ? 'POJO' : javaStyle === 'lombok' ? 'Lombok' : 'Record'}`
-                        : `Generated DTOs - TypeScript`
-                      }
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {generateLanguage === 'sql'
-                        ? `Database schema for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : generateLanguage === 'graphql'
-                        ? `GraphQL API schema for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : generateLanguage === 'scala'
-                        ? `Scala case classes for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : generateLanguage === 'java'
-                        ? `Java classes for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : `Data Type Objects for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                      }
-                    </p>
-                  </div>
-
-                  {/* Language Selector */}
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={generateLanguage}
-                      onChange={(e) => setGenerateLanguage(e.target.value as 'python' | 'typescript' | 'java' | 'sql' | 'graphql' | 'scala')}
-                      className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="python">Python</option>
-                      <option value="typescript">TypeScript</option>
-                      <option value="java">Java</option>
-                      <option value="sql">SQL</option>
-                      <option value="graphql">GraphQL</option>
-                      <option value="scala">Scala</option>
-                    </select>
-
-                    {/* Python Model Type Selector - only show when Python is selected */}
-                    {generateLanguage === 'python' && (
-                      <select
-                        value={pythonModelType}
-                        onChange={(e) => setPythonModelType(e.target.value as 'pydantic' | 'dataclass' | 'sqlalchemy')}
-                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="pydantic">Pydantic</option>
-                        <option value="dataclass">Dataclasses</option>
-                        <option value="sqlalchemy">SQLAlchemy</option>
-                      </select>
-                    )}
-
-                    {/* Java Style Selector - only show when Java is selected */}
-                    {generateLanguage === 'java' && (
-                      <select
-                        value={javaStyle}
-                        onChange={(e) => setJavaStyle(e.target.value as 'pojo' | 'lombok' | 'record')}
-                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="pojo">POJO</option>
-                        <option value="lombok">Lombok</option>
-                        <option value="record">Record</option>
-                      </select>
-                    )}
-
-                    {/* SQL Dialect Selector - only show when SQL is selected */}
-                    {generateLanguage === 'sql' && (
-                      <select
-                        value={sqlDialect}
-                        onChange={(e) => setSqlDialect(e.target.value as any)}
-                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="postgresql">PostgreSQL</option>
-                        <option value="mysql">MySQL</option>
-                        <option value="sqlserver">SQL Server</option>
-                        <option value="oracle">Oracle</option>
-                        <option value="sqlite">SQLite</option>
-                      </select>
-                    )}
-
-                    {/* Scala Codec Library Selector - only show when Scala is selected */}
-                    {generateLanguage === 'scala' && (
-                      <select
-                        value={scalaCodecLibrary}
-                        onChange={(e) => setScalaCodecLibrary(e.target.value as any)}
-                        className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="play-json">Play JSON</option>
-                        <option value="circe">Circe</option>
-                        <option value="none">No Codec</option>
-                      </select>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(generatedCode);
-                      setGenerateCopied(true);
-                      setTimeout(() => setGenerateCopied(false), 2000);
-                    }}
-                    disabled={generateCopied}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                      generateCopied
-                        ? 'bg-gray-500 text-white cursor-not-allowed'
-                        : 'bg-gray-600 hover:bg-gray-700 text-white'
-                    }`}
-                    title="Copy to clipboard"
-                  >
-                    {generateCopied ? <Check size={14} /> : <Copy size={14} />}
-                    {generateCopied ? 'Copied' : 'Copy'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      let filename: string;
-
-                      if (generateLanguage === 'python') {
-                        filename = 'schema.py';
-                      } else if (generateLanguage === 'typescript') {
-                        filename = 'schema.ts';
-                      } else if (generateLanguage === 'graphql') {
-                        filename = 'schema.graphql';
-                      } else if (generateLanguage === 'scala') {
-                        filename = 'Models.scala';
-                      } else {
-                        filename = `schema_${sqlDialect}.sql`;
-                      }
-
-                      const mimeType = 'text/plain';
-
-                      // Create a blob from the generated code
-                      const blob = new Blob([generatedCode], { type: mimeType });
-                      const url = URL.createObjectURL(blob);
-
-                      // Create a temporary download link
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = filename;
-
-                      // Trigger download
-                      document.body.appendChild(link);
-                      link.click();
-
-                      // Cleanup
-                      document.body.removeChild(link);
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                    title="Export to file"
-                  >
-                    <Download size={14} />
-                    Export
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1">
-              <Editor
-                height="100%"
-                language={
-                  generateLanguage === 'typescript' ? 'typescript'
-                  : generateLanguage === 'sql' ? 'sql'
-                  : generateLanguage === 'graphql' ? 'graphql'
-                  : generateLanguage === 'scala' ? 'scala'
-                  : 'python'
-                }
-                value={
-                  generatedCode ||
-                  (generateLanguage === 'typescript'
-                    ? '// No classes defined\n// Add classes to the canvas to generate DTOs'
-                    : generateLanguage === 'sql'
-                    ? '-- No classes defined\n-- Add classes to the canvas to generate SQL DDL'
-                    : generateLanguage === 'graphql'
-                    ? '# No classes defined\n# Add classes to the canvas to generate GraphQL schema'
-                    : generateLanguage === 'scala'
-                    ? '// No classes defined\n// Add classes to the canvas to generate Scala case classes'
-                    : '# No classes defined\n# Add classes to the canvas to generate DTOs')
-                }
                 theme="vs-dark"
                 options={{
                   readOnly: true,
