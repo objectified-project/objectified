@@ -51,6 +51,7 @@ export interface PropertyItem {
   readOnly?: boolean;
   writeOnly?: boolean;
   deprecated?: boolean;
+  deprecationMessage?: string;
   example?: any;
   additionalProperties?: boolean | any;
   // Tuple mode (OpenAPI 3.1)
@@ -455,7 +456,10 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
+                              textDecoration: propertyItem.deprecated ? 'line-through' : 'none',
+                              color: propertyItem.deprecated ? 'text.secondary' : 'text.primary',
                             }}
+                            title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
                           >
                             {propertyItem.name}
                           </Typography>
