@@ -232,6 +232,20 @@ export async function generateOpenApiSpec(
     version?: string;
     description?: string;
     openapiVersion?: string;
+    metadata?: {
+      summary?: string;
+      termsOfService?: string;
+      contact?: {
+        name?: string;
+        url?: string;
+        email?: string;
+      };
+      license?: {
+        name?: string;
+        identifier?: string;
+        url?: string;
+      };
+    };
   }
 ): Promise<string> {
   const schemas: any = {};
@@ -244,22 +258,62 @@ export async function generateOpenApiSpec(
   // Get OpenAPI version configuration
   const versionConfig = getOpenAPIVersionConfig(options?.openapiVersion);
 
+  // Prepare info object with metadata
+  const info: any = {
+    title: options?.projectName || 'API Schema',
+    version: options?.version || '1.0.0',
+    description: options?.description || `Generated OpenAPI ${versionConfig.version} specification from Objectified Studio`
+  };
+
+
+  // Add optional metadata fields
+  if (options?.metadata) {
+    if (options.metadata.summary) {
+      info.summary = options.metadata.summary;
+    }
+    if (options.metadata.termsOfService) {
+      info.termsOfService = options.metadata.termsOfService;
+    }
+    if (options.metadata.contact && Object.keys(options.metadata.contact).length > 0) {
+      info.contact = {};
+      if (options.metadata.contact.name) info.contact.name = options.metadata.contact.name;
+      if (options.metadata.contact.url) info.contact.url = options.metadata.contact.url;
+      if (options.metadata.contact.email) info.contact.email = options.metadata.contact.email;
+    }
+    if (options.metadata.license && Object.keys(options.metadata.license).length > 0) {
+      info.license = {};
+      if (options.metadata.license.name) info.license.name = options.metadata.license.name;
+      if (options.metadata.license.identifier) info.license.identifier = options.metadata.license.identifier;
+      if (options.metadata.license.url) info.license.url = options.metadata.license.url;
+    }
+  }
+
+
   // Prepare template data
-  const templateData = {
+  const templateData: any = {
     openapi: versionConfig.version,
-    info: {
-      title: options?.projectName || 'API Schema',
-      version: options?.version || '1.0.0',
-      description: options?.description || `Generated OpenAPI ${versionConfig.version} specification from Objectified Studio`
-    },
+    info,
     schemas
   };
+
+  // Add project metadata to top level as x-metadata extension
+  if (options?.metadata && Object.keys(options.metadata).length > 0) {
+    templateData.xMetadata = options.metadata;
+  }
 
   // Render using Handlebars template
   const rendered = await renderTemplate(versionConfig.templateFile, templateData);
 
+
   // Parse and re-stringify to ensure valid JSON and proper formatting
-  return JSON.stringify(JSON.parse(rendered), null, 2);
+  try {
+    const parsed = JSON.parse(rendered);
+    return JSON.stringify(parsed, null, 2);
+  } catch (error) {
+    console.error('[OpenAPI] Failed to parse rendered template. Error:', error);
+    console.error('[OpenAPI] Rendered output:', rendered);
+    throw new Error(`Failed to parse rendered OpenAPI spec: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /**
@@ -277,6 +331,20 @@ export async function generateClassOpenApiSpec(
     version?: string;
     description?: string;
     openapiVersion?: string;
+    metadata?: {
+      summary?: string;
+      termsOfService?: string;
+      contact?: {
+        name?: string;
+        url?: string;
+        email?: string;
+      };
+      license?: {
+        name?: string;
+        identifier?: string;
+        url?: string;
+      };
+    };
   }
 ): Promise<any> {
   const referencedClasses = new Set<string>();
@@ -354,16 +422,46 @@ export async function generateClassOpenApiSpec(
   // Get OpenAPI version configuration
   const versionConfig = getOpenAPIVersionConfig(options?.openapiVersion);
 
+  // Prepare info object with metadata
+  const info: any = {
+    title: options?.title || `${classData.name} Schema`,
+    version: options?.version || '1.0.0',
+    description: options?.description || `OpenAPI ${versionConfig.version} schema definition`
+  };
+
+  // Add optional metadata fields
+  if (options?.metadata) {
+    if (options.metadata.summary) {
+      info.summary = options.metadata.summary;
+    }
+    if (options.metadata.termsOfService) {
+      info.termsOfService = options.metadata.termsOfService;
+    }
+    if (options.metadata.contact && Object.keys(options.metadata.contact).length > 0) {
+      info.contact = {};
+      if (options.metadata.contact.name) info.contact.name = options.metadata.contact.name;
+      if (options.metadata.contact.url) info.contact.url = options.metadata.contact.url;
+      if (options.metadata.contact.email) info.contact.email = options.metadata.contact.email;
+    }
+    if (options.metadata.license && Object.keys(options.metadata.license).length > 0) {
+      info.license = {};
+      if (options.metadata.license.name) info.license.name = options.metadata.license.name;
+      if (options.metadata.license.identifier) info.license.identifier = options.metadata.license.identifier;
+      if (options.metadata.license.url) info.license.url = options.metadata.license.url;
+    }
+  }
+
   // Prepare template data
-  const templateData = {
+  const templateData: any = {
     openapi: versionConfig.version,
-    info: {
-      title: options?.title || `${classData.name} Schema`,
-      version: options?.version || '1.0.0',
-      description: options?.description || `OpenAPI ${versionConfig.version} schema definition`
-    },
+    info,
     schemas
   };
+
+  // Add project metadata to top level as x-metadata extension
+  if (options?.metadata && Object.keys(options.metadata).length > 0) {
+    templateData.xMetadata = options.metadata;
+  }
 
   // Render using Handlebars template
   const rendered = await renderTemplate(versionConfig.templateFile, templateData);

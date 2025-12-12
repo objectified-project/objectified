@@ -17,6 +17,20 @@ export function generateArazzoSpec(
     projectName?: string;
     version?: string;
     description?: string;
+    metadata?: {
+      summary?: string;
+      termsOfService?: string;
+      contact?: {
+        name?: string;
+        url?: string;
+        email?: string;
+      };
+      license?: {
+        name?: string;
+        identifier?: string;
+        url?: string;
+      };
+    };
   }
 ): string {
   // Generate workflows based on CRUD operations for each class
@@ -121,13 +135,34 @@ export function generateArazzoSpec(
   });
 
   // Build the complete Arazzo document
-  const arazzoDoc = {
+  const info: any = {
+    title: options?.projectName ? `${options.projectName} Workflows` : 'API Workflows',
+    version: options?.version || '1.0.0',
+    description: options?.description || 'Generated Arazzo 1.0.1 workflow specification from Objectified Studio'
+  };
+
+  // Add optional metadata fields to info
+  if (options?.metadata) {
+    if (options.metadata.summary) {
+      info.summary = options.metadata.summary;
+    }
+    if (options.metadata.contact && Object.keys(options.metadata.contact).length > 0) {
+      info.contact = {};
+      if (options.metadata.contact.name) info.contact.name = options.metadata.contact.name;
+      if (options.metadata.contact.url) info.contact.url = options.metadata.contact.url;
+      if (options.metadata.contact.email) info.contact.email = options.metadata.contact.email;
+    }
+    if (options.metadata.license && Object.keys(options.metadata.license).length > 0) {
+      info.license = {};
+      if (options.metadata.license.name) info.license.name = options.metadata.license.name;
+      if (options.metadata.license.identifier) info.license.identifier = options.metadata.license.identifier;
+      if (options.metadata.license.url) info.license.url = options.metadata.license.url;
+    }
+  }
+
+  const arazzoDoc: any = {
     arazzo: '1.0.1',
-    info: {
-      title: options?.projectName ? `${options.projectName} Workflows` : 'API Workflows',
-      version: options?.version || '1.0.0',
-      description: options?.description || 'Generated Arazzo 1.0.1 workflow specification from Objectified Studio'
-    },
+    info,
     sourceDescriptions: [
       {
         name: 'openapi-source',
@@ -138,6 +173,11 @@ export function generateArazzoSpec(
     ],
     workflows
   };
+
+  // Add project metadata to top level as x-metadata extension
+  if (options?.metadata && Object.keys(options.metadata).length > 0) {
+    arazzoDoc['x-metadata'] = options.metadata;
+  }
 
   return JSON.stringify(arazzoDoc, null, 2);
 }

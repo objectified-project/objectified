@@ -45,9 +45,23 @@ interface ClassEditDialogProps {
   projectId?: string;
   versionId?: string;
   projectTags?: any[];
+  projectMetadata?: {
+    summary?: string;
+    termsOfService?: string;
+    contact?: {
+      name?: string;
+      url?: string;
+      email?: string;
+    };
+    license?: {
+      name?: string;
+      identifier?: string;
+      url?: string;
+    };
+  };
 }
 
-const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', versionId = '', projectTags = [] }: ClassEditDialogProps) => {
+const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', versionId = '', projectTags = [], projectMetadata }: ClassEditDialogProps) => {
   const [tabValue, setTabValue] = useState(0);
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -193,7 +207,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         const doc = await generateClassOpenApiSpec(previewClassData, allClasses, {
           title: `${previewClassData.name} Schema`,
           version: '1.0.0',
-          description: 'OpenAPI 3.1.0 schema definition'
+          description: 'OpenAPI 3.1.0 schema definition',
+          metadata: projectMetadata
         });
 
         setOpenApiDoc(doc);

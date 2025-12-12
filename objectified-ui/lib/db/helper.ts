@@ -238,7 +238,7 @@ export async function getProjectsForTenant(tenantId: string) {
   }
 }
 
-export async function createProject(tenantId: string, creatorId: string, name: string, description: string, slug: string) {
+export async function createProject(tenantId: string, creatorId: string, name: string, description: string, slug: string, metadata?: any) {
   try {
     if (!name?.trim()) return errorResponse('Project name is required');
     if (!slug?.trim()) return errorResponse('Project slug is required');
@@ -246,8 +246,8 @@ export async function createProject(tenantId: string, creatorId: string, name: s
     if (slugError) return errorResponse(slugError);
 
     const result = await connectionPool.query(
-      `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [tenantId, creatorId, name.trim(), description?.trim() || null, slug.trim().toLowerCase()]);
+      `INSERT INTO odb.projects (tenant_id, creator_id, name, description, slug, metadata) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [tenantId, creatorId, name.trim(), description?.trim() || null, slug.trim().toLowerCase(), metadata ? JSON.stringify(metadata) : '{}']);
     return successResponse({ project: result.rows[0] });
   } catch (error: any) {
     if (error.code === '23505') return errorResponse('A project with this slug already exists in this tenant');
@@ -255,7 +255,7 @@ export async function createProject(tenantId: string, creatorId: string, name: s
   }
 }
 
-export async function updateProject(projectId: string, name: string, description: string, slug: string, enabled: boolean) {
+export async function updateProject(projectId: string, name: string, description: string, slug: string, enabled: boolean, metadata?: any) {
   try {
     if (!name?.trim()) return errorResponse('Project name is required');
     if (!slug?.trim()) return errorResponse('Project slug is required');
@@ -263,8 +263,8 @@ export async function updateProject(projectId: string, name: string, description
     if (slugError) return errorResponse(slugError);
 
     await connectionPool.query(
-      `UPDATE odb.projects SET name = $1, description = $2, slug = $3, enabled = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5 AND deleted_at IS NULL`,
-      [name.trim(), description?.trim() || null, slug.trim().toLowerCase(), enabled, projectId]);
+      `UPDATE odb.projects SET name = $1, description = $2, slug = $3, enabled = $4, metadata = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 AND deleted_at IS NULL`,
+      [name.trim(), description?.trim() || null, slug.trim().toLowerCase(), enabled, metadata ? JSON.stringify(metadata) : '{}', projectId]);
     return successResponse();
   } catch (error: any) {
     if (error.code === '23505') return errorResponse('A project with this slug already exists in this tenant');

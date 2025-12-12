@@ -1,11 +1,8 @@
 {
   "openapi": "{{openapi}}",
-  "info": {
-    "title": "{{info.title}}",
-    "version": "{{info.version}}"{{#if info.description}},
-    "description": "{{info.description}}"{{/if}}
-  },
-  "components": {
+  "info": {{{json info}}},
+{{#if xMetadata}}  "x-metadata": {{{json xMetadata}}},
+{{/if}}  "components": {
     "schemas": {
 {{#each schemas}}
       "{{@key}}": {{{json this}}}{{#unless @last}},{{/unless}}

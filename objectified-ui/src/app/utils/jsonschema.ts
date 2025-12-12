@@ -19,6 +19,20 @@ export function generateJsonSchema(
     projectName?: string;
     version?: string;
     description?: string;
+    metadata?: {
+      summary?: string;
+      termsOfService?: string;
+      contact?: {
+        name?: string;
+        url?: string;
+        email?: string;
+      };
+      license?: {
+        name?: string;
+        identifier?: string;
+        url?: string;
+      };
+    };
   }
 ): string {
   const definitions: any = {};
@@ -29,7 +43,7 @@ export function generateJsonSchema(
     definitions[cls.name] = buildClassSchema(cls);
   });
 
-  const jsonSchemaDoc = {
+  const jsonSchemaDoc: any = {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: `https://example.com/${options?.projectName?.toLowerCase().replace(/\s+/g, '-') || 'schema'}.json`,
     title: options?.projectName || 'JSON Schema',
@@ -37,6 +51,11 @@ export function generateJsonSchema(
     type: 'object',
     $defs: definitions
   };
+
+  // Add project metadata to top level as x-metadata extension
+  if (options?.metadata && Object.keys(options.metadata).length > 0) {
+    jsonSchemaDoc['x-metadata'] = options.metadata;
+  }
 
   return JSON.stringify(jsonSchemaDoc, null, 2);
 }

@@ -1521,7 +1521,7 @@ const StudioContent = () => {
   // Generate specs on-demand when switching views or when canvas changes
   useEffect(() => {
     const generateSpec = async () => {
-      if (!selectedVersionId || nodes.length === 0) return;
+      if (!selectedVersionId) return;
 
       try {
         // Convert current nodes to classes format
@@ -1543,21 +1543,24 @@ const StudioContent = () => {
           if (codeDisplayFormat === 'openapi') {
             const spec = await generateOpenApiSpec(classesWithProperties, {
               projectName: currentProject?.name,
-              version: currentVersion?.version_id
+              version: currentVersion?.version_id,
+              metadata: (currentProject as any)?.metadata
             });
             setOpenApiSpec(spec);
             console.log('Generated OpenAPI spec');
           } else if (codeDisplayFormat === 'arazzo') {
             const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
               projectName: currentProject?.name,
-              version: currentVersion?.version_id
+              version: currentVersion?.version_id,
+              metadata: (currentProject as any)?.metadata
             });
             setArazzoSpec(arazzoSpecContent);
             console.log('Generated Arazzo spec');
           } else if (codeDisplayFormat === 'jsonschema') {
             const jsonSchemaContent = generateJsonSchema(classesWithProperties, {
               projectName: currentProject?.name,
-              version: currentVersion?.version_id
+              version: currentVersion?.version_id,
+              metadata: (currentProject as any)?.metadata
             });
             setJsonSchemaSpec(jsonSchemaContent);
             console.log('Generated JSON Schema');
@@ -2447,6 +2450,7 @@ const StudioContent = () => {
         }}
         projectId={selectedProjectId}
         projectTags={projectTags}
+        projectMetadata={(projects.find(p => p.id === selectedProjectId) as any)?.metadata}
       />
 
       {/* Tag Manager Dialog */}

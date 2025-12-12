@@ -16,10 +16,27 @@ import Box from '@mui/material/Box';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
+import Autocomplete from '@mui/material/Autocomplete';
 import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { filterSlugInput } from '../../../utils/slug';
+import { SPDX_LICENSES, getLicenseUrl, SPDXLicense } from '../../../utils/spdx-licenses';
+
+interface ProjectMetadata {
+  summary?: string;
+  termsOfService?: string;
+  contact?: {
+    name?: string;
+    url?: string;
+    email?: string;
+  };
+  license?: {
+    name?: string;
+    identifier?: string;
+    url?: string;
+  };
+}
 
 interface Project {
   id: string;
@@ -33,6 +50,7 @@ interface Project {
   updated_at: string;
   creator_name: string;
   creator_email: string;
+  metadata?: ProjectMetadata;
 }
 
 const Projects = () => {
@@ -50,6 +68,17 @@ const Projects = () => {
   const [projectEnabled, setProjectEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [editTabValue, setEditTabValue] = useState(0);
+
+  // Metadata state
+  const [metadataSummary, setMetadataSummary] = useState('');
+  const [metadataTermsOfService, setMetadataTermsOfService] = useState('');
+  const [metadataContactName, setMetadataContactName] = useState('');
+  const [metadataContactUrl, setMetadataContactUrl] = useState('');
+  const [metadataContactEmail, setMetadataContactEmail] = useState('');
+  const [metadataLicenseName, setMetadataLicenseName] = useState('');
+  const [metadataLicenseIdentifier, setMetadataLicenseIdentifier] = useState('');
+  const [metadataLicenseUrl, setMetadataLicenseUrl] = useState('');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
@@ -88,6 +117,17 @@ const Projects = () => {
     setProjectEnabled(true);
     setErrorMessage('');
     setCreateTabValue(0);
+
+    // Reset metadata
+    setMetadataSummary('');
+    setMetadataTermsOfService('');
+    setMetadataContactName('');
+    setMetadataContactUrl('');
+    setMetadataContactEmail('');
+    setMetadataLicenseName('');
+    setMetadataLicenseIdentifier('');
+    setMetadataLicenseUrl('');
+
     setShowCreateDialog(true);
   };
 
@@ -114,12 +154,38 @@ const Projects = () => {
     setErrorMessage('');
 
     try {
+      // Build metadata object
+      const metadata: ProjectMetadata = {};
+
+      if (metadataSummary.trim()) {
+        metadata.summary = metadataSummary.trim();
+      }
+
+      if (metadataTermsOfService.trim()) {
+        metadata.termsOfService = metadataTermsOfService.trim();
+      }
+
+      if (metadataContactName.trim() || metadataContactUrl.trim() || metadataContactEmail.trim()) {
+        metadata.contact = {};
+        if (metadataContactName.trim()) metadata.contact.name = metadataContactName.trim();
+        if (metadataContactUrl.trim()) metadata.contact.url = metadataContactUrl.trim();
+        if (metadataContactEmail.trim()) metadata.contact.email = metadataContactEmail.trim();
+      }
+
+      if (metadataLicenseName.trim() || metadataLicenseIdentifier.trim() || metadataLicenseUrl.trim()) {
+        metadata.license = {};
+        if (metadataLicenseName.trim()) metadata.license.name = metadataLicenseName.trim();
+        if (metadataLicenseIdentifier.trim()) metadata.license.identifier = metadataLicenseIdentifier.trim();
+        if (metadataLicenseUrl.trim()) metadata.license.url = metadataLicenseUrl.trim();
+      }
+
       const result = await createProject(
         currentTenantId,
         currentUserId,
         projectName,
         projectDescription,
-        projectSlug
+        projectSlug,
+        metadata
       );
       const response = JSON.parse(result);
 
@@ -143,6 +209,19 @@ const Projects = () => {
     setProjectSlug((project as any).slug || '');
     setProjectEnabled(project.enabled);
     setErrorMessage('');
+    setEditTabValue(0);
+
+    // Load metadata
+    const metadata = project.metadata || {};
+    setMetadataSummary(metadata.summary || '');
+    setMetadataTermsOfService(metadata.termsOfService || '');
+    setMetadataContactName(metadata.contact?.name || '');
+    setMetadataContactUrl(metadata.contact?.url || '');
+    setMetadataContactEmail(metadata.contact?.email || '');
+    setMetadataLicenseName(metadata.license?.name || '');
+    setMetadataLicenseIdentifier(metadata.license?.identifier || '');
+    setMetadataLicenseUrl(metadata.license?.url || '');
+
     setShowEditDialog(true);
   };
 
@@ -163,12 +242,38 @@ const Projects = () => {
     setErrorMessage('');
 
     try {
+      // Build metadata object
+      const metadata: ProjectMetadata = {};
+
+      if (metadataSummary.trim()) {
+        metadata.summary = metadataSummary.trim();
+      }
+
+      if (metadataTermsOfService.trim()) {
+        metadata.termsOfService = metadataTermsOfService.trim();
+      }
+
+      if (metadataContactName.trim() || metadataContactUrl.trim() || metadataContactEmail.trim()) {
+        metadata.contact = {};
+        if (metadataContactName.trim()) metadata.contact.name = metadataContactName.trim();
+        if (metadataContactUrl.trim()) metadata.contact.url = metadataContactUrl.trim();
+        if (metadataContactEmail.trim()) metadata.contact.email = metadataContactEmail.trim();
+      }
+
+      if (metadataLicenseName.trim() || metadataLicenseIdentifier.trim() || metadataLicenseUrl.trim()) {
+        metadata.license = {};
+        if (metadataLicenseName.trim()) metadata.license.name = metadataLicenseName.trim();
+        if (metadataLicenseIdentifier.trim()) metadata.license.identifier = metadataLicenseIdentifier.trim();
+        if (metadataLicenseUrl.trim()) metadata.license.url = metadataLicenseUrl.trim();
+      }
+
       const result = await updateProject(
         selectedProject.id,
         projectName,
         projectDescription,
         projectSlug,
-        projectEnabled
+        projectEnabled,
+        metadata
       );
       const response = JSON.parse(result);
 
@@ -560,7 +665,7 @@ const Projects = () => {
       <Dialog
         open={showEditDialog}
         onClose={() => !isLoading && setShowEditDialog(false)}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>Edit Project</DialogTitle>
@@ -570,44 +675,182 @@ const Projects = () => {
               {errorMessage}
             </Alert>
           )}
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Project Name"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            disabled={isLoading}
-            required
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="Slug"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={projectSlug}
-            onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
-            disabled={isLoading}
-            required
-            helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="Description"
-            type="text"
-            fullWidth
-            variant="outlined"
-            multiline
-            rows={4}
-            value={projectDescription}
-            onChange={(e) => setProjectDescription(e.target.value)}
-            disabled={isLoading}
-          />
+
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+            <Tabs value={editTabValue} onChange={(e, newValue) => setEditTabValue(newValue)}>
+              <Tab label="Basic Information" />
+              <Tab label="API Metadata" />
+            </Tabs>
+          </Box>
+
+          {editTabValue === 0 && (
+            <Box>
+              <TextField
+                autoFocus
+                margin="dense"
+                label="Project Name"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                disabled={isLoading}
+                required
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                margin="dense"
+                label="Slug"
+                type="text"
+                fullWidth
+                variant="outlined"
+                value={projectSlug}
+                onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
+                disabled={isLoading}
+                required
+                helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                margin="dense"
+                label="Description"
+                type="text"
+                fullWidth
+                variant="outlined"
+                multiline
+                rows={4}
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                disabled={isLoading}
+              />
+            </Box>
+          )}
+
+          {editTabValue === 1 && (
+            <Box>
+              <Box sx={{ mb: 3 }}>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">OpenAPI Metadata</h3>
+                <TextField
+                  margin="dense"
+                  label="API Summary"
+                  type="text"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataSummary}
+                  onChange={(e) => setMetadataSummary(e.target.value)}
+                  disabled={isLoading}
+                  helperText="Short summary of the API"
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  margin="dense"
+                  label="Terms of Service URL"
+                  type="url"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataTermsOfService}
+                  onChange={(e) => setMetadataTermsOfService(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="https://example.com/terms"
+                  sx={{ mb: 2 }}
+                />
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Contact Information</h3>
+                <TextField
+                  margin="dense"
+                  label="Contact Name"
+                  type="text"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataContactName}
+                  onChange={(e) => setMetadataContactName(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="API Support Team"
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  margin="dense"
+                  label="Contact URL"
+                  type="url"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataContactUrl}
+                  onChange={(e) => setMetadataContactUrl(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="https://example.com/support"
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  margin="dense"
+                  label="Contact Email"
+                  type="email"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataContactEmail}
+                  onChange={(e) => setMetadataContactEmail(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="support@example.com"
+                />
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">License Information</h3>
+                <Autocomplete
+                  freeSolo
+                  options={SPDX_LICENSES}
+                  getOptionLabel={(option) => typeof option === 'string' ? option : `${option.name} (${option.identifier})`}
+                  value={SPDX_LICENSES.find((l: SPDXLicense) => l.identifier === metadataLicenseIdentifier) || metadataLicenseIdentifier}
+                  onChange={(e, newValue) => {
+                    if (typeof newValue === 'string') {
+                      setMetadataLicenseIdentifier(newValue);
+                    } else if (newValue) {
+                      setMetadataLicenseIdentifier(newValue.identifier);
+                      setMetadataLicenseName(newValue.name);
+                      const url = getLicenseUrl(newValue.identifier);
+                      if (url) setMetadataLicenseUrl(url);
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      margin="dense"
+                      label="License (SPDX Identifier)"
+                      variant="outlined"
+                      placeholder="Start typing to search..."
+                      helperText="Select from SPDX license list or enter custom identifier"
+                    />
+                  )}
+                  disabled={isLoading}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  margin="dense"
+                  label="License Name"
+                  type="text"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataLicenseName}
+                  onChange={(e) => setMetadataLicenseName(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="Apache License 2.0"
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  margin="dense"
+                  label="License URL"
+                  type="url"
+                  fullWidth
+                  variant="outlined"
+                  value={metadataLicenseUrl}
+                  onChange={(e) => setMetadataLicenseUrl(e.target.value)}
+                  disabled={isLoading}
+                  placeholder="https://www.apache.org/licenses/LICENSE-2.0.html"
+                />
+              </Box>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowEditDialog(false)} disabled={isLoading}>
