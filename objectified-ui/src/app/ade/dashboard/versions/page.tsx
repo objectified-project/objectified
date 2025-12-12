@@ -473,7 +473,7 @@ const Versions = () => {
       const project = projects.find(p => p.id === version.project_id);
 
       // Generate OpenAPI spec
-      const spec = generateOpenApiSpec(classesWithProperties, {
+      const spec = await generateOpenApiSpec(classesWithProperties, {
         projectName: project?.name,
         version: version.version_id,
         description: version.description || undefined
