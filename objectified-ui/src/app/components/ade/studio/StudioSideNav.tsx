@@ -308,7 +308,13 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                           <ListItemText
                             primary={
                               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{classItem.name}</span>
+                                <span style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  textDecoration: classItem.schema?.deprecated ? 'line-through' : 'none',
+                                  color: classItem.schema?.deprecated ? '#9ca3af' : 'inherit'
+                                }}>{classItem.name}</span>
                                 {classWarnings[classItem.id] && (
                                   <span title="This class has properties referencing missing classes" style={{ color: '#b91c1c', fontSize: 12 }}>⚠️</span>
                                 )}

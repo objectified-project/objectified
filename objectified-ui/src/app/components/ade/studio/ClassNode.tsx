@@ -334,11 +334,6 @@ function ClassNode({ data, selected }: NodeProps) {
           <div style={{ fontSize: '14px', fontWeight: 600, color: 'white', wordBreak: 'break-word', textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none' }}>
             {typedData.name}
           </div>
-          {typedData.schema?.deprecated && (
-            <span style={{ fontSize: '10px', padding: '2px 5px', borderRadius: '3px', background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fbbf24' }} title={typedData.schema?.deprecationMessage || 'Deprecated'}>
-              DEPRECATED
-            </span>
-          )}
           {/* Tags in header */}
           {typedData.tags && typedData.tags.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
