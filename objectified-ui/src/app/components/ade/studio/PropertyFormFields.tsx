@@ -36,6 +36,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { RegexTester } from './RegexTester';
 import { PrefixItemsEditor } from './PrefixItemsEditor';
+import { ExtensionsEditor } from './ExtensionsEditor';
 
 export interface PropertyFormData {
   // Basic fields
@@ -88,6 +89,9 @@ export interface PropertyFormData {
   additionalProperties?: 'default' | 'true' | 'false';
   minProperties?: string;
   maxProperties?: string;
+
+  // Extensions (x- prefixed properties)
+  extensions?: Record<string, any>;
 }
 
 interface SortableEnumItemProps {
@@ -1242,6 +1246,15 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               </Typography>
             </Box>
           )}
+        </Box>
+
+        {/* Extensions */}
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+          <ExtensionsEditor
+            value={data.extensions || {}}
+            onChange={(extensions) => onChange('extensions', extensions)}
+            size={size}
+          />
         </Box>
       </Box>
     </Box>

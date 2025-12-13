@@ -110,6 +110,14 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       additionalPropsValue = schema.additionalProperties === false ? 'false' : 'true';
     }
 
+    // Extract extensions (x- prefixed properties) from the property data
+    const extensions: Record<string, any> = {};
+    Object.keys(propData).forEach(key => {
+      if (key.startsWith('x-')) {
+        extensions[key] = propData[key];
+      }
+    });
+
     // Populate form data
     setFormData({
       description: editingClassProperty.description || '',
@@ -161,6 +169,9 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
       // NOT composition (OpenAPI 3.1)
       not: schema.not ? JSON.stringify(schema.not, null, 2) : '',
+
+      // Extensions (x- prefixed properties)
+      extensions: extensions,
     });
 
     setEditPropertyError('');
@@ -401,6 +412,18 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         updatedData.items = targetSchema;
         // Ensure additionalProperties isn't left on the array level
         delete updatedData.additionalProperties;
+      }
+
+      // Handle extensions (x- prefixed properties)
+      // First, remove any existing x- properties from updatedData
+      Object.keys(updatedData).forEach(key => {
+        if (key.startsWith('x-')) {
+          delete updatedData[key];
+        }
+      });
+      // Then merge in the current extensions
+      if (formData.extensions && Object.keys(formData.extensions).length > 0) {
+        Object.assign(updatedData, formData.extensions);
       }
 
       const result = await updateClassProperty(

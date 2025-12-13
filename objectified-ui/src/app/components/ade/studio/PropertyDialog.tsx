@@ -157,6 +157,14 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         additionalPropsValue = minMaxSource.additionalProperties === false ? 'false' : 'true';
       }
 
+      // Extract extensions (x- prefixed properties)
+      const extensions: Record<string, any> = {};
+      Object.keys(property as any).forEach(key => {
+        if (key.startsWith('x-')) {
+          extensions[key] = (property as any)[key];
+        }
+      });
+
       setFormData({
         title: property.title || '',
         description: property.description || '',
@@ -201,6 +209,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         maxProperties: minMaxSource.maxProperties?.toString() || '',
         // NOT composition (OpenAPI 3.1)
         not: minMaxSource.not ? JSON.stringify(minMaxSource.not, null, 2) : '',
+        // Extensions (x- prefixed properties)
+        extensions: extensions,
       });
       setPropertyError('');
     } else if (open && mode === 'add') {
@@ -752,6 +762,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         } else {
           delete dataObject.not;
         }
+      }
+
+      // Handle extensions (x- prefixed properties)
+      // First, remove any existing x- properties from dataObject
+      Object.keys(dataObject).forEach(key => {
+        if (key.startsWith('x-')) {
+          delete dataObject[key];
+        }
+      });
+      // Then merge in the current extensions
+      if (formData.extensions && Object.keys(formData.extensions).length > 0) {
+        Object.assign(dataObject, formData.extensions);
       }
 
       await onSubmit({
