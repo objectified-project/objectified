@@ -296,44 +296,106 @@ const LinkedAccounts = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-5xl mx-auto">
       {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Linked Accounts</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Link external accounts to enable single sign-on (SSO) authentication
-        </p>
+      <div className="flex items-center gap-4 mb-8">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+          <LinkIcon className="h-7 w-7 text-white" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Linked Accounts</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Link external accounts to enable single sign-on (SSO) authentication
+          </p>
+        </div>
       </div>
 
       {/* Success Message */}
       {successMessage && (
-        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMessage('')}>
+        <Alert
+          severity="success"
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'success.light',
+            '& .MuiAlert-icon': { alignItems: 'center' },
+          }}
+          onClose={() => setSuccessMessage('')}
+        >
           {successMessage}
         </Alert>
       )}
 
       {/* Error Message */}
       {errorMessage && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setErrorMessage('')}>
+        <Alert
+          severity="error"
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'error.light',
+            '& .MuiAlert-icon': { alignItems: 'center' },
+          }}
+          onClose={() => setErrorMessage('')}
+        >
           {errorMessage}
         </Alert>
       )}
 
       {/* Linked Accounts List */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-          Your Linked Accounts
-        </Typography>
+      <Box sx={{ mb: 5 }}>
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          mb: 3,
+          pb: 2,
+          borderBottom: '1px solid',
+          borderColor: 'rgba(99, 102, 241, 0.1)',
+        }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: 'rgba(99, 102, 241, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Check size={18} color="#6366f1" />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+            Your Linked Accounts
+          </Typography>
+        </Box>
 
         {linkedAccounts.length === 0 ? (
-          <Card>
+          <Card sx={{
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'rgba(0, 0, 0, 0.06)',
+            boxShadow: 'none',
+          }}>
             <CardContent>
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <LinkIcon size={48} className="mx-auto mb-3 text-gray-400" />
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <Box sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 3,
+                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2,
+                }}>
+                  <LinkIcon size={32} color="#6366f1" />
+                </Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#334155', mb: 0.5 }}>
                   No linked accounts
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
                   Link an external account below to enable SSO authentication
                 </Typography>
               </Box>
@@ -346,41 +408,70 @@ const LinkedAccounts = () => {
               const displayName = getProviderDisplayName(account.provider);
 
               return (
-                <Card key={account.id}>
-                  <CardContent>
+                <Card
+                  key={account.id}
+                  sx={{
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'rgba(0, 0, 0, 0.06)',
+                    boxShadow: 'none',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      borderColor: 'rgba(99, 102, 241, 0.3)',
+                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.1)',
+                    },
+                  }}
+                >
+                  <CardContent sx={{ p: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
                         <Box
                           sx={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: 1,
+                            width: 56,
+                            height: 56,
+                            borderRadius: 3,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            bgcolor: 'action.hover',
+                            background: `linear-gradient(135deg, ${providerConfigs[account.provider]?.color}15 0%, ${providerConfigs[account.provider]?.color}25 100%)`,
+                            border: '1px solid',
+                            borderColor: `${providerConfigs[account.provider]?.color}30`,
                           }}
                         >
-                          <Icon size={24} color={providerConfigs[account.provider]?.color || 'inherit'} />
+                          <Icon size={28} color={providerConfigs[account.provider]?.color || 'inherit'} />
                         </Box>
                         <Box>
-                          <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>
                             {displayName}
                           </Typography>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
                             {account.provider_username || account.provider_email}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
                             <Chip
                               label={`Linked ${formatDate(account.created_at)}`}
                               size="small"
-                              variant="outlined"
+                              sx={{
+                                height: 24,
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                bgcolor: 'rgba(99, 102, 241, 0.1)',
+                                color: '#6366f1',
+                                border: 'none',
+                              }}
                             />
                             {account.last_login_at && (
                               <Chip
                                 label={`Last login: ${formatDate(account.last_login_at)}`}
                                 size="small"
-                                variant="outlined"
+                                sx={{
+                                  height: 24,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  bgcolor: 'rgba(16, 185, 129, 0.1)',
+                                  color: '#10b981',
+                                  border: 'none',
+                                }}
                               />
                             )}
                           </Box>
@@ -392,6 +483,17 @@ const LinkedAccounts = () => {
                         startIcon={<Trash2 size={16} />}
                         onClick={() => handleUnlinkAccount(account)}
                         disabled={isLoading}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          px: 2.5,
+                          borderColor: 'rgba(239, 68, 68, 0.3)',
+                          '&:hover': {
+                            borderColor: 'error.main',
+                            bgcolor: 'rgba(239, 68, 68, 0.05)',
+                          },
+                        }}
                       >
                         Unlink
                       </Button>
@@ -406,9 +508,29 @@ const LinkedAccounts = () => {
 
       {/* Available Providers */}
       <Box>
-        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-          Available Providers
-        </Typography>
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          mb: 3,
+          pb: 2,
+          borderBottom: '1px solid',
+          borderColor: 'rgba(99, 102, 241, 0.1)',
+        }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: 'rgba(139, 92, 246, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Plus size={18} color="#8b5cf6" />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+            Available Providers
+          </Typography>
+        </Box>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {Object.values(providerConfigs).map((provider) => {
@@ -423,49 +545,95 @@ const LinkedAccounts = () => {
                 key={provider.name}
                 sx={{
                   opacity: !isAvailable ? 0.6 : 1,
+                  borderRadius: 3,
+                  border: '1px solid',
+                  borderColor: isLinked ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 0, 0, 0.06)',
+                  boxShadow: 'none',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  background: isLinked
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%)'
+                    : 'white',
+                  '&:hover': {
+                    transform: isAvailable ? 'translateY(-2px)' : 'none',
+                    boxShadow: isAvailable ? `0 8px 24px ${provider.color}15` : 'none',
+                    borderColor: isAvailable ? `${provider.color}40` : 'rgba(0, 0, 0, 0.06)',
+                  },
                 }}
               >
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: provider.name === 'github' && isAvailable ? 2 : 0 }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: (provider.name === 'github' || provider.name === 'gitlab') && isAvailable && isLinked ? 2 : 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Box
                         sx={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 1,
+                          width: 48,
+                          height: 48,
+                          borderRadius: 2.5,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          bgcolor: 'action.hover',
+                          background: `linear-gradient(135deg, ${provider.color}10 0%, ${provider.color}20 100%)`,
+                          border: '1px solid',
+                          borderColor: `${provider.color}25`,
                         }}
                       >
-                        <Icon size={20} color={provider.color} />
+                        <Icon size={24} color={provider.color} />
                       </Box>
                       <Box>
-                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
                           {provider.displayName}
                         </Typography>
                         {!isAvailable && (
-                          <Typography variant="caption" color="text.secondary">
-                            Coming soon
-                          </Typography>
+                          <Chip
+                            label="Coming soon"
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              bgcolor: 'rgba(148, 163, 184, 0.15)',
+                              color: '#64748b',
+                              border: 'none',
+                              mt: 0.5,
+                            }}
+                          />
                         )}
                         {hasPAT && (
                           <Chip
                             icon={<Key size={12} />}
-                            label="Using PAT"
+                            label="PAT Active"
                             size="small"
-                            sx={{ mt: 0.5 }}
+                            sx={{
+                              height: 22,
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              bgcolor: 'rgba(245, 158, 11, 0.1)',
+                              color: '#f59e0b',
+                              border: 'none',
+                              mt: 0.5,
+                              '& .MuiChip-icon': {
+                                color: '#f59e0b',
+                              },
+                            }}
                           />
                         )}
                       </Box>
                     </Box>
                     {isLinked ? (
                       <Chip
-                        icon={<Check size={16} />}
+                        icon={<Check size={14} />}
                         label="Linked"
-                        color="success"
                         size="small"
+                        sx={{
+                          height: 28,
+                          fontWeight: 700,
+                          fontSize: '0.75rem',
+                          bgcolor: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981',
+                          border: 'none',
+                          '& .MuiChip-icon': {
+                            color: '#10b981',
+                          },
+                        }}
                       />
                     ) : (
                       <Button
@@ -473,6 +641,18 @@ const LinkedAccounts = () => {
                         startIcon={<Plus size={16} />}
                         onClick={() => handleLinkAccount(provider.name)}
                         disabled={isLoading || !isAvailable}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          px: 2.5,
+                          borderColor: `${provider.color}40`,
+                          color: provider.color,
+                          '&:hover': {
+                            borderColor: provider.color,
+                            bgcolor: `${provider.color}08`,
+                          },
+                        }}
                       >
                         Link
                       </Button>
@@ -481,10 +661,15 @@ const LinkedAccounts = () => {
 
                   {/* Personal Access Token Section (GitHub and GitLab) - Only shown if account is linked */}
                   {(provider.name === 'github' || provider.name === 'gitlab') && isAvailable && isLinked && (
-                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Box sx={{
+                      mt: 2,
+                      pt: 2,
+                      borderTop: '1px solid',
+                      borderColor: 'rgba(99, 102, 241, 0.1)',
+                    }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Key size={14} />
+                        <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75, color: '#334155' }}>
+                          <Key size={14} color="#f59e0b" />
                           Personal Access Token
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -494,8 +679,20 @@ const LinkedAccounts = () => {
                             startIcon={<Key size={14} />}
                             onClick={() => handleOpenPatDialog(provider.name, linkedAccount?.id)}
                             disabled={isLoading}
+                            sx={{
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                              borderColor: 'rgba(245, 158, 11, 0.3)',
+                              color: '#f59e0b',
+                              '&:hover': {
+                                borderColor: '#f59e0b',
+                                bgcolor: 'rgba(245, 158, 11, 0.05)',
+                              },
+                            }}
                           >
-                            {linkedAccount?.access_token ? 'Update PAT' : 'Add PAT'}
+                            {linkedAccount?.access_token ? 'Update' : 'Add'} PAT
                           </Button>
                           {linkedAccount?.access_token && (
                             <Button
@@ -505,16 +702,27 @@ const LinkedAccounts = () => {
                               startIcon={<Trash2 size={14} />}
                               onClick={() => handleRemovePatToken(provider.name, linkedAccount.id)}
                               disabled={isLoading}
+                              sx={{
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                fontSize: '0.75rem',
+                                borderColor: 'rgba(239, 68, 68, 0.3)',
+                                '&:hover': {
+                                  borderColor: 'error.main',
+                                  bgcolor: 'rgba(239, 68, 68, 0.05)',
+                                },
+                              }}
                             >
-                              Remove PAT
+                              Remove
                             </Button>
                           )}
                         </Box>
                       </Box>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
                         {linkedAccount?.access_token
-                          ? 'Update your PAT to access repositories'
-                          : 'Add a PAT to your linked account for direct repository access'}
+                          ? 'PAT configured for direct repository access'
+                          : 'Add a PAT for direct repository access'}
                       </Typography>
                     </Box>
                   )}
@@ -525,8 +733,17 @@ const LinkedAccounts = () => {
         </div>
 
         {/* Info Alert */}
-        <Alert severity="info" sx={{ mt: 3 }}>
-          <Typography variant="body2">
+        <Alert
+          severity="info"
+          sx={{
+            mt: 4,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'info.light',
+            bgcolor: 'rgba(6, 182, 212, 0.05)',
+          }}
+        >
+          <Typography variant="body2" sx={{ color: '#334155' }}>
             <strong>Note:</strong> You can link multiple provider accounts to your Objectified account.
             Once linked, you can sign in using any of these providers. Your primary email and account
             data will always be tied to your main Objectified account.
@@ -535,60 +752,146 @@ const LinkedAccounts = () => {
       </Box>
 
       {/* Personal Access Token Dialog */}
-      <Dialog open={patDialogOpen} onClose={handleClosePatDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'Update Personal Access Token' : 'Add Personal Access Token'}
-          {patProvider && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              {providerConfigs[patProvider]?.displayName} - {linkedAccounts.find(a => a.id === editingAccountId)?.provider_username || linkedAccounts.find(a => a.id === editingAccountId)?.provider_email}
-            </Typography>
-          )}
+      <Dialog
+        open={patDialogOpen}
+        onClose={handleClosePatDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          },
+        }}
+      >
+        <DialogTitle sx={{
+          pb: 1,
+          borderBottom: '1px solid',
+          borderColor: 'rgba(99, 102, 241, 0.1)',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              p: 1.5,
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Key size={20} color="#f59e0b" />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                {linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'Update' : 'Add'} Personal Access Token
+              </Typography>
+              {patProvider && (
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  {providerConfigs[patProvider]?.displayName} • {linkedAccounts.find(a => a.id === editingAccountId)?.provider_username || linkedAccounts.find(a => a.id === editingAccountId)?.provider_email}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           <TextField
             autoFocus
             margin="dense"
             label="Personal Access Token"
-            type="text"
+            type="password"
             fullWidth
             variant="outlined"
             value={patToken}
             onChange={(e) => setPatToken(e.target.value)}
             helperText={`The token used to authenticate with ${providerConfigs[patProvider]?.displayName || 'the provider'}'s API`}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#f59e0b',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#f59e0b',
+                },
+              },
+              '& .MuiInputLabel-root.Mui-focused': {
+                color: '#f59e0b',
+              },
+            }}
           />
 
           {/* Provider-specific instructions */}
           {patProvider === 'github' && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              <Typography variant="caption">
+            <Alert
+              severity="info"
+              sx={{
+                mt: 2,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'info.light',
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 500 }}>
                 <strong>Required GitHub scopes:</strong> repo (or public_repo), read:org, read:user, user:email
               </Typography>
             </Alert>
           )}
           {patProvider === 'gitlab' && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              <Typography variant="caption">
+            <Alert
+              severity="info"
+              sx={{
+                mt: 2,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'info.light',
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 500 }}>
                 <strong>Required GitLab scopes:</strong> read_api, read_repository, read_user
               </Typography>
             </Alert>
           )}
 
           {errorMessage && (
-            <Alert severity="error" sx={{ mt: 2 }}>
+            <Alert
+              severity="error"
+              sx={{
+                mt: 2,
+                borderRadius: 2,
+              }}
+            >
               {errorMessage}
             </Alert>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClosePatDialog} color="primary">
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'rgba(0, 0, 0, 0.06)' }}>
+          <Button
+            onClick={handleClosePatDialog}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              color: '#64748b',
+            }}
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSavePatToken}
-            color="primary"
             variant="contained"
             disabled={isLoading}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                boxShadow: '0 6px 16px rgba(245, 158, 11, 0.35)',
+              },
+            }}
           >
             {linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'Update Token' : 'Add Token'}
           </Button>

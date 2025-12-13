@@ -128,82 +128,96 @@ const Profile = () => {
   const expiryDate = new Date(expires);
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-4xl mx-auto">
       {/* Page Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Profile</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            View and manage your account information
-          </p>
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+            <User className="h-7 w-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Profile</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
+              View and manage your account information
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Success Message */}
       {successMessage && (
-        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setSuccessMessage('')}>
+        <Alert
+          severity="success"
+          sx={{
+            mb: 3,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'success.light',
+          }}
+          onClose={() => setSuccessMessage('')}
+        >
           {successMessage}
         </Alert>
       )}
 
       {/* Profile Details Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-6 space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+        <div className="px-8 py-8 space-y-6">
           {/* Name */}
-          <div className="flex items-start space-x-4">
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+          <div className="flex items-start space-x-5 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all duration-200 -mx-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-3.5 shadow-sm">
               <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="flex-1">
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Full Name
               </label>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-lg text-gray-900 dark:text-white">
+              <div className="flex items-center gap-3 mt-1.5">
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">
                   {user?.name || 'Not provided'}
                 </p>
                 <button
                   onClick={handleEditClick}
-                  className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded cursor-pointer transition-colors"
+                  className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg cursor-pointer transition-all duration-200 group"
                   title="Edit name"
                 >
-                  <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <Edit2 className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
                 </button>
               </div>
             </div>
           </div>
 
           {/* Divider */}
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-gray-100 dark:border-gray-700/50"></div>
 
           {/* Email */}
-          <div className="flex items-start space-x-4">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
-              <Mail className="h-5 w-5 text-green-600 dark:text-green-400" />
+          <div className="flex items-start space-x-5 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all duration-200 -mx-4">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 rounded-xl p-3.5 shadow-sm">
+              <Mail className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div className="flex-1">
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Email Address
               </label>
-              <p className="text-lg text-gray-900 dark:text-white mt-1">
+              <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1.5">
                 {user?.email || 'Not provided'}
               </p>
             </div>
           </div>
 
           {/* Divider */}
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-gray-100 dark:border-gray-700/50"></div>
 
           {/* User ID */}
-          <div className="flex items-start space-x-4">
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+          <div className="flex items-start space-x-5 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all duration-200 -mx-4">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-3.5 shadow-sm">
               <Hash className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div className="flex-1">
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 User ID
               </label>
-              <p className="text-lg font-mono text-gray-900 dark:text-white mt-1 break-all">
+              <p className="text-sm font-mono text-gray-700 dark:text-gray-300 mt-1.5 break-all bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg">
                 {(user as any)?.user_id || 'Not available'}
               </p>
             </div>
@@ -213,17 +227,17 @@ const Profile = () => {
           {(user as any)?.current_tenant_id && (
             <>
               {/* Divider */}
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+              <div className="border-t border-gray-100 dark:border-gray-700/50"></div>
 
-              <div className="flex items-start space-x-4">
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3">
+              <div className="flex items-start space-x-5 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all duration-200 -mx-4">
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/30 rounded-xl p-3.5 shadow-sm">
                   <Building2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 <div className="flex-1">
-                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                     Current Tenant ID
                   </label>
-                  <p className="text-lg font-mono text-gray-900 dark:text-white mt-1 break-all">
+                  <p className="text-sm font-mono text-gray-700 dark:text-gray-300 mt-1.5 break-all bg-gray-50 dark:bg-gray-900/50 px-3 py-2 rounded-lg">
                     {(user as any)?.current_tenant_id}
                   </p>
                 </div>
@@ -232,18 +246,18 @@ const Profile = () => {
           )}
 
           {/* Divider */}
-          <div className="border-t border-gray-200 dark:border-gray-700"></div>
+          <div className="border-t border-gray-100 dark:border-gray-700/50"></div>
 
           {/* Session Expiry */}
-          <div className="flex items-start space-x-4">
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
-              <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+          <div className="flex items-start space-x-5 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-all duration-200 -mx-4">
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30 rounded-xl p-3.5 shadow-sm">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div className="flex-1">
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Session Expiration
               </label>
-              <p className="text-lg text-gray-900 dark:text-white mt-1">
+              <p className="text-lg font-semibold text-gray-900 dark:text-white mt-1.5">
                 {expiryDate.toLocaleString()}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -259,18 +273,18 @@ const Profile = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900/50 dark:to-gray-800/50 px-8 py-5 border-t border-gray-100 dark:border-gray-700/50">
           <div className="flex justify-end space-x-3">
             <button
               onClick={handleEditClick}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
             >
               <Edit2 className="h-4 w-4" />
               Edit Name
             </button>
             <button
               onClick={handlePasswordChangeClick}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5"
             >
               <Key className="h-4 w-4" />
               Change Password

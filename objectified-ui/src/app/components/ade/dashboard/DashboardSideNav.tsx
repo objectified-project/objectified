@@ -68,68 +68,97 @@ const DashboardSideNav: React.FC = () => {
     <Drawer
       variant="permanent"
       sx={{
-        width: 256,
+        width: 280,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: 256,
+          width: 280,
           boxSizing: 'border-box',
           top: 48, // Offset for top header
           height: 'calc(100vh - 48px)',
-          borderRight: 1,
-          borderColor: 'divider',
+          borderRight: 'none',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.06)',
         },
       }}
     >
-      <Box sx={{ overflow: 'auto', p: 2 }}>
+      <Box sx={{ overflow: 'auto', p: 2.5 }}>
         {navSections.map((section, index) => (
           <Box key={section.header} sx={{ mb: index < navSections.length - 1 ? 3 : 0 }}>
             <Typography
               variant="overline"
               sx={{
-                px: 2,
+                px: 1.5,
                 py: 1,
-                display: 'block',
-                fontWeight: 600,
-                color: 'text.secondary',
-                letterSpacing: 1.1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                fontWeight: 700,
+                color: '#64748b',
+                letterSpacing: '0.08em',
+                fontSize: '0.65rem',
               }}
             >
+              <Box
+                component="span"
+                sx={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: '50%',
+                  bgcolor: '#6366f1',
+                  opacity: 0.6,
+                }}
+              />
               {section.header}
             </Typography>
-            <List disablePadding>
+            <List disablePadding sx={{ mt: 0.5 }}>
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
 
                 return (
-                  <ListItem key={item.href} disablePadding>
+                  <ListItem key={item.href} disablePadding sx={{ mb: 0.5 }}>
                     <ListItemButton
                       component={item.disabled ? 'div' : Link}
                       href={item.disabled ? undefined : item.href}
                       disabled={item.disabled}
                       selected={active}
                       sx={{
-                        borderRadius: 1,
-                        mb: 0.5,
+                        borderRadius: 2,
+                        py: 1.25,
+                        px: 1.5,
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
-                          bgcolor: (theme) => '#888'
+                          bgcolor: 'rgba(99, 102, 241, 0.08)',
+                          transform: 'translateX(4px)',
                         },
                         '&.Mui-selected': {
-                          bgcolor: 'primary.main',
-                          color: 'primary.contrastText',
+                          bgcolor: 'rgba(99, 102, 241, 0.1)',
+                          borderLeft: '3px solid #6366f1',
+                          borderRadius: '0 8px 8px 0',
+                          ml: -0.5,
+                          pl: 2,
                           '&:hover': {
-                            bgcolor: 'primary.dark',
+                            bgcolor: 'rgba(99, 102, 241, 0.15)',
                           },
                           '& .MuiListItemIcon-root': {
-                            color: 'primary.contrastText',
+                            color: '#6366f1',
+                          },
+                          '& .MuiListItemText-primary': {
+                            color: '#6366f1',
                           },
                         },
                         '&.Mui-disabled': {
-                          opacity: 0.5,
+                          opacity: 0.4,
                         },
                       }}
                     >
-                      <ListItemIcon sx={{ minWidth: 40 }}>
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 40,
+                          color: active ? '#6366f1' : '#64748b',
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
                         <Icon size={20} />
                       </ListItemIcon>
                       <ListItemText
@@ -137,16 +166,30 @@ const DashboardSideNav: React.FC = () => {
                         slotProps={{
                           primary: {
                             fontSize: '0.875rem',
-                            fontWeight: active ? 600 : 400,
+                            fontWeight: active ? 600 : 500,
+                            color: active ? '#6366f1' : '#334155',
                           },
                         }}
                       />
+                      {active && (
+                        <Box
+                          sx={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            bgcolor: '#6366f1',
+                            boxShadow: '0 0 8px rgba(99, 102, 241, 0.5)',
+                          }}
+                        />
+                      )}
                     </ListItemButton>
                   </ListItem>
                 );
               })}
             </List>
-            {index < navSections.length - 1 && <Divider sx={{ my: 2 }} />}
+            {index < navSections.length - 1 && (
+              <Divider sx={{ my: 2, borderColor: 'rgba(99, 102, 241, 0.1)' }} />
+            )}
           </Box>
         ))}
       </Box>

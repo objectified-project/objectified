@@ -1719,89 +1719,134 @@ const StudioContent = () => {
             transform: translateX(400%);
           }
         }
+        @keyframes shimmer {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
+        }
       `}</style>
 
       {/* Header with Project and Version Selectors */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2" style={{ position: 'relative', zIndex: 1000 }}>
-        <div className="flex items-center gap-3">
+      <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-5 py-3 shadow-sm" style={{ position: 'relative', zIndex: 1000 }}>
+        <div className="flex items-center gap-4">
           {/* Project Selector */}
-          <div className="flex items-center gap-1.5" style={{ position: 'relative', zIndex: 1001 }}>
-            <select
-              value={selectedProjectId}
-              onChange={handleProjectChange}
-              disabled={isLoadingProjects || !currentTenantId}
-              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent min-w-[180px] pointer-events-auto"
-            >
-              <option value="">Select project...</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
+            <div className="flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md">
+              <div className="pl-3 text-gray-400 dark:text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+              </div>
+              <select
+                value={selectedProjectId}
+                onChange={handleProjectChange}
+                disabled={isLoadingProjects || !currentTenantId}
+                className="pl-1 pr-8 py-2 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none min-w-[200px] cursor-pointer appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 8px center', backgroundRepeat: 'no-repeat', backgroundSize: '16px' }}
+              >
+                <option value="">Select project...</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Separator */}
+          <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
+
           {/* Version Selector */}
-          <div className="flex items-center gap-1.5" style={{ position: 'relative', zIndex: 1001 }}>
-            <select
-              value={selectedVersionId}
-              onChange={handleVersionChange}
-              disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
-              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent min-w-[180px] pointer-events-auto"
-            >
-              <option value="">Select version...</option>
-              {versions.map((version) => (
-                <option key={version.id} value={version.id}>
-                  {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
+            <div className="flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md">
+              <div className="pl-3 text-gray-400 dark:text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <select
+                value={selectedVersionId}
+                onChange={handleVersionChange}
+                disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
+                className="pl-1 pr-8 py-2 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none min-w-[200px] cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 8px center', backgroundRepeat: 'no-repeat', backgroundSize: '16px' }}
+              >
+                <option value="">Select version...</option>
+                {versions.map((version) => (
+                  <option key={version.id} value={version.id}>
+                    {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* View Switcher */}
           {selectedProjectId && selectedVersionId && (
             <>
-              <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+              {/* Separator */}
+              <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
+
+              <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner">
                 <button
                   onClick={() => setViewMode('canvas')}
-                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                     viewMode === 'canvas'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  Canvas
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                    </svg>
+                    Canvas
+                  </span>
                 </button>
                 <button
                   onClick={() => setViewMode('code')}
-                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                     viewMode === 'code'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  Code
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    Code
+                  </span>
                 </button>
                 <button
                   onClick={() => setViewMode('mermaid')}
-                  className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                     viewMode === 'mermaid'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  Mermaid
+                  <span className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Diagram
+                  </span>
                 </button>
               </div>
 
               {/* Manage Tags Button */}
               <button
                 onClick={() => setTagManagerOpen(true)}
-                className="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+                className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md"
                 title="Manage project tags"
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
                 <span>Tags</span>
               </button>
@@ -1810,38 +1855,57 @@ const StudioContent = () => {
 
           {/* Context Display - Tenant Name */}
           {currentTenantName && (
-            <div className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-              <span className="font-medium">{currentTenantName}</span>
+            <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/50">
+              <div className="w-2 h-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-pulse" />
+              <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{currentTenantName}</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Canvas/Code Area */}
-      <div className="flex-1 bg-white dark:bg-gray-900 overflow-hidden relative">
+      <div className="flex-1 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 overflow-hidden relative">
         {!selectedProjectId || !selectedVersionId ? (
           // Empty state when no project/version selected
           <div className="h-full flex items-center justify-center">
-            <div className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-16 md:p-20 text-center">
-              <svg
-                className="mx-auto h-20 w-20 text-gray-400 dark:text-gray-500 mb-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <h3 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                No Project Selected
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Select a project and version to view the class diagram
-              </p>
+            <div className="relative">
+              {/* Decorative background elements */}
+              <div className="absolute -top-20 -left-20 w-40 h-40 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-3xl opacity-60" />
+              <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-full blur-3xl opacity-60" />
+
+              <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 md:p-16 text-center shadow-xl shadow-gray-200/50 dark:shadow-gray-900/50">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                  <svg
+                    className="h-10 w-10 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                  No Project Selected
+                </h3>
+                <p className="text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
+                  Select a project and version from the dropdowns above to view and edit your class diagram
+                </p>
+
+                {/* Quick tip */}
+                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700/50">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Tip: Drag properties from the sidebar onto classes to add them
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         ) : viewMode === 'canvas' ? (
@@ -1850,20 +1914,17 @@ const StudioContent = () => {
             {/* Loading Progress Bar */}
             {isLoadingCanvas && (
               <div className="absolute top-0 left-0 right-0 z-50">
-                <div className="bg-blue-600 h-1 animate-pulse" style={{
-                  animation: 'progress 1.5s ease-in-out infinite'
+                <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 animate-pulse" style={{
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 2s ease-in-out infinite'
                 }}>
-                  <div className="bg-blue-400 h-full" style={{
-                    width: '40%',
-                    animation: 'slide 1.5s ease-in-out infinite'
-                  }}></div>
                 </div>
-                <div className="bg-white dark:bg-gray-800 shadow-lg px-4 py-2 text-center border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm shadow-lg px-6 py-3 text-center border-b border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="relative">
+                      <div className="w-5 h-5 border-2 border-indigo-200 dark:border-indigo-800 rounded-full"></div>
+                      <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                    </div>
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {loadingMessage || 'Loading...'}
                     </span>
@@ -1890,42 +1951,55 @@ const StudioContent = () => {
               elementsSelectable={true}
               nodesFocusable={true}
               edgesFocusable={true}
+              style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)' }}
             >
             <Background
               variant={BackgroundVariant.Dots}
-              gap={12}
-              size={1}
+              gap={20}
+              size={1.5}
               className="dark:bg-gray-900"
               color="currentColor"
               style={{
-                color: 'rgb(156, 163, 175)',
-                opacity: 0.5
+                color: 'rgb(99, 102, 241)',
+                opacity: 0.15
               }}
             />
-            <Controls />
+            <Controls
+              className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden"
+              style={{
+                borderRadius: '12px',
+                overflow: 'hidden',
+              }}
+            />
             <MiniMap
               nodeStrokeColor={(node) => {
-                if (node.type === 'input') return '#3b82f6';
+                if (node.type === 'input') return '#6366f1';
                 if (node.type === 'output') return '#ec4899';
-                return '#6b7280';
+                return '#6366f1';
               }}
               nodeColor={(node) => {
-                if (node.type === 'input') return '#dbeafe';
+                if (node.type === 'input') return '#e0e7ff';
                 if (node.type === 'output') return '#fce7f3';
-                return '#f3f4f6';
+                return '#e0e7ff';
               }}
-              className="dark:bg-gray-800 dark:border-gray-700"
-              maskColor="rgb(0, 0, 0, 0.1)"
+              className="dark:bg-gray-800 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden"
+              maskColor="rgba(99, 102, 241, 0.1)"
+              style={{
+                borderRadius: '12px',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+              }}
             />
 
             {/* Read Only Indicator */}
             {isReadOnly && (
-              <Panel position="top-left" className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 rounded-lg shadow-lg px-3 py-1.5 border border-yellow-300 dark:border-yellow-700">
-                <div className="flex items-center gap-1.5">
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 002 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-xs font-semibold">Read Only</span>
+              <Panel position="top-left" className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-900/30 text-amber-800 dark:text-amber-200 rounded-xl shadow-lg px-4 py-2 border border-amber-200/80 dark:border-amber-700/50 backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-amber-100 dark:bg-amber-800/50 rounded-lg">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 002 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-semibold">Read Only Mode</span>
                 </div>
               </Panel>
             )}
@@ -1933,28 +2007,28 @@ const StudioContent = () => {
             {/* Expand/Collapse All Controls */}
             <Panel
               position="top-left"
-              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 ${isReadOnly ? 'mt-12' : ''}`}
+              className={`bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 ${isReadOnly ? 'mt-14' : ''}`}
             >
-              <div className="flex gap-1 p-1">
+              <div className="flex gap-1.5 p-1.5">
                 <button
                   onClick={handleExpandAll}
-                  className="px-2 py-1 text-xs font-medium rounded transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
                   title="Expand all properties"
                 >
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                  <span>Expand All</span>
+                  <span>Expand</span>
                 </button>
                 <button
                   onClick={handleCollapseAll}
-                  className="px-2 py-1 text-xs font-medium rounded transition-colors bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
                   title="Collapse all properties"
                 >
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                   </svg>
-                  <span>Collapse All</span>
+                  <span>Collapse</span>
                 </button>
               </div>
             </Panel>
@@ -1963,22 +2037,33 @@ const StudioContent = () => {
             {(() => {
               const warn = hasDanglingRefs(nodes.map(n => ({ id: n.id, name: (n.data as any)?.name, properties: (n.data as any)?.properties })));
               return warn ? (
-                <Panel position="top-left" className={`bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 rounded-lg shadow-lg px-3 py-1.5 border border-red-300 dark:border-red-700 ${isReadOnly ? 'mt-[7.5rem]' : 'mt-[4.5rem]'}`}>
-                  <div className="flex items-center gap-1.5">
-                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd"/></svg>
-                    <span className="text-xs font-semibold">One or more properties reference missing classes. Click a property handle and connect it to a class to fix.</span>
+                <Panel position="top-left" className={`bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 text-red-800 dark:text-red-200 rounded-xl shadow-lg px-4 py-2.5 border border-red-200/80 dark:border-red-700/50 backdrop-blur-sm ${isReadOnly ? 'mt-[8rem]' : 'mt-[4.5rem]'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1 bg-red-100 dark:bg-red-800/50 rounded-lg">
+                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
+                    <span className="text-xs font-medium max-w-xs">Missing class references detected. Connect property handles to target classes to resolve.</span>
                   </div>
                 </Panel>
               ) : null;
             })()}
 
             {/* Layout Control Panel */}
-            <Panel position="top-right" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700 min-w-[280px]">
-              <div className="flex flex-col gap-3">
+            <Panel position="top-right" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg p-4 border border-gray-200/80 dark:border-gray-700/80 min-w-[300px]">
+              <div className="flex flex-col gap-4">
                 {/* Auto Layout Toggle */}
-                <div className="flex items-center justify-between px-1">
-                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    Auto Layout
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                      <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Auto Layout
+                    </span>
                   </div>
                   <Switch
                     checked={autoLayoutEnabled}
@@ -1986,38 +2071,42 @@ const StudioContent = () => {
                     size="small"
                     sx={{
                       '& .MuiSwitch-switchBase.Mui-checked': {
-                        color: '#2563eb',
+                        color: '#6366f1',
                       },
                       '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                        backgroundColor: '#2563eb',
+                        backgroundColor: '#6366f1',
                       },
                     }}
                   />
                 </div>
 
                 {/* Algorithm Selector */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400 px-1">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Algorithm
                   </label>
                   <select
                     value={layoutAlgorithm}
                     onChange={(e) => onLayoutAlgorithm(e.target.value as LayoutAlgorithm)}
                     disabled={!autoLayoutEnabled}
-                    className={`text-xs px-2 py-1.5 rounded border transition-colors ${
+                    className={`text-sm px-3 py-2 rounded-lg border transition-all duration-200 ${
                       autoLayoutEnabled
-                        ? 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:border-blue-500 dark:hover:border-blue-500'
-                        : 'bg-gray-100 dark:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                        ? 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:border-indigo-300 dark:hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                        : 'bg-gray-50 dark:bg-gray-700/50 border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                     }`}
                   >
-                    <option value="hierarchical-tb">📊 Hierarchical (Top-Down)</option>
-                    <option value="hierarchical-lr">📊 Hierarchical (Left-Right)</option>
-                    <option value="hierarchical-bt">📊 Hierarchical (Bottom-Top)</option>
-                    <option value="hierarchical-rl">📊 Hierarchical (Right-Left)</option>
-                    <option value="force-directed">🔄 Force-Directed</option>
-                    <option value="circular">⭕ Circular</option>
-                    <option value="grid">⊞ Grid</option>
-                    <option value="layered">📚 Layered</option>
+                    <optgroup label="Hierarchical">
+                      <option value="hierarchical-tb">↓ Top to Bottom</option>
+                      <option value="hierarchical-lr">→ Left to Right</option>
+                      <option value="hierarchical-bt">↑ Bottom to Top</option>
+                      <option value="hierarchical-rl">← Right to Left</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                      <option value="force-directed">🔄 Force-Directed</option>
+                      <option value="circular">⭕ Circular</option>
+                      <option value="grid">⊞ Grid</option>
+                      <option value="layered">📚 Layered</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -2026,63 +2115,66 @@ const StudioContent = () => {
           </>
         ) : viewMode === 'code' ? (
           // Monaco Editor Code View - OpenAPI 3.1.0 Specification
-          <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/80 dark:border-gray-700/80 px-6 py-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {codeDisplayFormat === 'openapi'
-                        ? 'OpenAPI 3.1.0 Specification'
-                        : codeDisplayFormat === 'arazzo'
-                        ? 'Arazzo Specification v1.0.1'
-                        : 'JSON Schema (Draft 2020-12)'}
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {codeDisplayFormat === 'openapi'
-                        ? `Complete schema definition for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : codeDisplayFormat === 'arazzo'
-                        ? `Workflow specification for ${selectedProject?.name} v${selectedVersion?.version_id}`
-                        : `JSON Schema definition for ${selectedProject?.name} v${selectedVersion?.version_id}`}
-                    </p>
+                <div className="flex items-center gap-5">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/25">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                        {codeDisplayFormat === 'openapi'
+                          ? 'OpenAPI 3.1.0'
+                          : codeDisplayFormat === 'arazzo'
+                          ? 'Arazzo v1.0.1'
+                          : 'JSON Schema'}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {selectedProject?.name} • v{selectedVersion?.version_id}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Display Format Selector */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3 pl-5 border-l border-gray-200 dark:border-gray-700">
                     <select
                       value={codeDisplayFormat}
                       onChange={(e) => setCodeDisplayFormat(e.target.value as 'openapi' | 'arazzo' | 'jsonschema')}
-                      className="px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 text-sm font-medium border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                     >
                       <option value="openapi">OpenAPI Specification</option>
                       <option value="arazzo">Arazzo Specification</option>
                       <option value="jsonschema">JSON Schema</option>
                     </select>
-                  </div>
 
-                  {/* Format Toggle (JSON/YAML) */}
-                  <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                    {/* Format Toggle (JSON/YAML) */}
+                    <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
                       <button
                         onClick={() => setCodeFormat('json')}
-                        className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
                           codeFormat === 'json'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                            ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                         }`}
                       >
                         JSON
                       </button>
                       <button
                         onClick={() => setCodeFormat('yaml')}
-                        className={`px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
                           codeFormat === 'yaml'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                            ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                         }`}
                       >
                         YAML
                       </button>
                     </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -2102,15 +2194,15 @@ const StudioContent = () => {
                         setTimeout(() => setCodeCopied(false), 2000);
                       }}
                       disabled={codeCopied}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                         codeCopied
-                          ? 'bg-gray-500 text-white cursor-not-allowed'
-                          : 'bg-gray-600 hover:bg-gray-700 text-white'
+                          ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                       }`}
                       title="Copy to clipboard"
                     >
-                      {codeCopied ? <Check size={14} /> : <Copy size={14} />}
-                      {codeCopied ? 'Copied' : 'Copy'}
+                      {codeCopied ? <Check size={16} /> : <Copy size={16} />}
+                      {codeCopied ? 'Copied!' : 'Copy'}
                     </button>
                     <button
                       onClick={() => {
@@ -2152,10 +2244,10 @@ const StudioContent = () => {
                         document.body.removeChild(link);
                         URL.revokeObjectURL(url);
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
                       title={`Download as ${codeFormat.toUpperCase()} file`}
                     >
-                      <Download size={14} />
+                      <Download size={16} />
                       Export
                     </button>
                   </>
@@ -2231,46 +2323,56 @@ const StudioContent = () => {
           </div>
         ) : viewMode === 'mermaid' ? (
           // Mermaid Diagram View
-          <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/80 dark:border-gray-700/80 px-6 py-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    Mermaid Class Diagram
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Diagram representation of {selectedProject?.name} v{selectedVersion?.version_id}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                      Mermaid Class Diagram
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {selectedProject?.name} • v{selectedVersion?.version_id}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-3 items-center">
                   {/* View Mode Toggle */}
-                  <div className="flex border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
+                  <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
                     <button
                       onClick={() => setMermaidViewMode('preview')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                         mermaidViewMode === 'preview'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title="Preview diagram"
                     >
-                      <Eye size={14} />
+                      <Eye size={16} />
                       Preview
                     </button>
                     <button
                       onClick={() => setMermaidViewMode('code')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-300 dark:border-gray-600 ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                         mermaidViewMode === 'code'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title="View code"
                     >
-                      <Code size={14} />
+                      <Code size={16} />
                       Code
                     </button>
                   </div>
+
+                  {/* Separator */}
+                  <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
 
                   {/* Mode-specific actions */}
                   {mermaidViewMode === 'preview' ? (
@@ -2278,19 +2380,19 @@ const StudioContent = () => {
                       <button
                         onClick={() => mermaidPreviewRef.current?.exportSVG()}
                         disabled={!mermaidSvgReady}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
                         title="Export as SVG"
                       >
-                        <Download size={14} />
+                        <Download size={16} />
                         SVG
                       </button>
                       <button
                         onClick={() => mermaidPreviewRef.current?.exportPNG()}
                         disabled={!mermaidSvgReady}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
                         title="Export as PNG"
                       >
-                        <Download size={14} />
+                        <Download size={16} />
                         PNG
                       </button>
                     </>
@@ -2303,15 +2405,15 @@ const StudioContent = () => {
                           setTimeout(() => setMermaidCopied(false), 2000);
                         }}
                         disabled={mermaidCopied}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                        className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                           mermaidCopied
-                            ? 'bg-gray-500 text-white cursor-not-allowed'
-                            : 'bg-gray-600 hover:bg-gray-700 text-white'
+                            ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                         title="Copy code to clipboard"
                       >
-                        {mermaidCopied ? <Check size={14} /> : <Copy size={14} />}
-                        {mermaidCopied ? 'Copied' : 'Copy'}
+                        {mermaidCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {mermaidCopied ? 'Copied!' : 'Copy'}
                       </button>
                       <button
                         onClick={() => {
@@ -2336,10 +2438,10 @@ const StudioContent = () => {
                           document.body.removeChild(link);
                           URL.revokeObjectURL(url);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
                         title="Download as .mmd file"
                       >
-                        <Download size={14} />
+                        <Download size={16} />
                         Export
                       </button>
                     </>

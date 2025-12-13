@@ -11,17 +11,18 @@ interface SSOButtonProps {
   provider: string;
   icon: React.ReactNode;
   onClick: () => void;
+  color?: string;
 }
 
-const SSOButton: React.FC<SSOButtonProps> = ({ provider, icon, onClick }) => {
+const SSOButton: React.FC<SSOButtonProps> = ({ provider, icon, onClick, color }) => {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+      className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 hover:shadow-md transition-all duration-200 cursor-pointer group"
     >
-      <span className="flex-shrink-0">{icon}</span>
-      <span className="text-gray-700 font-medium">Continue with {provider}</span>
+      <span className="flex-shrink-0 transition-transform duration-200 group-hover:scale-110">{icon}</span>
+      <span className="text-gray-700 font-semibold">Continue with {provider}</span>
     </button>
   );
 };
@@ -132,69 +133,78 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
   const isBetaMode = process.env.NEXT_PUBLIC_BETA_MODE;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/30 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-indigo-200/40 to-purple-200/40 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-200/40 to-cyan-200/40 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+      <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-gradient-to-br from-purple-200/30 to-pink-200/30 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+
       {/* Beta Background */}
       {isBetaMode && <BetaBackground />}
 
       <div className="w-full max-w-md relative z-10">
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl shadow-indigo-500/10 p-8 border border-white/50">
           {/* Logo */}
-          <div className="flex justify-center mb-6">
-            <img
-              src="/Objectified-02.png"
-              alt="Objectified Logo"
-              style={{ height: "60px", width: "auto", objectFit: "contain" }}
-            />
+          <div className="flex justify-center mb-8">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 blur-xl opacity-20 rounded-full scale-150" />
+              <img
+                src="/Objectified-02.png"
+                alt="Objectified Logo"
+                className="relative"
+                style={{ height: "56px", width: "auto", objectFit: "contain" }}
+              />
+            </div>
           </div>
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-              {isSignUp ? 'Create Account' : 'Please Sign In'}
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-gray-900 bg-clip-text text-transparent mb-3">
+              {isSignUp ? 'Create Your Account' : 'Welcome Back'}
             </h1>
-            <p className="text-sm text-gray-600">
-              {isSignUp ? 'Sign up for early access' : 'Sign in to continue to your account'}
+            <p className="text-gray-500 text-sm">
+              {isSignUp ? 'Join thousands of developers building with Objectified' : 'Sign in to continue to your workspace'}
             </p>
-            <p className="text-sm text-gray-600 mt-2">
-              New to Objectified?{' '}
-              <a
-                href="https://youtu.be/GQBgza8eYoQ"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-500 underline"
-              >
-                Watch our intro video
-              </a>
-            </p>
+            {!isSignUp && (
+              <p className="text-sm text-gray-500 mt-3">
+                New to Objectified?{' '}
+                <a
+                  href="https://youtu.be/GQBgza8eYoQ"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:text-indigo-500 font-medium hover:underline transition-colors"
+                >
+                  Watch our intro video →
+                </a>
+              </p>
+            )}
           </div>
 
           {/* Message Display */}
           {(signupMessage || getErrorMessage(error)) && (
-            <div className={`mb-6 p-4 rounded-lg ${
-              (signupMessage || getErrorMessage(error))!.type === 'success' ? 'bg-green-50 border border-green-200' :
-              (signupMessage || getErrorMessage(error))!.type === 'info' ? 'bg-blue-50 border border-blue-200' :
-              'bg-red-50 border border-red-200'
+            <div className={`mb-6 p-4 rounded-xl border backdrop-blur-sm ${
+              (signupMessage || getErrorMessage(error))!.type === 'success' 
+                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800' 
+                : (signupMessage || getErrorMessage(error))!.type === 'info' 
+                  ? 'bg-blue-50/80 border-blue-200 text-blue-800' 
+                  : 'bg-red-50/80 border-red-200 text-red-800'
             }`}>
-              <p className={`text-sm ${
-                (signupMessage || getErrorMessage(error))!.type === 'success' ? 'text-green-800' :
-                (signupMessage || getErrorMessage(error))!.type === 'info' ? 'text-blue-800' :
-                'text-red-800'
-              }`}>
+              <p className="text-sm font-medium">
                 {(signupMessage || getErrorMessage(error))!.text}
               </p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {isSignUp && (
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-1.5">
                   Full Name
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User size={20} className="text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <User size={18} className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                   </div>
                   <input
                     type="text"
@@ -202,7 +212,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
                     value={payload['name']}
                     onChange={handleChange}
                     required
-                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+                    className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-gray-800 placeholder-gray-400 transition-all duration-200 bg-gray-50/50 hover:bg-white focus:bg-white"
                     placeholder="John Doe"
                   />
                 </div>
@@ -210,12 +220,12 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Email Address
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail size={20} className="text-gray-400" />
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Mail size={18} className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                 </div>
                 <input
                   type="email"
@@ -223,19 +233,19 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
                   value={payload['email']}
                   onChange={handleChange}
                   required
-                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+                  className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-gray-800 placeholder-gray-400 transition-all duration-200 bg-gray-50/50 hover:bg-white focus:bg-white"
                   placeholder="you@example.com"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Password
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock size={20} className="text-gray-400" />
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <Lock size={18} className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                 </div>
                 <input
                   type="password"
@@ -243,7 +253,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
                   value={payload['password']}
                   onChange={handleChange}
                   required
-                  className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
+                  className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-gray-800 placeholder-gray-400 transition-all duration-200 bg-gray-50/50 hover:bg-white focus:bg-white"
                   placeholder="••••••••"
                 />
               </div>
@@ -251,118 +261,85 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
 
             {isSignUp && (
               <div>
-                <label htmlFor="signupSource" className="block text-sm font-medium text-gray-700 mb-1">
-                  Where did you hear about Objectified?
+                <label htmlFor="signupSource" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  How did you hear about us?
+                  <span className="text-gray-400 font-normal ml-1">(optional)</span>
                 </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Info size={20} className="text-gray-400" />
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <Info size={18} className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
                   </div>
                   <input
                     type="text"
                     name={'signupSource'}
                     value={payload['signupSource'] || ''}
                     onChange={handleChange}
-                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-800"
-                    placeholder="e.g., Google, a friend, social media"
+                    className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-gray-800 placeholder-gray-400 transition-all duration-200 bg-gray-50/50 hover:bg-white focus:bg-white"
+                    placeholder="e.g., Google, Twitter, a friend"
                   />
                 </div>
               </div>
             )}
 
             {!isSignUp && (
-              <div className="text-right">
-                <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
-                  Forgot password?
+              <div className="flex items-center justify-end">
+                <a href="#" className="text-sm text-indigo-600 hover:text-indigo-500 font-medium transition-colors">
+                  Forgot your password?
                 </a>
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+              disabled={!signInEnabled}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3.5 rounded-xl font-semibold transition-all duration-200 cursor-pointer shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
-              {isSignUp ? 'Sign Up' : 'Sign In'}
+              {isSignUp ? 'Create Account' : 'Sign In'}
             </button>
           </form>
 
-          <div className="relative my-6">
+          {/* Divider */}
+          <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-gray-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">OR</span>
+              <span className="px-4 bg-white/80 text-gray-400 font-medium">or continue with</span>
             </div>
           </div>
 
           {/* SSO Loading Message */}
           {isSSOLoading ? (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-lg font-medium text-gray-900">Please wait while we log you in</p>
-              <p className="text-sm text-gray-600 mt-2">Redirecting to authentication provider...</p>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 mb-4">
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <p className="text-lg font-semibold text-gray-900">Connecting...</p>
+              <p className="text-sm text-gray-500 mt-1">Redirecting to authentication provider</p>
             </div>
           ) : (
             <>
               {/* SSO Buttons */}
-              {/*<div className="space-y-3">*/}
-              {/*  <SSOButton*/}
-              {/*    provider="Google"*/}
-              {/*    icon={*/}
-              {/*      <svg width="18" height="18" viewBox="0 0 18 18">*/}
-              {/*        <path*/}
-              {/*          fill="#4285F4"*/}
-              {/*          d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"*/}
-              {/*        />*/}
-              {/*        <path*/}
-              {/*          fill="#34A853"*/}
-              {/*          d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"*/}
-              {/*        />*/}
-              {/*        <path*/}
-              {/*          fill="#FBBC05"*/}
-              {/*          d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"*/}
-              {/*        />*/}
-              {/*        <path*/}
-              {/*          fill="#EA4335"*/}
-              {/*          d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"*/}
-              {/*        />*/}
-              {/*      </svg>*/}
-              {/*    }*/}
-              {/*    onClick={() => handleSSOLogin('Google')}*/}
-              {/*  />*/}
+              <div className="space-y-3">
+                <SSOButton
+                  provider="GitHub"
+                  icon={<SiGithub size={20} className="text-gray-800" />}
+                  onClick={() => handleSSOLogin('github')}
+                />
 
-              <SSOButton
-                provider="GitHub"
-                icon={<SiGithub size={18} className="text-gray-700" />}
-                onClick={() => handleSSOLogin('github')}
-              />
-
-              <SSOButton
-                provider="GitLab"
-                icon={<SiGitlab size={18} className="text-orange-600" />}
-                onClick={() => handleSSOLogin('gitlab')}
-              />
-
-              {/*  <SSOButton*/}
-              {/*    provider="Microsoft"*/}
-              {/*    icon={*/}
-              {/*      <svg width="18" height="18" viewBox="0 0 18 18">*/}
-              {/*        <rect width="8" height="8" fill="#F25022" />*/}
-              {/*        <rect x="10" width="8" height="8" fill="#7FBA00" />*/}
-              {/*        <rect y="10" width="8" height="8" fill="#00A4EF" />*/}
-              {/*        <rect x="10" y="10" width="8" height="8" fill="#FFB900" />*/}
-              {/*      </svg>*/}
-              {/*    }*/}
-              {/*    onClick={() => handleSSOLogin('Microsoft')}*/}
-              {/*  />*/}
-              {/*</div>*/}
+                <SSOButton
+                  provider="GitLab"
+                  icon={<SiGitlab size={20} className="text-orange-600" />}
+                  onClick={() => handleSSOLogin('gitlab')}
+                />
+              </div>
             </>
           )}
 
           {/* Toggle Sign Up/Sign In */}
-          <div className="mt-6 text-center">
+          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
             <p className="text-sm text-gray-600">
-              {isSignUp ? 'Already have an account?' : 'Don\'t have an account?'}{' '}
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
               <button
                 type="button"
                 disabled={!signInEnabled}
@@ -370,13 +347,45 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
                   setIsSignUp(!isSignUp);
                   setSignupMessage(null);
                 }}
-                className="text-blue-600 font-semibold hover:text-blue-500 cursor-pointer"
+                className="text-indigo-600 font-semibold hover:text-indigo-500 cursor-pointer transition-colors"
               >
-                {isSignUp ? 'Sign In' : 'Sign Up'}
+                {isSignUp ? 'Sign In' : 'Create one'}
               </button>
             </p>
           </div>
+
+          {/* Trust Badges */}
+          {!isSignUp && (
+            <div className="mt-6 flex items-center justify-center gap-6 text-xs text-gray-400">
+              <div className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>Secure</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>Free to start</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>No credit card</span>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-400 mt-6">
+          By signing in, you agree to our{' '}
+          <a href="#" className="text-indigo-500 hover:text-indigo-600 transition-colors">Terms of Service</a>
+          {' '}and{' '}
+          <a href="#" className="text-indigo-500 hover:text-indigo-600 transition-colors">Privacy Policy</a>
+        </p>
       </div>
     </div>
   );
