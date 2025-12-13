@@ -19,6 +19,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "minContains" and "maxContains" fields - specify minimum/maximum number of items that must match the contains schema
   - Added "minProperties" and "maxProperties" fields for object types
   - Added "constant" field for properties
+  - Added support for custom "x-" tags and values to classes
   - Marking for deprecation is now available for properties and classes
   - prefixItems:
     - Define ordered schemas for specific array positions (e.g., `[string, number, boolean]`)

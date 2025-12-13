@@ -24,6 +24,7 @@ import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
 import { createClass, updateClass, assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
 import Chip from '@mui/material/Chip';
+import { ExtensionsEditor } from './ExtensionsEditor';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -82,6 +83,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     deprecated: false,
     deprecationMessage: '',
     selectedTags: [] as string[],
+    extensions: {} as Record<string, any>,
     error: ''
   });
 
@@ -100,6 +102,14 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         const allOf = schema.allOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
         const anyOf = schema.anyOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
         const oneOf = schema.oneOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
+
+        // Extract extensions (x- prefixed properties)
+        const extensions: Record<string, any> = {};
+        Object.keys(schema).forEach(key => {
+          if (key.startsWith('x-')) {
+            extensions[key] = schema[key];
+          }
+        });
 
         // Load tags for this class
         const loadTags = async () => {
@@ -120,6 +130,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: tagIds,
+              extensions,
               error: ''
             });
           } catch (error) {
@@ -136,6 +147,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: [],
+              extensions,
               error: ''
             });
           }
@@ -156,6 +168,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           deprecated: false,
           deprecationMessage: '',
           selectedTags: [],
+          extensions: {},
           error: ''
         });
       }
@@ -201,6 +214,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         schema.deprecationMessage = formData.deprecationMessage.trim();
       }
     }
+
+    // Add extensions (x- prefixed properties)
+    Object.keys(formData.extensions).forEach(key => {
+      if (key.startsWith('x-')) {
+        schema[key] = formData.extensions[key];
+      }
+    });
 
     return schema;
   };
@@ -913,6 +933,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   disabled={isReadOnly}
                 />
               )}
+            </Box>
+
+            {/* Extensions */}
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <ExtensionsEditor
+                value={formData.extensions}
+                onChange={(extensions) => setFormData(prev => ({ ...prev, extensions }))}
+                disabled={isReadOnly}
+                size="small"
+              />
             </Box>
           </Box>
         )}
