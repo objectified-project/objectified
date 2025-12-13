@@ -1,0 +1,15 @@
+{
+  "arazzo": "{{arazzo}}",
+  "info": {{{json info}}},
+{{#if xMetadata}}  "x-metadata": {{{json xMetadata}}},
+{{/if}}  "sourceDescriptions": [
+{{#each sourceDescriptions}}
+    {{{json this}}}{{#unless @last}},{{/unless}}
+{{/each}}
+  ],
+  "workflows": [
+{{#each workflows}}
+    {{{json this}}}{{#unless @last}},{{/unless}}
+{{/each}}
+  ]
+}

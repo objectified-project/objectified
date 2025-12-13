@@ -1,0 +1,11 @@
+{
+  "stepId": "{{stepId}}",
+  "description": "{{description}}",
+  "operationId": "{{operationId}}",
+{{#if parameters}}  "parameters": {{{json parameters}}},
+{{/if}}{{#if requestBody}}  "requestBody": {{{json requestBody}}},
+{{/if}}  "successCriteria": {{{json successCriteria}}}{{#if outputs}},
+  "outputs": {{{json outputs}}}{{/if}}{{#if dependsOn}},
+  "dependsOn": {{{json dependsOn}}}{{/if}}
+}
+

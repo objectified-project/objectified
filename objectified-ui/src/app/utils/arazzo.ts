@@ -3,7 +3,10 @@
  *
  * Generates Arazzo v1.0.1 workflow specifications from class definitions.
  * Arazzo is a specification for describing sequences of API calls and their dependencies.
+ * Uses Handlebars templates for flexible generation.
  */
+
+import { renderTemplate, clearTemplateCache } from './template-loader';
 
 /**
  * Generates a complete Arazzo v1.0.1 specification from class definitions
@@ -11,7 +14,7 @@
  * @param options - Optional metadata for the spec
  * @returns Arazzo document as a JSON string
  */
-export function generateArazzoSpec(
+export async function generateArazzoSpec(
   classes: any[],
   options?: {
     projectName?: string;
@@ -32,9 +35,17 @@ export function generateArazzoSpec(
       };
     };
   }
-): string {
+): Promise<string> {
+  // Validate input
+  if (!classes || !Array.isArray(classes)) {
+    throw new Error('Classes parameter must be an array');
+  }
+
+  console.log('Generating Arazzo spec for', classes.length, 'classes');
+
   // Generate workflows based on CRUD operations for each class
   const workflows = classes.map((cls) => {
+    console.log('Processing class:', cls.name);
     const className = cls.name;
     const classDescription = cls.description || `Operations for ${className}`;
 
@@ -160,25 +171,40 @@ export function generateArazzoSpec(
     }
   }
 
-  const arazzoDoc: any = {
+  // Prepare source descriptions
+  const sourceDescriptions = [
+    {
+      name: 'openapi-source',
+      type: 'openapi',
+      url: './openapi.json',
+      description: 'OpenAPI specification containing schema definitions'
+    }
+  ];
+
+  // Prepare template data
+  const templateData = {
     arazzo: '1.0.1',
     info,
-    sourceDescriptions: [
-      {
-        name: 'openapi-source',
-        type: 'openapi',
-        url: './openapi.json',
-        description: 'OpenAPI specification containing schema definitions'
-      }
-    ],
-    workflows
+    sourceDescriptions,
+    workflows,
+    xMetadata: options?.metadata && Object.keys(options.metadata).length > 0 ? options.metadata : undefined
   };
 
-  // Add project metadata to top level as x-metadata extension
-  if (options?.metadata && Object.keys(options.metadata).length > 0) {
-    arazzoDoc['x-metadata'] = options.metadata;
+  console.log('Template data:', JSON.stringify(templateData, null, 2));
+
+  // Clear template cache in development to ensure fresh templates
+  if (process.env.NODE_ENV === 'development') {
+    await clearTemplateCache();
   }
 
-  return JSON.stringify(arazzoDoc, null, 2);
+  // Render using Handlebars template
+  try {
+    const result = await renderTemplate('arazzo/arazzo-spec.hbs', templateData);
+    console.log('Arazzo spec generated successfully');
+    return result;
+  } catch (error) {
+    console.error('Failed to render Arazzo template:', error);
+    throw error;
+  }
 }
 

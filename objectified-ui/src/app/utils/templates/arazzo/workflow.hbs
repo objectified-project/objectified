@@ -1,0 +1,11 @@
+{
+  "workflowId": "{{workflowId}}",
+  "summary": "{{summary}}",
+  "description": "{{description}}",
+  "steps": [
+{{#each steps}}
+    {{{json this}}}{{#unless @last}},{{/unless}}
+{{/each}}
+  ]
+}
+

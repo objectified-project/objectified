@@ -1555,7 +1555,7 @@ const StudioContent = () => {
             setOpenApiSpec(spec);
             console.log('Generated OpenAPI spec');
           } else if (codeDisplayFormat === 'arazzo') {
-            const arazzoSpecContent = generateArazzoSpec(classesWithProperties, {
+            const arazzoSpecContent = await generateArazzoSpec(classesWithProperties, {
               projectName: currentProject?.name,
               version: currentVersion?.version_id,
               metadata: (currentProject as any)?.metadata
