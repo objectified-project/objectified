@@ -19,7 +19,13 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import TuneIcon from '@mui/icons-material/Tune';
+import SettingsIcon from '@mui/icons-material/Settings';
+import CodeIcon from '@mui/icons-material/Code';
 import Button from '@mui/material/Button';
+import Collapse from '@mui/material/Collapse';
+import Paper from '@mui/material/Paper';
 import {
   DndContext,
   closestCenter,
@@ -422,203 +428,339 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   };
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: 0 }}>
-      {/* LEFT COLUMN: Standard Fields */}
-      <Box sx={{ pr: 3 }}>
-        {/* Section Header */}
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-          Standard Fields
-        </Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* ═══════════════════════════════════════════════════════════════════════════
+          SECTION 1: Basic Information
+          ═══════════════════════════════════════════════════════════════════════════ */}
+      <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <InfoOutlinedIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            Basic Information
+          </Typography>
+        </Box>
 
-        {/* Basic Fields */}
-        {showTitle && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 2 }}>
+          {showTitle && (
+            <TextField
+              label="Title"
+              size={size}
+              fullWidth
+              value={data.title || ''}
+              onChange={(e) => onChange('title', e.target.value)}
+              helperText="Display title"
+            />
+          )}
+
           <TextField
-            label="Title"
+            label="Description"
             size={size}
             fullWidth
-            value={data.title || ''}
-            onChange={(e) => onChange('title', e.target.value)}
-            helperText="Optional display title for the property"
-            sx={{ mb: 2 }}
+            multiline
+            rows={2}
+            value={data.description || ''}
+            onChange={(e) => onChange('description', e.target.value)}
+            helperText="What this property represents"
+            sx={{ gridColumn: showTitle ? 'auto' : '1 / -1' }}
           />
-        )}
+        </Box>
 
-        <TextField
-          label="Description"
-          size={size}
-          fullWidth
-          multiline
-          rows={3}
-          value={data.description || ''}
-          onChange={(e) => onChange('description', e.target.value)}
-          helperText="Optional description for the property"
-          sx={{ mb: 2 }}
-        />
+        {/* Default and Example in a row */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+          <TextField
+            label="Default Value"
+            size={size}
+            fullWidth
+            value={data.default || ''}
+            onChange={(e) => onChange('default', e.target.value)}
+            helperText="JSON default value"
+            sx={{
+              '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.875rem' },
+            }}
+          />
 
-        {/* Default Value */}
-        <TextField
-          label="Default Value"
-          size={size}
-          fullWidth
-          value={data.default || ''}
-          onChange={(e) => onChange('default', e.target.value)}
-          helperText="JSON value for default"
-          sx={{ mb: 2 }}
-        />
+          <TextField
+            label="Example"
+            size={size}
+            fullWidth
+            value={data.example || ''}
+            onChange={(e) => onChange('example', e.target.value)}
+            helperText="JSON example value"
+            sx={{
+              '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.875rem' },
+            }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip title="Generate example based on schema">
+                    <IconButton onClick={generateExample} size="small" sx={{ color: 'primary.main' }}>
+                      <AutoAwesomeIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+      </Box>
 
-        {/* Metadata Fields */}
-        {showMetadata && (
-          <Box sx={{ mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={data.required || false}
-                  onChange={(e) => onChange('required', e.target.checked)}
-                  size={size}
-                />
-              }
-              label="Required"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={data.readOnly || false}
-                  onChange={(e) => {
-                    onChange('readOnly', e.target.checked);
-                    if (e.target.checked) onChange('writeOnly', false);
-                  }}
-                  size={size}
-                />
-              }
-              label="Read Only"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={data.writeOnly || false}
-                  onChange={(e) => {
-                    onChange('writeOnly', e.target.checked);
-                    if (e.target.checked) onChange('readOnly', false);
-                  }}
-                  size={size}
-                />
-              }
-              label="Write Only"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={data.deprecated || false}
-                  onChange={(e) => onChange('deprecated', e.target.checked)}
-                  size={size}
-                />
-              }
-              label="Deprecated"
-            />
+      {/* ═══════════════════════════════════════════════════════════════════════════
+          SECTION 2: Property Behavior (Metadata flags)
+          ═══════════════════════════════════════════════════════════════════════════ */}
+      {showMetadata && (
+        <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: '#fafafa' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Property Behavior
+            </Typography>
+          </Box>
 
-            {data.deprecated && (
-              <TextField
-                label="Deprecation Message (Optional)"
-                size={size}
-                fullWidth
-                multiline
-                rows={2}
-                value={data.deprecationMessage || ''}
-                onChange={(e) => onChange('deprecationMessage', e.target.value)}
-                helperText="Provide context about why it's deprecated and what to use instead"
-                sx={{ mt: 2, bgcolor: 'warning.lighter' }}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+            {/* Required */}
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: data.required ? '#fef2f2' : 'white',
+                borderRadius: 2,
+                border: 1,
+                borderColor: data.required ? '#fecaca' : 'divider',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                '&:hover': { borderColor: data.required ? '#f87171' : '#94a3b8' }
+              }}
+              onClick={() => onChange('required', !data.required)}
+            >
+              <Checkbox
+                checked={data.required || false}
+                size="small"
+                sx={{ p: 0, pointerEvents: 'none' }}
+                tabIndex={-1}
               />
-            )}
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: data.required ? '#dc2626' : 'text.primary' }}>
+                  Required
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Must be provided
+                </Typography>
+              </Box>
+            </Box>
 
+            {/* Read Only */}
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: data.readOnly ? '#eff6ff' : 'white',
+                borderRadius: 2,
+                border: 1,
+                borderColor: data.readOnly ? '#bfdbfe' : 'divider',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                '&:hover': { borderColor: data.readOnly ? '#60a5fa' : '#94a3b8' }
+              }}
+              onClick={() => {
+                onChange('readOnly', !data.readOnly);
+                if (!data.readOnly) onChange('writeOnly', false);
+              }}
+            >
+              <Checkbox
+                checked={data.readOnly || false}
+                size="small"
+                sx={{ p: 0, pointerEvents: 'none' }}
+                tabIndex={-1}
+              />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: data.readOnly ? '#2563eb' : 'text.primary' }}>
+                  Read Only
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Output only
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Write Only */}
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: data.writeOnly ? '#f0fdf4' : 'white',
+                borderRadius: 2,
+                border: 1,
+                borderColor: data.writeOnly ? '#bbf7d0' : 'divider',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                '&:hover': { borderColor: data.writeOnly ? '#4ade80' : '#94a3b8' }
+              }}
+              onClick={() => {
+                onChange('writeOnly', !data.writeOnly);
+                if (!data.writeOnly) onChange('readOnly', false);
+              }}
+            >
+              <Checkbox
+                checked={data.writeOnly || false}
+                size="small"
+                sx={{ p: 0, pointerEvents: 'none' }}
+                tabIndex={-1}
+              />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: data.writeOnly ? '#16a34a' : 'text.primary' }}>
+                  Write Only
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Input only
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Deprecated */}
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: data.deprecated ? '#fef3c7' : 'white',
+                borderRadius: 2,
+                border: 1,
+                borderColor: data.deprecated ? '#fcd34d' : 'divider',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                '&:hover': { borderColor: data.deprecated ? '#fbbf24' : '#94a3b8' }
+              }}
+              onClick={() => onChange('deprecated', !data.deprecated)}
+            >
+              <Checkbox
+                checked={data.deprecated || false}
+                size="small"
+                sx={{ p: 0, pointerEvents: 'none' }}
+                tabIndex={-1}
+              />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: data.deprecated ? '#d97706' : 'text.primary' }}>
+                  Deprecated
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Avoid using
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+
+          {/* Deprecation Message */}
+          <Collapse in={data.deprecated}>
             <TextField
-              label="Example"
+              label="Deprecation Message"
               size={size}
               fullWidth
               multiline
               rows={2}
-              value={data.example || ''}
-              onChange={(e) => onChange('example', e.target.value)}
-              helperText="JSON example value"
-              sx={{ mt: 2 }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
-                    <Tooltip title="Generate example based on property schema">
-                      <IconButton
-                        onClick={generateExample}
-                        size="small"
-                        edge="end"
-                        sx={{ color: 'primary.main' }}
-                      >
-                        <AutoAwesomeIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </InputAdornment>
-                ),
-              }}
+              value={data.deprecationMessage || ''}
+              onChange={(e) => onChange('deprecationMessage', e.target.value)}
+              placeholder="e.g., Use newProperty instead. Will be removed in v2.0."
+              sx={{ mt: 2, bgcolor: 'white' }}
             />
-          </Box>
-        )}
-      </Box>
+          </Collapse>
+        </Box>
+      )}
 
-      {/* VERTICAL DIVIDER */}
-      <Box sx={{ bgcolor: 'divider' }} />
+      {/* ═══════════════════════════════════════════════════════════════════════════
+          SECTION 3: Type-Specific Constraints
+          ═══════════════════════════════════════════════════════════════════════════ */}
+      <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <TuneIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            Constraints
+          </Typography>
+          <Typography variant="caption" sx={{
+            px: 1,
+            py: 0.25,
+            bgcolor: '#e0e7ff',
+            color: '#4338ca',
+            borderRadius: 1,
+            fontWeight: 500,
+            ml: 1
+          }}>
+            {baseType}{isArray ? '[]' : ''}
+          </Typography>
+        </Box>
 
-      {/* RIGHT COLUMN: Constraints & Options */}
-      <Box sx={{ pl: 3 }}>
-        {/* Section Header */}
-        <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-          Constraints
-        </Typography>
-
-        {/* Tuple mode message - constraints are per-position */}
+        {/* Tuple mode message */}
         {data.tupleMode && isArray && (
-          <Box sx={{ mb: 2, p: 2, bgcolor: 'info.main', color: 'info.contrastText', borderRadius: 1, opacity: 0.9 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+          <Box sx={{ mb: 2, p: 2, bgcolor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: '#1d4ed8' }}>
               Tuple Mode Active
             </Typography>
-            <Typography variant="caption" sx={{ display: 'block' }}>
-              Item-level constraints are defined per-position in the Tuple Mode section below.
-              Each position in the tuple can have its own type and constraints.
+            <Typography variant="caption" color="text.secondary">
+              Item-level constraints are defined per-position below. Each position can have its own type and constraints.
             </Typography>
           </Box>
         )}
 
         {/* No constraints message for boolean and null types */}
         {(baseType === 'boolean' || baseType === 'null') && (
-          <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+          <Box sx={{ p: 3, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              No additional constraints
+              No additional constraints available
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
               {baseType === 'boolean'
-                ? 'Boolean types have no additional constraints (values are true or false)'
-                : 'Null type has no additional constraints (value is always null)'}
+                ? 'Boolean values are either true or false'
+                : 'Null type is always null'}
             </Typography>
           </Box>
         )}
 
         {/* String Constraints */}
         {baseType === 'string' && !data.tupleMode && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#334155' }}>
               String Constraints
+              {isArray && <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>(per item)</Typography>}
             </Typography>
-            {isArray && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                These constraints apply to each string item in the array
-              </Typography>
-            )}
 
-            <TextField
-              label="Format"
-              size={size}
-              fullWidth
-              value={data.format || ''}
-              onChange={(e) => onChange('format', e.target.value)}
-              helperText="e.g., date, date-time, email, uri, uuid"
-              sx={{ mb: 2 }}
-            />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
+              <TextField
+                label="Format"
+                size={size}
+                fullWidth
+                value={data.format || ''}
+                onChange={(e) => onChange('format', e.target.value)}
+                placeholder="date, email, uri, uuid..."
+                helperText="Standard format hint"
+              />
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                <TextField
+                  label="Min Length"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.minLength || ''}
+                  onChange={(e) => onChange('minLength', e.target.value)}
+                  inputProps={{ min: 0 }}
+                />
+                <TextField
+                  label="Max Length"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.maxLength || ''}
+                  onChange={(e) => onChange('maxLength', e.target.value)}
+                  inputProps={{ min: 0 }}
+                />
+              </Box>
+            </Box>
 
             <TextField
               label="Pattern (Regex)"
@@ -627,49 +769,28 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               value={data.pattern || ''}
               onChange={(e) => onChange('pattern', e.target.value)}
               placeholder="e.g., ^[A-Z]{3}$"
-              helperText="Regular expression pattern for validation"
-              sx={{ mb: 2 }}
+              helperText="Regular expression for validation"
+              sx={{
+                mb: 1,
+                '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.875rem' }
+              }}
             />
 
             <RegexTester pattern={data.pattern || ''} />
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-              <TextField
-                label="Min Length"
-                type="number"
-                size={size}
-                fullWidth
-                value={data.minLength || ''}
-                onChange={(e) => onChange('minLength', e.target.value)}
-                inputProps={{ min: 0 }}
-              />
-              <TextField
-                label="Max Length"
-                type="number"
-                size={size}
-                fullWidth
-                value={data.maxLength || ''}
-                onChange={(e) => onChange('maxLength', e.target.value)}
-                inputProps={{ min: 0 }}
-              />
-            </Box>
           </Box>
         )}
 
         {/* Number/Integer Constraints */}
         {(baseType === 'number' || baseType === 'integer') && !data.tupleMode && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#334155' }}>
               Numeric Constraints
+              {isArray && <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>(per item)</Typography>}
             </Typography>
-            {isArray && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                These constraints apply to each {baseType} item in the array
-              </Typography>
-            )}
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-              <Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
+              {/* Minimum */}
+              <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
                 <TextField
                   label="Minimum"
                   type="number"
@@ -678,25 +799,26 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   value={data.minimum || ''}
                   onChange={(e) => {
                     onChange('minimum', e.target.value);
-                    // Set default type if not already set, clear if value is empty
                     if (e.target.value && !data.minimumType) {
                       onChange('minimumType', 'inclusive');
                     } else if (!e.target.value) {
                       onChange('minimumType', undefined);
                     }
                   }}
+                  sx={{ mb: 1 }}
                 />
-                <Box sx={{ ml: 1, mt: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
                   <FormControlLabel
                     control={
                       <Radio
                         checked={data.minimumType === 'inclusive' || !data.minimumType}
                         onChange={() => onChange('minimumType', 'inclusive')}
                         disabled={!data.minimum}
-                        size={size}
+                        size="small"
                       />
                     }
-                    label={<Typography variant="body2">Inclusive (≥)</Typography>}
+                    label={<Typography variant="caption">≥ inclusive</Typography>}
+                    sx={{ m: 0 }}
                   />
                   <FormControlLabel
                     control={
@@ -704,14 +826,17 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         checked={data.minimumType === 'exclusive'}
                         onChange={() => onChange('minimumType', 'exclusive')}
                         disabled={!data.minimum}
-                        size={size}
+                        size="small"
                       />
                     }
-                    label={<Typography variant="body2">Exclusive (&gt;)</Typography>}
+                    label={<Typography variant="caption">&gt; exclusive</Typography>}
+                    sx={{ m: 0 }}
                   />
                 </Box>
               </Box>
-              <Box>
+
+              {/* Maximum */}
+              <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
                 <TextField
                   label="Maximum"
                   type="number"
@@ -720,25 +845,26 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   value={data.maximum || ''}
                   onChange={(e) => {
                     onChange('maximum', e.target.value);
-                    // Set default type if not already set, clear if value is empty
                     if (e.target.value && !data.maximumType) {
                       onChange('maximumType', 'inclusive');
                     } else if (!e.target.value) {
                       onChange('maximumType', undefined);
                     }
                   }}
+                  sx={{ mb: 1 }}
                 />
-                <Box sx={{ ml: 1, mt: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 2 }}>
                   <FormControlLabel
                     control={
                       <Radio
                         checked={data.maximumType === 'inclusive' || !data.maximumType}
                         onChange={() => onChange('maximumType', 'inclusive')}
                         disabled={!data.maximum}
-                        size={size}
+                        size="small"
                       />
                     }
-                    label={<Typography variant="body2">Inclusive (≤)</Typography>}
+                    label={<Typography variant="caption">≤ inclusive</Typography>}
+                    sx={{ m: 0 }}
                   />
                   <FormControlLabel
                     control={
@@ -746,10 +872,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         checked={data.maximumType === 'exclusive'}
                         onChange={() => onChange('maximumType', 'exclusive')}
                         disabled={!data.maximum}
-                        size={size}
+                        size="small"
                       />
                     }
-                    label={<Typography variant="body2">Exclusive (&lt;)</Typography>}
+                    label={<Typography variant="caption">&lt; exclusive</Typography>}
+                    sx={{ m: 0 }}
                   />
                 </Box>
               </Box>
@@ -762,20 +889,19 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               fullWidth
               value={data.multipleOf || ''}
               onChange={(e) => onChange('multipleOf', e.target.value)}
-              helperText="Value must be a multiple of this number"
-              sx={{ mb: 2 }}
+              helperText="Value must be divisible by this number"
             />
           </Box>
         )}
 
         {/* Array Constraints */}
         {isArray && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          <Box sx={{ p: 2, bgcolor: '#fefce8', borderRadius: 2, border: '1px solid #fef08a', mt: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#854d0e' }}>
               Array Constraints
             </Typography>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2, mb: 2 }}>
               <TextField
                 label="Min Items"
                 type="number"
@@ -794,70 +920,84 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 onChange={(e) => onChange('maxItems', e.target.value)}
                 inputProps={{ min: 0 }}
               />
-            </Box>
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={data.uniqueItems || false}
-                  onChange={(e) => onChange('uniqueItems', e.target.checked)}
-                  size={size}
-                />
-              }
-              label="Unique Items (no duplicates)"
-            />
-
-            <TextField
-              label="Contains (JSON Schema)"
-              size={size}
-              fullWidth
-              multiline
-              rows={3}
-              value={data.contains || ''}
-              onChange={(e) => {
-                onChange('contains', e.target.value);
-                // Clear minContains/maxContains if contains is cleared
-                if (!e.target.value.trim()) {
-                  onChange('minContains', undefined);
-                  onChange('maxContains', undefined);
-                }
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                p: 1.5,
+                bgcolor: data.uniqueItems ? '#f0fdf4' : 'white',
+                borderRadius: 1,
+                border: 1,
+                borderColor: data.uniqueItems ? '#86efac' : 'divider',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
               }}
-              placeholder='{"type": "string", "minLength": 5}'
-              helperText="OpenAPI 3.1: JSON Schema that at least one item must match"
-              sx={{ mt: 2 }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, ml: 0.5 }}>
-              Example: Require at least one item to be a string with minimum length 5
-            </Typography>
-
-            {/* minContains and maxContains - only shown when contains is set */}
-            {data.contains && data.contains.trim() && (
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
-                <TextField
-                  label="Min Contains"
-                  type="number"
-                  size={size}
-                  fullWidth
-                  value={data.minContains || ''}
-                  onChange={(e) => onChange('minContains', e.target.value)}
-                  inputProps={{ min: 1 }}
-                  helperText="Minimum matching items"
-                />
-                <TextField
-                  label="Max Contains"
-                  type="number"
-                  size={size}
-                  fullWidth
-                  value={data.maxContains || ''}
-                  onChange={(e) => onChange('maxContains', e.target.value)}
-                  inputProps={{ min: 1 }}
-                  helperText="Maximum matching items"
+              onClick={() => onChange('uniqueItems', !data.uniqueItems)}
+              >
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={data.uniqueItems || false}
+                      onChange={(e) => onChange('uniqueItems', e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={<Typography variant="body2">Unique Items</Typography>}
+                  sx={{ m: 0 }}
                 />
               </Box>
-            )}
+            </Box>
+
+            {/* Contains Schema - collapsible advanced feature */}
+            <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: '1px dashed #e2e8f0' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', display: 'block', mb: 1 }}>
+                Contains Schema (OpenAPI 3.1)
+              </Typography>
+              <TextField
+                size={size}
+                fullWidth
+                multiline
+                rows={2}
+                value={data.contains || ''}
+                onChange={(e) => {
+                  onChange('contains', e.target.value);
+                  if (!e.target.value.trim()) {
+                    onChange('minContains', undefined);
+                    onChange('maxContains', undefined);
+                  }
+                }}
+                placeholder='{"type": "string", "minLength": 5}'
+                helperText="At least one item must match this schema"
+                sx={{
+                  '& .MuiInputBase-input': { fontFamily: 'monospace', fontSize: '0.8rem' }
+                }}
+              />
+
+              <Collapse in={!!(data.contains && data.contains.trim())}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
+                  <TextField
+                    label="Min Contains"
+                    type="number"
+                    size={size}
+                    fullWidth
+                    value={data.minContains || ''}
+                    onChange={(e) => onChange('minContains', e.target.value)}
+                    inputProps={{ min: 1 }}
+                  />
+                  <TextField
+                    label="Max Contains"
+                    type="number"
+                    size={size}
+                    fullWidth
+                    value={data.maxContains || ''}
+                    onChange={(e) => onChange('maxContains', e.target.value)}
+                    inputProps={{ min: 1 }}
+                  />
+                </Box>
+              </Collapse>
+            </Box>
 
             {/* Tuple Mode - OpenAPI 3.1 prefixItems */}
-            <Box sx={{ mt: 3, p: 2, border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
               <FormControlLabel
                 control={
                   <Checkbox
@@ -865,14 +1005,12 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     onChange={(e) => {
                       onChange('tupleMode', e.target.checked);
                       if (!e.target.checked) {
-                        // Clear prefixItems when disabling tuple mode
                         onChange('prefixItems', undefined);
                       } else if (!data.prefixItems) {
-                        // Initialize with empty array when enabling
                         onChange('prefixItems', []);
                       }
                     }}
-                    size={size}
+                    size="small"
                   />
                 }
                 label={
@@ -881,13 +1019,14 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       Tuple Mode (prefixItems)
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      OpenAPI 3.1: Define ordered schemas for specific positions
+                      Define ordered schemas for specific array positions
                     </Typography>
                   </Box>
                 }
+                sx={{ m: 0 }}
               />
 
-              {data.tupleMode && (
+              <Collapse in={data.tupleMode}>
                 <Box sx={{ mt: 2 }}>
                   <PrefixItemsEditor
                     value={data.prefixItems || []}
@@ -895,230 +1034,37 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   />
 
                   <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Items Schema (for positions beyond prefix)
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', display: 'block', mb: 1 }}>
+                      Items Schema (beyond prefix positions)
                     </Typography>
                     <TextField
                       fullWidth
                       multiline
-                      rows={4}
+                      rows={3}
                       size={size}
                       value={data.itemsSchema || ''}
                       onChange={(e) => onChange('itemsSchema', e.target.value)}
                       placeholder='{"type": "string"}'
-                      helperText="JSON Schema for items beyond the defined prefix positions"
+                      helperText="Schema for items beyond defined positions"
                       sx={{
-                        fontFamily: 'monospace',
-                        '& textarea': {
-                          fontFamily: 'monospace',
-                          fontSize: '0.875rem',
-                        },
+                        '& textarea': { fontFamily: 'monospace', fontSize: '0.8rem' },
                       }}
                     />
                   </Box>
                 </Box>
-              )}
+              </Collapse>
             </Box>
           </Box>
         )}
 
-        {/* Constant Value */}
-        {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'boolean') && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Constant Value
-            </Typography>
-            {isArray && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Constant value applies to each item in the array
-              </Typography>
-            )}
-            <TextField
-              label="Constant Value"
-              size={size}
-              fullWidth
-              type={baseType === 'string' || baseType === 'boolean' ? 'text' : 'number'}
-              value={data.const || ''}
-              onChange={(e) => {
-                onChange('const', e.target.value);
-                // Clear enum if const is set
-                if (e.target.value && data.enum && data.enum.length > 0) {
-                  onChange('enum', []);
-                }
-              }}
-              placeholder={
-                baseType === 'boolean' ? 'e.g., true or false' :
-                baseType === 'integer' ? 'e.g., 42' :
-                baseType === 'number' ? 'e.g., 3.14' :
-                'e.g., "active"'
-              }
-              helperText={
-                data.const
-                  ? 'Property can only have this specific value (overrides enum)'
-                  : 'Use const when a property should only have one specific value (e.g., discriminator fields)'
-              }
-              disabled={!!data.enum && data.enum.length > 0}
-              sx={{
-                mb: 1,
-                '& .MuiInputBase-input': {
-                  fontFamily: baseType !== 'string' ? 'monospace' : 'inherit',
-                },
-              }}
-            />
-            {data.const && (
-              <Box
-                sx={{
-                  mt: 1,
-                  p: 1.5,
-                  bgcolor: 'info.lighter',
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: 'info.main',
-                }}
-              >
-                <Typography variant="caption" color="info.dark" sx={{ fontWeight: 600 }}>
-                  ℹ️ Constant Value Set
-                </Typography>
-                <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
-                  This property will only accept the value: <code style={{ background: 'rgba(0,0,0,0.1)', padding: '2px 4px', borderRadius: '2px' }}>{data.const}</code>
-                </Typography>
-                <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
-                  Useful for discriminator fields or fixed configuration values.
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Enum Values */}
-        {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2" color="text.secondary">
-                Allowed Values (Enum)
-              </Typography>
-              {data.enum && data.enum.length > 1 && (
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <Tooltip title="Sort A-Z (ascending)">
-                    <IconButton
-                      onClick={handleSortEnumAZ}
-                      size="small"
-                      disabled={!!data.const}
-                      sx={{
-                        border: 1,
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        p: 0.5,
-                      }}
-                    >
-                      <SortByAlphaIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Sort Z-A (descending)">
-                    <IconButton
-                      onClick={handleSortEnumZA}
-                      size="small"
-                      disabled={!!data.const}
-                      sx={{
-                        border: 1,
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        p: 0.5,
-                        transform: 'scaleY(-1)',
-                      }}
-                    >
-                      <SortByAlphaIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              )}
-            </Box>
-            {data.const && (
-              <Typography variant="caption" color="warning.main" sx={{ display: 'block', mb: 1, fontWeight: 600 }}>
-                ⚠️ Constant value is set - enum is disabled
-              </Typography>
-            )}
-            {!data.const && isArray && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Enum values apply to each item in the array
-              </Typography>
-            )}
-
-            <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-              <TextField
-                label="Add Enum Value"
-                size={size}
-                fullWidth
-                type={baseType === 'string' ? 'text' : 'number'}
-                value={enumInput}
-                onChange={(e) => {
-                  setEnumInput(e.target.value);
-                  setEnumError('');
-                }}
-                onKeyDown={handleEnumKeyPress}
-                error={!!enumError}
-                helperText={enumError || (data.const ? 'Disabled when constant value is set' : `Enter a ${baseType} value and press Enter`)}
-                placeholder={
-                  baseType === 'integer' ? 'e.g., 1, 2, 3' :
-                  baseType === 'number' ? 'e.g., 1.5, 2.0, 3.14' :
-                  'e.g., "active", "pending"'
-                }
-                disabled={!!data.const}
-              />
-            <IconButton
-              onClick={handleAddEnum}
-              color="primary"
-              disabled={!enumInput.trim() || !!data.const}
-            >
-              <AddIcon />
-            </IconButton>
-          </Box>
-
-          {data.enum && data.enum.length > 0 && (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleEnumDragEnd}
-            >
-              <List
-                dense
-                sx={{
-                  bgcolor: 'action.hover',
-                  borderRadius: 1,
-                  maxHeight: 200,
-                  overflow: 'auto',
-                  border: 1,
-                  borderColor: 'divider',
-                }}
-              >
-                <SortableContext
-                  items={data.enum}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {data.enum.map((value, index) => (
-                    <SortableEnumItem
-                      key={value}
-                      id={value}
-                      value={value}
-                      onDelete={handleRemoveEnum}
-                    />
-                  ))}
-                </SortableContext>
-              </List>
-            </DndContext>
-          )}
-          </Box>
-        )}
-
-        {/* Object Schema Settings */}
+        {/* Object Constraints */}
         {baseType === 'object' && (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          <Box sx={{ p: 2, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#166534' }}>
               Object Constraints
             </Typography>
 
-            {/* Min/Max Properties */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
               <TextField
                 label="Min Properties"
                 type="number"
@@ -1127,7 +1073,6 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 value={data.minProperties || ''}
                 onChange={(e) => onChange('minProperties', e.target.value)}
                 inputProps={{ min: 0 }}
-                helperText="Minimum number of properties"
               />
               <TextField
                 label="Max Properties"
@@ -1137,178 +1082,250 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 value={data.maxProperties || ''}
                 onChange={(e) => onChange('maxProperties', e.target.value)}
                 inputProps={{ min: 0 }}
-                helperText="Maximum number of properties"
               />
             </Box>
 
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-              Additional Properties
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, ml: 1 }}>
-              <Box>
+            <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: '1px solid #e2e8f0' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', display: 'block', mb: 1 }}>
+                Additional Properties
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 <FormControlLabel
-                  control={
-                    <Radio
-                      checked={data.additionalProperties === 'default'}
-                      onChange={() => onChange('additionalProperties', 'default')}
-                      value="default"
-                      size={size === 'small' ? 'small' : 'medium'}
-                    />
-                  }
-                  label="Default"
-                  sx={{ mb: 0.5 }}
+                  control={<Radio checked={data.additionalProperties === 'default'} onChange={() => onChange('additionalProperties', 'default')} size="small" />}
+                  label={<Typography variant="body2">Default (allows additional)</Typography>}
+                  sx={{ m: 0 }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-                  Use JSON Schema default (allows additional properties)
-                </Typography>
-              </Box>
-              <Box>
                 <FormControlLabel
-                  control={
-                    <Radio
-                      checked={data.additionalProperties === 'true'}
-                      onChange={() => onChange('additionalProperties', 'true')}
-                      value="true"
-                      size={size === 'small' ? 'small' : 'medium'}
-                    />
-                  }
-                  label="Allow Additional"
-                  sx={{ mb: 0.5 }}
+                  control={<Radio checked={data.additionalProperties === 'true'} onChange={() => onChange('additionalProperties', 'true')} size="small" />}
+                  label={<Typography variant="body2">Allow additional properties</Typography>}
+                  sx={{ m: 0 }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-                  Explicitly allow any additional properties
-                </Typography>
-              </Box>
-              <Box>
                 <FormControlLabel
-                  control={
-                    <Radio
-                      checked={data.additionalProperties === 'false'}
-                      onChange={() => onChange('additionalProperties', 'false')}
-                      value="false"
-                      size={size === 'small' ? 'small' : 'medium'}
-                    />
-                  }
-                  label="Strict Schema"
-                  sx={{ mb: 0.5 }}
+                  control={<Radio checked={data.additionalProperties === 'false'} onChange={() => onChange('additionalProperties', 'false')} size="small" />}
+                  label={<Typography variant="body2">Strict (no extra properties)</Typography>}
+                  sx={{ m: 0 }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-                  Only defined properties allowed (additionalProperties: false)
-                </Typography>
               </Box>
             </Box>
           </Box>
         )}
+      </Box>
 
-        {/* NOT Composition */}
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            NOT Composition
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            Specify a schema that the data must NOT match. Useful for exclusion rules.
-          </Typography>
-          <TextField
-            label="NOT Schema (JSON)"
-            size={size}
-            fullWidth
-            multiline
-            rows={3}
-            value={data.not || ''}
-            onChange={(e) => onChange('not', e.target.value)}
-            placeholder='{"type": "string", "maxLength": 0}'
-            helperText={
-              isArray
-                ? 'NOT schema applies to each item in the array. Example: exclude empty strings'
-                : 'Example: {"type": "string", "maxLength": 0} excludes empty strings'
-            }
-            sx={{
-              fontFamily: 'monospace',
-              '& textarea': {
-                fontFamily: 'monospace',
-                fontSize: '0.875rem',
-              },
-            }}
-          />
-          {data.not && data.not.trim() && (
-            <Box
-              sx={{
-                mt: 1,
-                p: 1.5,
-                bgcolor: 'info.lighter',
-                borderRadius: 1,
-                border: 1,
-                borderColor: 'info.main',
-              }}
-            >
-              <Typography variant="caption" color="info.dark" sx={{ fontWeight: 600 }}>
-                ℹ️ NOT Schema Active
+      {/* ═══════════════════════════════════════════════════════════════════════════
+          SECTION 4: Values (Const & Enum)
+          ═══════════════════════════════════════════════════════════════════════════ */}
+      {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'boolean') && (
+        <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: '#fafafa' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <CodeIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Allowed Values
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+            {/* Constant Value */}
+            <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#334155' }}>
+                Constant Value
               </Typography>
-              <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
-                Data will be validated to ensure it does NOT match the specified schema.
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                Use when property must have exactly one specific value
               </Typography>
-              <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
-                Common uses: Exclude empty strings, null values, specific subtypes, or patterns.
-              </Typography>
+              <TextField
+                label="Const"
+                size={size}
+                fullWidth
+                type={baseType === 'string' || baseType === 'boolean' ? 'text' : 'number'}
+                value={data.const || ''}
+                onChange={(e) => {
+                  onChange('const', e.target.value);
+                  if (e.target.value && data.enum && data.enum.length > 0) {
+                    onChange('enum', []);
+                  }
+                }}
+                placeholder={
+                  baseType === 'boolean' ? 'true or false' :
+                  baseType === 'integer' ? '42' :
+                  baseType === 'number' ? '3.14' : 'value'
+                }
+                disabled={!!data.enum && data.enum.length > 0}
+                sx={{
+                  '& .MuiInputBase-input': { fontFamily: 'monospace' },
+                }}
+              />
+              {data.const && (
+                <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#eff6ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
+                  <Typography variant="caption" sx={{ color: '#1e40af' }}>
+                    ✓ Only accepts: <code style={{ fontWeight: 600 }}>{data.const}</code>
+                  </Typography>
+                </Box>
+              )}
             </Box>
-          )}
+
+            {/* Enum Values */}
+            {baseType !== 'boolean' && (
+              <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                      Enum Values
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      List of allowed values
+                    </Typography>
+                  </Box>
+                  {data.enum && data.enum.length > 1 && (
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Sort A-Z">
+                        <IconButton onClick={handleSortEnumAZ} size="small" disabled={!!data.const}>
+                          <SortByAlphaIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Sort Z-A">
+                        <IconButton onClick={handleSortEnumZA} size="small" disabled={!!data.const} sx={{ transform: 'scaleY(-1)' }}>
+                          <SortByAlphaIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  )}
+                </Box>
+
+                {data.const && (
+                  <Typography variant="caption" sx={{ color: '#d97706', display: 'block', mb: 1 }}>
+                    ⚠️ Disabled when const is set
+                  </Typography>
+                )}
+
+                <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                  <TextField
+                    size={size}
+                    fullWidth
+                    type={baseType === 'string' ? 'text' : 'number'}
+                    value={enumInput}
+                    onChange={(e) => { setEnumInput(e.target.value); setEnumError(''); }}
+                    onKeyDown={handleEnumKeyPress}
+                    error={!!enumError}
+                    helperText={enumError}
+                    placeholder="Add value..."
+                    disabled={!!data.const}
+                  />
+                  <IconButton onClick={handleAddEnum} color="primary" disabled={!enumInput.trim() || !!data.const}>
+                    <AddIcon />
+                  </IconButton>
+                </Box>
+
+                {data.enum && data.enum.length > 0 && (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleEnumDragEnd}>
+                    <List dense sx={{ bgcolor: '#f8fafc', borderRadius: 1, maxHeight: 150, overflow: 'auto', border: '1px solid #e2e8f0' }}>
+                      <SortableContext items={data.enum} strategy={verticalListSortingStrategy}>
+                        {data.enum.map((value) => (
+                          <SortableEnumItem key={value} id={value} value={value} onDelete={handleRemoveEnum} />
+                        ))}
+                      </SortableContext>
+                    </List>
+                  </DndContext>
+                )}
+              </Box>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════════
+          SECTION 5: Advanced (NOT Composition, External Docs, Extensions)
+          ═══════════════════════════════════════════════════════════════════════════ */}
+      <Box sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <CodeIcon sx={{ color: '#6366f1', fontSize: 20 }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            Advanced
+          </Typography>
         </Box>
 
-        {/* External Documentation */}
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-            External Documentation
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-            Link to additional documentation outside the OpenAPI specification
-          </Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
+          {/* NOT Composition */}
+          <Box sx={{ p: 2, bgcolor: '#fef2f2', borderRadius: 2, border: '1px solid #fecaca' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#991b1b' }}>
+              NOT Schema
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              Data must NOT match this schema (exclusion rule)
+            </Typography>
+            <TextField
+              size={size}
+              fullWidth
+              multiline
+              rows={3}
+              value={data.not || ''}
+              onChange={(e) => onChange('not', e.target.value)}
+              placeholder='{"type": "string", "maxLength": 0}'
+              sx={{
+                bgcolor: 'white',
+                '& textarea': { fontFamily: 'monospace', fontSize: '0.8rem' },
+              }}
+            />
+            {data.not && data.not.trim() && (
+              <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'white', borderRadius: 1, border: '1px solid #fecaca' }}>
+                <Typography variant="caption" sx={{ color: '#991b1b' }}>
+                  ✗ Values matching this schema will be rejected
+                </Typography>
+              </Box>
+            )}
+          </Box>
 
-          <TextField
-            label="Documentation URL"
-            size={size}
-            fullWidth
-            type="url"
-            value={data.externalDocsUrl || ''}
-            onChange={(e) => onChange('externalDocsUrl', e.target.value)}
-            placeholder="https://docs.example.com/properties/example"
-            helperText="URL to external documentation"
-            sx={{ mb: 2 }}
-            InputProps={{
-              endAdornment: data.externalDocsUrl?.trim() && (
-                <InputAdornment position="end">
-                  <Tooltip title="Open documentation in new tab">
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        const url = data.externalDocsUrl?.trim();
-                        if (url) {
-                          window.open(url, '_blank', 'noopener,noreferrer');
-                        }
-                      }}
-                    >
-                      <OpenInNewIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </InputAdornment>
-              ),
-            }}
-          />
+          {/* External Documentation */}
+          <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <OpenInNewIcon sx={{ color: '#6366f1', fontSize: 16 }} />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                External Documentation
+              </Typography>
+            </Box>
 
-          <TextField
-            label="Description (Optional)"
-            size={size}
-            fullWidth
-            multiline
-            rows={2}
-            value={data.externalDocsDescription || ''}
-            onChange={(e) => onChange('externalDocsDescription', e.target.value)}
-            placeholder="e.g., Detailed documentation with examples"
-            helperText="Optional description of the external documentation"
-          />
+            <TextField
+              label="URL"
+              size={size}
+              fullWidth
+              type="url"
+              value={data.externalDocsUrl || ''}
+              onChange={(e) => onChange('externalDocsUrl', e.target.value)}
+              placeholder="https://docs.example.com/..."
+              sx={{ mb: 2 }}
+              InputProps={{
+                endAdornment: data.externalDocsUrl?.trim() && (
+                  <InputAdornment position="end">
+                    <Tooltip title="Open in new tab">
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          const url = data.externalDocsUrl?.trim();
+                          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        <OpenInNewIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <TextField
+              label="Description"
+              size={size}
+              fullWidth
+              multiline
+              rows={2}
+              value={data.externalDocsDescription || ''}
+              onChange={(e) => onChange('externalDocsDescription', e.target.value)}
+              placeholder="Brief description..."
+            />
+          </Box>
         </Box>
 
         {/* Extensions */}
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+        <Box sx={{ mt: 3, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
           <ExtensionsEditor
             value={data.extensions || {}}
             onChange={(extensions) => onChange('extensions', extensions)}

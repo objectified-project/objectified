@@ -18,7 +18,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Autocomplete from '@mui/material/Autocomplete';
-import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
@@ -397,42 +397,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     }
   };
 
-  // Render composition selector
-  const renderCompositionSelector = (
-    label: string,
-    helperText: string,
-    value: string[],
-    onChange: (items: string[]) => void,
-    color: 'primary' | 'info' | 'secondary'
-  ) => (
-    <Box sx={{ mb: 2 }}>
-      <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-        {label}
-      </Typography>
-      <Autocomplete
-        multiple
-        options={availableClasses}
-        value={value}
-        onChange={(_, newValue) => onChange(newValue)}
-        disabled={isReadOnly}
-        slotProps={{
-          chip: {
-            color: color,
-            size: "small"
-          }
-        }}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            placeholder="Select classes..."
-            helperText={helperText}
-            size="small"
-          />
-        )}
-      />
-    </Box>
-  );
-
   // Get the preview class data for display
   const previewClassData = editingClassData || {
     name: formData.name || 'NewClass',
@@ -751,400 +715,488 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         </Tabs>
       </Box>
 
-      <DialogContent sx={{ p: tabValue === 0 ? 3 : 0, overflow: tabValue === 0 ? 'auto' : 'hidden' }}>
+      <DialogContent sx={{ p: tabValue === 0 ? 0 : 0, overflow: tabValue === 0 ? 'auto' : 'hidden' }}>
         {/* Tab 0: Edit Form */}
         {tabValue === 0 && (
-          <Box>
-            {formData.error && <Alert severity="error" sx={{ mb: 2 }}>{formData.error}</Alert>}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {formData.error && <Alert severity="error" sx={{ m: 2, mb: 0 }}>{formData.error}</Alert>}
 
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Class Name"
-              fullWidth
-              required
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') }))}
-              helperText="Only letters, numbers, and underscores are allowed; recommend PascalCase class names."
-              sx={{ mb: 2 }}
-              disabled={isReadOnly}
-            />
-
-            <TextField
-              margin="dense"
-              label="Description"
-              fullWidth
-              multiline
-              rows={2}
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              sx={{ mb: 2 }}
-              disabled={isReadOnly}
-            />
-
-            {/* Tags */}
-            {projectId && projectTags && projectTags.length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TagIcon size={16} />
-                  Tags
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 1: Basic Information
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <FileText size={18} style={{ color: '#6366f1' }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Basic Information
                 </Typography>
-                <Autocomplete
-                  multiple
-                  options={projectTags.map((tag: any) => tag.id)}
-                  value={formData.selectedTags}
-                  onChange={(_, newValue) => setFormData(prev => ({ ...prev, selectedTags: newValue }))}
+              </Box>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 2 }}>
+                <TextField
+                  autoFocus
+                  label="Class Name"
+                  fullWidth
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') }))}
+                  helperText="PascalCase recommended (e.g., UserAccount)"
                   disabled={isReadOnly}
-                  getOptionLabel={(tagId) => {
-                    const tag = projectTags.find((t: any) => t.id === tagId);
-                    return tag ? tag.name : tagId;
-                  }}
-                  renderTags={(value, getTagProps) =>
-                    value.map((tagId, index) => {
+                  size="small"
+                />
+
+                <TextField
+                  label="Description"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  helperText="Brief description of what this class represents"
+                  disabled={isReadOnly}
+                  size="small"
+                />
+              </Box>
+
+              {/* Tags - inline with basic info */}
+              {projectId && projectTags && projectTags.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Autocomplete
+                    multiple
+                    options={projectTags.map((tag: any) => tag.id)}
+                    value={formData.selectedTags}
+                    onChange={(_, newValue) => setFormData(prev => ({ ...prev, selectedTags: newValue }))}
+                    disabled={isReadOnly}
+                    size="small"
+                    getOptionLabel={(tagId) => {
+                      const tag = projectTags.find((t: any) => t.id === tagId);
+                      return tag ? tag.name : tagId;
+                    }}
+                    renderTags={(value, getTagProps) =>
+                      value.map((tagId, index) => {
+                        const tag = projectTags.find((t: any) => t.id === tagId);
+                        return (
+                          <Chip
+                            label={tag?.name || tagId}
+                            color={tag?.color as any || 'default'}
+                            size="small"
+                            {...getTagProps({ index })}
+                          />
+                        );
+                      })
+                    }
+                    renderOption={(props, tagId) => {
                       const tag = projectTags.find((t: any) => t.id === tagId);
                       return (
-                        <Chip
-                          label={tag?.name || tagId}
-                          color={tag?.color as any || 'default'}
-                          size="small"
-                          {...getTagProps({ index })}
-                        />
+                        <li {...props}>
+                          <Chip
+                            label={tag?.name || tagId}
+                            color={tag?.color as any || 'default'}
+                            size="small"
+                            sx={{ mr: 1 }}
+                          />
+                          {tag?.description || ''}
+                        </li>
                       );
-                    })
-                  }
-                  renderOption={(props, tagId) => {
-                    const tag = projectTags.find((t: any) => t.id === tagId);
-                    return (
-                      <li {...props}>
-                        <Chip
-                          label={tag?.name || tagId}
-                          color={tag?.color as any || 'default'}
-                          size="small"
-                          sx={{ mr: 1 }}
-                        />
-                        {tag?.description || ''}
-                      </li>
-                    );
-                  }}
-                  renderInput={(params) => (
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Tags"
+                        placeholder="Select tags to organize this class..."
+                        InputProps={{
+                          ...params.InputProps,
+                          startAdornment: (
+                            <>
+                              <TagIcon size={16} style={{ marginLeft: 8, marginRight: 4, color: '#9ca3af' }} />
+                              {params.InputProps.startAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                  />
+                </Box>
+              )}
+            </Box>
+
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 2: Schema Behavior (Two-column layout)
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: '#fafafa' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Settings size={18} style={{ color: '#6366f1' }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Schema Settings
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                {/* Additional Properties */}
+                <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    Additional Properties
+                  </Typography>
+                  <RadioGroup
+                    value={formData.additionalProperties === null ? 'default' : formData.additionalProperties ? 'allow' : 'disallow'}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData(prev => ({ ...prev, additionalProperties: value === 'default' ? null : value === 'allow' }));
+                    }}
+                    sx={{ gap: 0.5 }}
+                  >
+                    <FormControlLabel
+                      value="default"
+                      control={<Radio size="small" />}
+                      label={<Typography variant="body2">Not specified (default)</Typography>}
+                      disabled={isReadOnly}
+                      sx={{ m: 0 }}
+                    />
+                    <FormControlLabel
+                      value="allow"
+                      control={<Radio size="small" />}
+                      label={<Typography variant="body2">Allow additional properties</Typography>}
+                      disabled={isReadOnly}
+                      sx={{ m: 0 }}
+                    />
+                    <FormControlLabel
+                      value="disallow"
+                      control={<Radio size="small" />}
+                      label={<Typography variant="body2">Strict mode (no extra props)</Typography>}
+                      disabled={isReadOnly}
+                      sx={{ m: 0 }}
+                    />
+                  </RadioGroup>
+                </Box>
+
+                {/* Deprecation Status */}
+                <Box sx={{
+                  p: 2,
+                  bgcolor: formData.deprecated ? '#fef3c7' : 'white',
+                  borderRadius: 2,
+                  border: 1,
+                  borderColor: formData.deprecated ? '#fbbf24' : 'divider',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.deprecated}
+                        onChange={(e) => setFormData(prev => ({ ...prev, deprecated: e.target.checked }))}
+                        disabled={isReadOnly}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AlertTriangle size={16} style={{ color: formData.deprecated ? '#d97706' : '#9ca3af' }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Mark as Deprecated
+                        </Typography>
+                      </Box>
+                    }
+                    sx={{ m: 0, mb: formData.deprecated ? 1.5 : 0 }}
+                  />
+                  {formData.deprecated && (
                     <TextField
-                      {...params}
-                      placeholder="Select tags..."
-                      helperText="Organize and categorize this class"
+                      label="Deprecation Message"
+                      fullWidth
+                      multiline
+                      rows={2}
+                      placeholder="e.g., Use NewClass instead. Will be removed in v2.0."
+                      value={formData.deprecationMessage}
+                      onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
+                      disabled={isReadOnly}
                       size="small"
                     />
                   )}
-                />
+                </Box>
               </Box>
-            )}
+            </Box>
 
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              Composition/Inheritance (Optional)
-            </Typography>
-
-            {renderCompositionSelector(
-              "allOf (Inheritance)",
-              "Must match all listed schemas",
-              formData.allOf,
-              (items) => setFormData(prev => ({ ...prev, allOf: items })),
-              "primary"
-            )}
-
-            {renderCompositionSelector(
-              "anyOf (Alternatives)",
-              "Must match at least one listed schema",
-              formData.anyOf,
-              (items) => setFormData(prev => ({ ...prev, anyOf: items })),
-              "info"
-            )}
-
-            {renderCompositionSelector(
-              "oneOf (Exclusive)",
-              "Must match exactly one listed schema",
-              formData.oneOf,
-              (items) => setFormData(prev => ({ ...prev, oneOf: items })),
-              "secondary"
-            )}
-
-            {/* Discriminator */}
-            {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
-              <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Discriminator Configuration
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 3: Composition/Inheritance
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Layers size={18} style={{ color: '#6366f1' }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Composition & Inheritance
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                  The discriminator helps code generators and documentation tools understand polymorphic types.
-                  {formData.oneOf.length > 0 && " It's especially important for oneOf where exactly one schema must match."}
+                <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
+                  (Optional)
                 </Typography>
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                Define relationships with other classes using OpenAPI composition keywords
+              </Typography>
 
-                <TextField
-                  margin="dense"
-                  label="Discriminator Property Name"
-                  fullWidth
-                  placeholder="e.g., type, petType, kind"
-                  value={formData.discriminatorProperty}
-                  onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
-                  helperText="Property name that indicates which schema variant to use for polymorphic objects"
-                  sx={{ mb: 2 }}
-                  disabled={isReadOnly}
-                />
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {/* allOf */}
+                <Box sx={{ p: 2, bgcolor: '#eef2ff', borderRadius: 2, border: '1px solid #c7d2fe' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#4338ca' }}>
+                    allOf (Inheritance)
+                  </Typography>
+                  <Autocomplete
+                    multiple
+                    options={availableClasses}
+                    value={formData.allOf}
+                    onChange={(_, newValue) => setFormData(prev => ({ ...prev, allOf: newValue }))}
+                    disabled={isReadOnly}
+                    size="small"
+                    renderTags={(value, getTagProps) =>
+                      value.map((name, index) => (
+                        <Chip label={name} color="primary" size="small" {...getTagProps({ index })} />
+                      ))
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Select classes..." size="small" />
+                    )}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Must match ALL listed schemas
+                  </Typography>
+                </Box>
 
-                {formData.discriminatorProperty && (
-                  <>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={formData.discriminatorUseAuto}
-                          onChange={(e) => {
-                            const useAuto = e.target.checked;
-                            setFormData(prev => ({
-                              ...prev,
-                              discriminatorUseAuto: useAuto,
-                              // Clear mapping when switching to auto
-                              discriminatorMapping: useAuto ? {} : prev.discriminatorMapping
-                            }));
-                          }}
-                          disabled={isReadOnly}
-                        />
-                      }
-                      label="Use automatic mapping (implicit mapping based on schema names)"
-                      sx={{ mb: 2 }}
-                    />
+                {/* anyOf */}
+                <Box sx={{ p: 2, bgcolor: '#fef3c7', borderRadius: 2, border: '1px solid #fcd34d' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#b45309' }}>
+                    anyOf (Alternatives)
+                  </Typography>
+                  <Autocomplete
+                    multiple
+                    options={availableClasses}
+                    value={formData.anyOf}
+                    onChange={(_, newValue) => setFormData(prev => ({ ...prev, anyOf: newValue }))}
+                    disabled={isReadOnly}
+                    size="small"
+                    renderTags={(value, getTagProps) =>
+                      value.map((name, index) => (
+                        <Chip label={name} color="warning" size="small" {...getTagProps({ index })} />
+                      ))
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Select classes..." size="small" />
+                    )}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Must match AT LEAST one schema
+                  </Typography>
+                </Box>
 
-                    {!formData.discriminatorUseAuto && (
-                      <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                          Explicit Mapping
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                          Map property values to schema references. Example: "dog" → Dog, "cat" → Cat
-                        </Typography>
+                {/* oneOf */}
+                <Box sx={{ p: 2, bgcolor: '#f3e8ff', borderRadius: 2, border: '1px solid #d8b4fe' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#7c3aed' }}>
+                    oneOf (Exclusive)
+                  </Typography>
+                  <Autocomplete
+                    multiple
+                    options={availableClasses}
+                    value={formData.oneOf}
+                    onChange={(_, newValue) => setFormData(prev => ({ ...prev, oneOf: newValue }))}
+                    disabled={isReadOnly}
+                    size="small"
+                    renderTags={(value, getTagProps) =>
+                      value.map((name, index) => (
+                        <Chip label={name} color="secondary" size="small" {...getTagProps({ index })} />
+                      ))
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Select classes..." size="small" />
+                    )}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Must match EXACTLY one schema
+                  </Typography>
+                </Box>
+              </Box>
 
-                        {/* Mapping Editor */}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                          {/* Get list of schemas from composition */}
+              {/* Discriminator - Only show when composition is used */}
+              {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
+                <Box sx={{ mt: 3, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                    Discriminator Configuration
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                    Helps tools understand which schema variant to use for polymorphic types
+                  </Typography>
+
+                  <TextField
+                    label="Discriminator Property"
+                    fullWidth
+                    size="small"
+                    placeholder="e.g., type, petType, kind"
+                    value={formData.discriminatorProperty}
+                    onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
+                    helperText="Property name that indicates which schema variant applies"
+                    sx={{ mb: 2 }}
+                    disabled={isReadOnly}
+                  />
+
+                  {formData.discriminatorProperty && (
+                    <>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={formData.discriminatorUseAuto}
+                            onChange={(e) => {
+                              const useAuto = e.target.checked;
+                              setFormData(prev => ({
+                                ...prev,
+                                discriminatorUseAuto: useAuto,
+                                discriminatorMapping: useAuto ? {} : prev.discriminatorMapping
+                              }));
+                            }}
+                            disabled={isReadOnly}
+                            size="small"
+                          />
+                        }
+                        label={<Typography variant="body2">Use automatic mapping (based on schema names)</Typography>}
+                        sx={{ mb: 2 }}
+                      />
+
+                      {!formData.discriminatorUseAuto && (
+                        <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                            Explicit Mapping
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {(() => {
+                              const schemas = formData.oneOf.length > 0 ? formData.oneOf :
+                                            formData.anyOf.length > 0 ? formData.anyOf :
+                                            formData.allOf;
+
+                              return schemas.map((schemaName) => {
+                                const currentValue = Object.entries(formData.discriminatorMapping)
+                                  .find(([_, name]) => name === schemaName)?.[0] || '';
+
+                                return (
+                                  <Box key={schemaName} sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 1, alignItems: 'center' }}>
+                                    <TextField
+                                      size="small"
+                                      placeholder={`e.g., ${schemaName.toLowerCase()}`}
+                                      value={currentValue}
+                                      onChange={(e) => {
+                                        const newValue = e.target.value;
+                                        setFormData(prev => {
+                                          const newMapping = { ...prev.discriminatorMapping };
+                                          Object.keys(newMapping).forEach(key => {
+                                            if (newMapping[key] === schemaName) {
+                                              delete newMapping[key];
+                                            }
+                                          });
+                                          if (newValue.trim()) {
+                                            newMapping[newValue.trim()] = schemaName;
+                                          }
+                                          return { ...prev, discriminatorMapping: newMapping };
+                                        });
+                                      }}
+                                      disabled={isReadOnly}
+                                      label="Value"
+                                    />
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>→</Typography>
+                                    <Box sx={{ p: 1, bgcolor: 'primary.lighter', borderRadius: 1, border: 1, borderColor: 'primary.main', textAlign: 'center' }}>
+                                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>{schemaName}</Typography>
+                                    </Box>
+                                  </Box>
+                                );
+                              });
+                            })()}
+                          </Box>
+
                           {(() => {
                             const schemas = formData.oneOf.length > 0 ? formData.oneOf :
                                           formData.anyOf.length > 0 ? formData.anyOf :
                                           formData.allOf;
+                            const mappedSchemas = new Set(Object.values(formData.discriminatorMapping));
+                            const unmappedSchemas = schemas.filter(s => !mappedSchemas.has(s));
 
-                            return schemas.map((schemaName) => {
-                              const currentValue = Object.entries(formData.discriminatorMapping)
-                                .find(([_, name]) => name === schemaName)?.[0] || '';
-
-                              return (
-                                <Box key={schemaName} sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 1, alignItems: 'center' }}>
-                                  <TextField
-                                    size="small"
-                                    placeholder={`e.g., ${schemaName.toLowerCase()}`}
-                                    value={currentValue}
-                                    onChange={(e) => {
-                                      const newValue = e.target.value;
-                                      setFormData(prev => {
-                                        const newMapping = { ...prev.discriminatorMapping };
-
-                                        // Remove old entry for this schema if value changed
-                                        Object.keys(newMapping).forEach(key => {
-                                          if (newMapping[key] === schemaName) {
-                                            delete newMapping[key];
-                                          }
-                                        });
-
-                                        // Add new entry if value is not empty
-                                        if (newValue.trim()) {
-                                          newMapping[newValue.trim()] = schemaName;
-                                        }
-
-                                        return { ...prev, discriminatorMapping: newMapping };
-                                      });
-                                    }}
-                                    disabled={isReadOnly}
-                                    label="Property Value"
-                                  />
-                                  <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
-                                    →
-                                  </Typography>
-                                  <Box sx={{
-                                    p: 1,
-                                    bgcolor: 'primary.lighter',
-                                    borderRadius: 1,
-                                    border: 1,
-                                    borderColor: 'primary.main',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}>
-                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                                      {schemaName}
-                                    </Typography>
-                                  </Box>
-                                </Box>
-                              );
-                            });
+                            return unmappedSchemas.length > 0 && (
+                              <Alert severity="warning" sx={{ mt: 2 }} icon={<AlertTriangle size={16} />}>
+                                <Typography variant="caption">
+                                  <strong>Unmapped:</strong> {unmappedSchemas.join(', ')}
+                                </Typography>
+                              </Alert>
+                            );
                           })()}
                         </Box>
-
-                        {/* Validation warning */}
-                        {(() => {
-                          const schemas = formData.oneOf.length > 0 ? formData.oneOf :
-                                        formData.anyOf.length > 0 ? formData.anyOf :
-                                        formData.allOf;
-                          const mappedSchemas = new Set(Object.values(formData.discriminatorMapping));
-                          const unmappedSchemas = schemas.filter(s => !mappedSchemas.has(s));
-
-                          return unmappedSchemas.length > 0 && (
-                            <Alert severity="warning" sx={{ mt: 2 }}>
-                              <Typography variant="caption">
-                                <strong>Unmapped schemas:</strong> {unmappedSchemas.join(', ')}
-                              </Typography>
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                These schemas won't be reachable via the discriminator property.
-                              </Typography>
-                            </Alert>
-                          );
-                        })()}
-                      </Box>
-                    )}
-                  </>
-                )}
-              </Box>
-            )}
-
-            {/* Additional Properties */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                Additional Properties
-              </Typography>
-              <RadioGroup
-                value={formData.additionalProperties === null ? 'default' : formData.additionalProperties ? 'allow' : 'disallow'}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFormData(prev => ({ ...prev, additionalProperties: value === 'default' ? null : value === 'allow' }));
-                }}
-              >
-                <FormControlLabel
-                  value="default"
-                  control={<Radio />}
-                  label="Not specified (default behavior - property omitted)"
-                  disabled={isReadOnly}
-                />
-                <FormControlLabel
-                  value="allow"
-                  control={<Radio />}
-                  label="Allow additional properties (set true)"
-                  disabled={isReadOnly}
-                />
-                <FormControlLabel
-                  value="disallow"
-                  control={<Radio />}
-                  label="Disallow additional properties (set false)"
-                  disabled={isReadOnly}
-                />
-              </RadioGroup>
-            </Box>
-
-            {/* Deprecated */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'warning.lighter', borderRadius: 1, border: 1, borderColor: 'warning.light' }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={formData.deprecated}
-                    onChange={(e) => setFormData(prev => ({ ...prev, deprecated: e.target.checked }))}
-                    disabled={isReadOnly}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      Mark as Deprecated
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Indicates this class should no longer be used
-                    </Typography>
-                  </Box>
-                }
-              />
-              {formData.deprecated && (
-                <TextField
-                  margin="dense"
-                  label="Deprecation Message (Optional)"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  placeholder="e.g., Use NewClass instead. This will be removed in version 2.0."
-                  value={formData.deprecationMessage}
-                  onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
-                  helperText="Provide context about why it's deprecated and what to use instead"
-                  sx={{ mt: 1 }}
-                  disabled={isReadOnly}
-                />
+                      )}
+                    </>
+                  )}
+                </Box>
               )}
             </Box>
 
-            {/* External Documentation */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                External Documentation
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
-                Link to additional documentation outside the OpenAPI specification
-              </Typography>
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 4: Documentation & Extensions (Two-column)
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, bgcolor: '#fafafa' }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                {/* External Documentation */}
+                <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <ExternalLink size={16} style={{ color: '#6366f1' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      External Documentation
+                    </Typography>
+                  </Box>
 
-              <TextField
-                margin="dense"
-                label="Documentation URL"
-                fullWidth
-                type="url"
-                value={formData.externalDocsUrl}
-                onChange={(e) => setFormData(prev => ({ ...prev, externalDocsUrl: e.target.value }))}
-                placeholder="https://docs.example.com/classes/user"
-                helperText="URL to external documentation"
-                sx={{ mb: 2 }}
-                disabled={isReadOnly}
-                slotProps={{
-                  input: {
-                    endAdornment: formData.externalDocsUrl.trim() && (
-                      <Button
-                        size="small"
-                        startIcon={<ExternalLink size={16} />}
-                        onClick={() => {
-                          const url = formData.externalDocsUrl.trim();
-                          if (url) {
-                            window.open(url, '_blank', 'noopener,noreferrer');
-                          }
-                        }}
-                        disabled={isReadOnly}
-                        sx={{ ml: 1 }}
-                      >
-                        Check Link
-                      </Button>
-                    ),
-                  }
-                }}
-              />
+                  <TextField
+                    label="Documentation URL"
+                    fullWidth
+                    type="url"
+                    size="small"
+                    value={formData.externalDocsUrl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, externalDocsUrl: e.target.value }))}
+                    placeholder="https://docs.example.com/..."
+                    sx={{ mb: 2 }}
+                    disabled={isReadOnly}
+                    InputProps={{
+                      endAdornment: formData.externalDocsUrl.trim() && (
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            const url = formData.externalDocsUrl.trim();
+                            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                          }}
+                          disabled={isReadOnly}
+                          sx={{ minWidth: 'auto', px: 1 }}
+                        >
+                          <ExternalLink size={14} />
+                        </Button>
+                      ),
+                    }}
+                  />
 
-              <TextField
-                margin="dense"
-                label="Description (Optional)"
-                fullWidth
-                multiline
-                rows={2}
-                value={formData.externalDocsDescription}
-                onChange={(e) => setFormData(prev => ({ ...prev, externalDocsDescription: e.target.value }))}
-                placeholder="e.g., Detailed user guide with examples"
-                helperText="Optional description of the external documentation"
-                disabled={isReadOnly}
-              />
-            </Box>
+                  <TextField
+                    label="Description"
+                    fullWidth
+                    multiline
+                    rows={2}
+                    size="small"
+                    value={formData.externalDocsDescription}
+                    onChange={(e) => setFormData(prev => ({ ...prev, externalDocsDescription: e.target.value }))}
+                    placeholder="Brief description of external docs"
+                    disabled={isReadOnly}
+                  />
+                </Box>
 
-            {/* Extensions */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <ExtensionsEditor
-                value={formData.extensions}
-                onChange={(extensions) => setFormData(prev => ({ ...prev, extensions }))}
-                disabled={isReadOnly}
-                size="small"
-              />
+                {/* Extensions */}
+                <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Code size={16} style={{ color: '#6366f1' }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Custom Extensions
+                    </Typography>
+                  </Box>
+                  <ExtensionsEditor
+                    value={formData.extensions}
+                    onChange={(extensions) => setFormData(prev => ({ ...prev, extensions }))}
+                    disabled={isReadOnly}
+                    size="small"
+                  />
+                </Box>
+              </Box>
             </Box>
           </Box>
         )}

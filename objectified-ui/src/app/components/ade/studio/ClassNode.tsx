@@ -308,6 +308,13 @@ function ClassNode({ data, selected }: NodeProps) {
 
   const { topLevel, childMap } = buildPropertyHierarchy();
 
+  // Determine header accent color based on state
+  const getHeaderGradient = () => {
+    if (dragTarget === 'node') return 'linear-gradient(135deg, #059669 0%, #047857 100%)';
+    if (selected) return 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)';
+    return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+  };
+
   return (
     <div
       onDragOver={handleDragOver}
@@ -315,13 +322,17 @@ function ClassNode({ data, selected }: NodeProps) {
       onDrop={handleDrop}
       onDoubleClick={handleDoubleClick}
       style={{
-        borderRadius: '4px',
-        border: `1px solid ${dragTarget === 'node' ? '#10b981' : selected ? '#5b68ea' : '#d1d5db'}`,
+        borderRadius: '12px',
+        border: 'none',
         background: 'white',
-        minWidth: '240px',
-        maxWidth: '380px',
-        boxShadow: selected ? '0 2px 8px rgba(91, 104, 234, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.08)',
-        transition: 'all 0.2s ease',
+        minWidth: '260px',
+        maxWidth: '400px',
+        boxShadow: selected
+          ? '0 0 0 2px #6366f1, 0 10px 40px -10px rgba(99, 102, 241, 0.4), 0 4px 20px -4px rgba(0, 0, 0, 0.1)'
+          : dragTarget === 'node'
+          ? '0 0 0 2px #10b981, 0 10px 40px -10px rgba(16, 185, 129, 0.3), 0 4px 20px -4px rgba(0, 0, 0, 0.1)'
+          : '0 4px 24px -4px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.04)',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'hidden',
         cursor: 'pointer',
       }}
@@ -331,11 +342,13 @@ function ClassNode({ data, selected }: NodeProps) {
         type="target"
         position={Position.Top}
         style={{
-          background: '#6b7280',
-          width: '8px',
-          height: '8px',
+          background: selected ? '#6366f1' : '#94a3b8',
+          width: '10px',
+          height: '10px',
           border: '2px solid white',
-          borderRadius: '50%'
+          borderRadius: '50%',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          transition: 'background 0.2s ease',
         }}
         isConnectable={true}
       />
@@ -343,81 +356,134 @@ function ClassNode({ data, selected }: NodeProps) {
       {/* Header */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #5b68ea 0%, #4751c4 100%)',
-          padding: '8px 12px',
+          background: getHeaderGradient(),
+          padding: '12px 16px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderBottom: dragTarget === 'node' ? '2px solid #10b981' : 'none',
-          gap: '8px',
+          gap: '10px',
+          position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'white', wordBreak: 'break-word', textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none' }}>
-            {typedData.name}
+        {/* Subtle pattern overlay */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at 100% 0%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
+          {/* Class icon */}
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: 'white',
+            flexShrink: 0,
+            letterSpacing: '-0.5px',
+          }}>
+            {typedData.name.substring(0, 2).toUpperCase()}
           </div>
-          {/* Tags in header */}
-          {showTags && typedData.tags && typedData.tags.length > 0 && (
+
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '4px',
-              alignItems: 'center',
-              opacity: tagsOpacity,
-              transition: 'opacity 0.3s ease-in-out'
+              fontSize: '14px',
+              fontWeight: 600,
+              color: 'white',
+              letterSpacing: '-0.01em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none',
+              opacity: typedData.schema?.deprecated ? 0.7 : 1,
             }}>
-              {typedData.tags.map((tag) => {
-                const colorMap: Record<string, string> = {
-                  default: 'rgba(255, 255, 255, 0.25)',
-                  primary: 'rgba(255, 255, 255, 0.3)',
-                  secondary: 'rgba(147, 51, 234, 0.4)',
-                  error: 'rgba(239, 68, 68, 0.4)',
-                  warning: 'rgba(245, 158, 11, 0.4)',
-                  info: 'rgba(59, 130, 246, 0.4)',
-                  success: 'rgba(16, 185, 129, 0.4)',
-                };
-                const bgColor = colorMap[tag.tag_color] || colorMap.default;
-                return (
-                  <span
-                    key={tag.id}
-                    style={{
-                      fontSize: '9px',
-                      padding: '2px 5px',
-                      borderRadius: '3px',
-                      background: bgColor,
-                      color: 'white',
-                      fontWeight: 600,
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {tag.tag_name}
-                  </span>
-                );
-              })}
+              {typedData.name}
             </div>
-          )}
+
+            {/* Tags inline with name */}
+            {showTags && typedData.tags && typedData.tags.length > 0 && (
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '4px',
+                marginTop: '4px',
+                opacity: tagsOpacity,
+                transition: 'opacity 0.3s ease-in-out'
+              }}>
+                {typedData.tags.map((tag) => {
+                  const colorMap: Record<string, { bg: string; border: string }> = {
+                    default: { bg: 'rgba(255, 255, 255, 0.15)', border: 'rgba(255, 255, 255, 0.25)' },
+                    primary: { bg: 'rgba(99, 102, 241, 0.3)', border: 'rgba(99, 102, 241, 0.5)' },
+                    secondary: { bg: 'rgba(168, 85, 247, 0.3)', border: 'rgba(168, 85, 247, 0.5)' },
+                    error: { bg: 'rgba(239, 68, 68, 0.3)', border: 'rgba(239, 68, 68, 0.5)' },
+                    warning: { bg: 'rgba(245, 158, 11, 0.3)', border: 'rgba(245, 158, 11, 0.5)' },
+                    info: { bg: 'rgba(59, 130, 246, 0.3)', border: 'rgba(59, 130, 246, 0.5)' },
+                    success: { bg: 'rgba(16, 185, 129, 0.3)', border: 'rgba(16, 185, 129, 0.5)' },
+                  };
+                  const colors = colorMap[tag.tag_color] || colorMap.default;
+                  return (
+                    <span
+                      key={tag.id}
+                      style={{
+                        fontSize: '9px',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: colors.bg,
+                        color: 'white',
+                        fontWeight: 500,
+                        border: `1px solid ${colors.border}`,
+                        whiteSpace: 'nowrap',
+                        backdropFilter: 'blur(4px)',
+                      }}
+                    >
+                      {tag.tag_name}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
+
         {!typedData.isReadOnly && (
           <button
             style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              border: 'none',
-              borderRadius: '3px',
-              padding: '4px 6px',
+              background: 'rgba(255, 255, 255, 0.15)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '6px',
+              padding: '6px',
               cursor: 'pointer',
-              color: 'white',
+              color: 'rgba(255, 255, 255, 0.9)',
               fontSize: '14px',
               lineHeight: 1,
-              transition: 'all 0.2s',
+              transition: 'all 0.2s ease',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              backdropFilter: 'blur(4px)',
+              position: 'relative',
+              zIndex: 1,
             }}
             onClick={(e) => {
               e.stopPropagation();
               if (typedData.onClassDelete) typedData.onClassDelete(typedData.id, typedData.name);
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.9)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
             }}
             title="Delete class"
           >
@@ -430,15 +496,17 @@ function ClassNode({ data, selected }: NodeProps) {
       {showDescription && (
         <div
           style={{
-            padding: '8px 12px',
-            fontSize: '11px',
-            color: dragTarget === 'node' ? '#065f46' : '#9ca3af',
-            lineHeight: '1.4',
-            background: dragTarget === 'node' ? '#d1fae5' : '#fafafa',
-            borderBottom: dragTarget === 'node' ? '1px solid #10b981' : '1px solid #e5e7eb',
+            padding: '10px 16px',
+            fontSize: '12px',
+            color: dragTarget === 'node' ? '#059669' : '#64748b',
+            lineHeight: '1.5',
+            background: dragTarget === 'node'
+              ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+              : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            borderBottom: `1px solid ${dragTarget === 'node' ? '#a7f3d0' : '#e2e8f0'}`,
             textAlign: dragTarget === 'node' ? 'center' : 'left',
-            fontWeight: dragTarget === 'node' ? 500 : 'normal',
-            height: '31.2px',
+            fontWeight: dragTarget === 'node' ? 500 : 400,
+            minHeight: '40px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: dragTarget === 'node' ? 'center' : 'flex-start',
@@ -446,17 +514,18 @@ function ClassNode({ data, selected }: NodeProps) {
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             opacity: descriptionOpacity,
-            transition: 'opacity 0.3s ease-in-out',
+            transition: 'all 0.3s ease-in-out',
+            fontStyle: typedData.description ? 'normal' : 'italic',
           }}
         >
-          {dragTarget === 'node' ? 'Drop property here' : (typedData.description || '\u00A0')}
+          {dragTarget === 'node' ? '✨ Drop property here' : (typedData.description || 'No description')}
         </div>
       )}
 
       {/* Properties */}
       {showProperties && (
         <div style={{
-          padding: 0,
+          padding: '4px 0',
           opacity: propertiesOpacity,
           transition: 'opacity 0.3s ease-in-out'
         }}>
@@ -471,6 +540,8 @@ function ClassNode({ data, selected }: NodeProps) {
               const childOfDragged = isDescendantOfDraggedProperty(p.id, dragOverPropertyId);
               const isInDropZone = draggedOver || childOfDragged;
               const currentIndex = rowIndex++;
+              const isRequired = p.data?.required;
+              const isDeprecated = parseData(p)?.deprecated;
 
               const row: React.JSX.Element[] = [];
               row.push(
@@ -481,22 +552,56 @@ function ClassNode({ data, selected }: NodeProps) {
                   onDrop={container && !typedData.isReadOnly ? (e) => handlePropertyDrop(e, p.id) : undefined}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '20px 1fr auto 50px auto',
+                    gridTemplateColumns: '20px 1fr auto 44px',
                     alignItems: 'center',
-                    padding: '6px 4px 6px 12px',
+                    padding: '8px 12px 8px 12px',
                     paddingLeft: `${12 + depth * 16}px`,
-                    borderBottom: '1px solid #e5e7eb',
-                    background: isInDropZone ? '#d1fae5' : (currentIndex % 2 === 0 ? 'white' : '#fafafa'),
+                    margin: '0 8px',
+                    marginBottom: '2px',
+                    borderRadius: '6px',
+                    background: isInDropZone
+                      ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+                      : 'transparent',
                     position: 'relative',
-                    gap: '4px',
-                    transition: 'background 0.2s',
+                    gap: '6px',
+                    transition: 'all 0.15s ease',
+                    cursor: 'default',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isInDropZone) {
+                      e.currentTarget.style.background = '#f8fafc';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isInDropZone) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
                   }}
                 >
                   <div style={{ width: '16px', display: 'flex', alignItems: 'center' }}>
                     {container && (
                       <button
                         onClick={(e) => { e.stopPropagation(); togglePropertyExpansion(p.id); }}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#94a3b8',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e2e8f0';
+                          e.currentTarget.style.color = '#475569';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#94a3b8';
+                        }}
                         title={isExpanded ? 'Collapse' : 'Expand'}
                       >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -504,24 +609,87 @@ function ClassNode({ data, selected }: NodeProps) {
                     )}
                   </div>
 
-                  <div style={{ fontWeight: depth > 0 ? 400 : 500, color: parseData(p)?.deprecated ? '#9ca3af' : '#111827', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: parseData(p)?.deprecated ? 'line-through' : 'none' }} title={parseData(p)?.deprecated ? (parseData(p)?.deprecationMessage || 'Deprecated') : undefined}>
-                    {p.data.required && '* '} {p.name}
-                    {children.length > 0 && <span style={{ color: '#6b7280', marginLeft: 4 }}>({children.length})</span>}
+                  <div
+                    style={{
+                      fontWeight: 500,
+                      color: isDeprecated ? '#94a3b8' : '#1e293b',
+                      fontSize: '12px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      textDecoration: isDeprecated ? 'line-through' : 'none',
+                      letterSpacing: '-0.01em',
+                    }}
+                    title={isDeprecated ? (parseData(p)?.deprecationMessage || 'Deprecated') : undefined}
+                  >
+                    {isRequired && (
+                      <span style={{
+                        color: '#ef4444',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        lineHeight: 1,
+                      }}>*</span>
+                    )}
+                    <span>{p.name}</span>
+                    {children.length > 0 && (
+                      <span style={{
+                        color: '#94a3b8',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        background: '#f1f5f9',
+                        padding: '1px 5px',
+                        borderRadius: '10px',
+                      }}>
+                        {children.length}
+                      </span>
+                    )}
                   </div>
 
-                  <div style={{ fontSize: '11px', color: '#6b7280', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#64748b',
+                    fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace',
+                    whiteSpace: 'nowrap',
+                    background: '#f1f5f9',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontWeight: 500,
+                    letterSpacing: '-0.02em',
+                  }}>
                     {getPropertyType(p)}
                   </div>
 
                   {!typedData.isReadOnly && (
-                    <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                       {typedData.onPropertyEdit && (
                         <button
                           onClick={(e) => { e.stopPropagation(); typedData.onPropertyEdit!(typedData.id, p); }}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 2, color: '#9ca3af' }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            color: '#94a3b8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#e0e7ff';
+                            e.currentTarget.style.color = '#6366f1';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#94a3b8';
+                          }}
                           title="Edit property"
                         >
-                          <Edit size={11} />
+                          <Edit size={12} />
                         </button>
                       )}
                       {typedData.onPropertyDelete && (
@@ -537,7 +705,26 @@ function ClassNode({ data, selected }: NodeProps) {
                             });
                             if (confirmed) typedData.onPropertyDelete!(typedData.id, p.id);
                           }}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, borderRadius: 2, color: '#9ca3af' }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            color: '#94a3b8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fee2e2';
+                            e.currentTarget.style.color = '#ef4444';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#94a3b8';
+                          }}
                           title="Remove property from class"
                         >
                           <Trash2 size={12} />
@@ -554,7 +741,7 @@ function ClassNode({ data, selected }: NodeProps) {
                       id={`prop-${p.id}`}
                       style={{
                         right: '-6px',
-                        background: '#5b68ea',
+                        background: '#6366f1',
                         width: '10px',
                         height: '10px',
                         border: '2px solid white',
@@ -562,7 +749,8 @@ function ClassNode({ data, selected }: NodeProps) {
                         position: 'absolute',
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        zIndex: 1000
+                        zIndex: 1000,
+                        boxShadow: '0 2px 4px rgba(99, 102, 241, 0.3)',
                       }}
                       isConnectable={!typedData.isReadOnly}
                     />
@@ -580,7 +768,15 @@ function ClassNode({ data, selected }: NodeProps) {
             return renderProperty(prop, 0);
           })
         ) : (
-          <div style={{ padding: 12, textAlign: 'center', color: '#9ca3af', fontSize: '11px', fontStyle: 'italic' }}>
+          <div style={{
+            padding: '16px 12px',
+            textAlign: 'center',
+            color: '#94a3b8',
+            fontSize: '12px',
+            fontStyle: 'italic',
+            background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+            borderRadius: '0 0 12px 12px',
+          }}>
             No properties
           </div>
         )}
@@ -595,10 +791,18 @@ function ClassNode({ data, selected }: NodeProps) {
           (schema?.anyOf && Array.isArray(schema.anyOf) && schema.anyOf.some((it: any) => it.$ref)) ||
           (schema?.oneOf && Array.isArray(schema.oneOf) && schema.oneOf.some((it: any) => it.$ref));
 
-        let handleColor = '#6b7280';
-        if (schema?.allOf && schema.allOf.length > 0) handleColor = '#2563eb';
-        else if (schema?.anyOf && schema.anyOf.length > 0) handleColor = '#ea580c';
-        else if (schema?.oneOf && schema.oneOf.length > 0) handleColor = '#9333ea';
+        let handleColor = '#94a3b8';
+        let shadowColor = 'rgba(0, 0, 0, 0.1)';
+        if (schema?.allOf && schema.allOf.length > 0) {
+          handleColor = '#3b82f6';
+          shadowColor = 'rgba(59, 130, 246, 0.3)';
+        } else if (schema?.anyOf && schema.anyOf.length > 0) {
+          handleColor = '#f97316';
+          shadowColor = 'rgba(249, 115, 22, 0.3)';
+        } else if (schema?.oneOf && schema.oneOf.length > 0) {
+          handleColor = '#a855f7';
+          shadowColor = 'rgba(168, 85, 247, 0.3)';
+        }
 
         return hasComposition ? (
           <Handle
@@ -613,9 +817,10 @@ function ClassNode({ data, selected }: NodeProps) {
               background: handleColor,
               width: '12px',
               height: '12px',
-              border: '3px solid white',
+              border: '2px solid white',
               borderRadius: '50%',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              boxShadow: `0 2px 6px ${shadowColor}`,
+              transition: 'all 0.2s ease',
             }}
             isConnectable={false}
           />
@@ -626,4 +831,3 @@ function ClassNode({ data, selected }: NodeProps) {
 }
 
 export default memo(ClassNode);
-
