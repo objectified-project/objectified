@@ -73,6 +73,9 @@ export interface PropertyFormData {
   const?: string; // OpenAPI 3.1: Constant value (mutually exclusive with enum)
   default?: string;
 
+  // Composition constraints
+  not?: string; // OpenAPI 3.1: JSON Schema that the data must NOT match
+
   // Metadata
   required?: boolean;
   readOnly?: boolean;
@@ -1186,6 +1189,60 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             </Box>
           </Box>
         )}
+
+        {/* NOT Composition */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            NOT Composition
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Specify a schema that the data must NOT match. Useful for exclusion rules.
+          </Typography>
+          <TextField
+            label="NOT Schema (JSON)"
+            size={size}
+            fullWidth
+            multiline
+            rows={3}
+            value={data.not || ''}
+            onChange={(e) => onChange('not', e.target.value)}
+            placeholder='{"type": "string", "maxLength": 0}'
+            helperText={
+              isArray
+                ? 'NOT schema applies to each item in the array. Example: exclude empty strings'
+                : 'Example: {"type": "string", "maxLength": 0} excludes empty strings'
+            }
+            sx={{
+              fontFamily: 'monospace',
+              '& textarea': {
+                fontFamily: 'monospace',
+                fontSize: '0.875rem',
+              },
+            }}
+          />
+          {data.not && data.not.trim() && (
+            <Box
+              sx={{
+                mt: 1,
+                p: 1.5,
+                bgcolor: 'info.lighter',
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'info.main',
+              }}
+            >
+              <Typography variant="caption" color="info.dark" sx={{ fontWeight: 600 }}>
+                ℹ️ NOT Schema Active
+              </Typography>
+              <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
+                Data will be validated to ensure it does NOT match the specified schema.
+              </Typography>
+              <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
+                Common uses: Exclude empty strings, null values, specific subtypes, or patterns.
+              </Typography>
+            </Box>
+          )}
+        </Box>
       </Box>
     </Box>
   );

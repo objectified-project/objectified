@@ -158,6 +158,9 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       additionalProperties: additionalPropsValue,
       minProperties: schema.minProperties?.toString() || '',
       maxProperties: schema.maxProperties?.toString() || '',
+
+      // NOT composition (OpenAPI 3.1)
+      not: schema.not ? JSON.stringify(schema.not, null, 2) : '',
     });
 
     setEditPropertyError('');
@@ -379,6 +382,18 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         }
       } else {
         delete targetSchema.default;
+      }
+
+      // NOT composition (OpenAPI 3.1)
+      if (formData.not && formData.not.trim()) {
+        try {
+          targetSchema.not = JSON.parse(formData.not);
+        } catch (e) {
+          // If not valid JSON, treat as a simple type
+          targetSchema.not = { type: formData.not };
+        }
+      } else {
+        delete targetSchema.not;
       }
 
       // Update items if it's an array (but not if tuple mode is active - already set above)

@@ -199,6 +199,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         additionalProperties: additionalPropsValue,
         minProperties: minMaxSource.minProperties?.toString() || '',
         maxProperties: minMaxSource.maxProperties?.toString() || '',
+        // NOT composition (OpenAPI 3.1)
+        not: minMaxSource.not ? JSON.stringify(minMaxSource.not, null, 2) : '',
       });
       setPropertyError('');
     } else if (open && mode === 'add') {
@@ -339,6 +341,16 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           if (formData.maxProperties) itemsSchema.maxProperties = parseInt(formData.maxProperties);
         }
 
+        // Handle NOT composition (OpenAPI 3.1)
+        if (formData.not && formData.not.trim()) {
+          try {
+            itemsSchema.not = JSON.parse(formData.not);
+          } catch (e) {
+            // If not valid JSON, treat as a simple type
+            itemsSchema.not = { type: formData.not };
+          }
+        }
+
         schema.items = itemsSchema;
       }
     } else {
@@ -397,6 +409,16 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         // Handle minProperties and maxProperties
         if (formData.minProperties) schema.minProperties = parseInt(formData.minProperties);
         if (formData.maxProperties) schema.maxProperties = parseInt(formData.maxProperties);
+      }
+
+      // Handle NOT composition (OpenAPI 3.1)
+      if (formData.not && formData.not.trim()) {
+        try {
+          schema.not = JSON.parse(formData.not);
+        } catch (e) {
+          // If not valid JSON, treat as a simple type
+          schema.not = { type: formData.not };
+        }
       }
     }
 
@@ -608,6 +630,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             }
           }
 
+          // Handle NOT composition (OpenAPI 3.1)
+          if (formData.not && formData.not.trim()) {
+            try {
+              itemsSchema.not = JSON.parse(formData.not);
+            } catch (e) {
+              // If not valid JSON, treat as a simple type
+              itemsSchema.not = { type: formData.not };
+            }
+          } else {
+            delete itemsSchema.not;
+          }
+
           dataObject.items = itemsSchema;
         }
       } else {
@@ -705,6 +739,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           } else {
             delete dataObject.maxProperties;
           }
+        }
+
+        // Handle NOT composition (OpenAPI 3.1)
+        if (formData.not && formData.not.trim()) {
+          try {
+            dataObject.not = JSON.parse(formData.not);
+          } catch (e) {
+            // If not valid JSON, treat as a simple type
+            dataObject.not = { type: formData.not };
+          }
+        } else {
+          delete dataObject.not;
         }
       }
 

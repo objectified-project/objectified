@@ -415,44 +415,9 @@ const StudioContent = () => {
         propertyData.id,
         propertyData.name,
         propertyData.description || null,
-        {
-          type: propertyData.type,
-          $ref: propertyData.$ref,
-          title: propertyData.title,
-          description: propertyData.description,
-          format: propertyData.format,
-          pattern: propertyData.pattern,
-          minLength: propertyData.minLength,
-          maxLength: propertyData.maxLength,
-          minimum: propertyData.minimum,
-          maximum: propertyData.maximum,
-          exclusiveMinimum: propertyData.exclusiveMinimum,
-          exclusiveMaximum: propertyData.exclusiveMaximum,
-          multipleOf: propertyData.multipleOf,
-          minItems: propertyData.minItems,
-          maxItems: propertyData.maxItems,
-          uniqueItems: propertyData.uniqueItems,
-          items: propertyData.items,
-          // OpenAPI 3.1 array features
-          contains: propertyData.contains,
-          minContains: propertyData.minContains,
-          maxContains: propertyData.maxContains,
-          tupleMode: propertyData.tupleMode,
-          prefixItems: propertyData.prefixItems,
-          // Constant value (OpenAPI 3.1)
-          const: propertyData.const,
-          enum: propertyData.enum,
-          default: propertyData.default,
-          required: propertyData.required,
-          readOnly: propertyData.readOnly,
-          writeOnly: propertyData.writeOnly,
-          deprecated: propertyData.deprecated,
-          deprecationMessage: propertyData.deprecationMessage,
-          example: propertyData.example,
-          additionalProperties: propertyData.additionalProperties,
-          minProperties: propertyData.minProperties,
-          maxProperties: propertyData.maxProperties
-        },
+        // Use spread operator to copy all fields from propertyData
+        // This prevents fields from being forgotten when new ones are added
+        { ...propertyData },
         parentId || null
       );
 
