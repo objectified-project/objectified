@@ -167,15 +167,16 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     <Drawer
       variant="permanent"
       sx={{
-        width: 256,
+        width: 280,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: 256,
+          width: 280,
           boxSizing: 'border-box',
           top: 48, // Offset for top header
           height: 'calc(100vh - 48px)',
-          borderRight: 1,
-          borderColor: 'divider',
+          borderRight: 'none',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.06)',
         },
       }}
     >
@@ -184,19 +185,23 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
         {((currentTab === 'classes' && !selectedVersionId) || (currentTab === 'properties' && !selectedProjectId)) && (
           <Box
             sx={{
-              p: 1.5,
-              bgcolor: 'warning.light',
-              color: 'warning.contrastText',
+              p: 2,
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              color: '#92400e',
               textAlign: 'center',
               fontSize: '0.75rem',
-              fontWeight: 500,
-              borderBottom: 1,
-              borderColor: 'divider'
+              fontWeight: 600,
+              borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
             }}
           >
+            <span style={{ fontSize: '1rem' }}>⚠️</span>
             {currentTab === 'classes'
-              ? '⚠️ Select a version from the canvas to manage classes'
-              : '⚠️ Select a project from the canvas to manage properties'}
+              ? 'Select a version from the canvas to manage classes'
+              : 'Select a project from the canvas to manage properties'}
           </Box>
         )}
 
@@ -206,25 +211,43 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
           onChange={handleTabChange}
           variant="fullWidth"
           sx={{
-            borderBottom: 1,
-            borderColor: 'divider',
-            minHeight: 48,
+            borderBottom: '1px solid #e2e8f0',
+            minHeight: 52,
+            '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: '3px 3px 0 0',
+              background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)',
+            },
           }}
         >
           <Tab
             label="Classes"
             value="classes"
             sx={{
-              minHeight: 48,
-              fontWeight: currentTab === 'classes' ? 600 : 400,
+              minHeight: 52,
+              fontWeight: currentTab === 'classes' ? 700 : 500,
+              fontSize: '0.875rem',
+              color: currentTab === 'classes' ? '#6366f1' : '#64748b',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                color: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+              },
             }}
           />
           <Tab
             label="Properties"
             value="properties"
             sx={{
-              minHeight: 48,
-              fontWeight: currentTab === 'properties' ? 600 : 400,
+              minHeight: 52,
+              fontWeight: currentTab === 'properties' ? 700 : 500,
+              fontSize: '0.875rem',
+              color: currentTab === 'properties' ? '#6366f1' : '#64748b',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                color: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+              },
             }}
           />
         </Tabs>
@@ -235,18 +258,32 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             // Classes View
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Search Bar */}
-              <Box sx={{ p: 2, pb: 1 }}>
+              <Box sx={{ p: 2, pb: 1.5 }}>
                 <TextField
                   fullWidth
                   size="small"
                   placeholder="Search classes..."
                   value={classesSearchQuery}
                   onChange={(e) => setClassesSearchQuery(e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#f8fafc',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        backgroundColor: '#f1f5f9',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
+                      },
+                    },
+                  }}
                   slotProps={{
                     input: {
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Search fontSize="small" />
+                          <Search fontSize="small" sx={{ color: '#94a3b8' }} />
                         </InputAdornment>
                       ),
                     },
@@ -255,25 +292,48 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               </Box>
 
               {/* Classes List */}
-              <Box sx={{ flex: 1, overflow: 'auto' }}>
+              <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
                 {filteredClasses.length === 0 ? (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ textAlign: 'center', mt: 4, px: 2 }}
-                  >
-                    {classes.length === 0
-                      ? 'No classes yet. Click + to add one.'
-                      : 'No classes match your search.'}
-                  </Typography>
+                  <Box sx={{
+                    textAlign: 'center',
+                    mt: 6,
+                    px: 3,
+                  }}>
+                    <Box sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      bgcolor: 'rgba(99, 102, 241, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px',
+                    }}>
+                      <Add sx={{ color: '#6366f1', fontSize: 24 }} />
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: '#64748b', fontWeight: 500, mb: 0.5 }}
+                    >
+                      {classes.length === 0
+                        ? 'No classes yet'
+                        : 'No classes match your search'}
+                    </Typography>
+                    {classes.length === 0 && (
+                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        Click the + button to add one
+                      </Typography>
+                    )}
+                  </Box>
                 ) : (
-                  <List dense>
+                  <List dense sx={{ py: 0.5 }}>
                     {filteredClasses.map((classItem) => (
                       <ListItem
                         key={classItem.id}
                         disablePadding
+                        sx={{ mb: 0.5 }}
                         secondaryAction={
-                          <Box>
+                          <Box sx={{ display: 'flex', gap: 0.25 }}>
                             <IconButton
                               edge="end"
                               size="small"
@@ -283,6 +343,15 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                                 callbacks.onClassEdit?.(classItem);
                               }}
                               title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Edit class'}
+                              sx={{
+                                opacity: 0.6,
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  opacity: 1,
+                                  color: '#6366f1',
+                                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                },
+                              }}
                             >
                               <Edit fontSize="small" />
                             </IconButton>
@@ -295,6 +364,15 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                                 callbacks.onClassDelete?.(classItem.id);
                               }}
                               title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Delete class'}
+                              sx={{
+                                opacity: 0.6,
+                                transition: 'all 0.2s ease',
+                                '&:hover': {
+                                  opacity: 1,
+                                  color: '#ef4444',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                },
+                              }}
                             >
                               <Delete fontSize="small" />
                             </IconButton>
@@ -304,6 +382,20 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                         <ListItemButton
                           selected={selectedClassId === classItem.id}
                           onClick={() => handleClassSelect(classItem)}
+                          sx={{
+                            borderRadius: 2,
+                            transition: 'all 0.2s ease',
+                            '&.Mui-selected': {
+                              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                              borderLeft: '3px solid #6366f1',
+                              '&:hover': {
+                                backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                              },
+                            },
+                            '&:hover': {
+                              backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                            },
+                          }}
                         >
                           <ListItemText
                             primary={
@@ -334,7 +426,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               </Box>
 
               {/* Add Button */}
-              <Box sx={{ position: 'absolute', bottom: 16, right: 16 }}>
+              <Box sx={{ position: 'absolute', bottom: 20, right: 20 }}>
                 <Fab
                   color="primary"
                   size="small"
@@ -342,6 +434,19 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   disabled={!selectedVersionId || isReadOnly}
                   aria-label="Add class"
                   title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Add class'}
+                  sx={{
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-2px) scale(1.05)',
+                      boxShadow: '0 6px 20px rgba(99, 102, 241, 0.5)',
+                    },
+                    '&:disabled': {
+                      background: '#e2e8f0',
+                      boxShadow: 'none',
+                    },
+                  }}
                 >
                   <Add />
                 </Fab>
@@ -351,18 +456,32 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             // Properties View
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Search Bar */}
-              <Box sx={{ p: 2, pb: 1 }}>
+              <Box sx={{ p: 2, pb: 1.5 }}>
                 <TextField
                   fullWidth
                   size="small"
                   placeholder="Search properties..."
                   value={propertiesSearchQuery}
                   onChange={(e) => setPropertiesSearchQuery(e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#f8fafc',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        backgroundColor: '#f1f5f9',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
+                      },
+                    },
+                  }}
                   slotProps={{
                     input: {
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Search fontSize="small" />
+                          <Search fontSize="small" sx={{ color: '#94a3b8' }} />
                         </InputAdornment>
                       ),
                     },
@@ -372,7 +491,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
 
               {/* New Reference draggable */}
               {!isReadOnly && (
-                <Box sx={{ px: 2, pb: 1 }}>
+                <Box sx={{ px: 2, pb: 1.5 }}>
                   <Box
                     role="button"
                     draggable
@@ -381,35 +500,72 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-reference' }));
                     }}
                     sx={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      px: 2, py: 1.5, mb: 1,
-                      borderRadius: 1,
-                      border: '1px dashed', borderColor: 'success.light',
-                      bgcolor: 'success.light', color: 'success.contrastText',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: 2,
+                      border: '2px dashed',
+                      borderColor: 'rgba(34, 197, 94, 0.4)',
+                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.04) 100%)',
                       cursor: 'grab',
+                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        borderColor: '#22c55e',
+                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.08) 100%)',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
+                      },
+                      '&:active': {
+                        cursor: 'grabbing',
+                        transform: 'scale(0.98)',
+                      },
                     }}
                     title="Drag to create a new reference on a class or inside an object"
                   >
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>New Reference</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>drag onto class or object</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#16a34a' }}>+ New Reference</Typography>
+                    <Typography variant="caption" sx={{ color: '#22c55e', fontSize: '0.7rem' }}>drag to class</Typography>
                   </Box>
                 </Box>
               )}
 
               {/* Properties List */}
-              <Box sx={{ flex: 1, overflow: 'auto' }}>
+              <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
                 {filteredProperties.length === 0 ? (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ textAlign: 'center', mt: 4, px: 2 }}
-                  >
-                    {properties.length === 0
-                      ? 'No properties yet. Click + to add one.'
-                      : 'No properties match your search.'}
-                  </Typography>
+                  <Box sx={{
+                    textAlign: 'center',
+                    mt: 6,
+                    px: 3,
+                  }}>
+                    <Box sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      bgcolor: 'rgba(99, 102, 241, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px',
+                    }}>
+                      <Add sx={{ color: '#6366f1', fontSize: 24 }} />
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: '#64748b', fontWeight: 500, mb: 0.5 }}
+                    >
+                      {properties.length === 0
+                        ? 'No properties yet'
+                        : 'No properties match your search'}
+                    </Typography>
+                    {properties.length === 0 && (
+                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                        Click the + button to add one
+                      </Typography>
+                    )}
+                  </Box>
                 ) : (
-                  <Box>
+                  <Box sx={{ py: 0.5 }}>
                     {filteredProperties.map((propertyItem) => (
                       <Box
                         key={propertyItem.id}
@@ -431,26 +587,28 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 1,
+                          gap: 1.5,
                           px: 2,
                           py: 1.5,
                           mb: 0.5,
+                          mx: 0.5,
                           cursor: isReadOnly ? 'default' : 'grab',
                           backgroundColor: selectedPropertyId === propertyItem.id
-                            ? 'action.selected'
+                            ? 'rgba(99, 102, 241, 0.1)'
                             : 'transparent',
-                          borderRadius: 1,
-                          transition: 'all 0.2s',
+                          borderRadius: 2,
+                          borderLeft: selectedPropertyId === propertyItem.id ? '3px solid #6366f1' : '3px solid transparent',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                           '&:hover': {
                             backgroundColor: selectedPropertyId === propertyItem.id
-                              ? 'action.selected'
-                              : 'action.hover',
+                              ? 'rgba(99, 102, 241, 0.15)'
+                              : 'rgba(99, 102, 241, 0.05)',
+                            transform: isReadOnly ? 'none' : 'translateX(2px)',
                           },
                           '&:active': {
                             cursor: 'grabbing',
+                            transform: 'scale(0.98)',
                           },
-                          border: '1px solid',
-                          borderColor: 'divider',
                         }}
                       >
                         {/* Property content */}
@@ -458,16 +616,16 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                           <Typography
                             variant="body2"
                             sx={{
-                              fontWeight: 500,
+                              fontWeight: 600,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               textDecoration: propertyItem.deprecated ? 'line-through' : 'none',
-                              color: propertyItem.deprecated ? 'text.secondary' : 'text.primary',
+                              color: propertyItem.deprecated ? '#94a3b8' : '#334155',
                             }}
                             title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
                           >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span style={{
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
@@ -477,12 +635,12 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                                 <span
                                   title={`Enumeration: ${propertyItem.enum.join(', ')}`}
                                   style={{
-                                    backgroundColor: '#dbeafe',
-                                    color: '#1e40af',
-                                    fontSize: 10,
-                                    fontWeight: 600,
+                                    background: 'linear-gradient(135deg, #dbeafe 0%, #c7d2fe 100%)',
+                                    color: '#4338ca',
+                                    fontSize: 9,
+                                    fontWeight: 700,
                                     padding: '2px 6px',
-                                    borderRadius: '4px',
+                                    borderRadius: '6px',
                                     flexShrink: 0,
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.5px'
@@ -495,12 +653,13 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                           </Typography>
                           <Typography
                             variant="caption"
-                            color="text.secondary"
                             sx={{
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               display: 'block',
+                              color: '#64748b',
+                              mt: 0.25,
                             }}
                           >
                             {propertyItem.type || propertyItem.description}
@@ -508,7 +667,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                         </Box>
 
                         {/* Action buttons */}
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', gap: 0.25 }}>
                           <IconButton
                             size="small"
                             disabled={!selectedProjectId || isReadOnly}
@@ -518,8 +677,13 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                             }}
                             title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Edit property'}
                             sx={{
-                              opacity: 0.7,
-                              '&:hover': { opacity: 1 }
+                              opacity: 0.6,
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                opacity: 1,
+                                color: '#6366f1',
+                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                              },
                             }}
                           >
                             <Edit fontSize="small" />
@@ -533,8 +697,13 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                             }}
                             title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Delete property'}
                             sx={{
-                              opacity: 0.7,
-                              '&:hover': { opacity: 1 }
+                              opacity: 0.6,
+                              transition: 'all 0.2s ease',
+                              '&:hover': {
+                                opacity: 1,
+                                color: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              },
                             }}
                           >
                             <Delete fontSize="small" />
@@ -547,7 +716,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               </Box>
 
               {/* Add Button */}
-              <Box sx={{ position: 'absolute', bottom: 16, right: 16 }}>
+              <Box sx={{ position: 'absolute', bottom: 20, right: 20 }}>
                 <Fab
                   color="primary"
                   size="small"
@@ -555,6 +724,19 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   disabled={!selectedProjectId || isReadOnly}
                   aria-label="Add property"
                   title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Add property'}
+                  sx={{
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-2px) scale(1.05)',
+                      boxShadow: '0 6px 20px rgba(99, 102, 241, 0.5)',
+                    },
+                    '&:disabled': {
+                      background: '#e2e8f0',
+                      boxShadow: 'none',
+                    },
+                  }}
                 >
                   <Add />
                 </Fab>
