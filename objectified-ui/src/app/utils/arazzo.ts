@@ -199,7 +199,8 @@ export async function generateArazzoSpec(
 
   // Render using Handlebars template
   try {
-    const result = await renderTemplate('arazzo/arazzo-spec.hbs', templateData);
+    const result = await renderTemplate('arazzo/arazzo-spec.hbs', templateData)
+      .then(res => JSON.stringify(JSON.parse(res), null, 2));
     console.log('Arazzo spec generated successfully');
     return result;
   } catch (error) {
