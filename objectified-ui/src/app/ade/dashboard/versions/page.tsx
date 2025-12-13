@@ -641,23 +641,32 @@ const Versions = () => {
 
   if (!currentTenantId) {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <Lock className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
-            <div>
-              <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                No Tenant Selected
-              </h2>
-              <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                Please select a tenant before managing versions. Versions are associated with projects within a tenant.
-              </p>
-              <a
-                href="/ade/dashboard/tenants"
-                className="inline-block px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Go to Tenants
-              </a>
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="relative">
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-full blur-3xl opacity-60" />
+
+          <div className="relative bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-8">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-500/25 flex-shrink-0">
+                <Lock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100 mb-2">
+                  No Tenant Selected
+                </h2>
+                <p className="text-amber-800 dark:text-amber-200 mb-4">
+                  Please select a tenant before managing versions. Versions are associated with projects within a tenant.
+                </p>
+                <a
+                  href="/ade/dashboard/tenants"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40"
+                >
+                  Go to Tenants
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -667,23 +676,32 @@ const Versions = () => {
 
   if (projects.length === 0) {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
-            <div>
-              <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                No Versions Available
-              </h2>
-              <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                Please create a project before managing versions. Versions belong to specific projects.
-              </p>
-              <a
-                href="/ade/dashboard/projects"
-                className="inline-block px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Go to Projects
-              </a>
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="relative">
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 rounded-full blur-3xl opacity-60" />
+
+          <div className="relative bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-8">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25 flex-shrink-0">
+                <AlertCircle className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100 mb-2">
+                  No Projects Available
+                </h2>
+                <p className="text-amber-800 dark:text-amber-200 mb-4">
+                  Please create a project before managing versions. Versions belong to specific projects.
+                </p>
+                <a
+                  href="/ade/dashboard/projects"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40"
+                >
+                  Go to Projects
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -847,35 +865,42 @@ const Versions = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Versions</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage versions with semantic versioning
-          </p>
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+            <Package className="h-7 w-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Versions</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
+              Manage versions with semantic versioning
+            </p>
+          </div>
         </div>
         <div className="flex gap-3">
           <FormControl
+            size="small"
             sx={{
-              minWidth: 250,
+              minWidth: 220,
               '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
                 color: 'var(--foreground)',
                 backgroundColor: 'var(--background)',
                 '& fieldset': {
-                  borderColor: 'rgba(128, 128, 128, 0.5)',
+                  borderColor: 'rgba(128, 128, 128, 0.3)',
                 },
                 '&:hover fieldset': {
-                  borderColor: 'rgba(128, 128, 128, 0.7)',
+                  borderColor: 'rgba(16, 185, 129, 0.5)',
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: '#3b82f6',
+                  borderColor: '#10b981',
                 },
               },
               '& .MuiInputLabel-root': {
                 color: 'var(--foreground)',
                 '&.Mui-focused': {
-                  color: '#3b82f6',
+                  color: '#10b981',
                 },
               },
               '& .MuiSvgIcon-root': {
@@ -893,14 +918,15 @@ const Versions = () => {
                   sx: {
                     bgcolor: 'var(--background)',
                     color: 'var(--foreground)',
+                    borderRadius: 2,
                     '& .MuiMenuItem-root': {
                       '&:hover': {
-                        backgroundColor: 'rgba(128, 128, 128, 0.2)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
                       },
                       '&.Mui-selected': {
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
                         '&:hover': {
-                          backgroundColor: 'rgba(59, 130, 246, 0.3)',
+                          backgroundColor: 'rgba(16, 185, 129, 0.2)',
                         },
                       },
                     },
@@ -918,7 +944,7 @@ const Versions = () => {
           <button
             onClick={handleCompareDialogOpen}
             disabled={!selectedProjectId || versions.length < 2}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg cursor-pointer transition-colors disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold py-2.5 px-5 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 disabled:shadow-none disabled:cursor-not-allowed"
             title={versions.length < 2 ? 'Need at least 2 versions to compare' : 'Compare two versions'}
           >
             <Copy className="h-5 w-5" />
@@ -927,7 +953,7 @@ const Versions = () => {
           <button
             onClick={handleCreateClick}
             disabled={!selectedProjectId}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded-lg cursor-pointer transition-colors disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-gray-400 disabled:to-gray-400 text-white font-semibold py-2.5 px-5 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 disabled:shadow-none disabled:cursor-not-allowed"
           >
             <Plus className="h-5 w-5" />
             New Version
@@ -936,51 +962,58 @@ const Versions = () => {
       </div>
 
       {versions.length === 0 ? (
-        <div className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center">
-          <Package className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            No Versions Yet
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400">
-            Get started by creating your first version using the "New Version" button above
-          </p>
+        <div className="relative">
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-full blur-3xl opacity-60" />
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-teal-100 to-cyan-100 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-full blur-3xl opacity-60" />
+
+          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
+            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <Package className="h-10 w-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+              No Versions Yet
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+              Get started by creating your first version using the &quot;New Version&quot; button above
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+            <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Version
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Description
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Created By
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Created
                 </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
 
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
               {versions.map((version) => (
-                <tr key={version.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <tr key={version.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-bold text-gray-900 dark:text-white">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white font-mono">
                         v{version.version_id}
                       </div>
                       {version.published && (
-                        <div title="Published (Frozen)">
-                          <Lock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <div title="Published (Frozen)" className="p-1 bg-blue-100 dark:bg-blue-900/30 rounded">
+                          <Lock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
                         </div>
                       )}
                     </div>
@@ -998,35 +1031,25 @@ const Versions = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex gap-2">
                       {version.published ? (
-                        <Chip
-                          label="Published"
-                          color="success"
-                          size="small"
-                          icon={<CheckCircle style={{ fontSize: 16 }} size={16}/>}
-                        />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle className="h-3 w-3" />
+                          Published
+                        </span>
                       ) : (
-                        <Chip
-                          label="Draft"
-                          size="small"
-                          sx={{
-                            backgroundColor: 'rgba(128, 128, 128, 0.2)',
-                            color: 'var(--foreground)',
-                            borderColor: 'rgba(128, 128, 128, 0.3)',
-                            border: '1px solid',
-                          }}
-                        />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 border border-gray-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                          Draft
+                        </span>
                       )}
                       {!version.enabled && (
-                        <Chip
-                          label="Disabled"
-                          color="error"
-                          size="small"
-                        />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-700 border border-red-200">
+                          Disabled
+                        </span>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">
                       {version.creator_name}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -1036,13 +1059,12 @@ const Versions = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {formatDate(version.created_at)}
                     {version.published_at && (
-                      <div className="text-xs text-green-600 dark:text-green-400">
+                      <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
                         Published: {formatDate(version.published_at)}
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {/* Replace icon buttons with dropdown */}
                     <div className="flex justify-end">
                       <RowActions version={version} />
                     </div>

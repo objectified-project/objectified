@@ -571,11 +571,50 @@ const Projects = () => {
         onClose={() => !isLoading && setShowCreateDialog(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          },
+        }}
       >
-        <DialogTitle>Create New Project</DialogTitle>
-        <DialogContent>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-            <Tabs value={createTabValue} onChange={(e, newValue) => setCreateTabValue(newValue)}>
+        <DialogTitle sx={{
+          pb: 1,
+          borderBottom: '1px solid',
+          borderColor: 'rgba(139, 92, 246, 0.1)',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              p: 1.5,
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <FolderOpen size={20} color="#8b5cf6" />
+            </Box>
+            <span className="text-lg font-bold text-gray-900 dark:text-white">Create New Project</span>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs
+              value={createTabValue}
+              onChange={(e, newValue) => setCreateTabValue(newValue)}
+              sx={{
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  fontWeight: 600,
+                },
+                '& .Mui-selected': {
+                  color: '#8b5cf6',
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: '#8b5cf6',
+                },
+              }}
+            >
               <Tab label="From Scratch" />
               <Tab label="From OpenAPI Import" />
             </Tabs>
@@ -584,7 +623,7 @@ const Projects = () => {
           {createTabValue === 0 && (
             <Box>
               {errorMessage && (
-                <Alert severity="error" sx={{ mb: 2 }}>
+                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
                   {errorMessage}
                 </Alert>
               )}
@@ -605,7 +644,21 @@ const Projects = () => {
                 }}
                 disabled={isLoading}
                 required
-                sx={{ mb: 2 }}
+                sx={{
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#8b5cf6',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#8b5cf6',
+                    },
+                  },
+                  '& .MuiInputLabel-root.Mui-focused': {
+                    color: '#8b5cf6',
+                  },
+                }}
               />
               <TextField
                 margin="dense"
@@ -618,7 +671,22 @@ const Projects = () => {
                 disabled={isLoading}
                 required
                 helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
-                sx={{ mb: 2 }}
+                sx={{
+                  mb: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    fontFamily: 'monospace',
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#8b5cf6',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#8b5cf6',
+                    },
+                  },
+                  '& .MuiInputLabel-root.Mui-focused': {
+                    color: '#8b5cf6',
+                  },
+                }}
               />
               <TextField
                 margin="dense"
@@ -631,13 +699,39 @@ const Projects = () => {
                 value={projectDescription}
                 onChange={(e) => setProjectDescription(e.target.value)}
                 disabled={isLoading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#8b5cf6',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#8b5cf6',
+                    },
+                  },
+                  '& .MuiInputLabel-root.Mui-focused': {
+                    color: '#8b5cf6',
+                  },
+                }}
               />
             </Box>
           )}
 
           {createTabValue === 1 && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <AlertCircle size={48} style={{ margin: '0 auto 16px', color: '#3b82f6' }} />
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Box sx={{
+                width: 64,
+                height: 64,
+                borderRadius: 3,
+                bgcolor: 'rgba(59, 130, 246, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 3,
+              }}>
+                <AlertCircle size={32} color="#3b82f6" />
+              </Box>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 Import a project from an OpenAPI specification file. This will create a new project with classes and properties automatically.
               </p>
@@ -647,18 +741,54 @@ const Projects = () => {
                   setShowCreateDialog(false);
                   handleImportClick();
                 }}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 4,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
+                  },
+                }}
               >
                 Start Import
               </Button>
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowCreateDialog(false)} disabled={isLoading}>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'rgba(0, 0, 0, 0.06)' }}>
+          <Button
+            onClick={() => setShowCreateDialog(false)}
+            disabled={isLoading}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 600,
+              color: '#64748b',
+            }}
+          >
             Cancel
           </Button>
           {createTabValue === 0 && (
-            <Button onClick={handleCreateSubmit} variant="contained" disabled={isLoading}>
+            <Button
+              onClick={handleCreateSubmit}
+              variant="contained"
+              disabled={isLoading}
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                  boxShadow: '0 6px 16px rgba(139, 92, 246, 0.35)',
+                },
+              }}
+            >
               {isLoading ? 'Creating...' : 'Create Project'}
             </Button>
           )}

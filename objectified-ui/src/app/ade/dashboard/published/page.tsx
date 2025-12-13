@@ -201,23 +201,32 @@ const PublishedVersions = () => {
 
   if (!currentTenantId) {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-          <div className="flex items-start gap-3">
-            <Lock className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
-            <div>
-              <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                No Tenant Selected
-              </h2>
-              <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                Please select a tenant before managing publications. Publications are associated with a specific tenant.
-              </p>
-              <a
-                href="/ade/dashboard/tenants"
-                className="inline-block px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Go to Tenants
-              </a>
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="relative">
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-full blur-3xl opacity-60" />
+
+          <div className="relative bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-8">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-500/25 flex-shrink-0">
+                <Lock className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100 mb-2">
+                  No Tenant Selected
+                </h2>
+                <p className="text-amber-800 dark:text-amber-200 mb-4">
+                  Please select a tenant before managing publications. Publications are associated with a specific tenant.
+                </p>
+                <a
+                  href="/ade/dashboard/tenants"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40"
+                >
+                  Go to Tenants
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -370,18 +379,23 @@ const PublishedVersions = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          Published Versions
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          View all published and locked versions with their access URLs and visibility settings.
-        </p>
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+          <Eye className="h-7 w-7 text-white" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+            Published Versions
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            View all published and locked versions with their access URLs and visibility settings.
+          </p>
+        </div>
       </div>
 
       {/* Search/Filter Field */}
-      <div className="mb-4">
+      <div className="mb-6">
         <TextField
           fullWidth
           size="small"
@@ -392,76 +406,103 @@ const PublishedVersions = () => {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <Search className="h-4 w-4 text-gray-400" />
                 </InputAdornment>
               ),
             },
           }}
-          className="bg-white dark:bg-gray-800"
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 3,
+              backgroundColor: 'white',
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(99, 102, 241, 0.5)',
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#6366f1',
+              },
+            },
+          }}
         />
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-gray-500 dark:text-gray-400">Loading published versions...</div>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-gray-500 dark:text-gray-400">Loading published versions...</div>
+          </div>
         </div>
       ) : versions.length === 0 ? (
-        <div className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center">
-          <Eye className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            No Published Versions
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400">
-            You don't have any published versions yet. Publish a version to make it available via API.
-          </p>
+        <div className="relative">
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-full blur-3xl opacity-60" />
+          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-3xl opacity-60" />
+
+          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
+            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <Eye className="h-10 w-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+              No Published Versions
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+              You don&apos;t have any published versions yet. Publish a version to make it available via API.
+            </p>
+          </div>
         </div>
       ) : filteredVersions.length === 0 ? (
-        <div className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-12 text-center">
-          <Search className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
-            No Matching Versions
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400">
-            No published versions match your search query. Try a different search term.
-          </p>
+        <div className="relative">
+          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
+            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-500/30">
+              <Search className="h-10 w-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+              No Matching Versions
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+              No published versions match your search query. Try a different search term.
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+              <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Project / Version
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Visibility
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Access URL
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Published
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
 
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                 {filteredVersions.map((version) => (
-                  <tr key={version.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <tr key={version.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-all duration-200">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
                           {version.project_name}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                          <span className="font-mono">{version.version_id}</span>
-                          <Lock className="h-3 w-3" />
+                        <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-0.5">
+                          <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">v{version.version_id}</span>
+                          <div className="p-0.5 bg-blue-100 dark:bg-blue-900/30 rounded">
+                            <Lock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                          </div>
                         </div>
                         {version.description && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs truncate">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 max-w-xs truncate">
                             {version.description}
                           </div>
                         )}
@@ -477,12 +518,18 @@ const PublishedVersions = () => {
                               size="small"
                               onClick={() => handleToggleVisibility(version)}
                               disabled={changingVisibility === version.id}
-                              className="bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 cursor-pointer hover:bg-green-200 dark:hover:bg-green-900/60 transition-colors"
                               sx={{
-                                border: (theme) =>
-                                  theme.palette.mode === 'light'
-                                    ? '1px solid rgb(22, 101, 52)'
-                                    : 'none',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                color: '#059669',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                },
+                                '& .MuiChip-icon': {
+                                  color: '#10b981',
+                                },
                               }}
                             />
                           ) : (
@@ -492,12 +539,18 @@ const PublishedVersions = () => {
                               size="small"
                               onClick={() => handleToggleVisibility(version)}
                               disabled={changingVisibility === version.id}
-                              className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                               sx={{
-                                border: (theme) =>
-                                  theme.palette.mode === 'light'
-                                    ? '1px solid rgb(31, 41, 55)'
-                                    : 'none',
+                                backgroundColor: 'rgba(100, 116, 139, 0.1)',
+                                color: '#475569',
+                                border: '1px solid rgba(100, 116, 139, 0.3)',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(100, 116, 139, 0.2)',
+                                },
+                                '& .MuiChip-icon': {
+                                  color: '#64748b',
+                                },
                               }}
                             />
                           )}
@@ -506,7 +559,7 @@ const PublishedVersions = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <code className="text-xs bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 font-mono max-w-md truncate">
+                        <code className="text-xs bg-gray-50 dark:bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-mono max-w-md truncate">
                           schema/{getAccessUrl(version)}
                         </code>
                       </div>
