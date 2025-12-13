@@ -172,6 +172,10 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
       // Extensions (x- prefixed properties)
       extensions: extensions,
+
+      // External Documentation
+      externalDocsUrl: propData.externalDocs?.url || '',
+      externalDocsDescription: propData.externalDocs?.description || '',
     });
 
     setEditPropertyError('');
@@ -424,6 +428,18 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       // Then merge in the current extensions
       if (formData.extensions && Object.keys(formData.extensions).length > 0) {
         Object.assign(updatedData, formData.extensions);
+      }
+
+      // Handle externalDocs
+      if (formData.externalDocsUrl?.trim()) {
+        updatedData.externalDocs = {
+          url: formData.externalDocsUrl.trim()
+        };
+        if (formData.externalDocsDescription?.trim()) {
+          updatedData.externalDocs.description = formData.externalDocsDescription.trim();
+        }
+      } else {
+        delete updatedData.externalDocs;
       }
 
       const result = await updateClassProperty(

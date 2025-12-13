@@ -211,6 +211,9 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         not: minMaxSource.not ? JSON.stringify(minMaxSource.not, null, 2) : '',
         // Extensions (x- prefixed properties)
         extensions: extensions,
+        // External Documentation
+        externalDocsUrl: (property as any).externalDocs?.url || '',
+        externalDocsDescription: (property as any).externalDocs?.description || '',
       });
       setPropertyError('');
     } else if (open && mode === 'add') {
@@ -774,6 +777,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       // Then merge in the current extensions
       if (formData.extensions && Object.keys(formData.extensions).length > 0) {
         Object.assign(dataObject, formData.extensions);
+      }
+
+      // Handle externalDocs
+      if (formData.externalDocsUrl?.trim()) {
+        dataObject.externalDocs = {
+          url: formData.externalDocsUrl.trim()
+        };
+        if (formData.externalDocsDescription?.trim()) {
+          dataObject.externalDocs.description = formData.externalDocsDescription.trim();
+        }
+      } else {
+        delete dataObject.externalDocs;
       }
 
       await onSubmit({

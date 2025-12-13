@@ -18,6 +18,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import Button from '@mui/material/Button';
 import {
   DndContext,
   closestCenter,
@@ -92,6 +94,10 @@ export interface PropertyFormData {
 
   // Extensions (x- prefixed properties)
   extensions?: Record<string, any>;
+
+  // External Documentation
+  externalDocsUrl?: string;
+  externalDocsDescription?: string;
 }
 
 interface SortableEnumItemProps {
@@ -1246,6 +1252,59 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               </Typography>
             </Box>
           )}
+        </Box>
+
+        {/* External Documentation */}
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+            External Documentation
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+            Link to additional documentation outside the OpenAPI specification
+          </Typography>
+
+          <TextField
+            label="Documentation URL"
+            size={size}
+            fullWidth
+            type="url"
+            value={data.externalDocsUrl || ''}
+            onChange={(e) => onChange('externalDocsUrl', e.target.value)}
+            placeholder="https://docs.example.com/properties/example"
+            helperText="URL to external documentation"
+            sx={{ mb: 2 }}
+            InputProps={{
+              endAdornment: data.externalDocsUrl?.trim() && (
+                <InputAdornment position="end">
+                  <Tooltip title="Open documentation in new tab">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        const url = data.externalDocsUrl?.trim();
+                        if (url) {
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                    >
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <TextField
+            label="Description (Optional)"
+            size={size}
+            fullWidth
+            multiline
+            rows={2}
+            value={data.externalDocsDescription || ''}
+            onChange={(e) => onChange('externalDocsDescription', e.target.value)}
+            placeholder="e.g., Detailed documentation with examples"
+            helperText="Optional description of the external documentation"
+          />
         </Box>
 
         {/* Extensions */}
