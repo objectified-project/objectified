@@ -29,6 +29,7 @@ type ClassNodeData = {
   isReadOnly?: boolean;
   expandedProperties?: Set<string>; // Global expanded properties state
   onTogglePropertyExpansion?: (propertyId: string) => void; // Callback to toggle property expansion
+  zoomLevel?: number; // Current zoom level for level-of-detail rendering
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -38,6 +39,27 @@ function ClassNode({ data, selected }: NodeProps) {
   const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
+
+  // Level of detail calculations based on zoom
+  // At zoom < 0.5 (50% - zoomed out), show minimal detail (class name only)
+  // At zoom 0.5-1.0, transition from minimal to full detail
+  // At zoom >= 1.0 (zoomed in), show full detail
+  const zoom = typedData.zoomLevel ?? 1;
+
+  // Calculate opacity for different detail levels
+  // Properties fade out completely when zoomed out to 50% or less
+  const propertiesOpacity = Math.max(0, Math.min(1, (zoom - 0.5) / 0.5));
+
+  // Description fades out when zooming out to 75% or less
+  const descriptionOpacity = Math.max(0, Math.min(1, (zoom - 0.75) / 0.25));
+
+  // Tags fade out at same rate as description
+  const tagsOpacity = descriptionOpacity;
+
+  // Show properties only when there's visible opacity
+  const showProperties = propertiesOpacity > 0.05;
+  const showDescription = descriptionOpacity > 0.05;
+  const showTags = tagsOpacity > 0.05;
 
   // Use global expanded state if provided, otherwise use local state
   const expandedProperties = typedData.expandedProperties || localExpandedProperties;
@@ -335,8 +357,15 @@ function ClassNode({ data, selected }: NodeProps) {
             {typedData.name}
           </div>
           {/* Tags in header */}
-          {typedData.tags && typedData.tags.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+          {showTags && typedData.tags && typedData.tags.length > 0 && (
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '4px',
+              alignItems: 'center',
+              opacity: tagsOpacity,
+              transition: 'opacity 0.3s ease-in-out'
+            }}>
               {typedData.tags.map((tag) => {
                 const colorMap: Record<string, string> = {
                   default: 'rgba(255, 255, 255, 0.25)',
@@ -398,32 +427,40 @@ function ClassNode({ data, selected }: NodeProps) {
       </div>
 
       {/* Description / Drop zone */}
-      <div
-        style={{
-          padding: '8px 12px',
-          fontSize: '11px',
-          color: dragTarget === 'node' ? '#065f46' : '#9ca3af',
-          lineHeight: '1.4',
-          background: dragTarget === 'node' ? '#d1fae5' : '#fafafa',
-          borderBottom: dragTarget === 'node' ? '1px solid #10b981' : '1px solid #e5e7eb',
-          textAlign: dragTarget === 'node' ? 'center' : 'left',
-          fontWeight: dragTarget === 'node' ? 500 : 'normal',
-          height: '31.2px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: dragTarget === 'node' ? 'center' : 'flex-start',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          transition: 'all 0.15s ease',
-        }}
-      >
-        {dragTarget === 'node' ? 'Drop property here' : (typedData.description || '\u00A0')}
-      </div>
+      {showDescription && (
+        <div
+          style={{
+            padding: '8px 12px',
+            fontSize: '11px',
+            color: dragTarget === 'node' ? '#065f46' : '#9ca3af',
+            lineHeight: '1.4',
+            background: dragTarget === 'node' ? '#d1fae5' : '#fafafa',
+            borderBottom: dragTarget === 'node' ? '1px solid #10b981' : '1px solid #e5e7eb',
+            textAlign: dragTarget === 'node' ? 'center' : 'left',
+            fontWeight: dragTarget === 'node' ? 500 : 'normal',
+            height: '31.2px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: dragTarget === 'node' ? 'center' : 'flex-start',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            opacity: descriptionOpacity,
+            transition: 'opacity 0.3s ease-in-out',
+          }}
+        >
+          {dragTarget === 'node' ? 'Drop property here' : (typedData.description || '\u00A0')}
+        </div>
+      )}
 
       {/* Properties */}
-      <div style={{ padding: 0 }}>
-        {(topLevel.length > 0 ? topLevel : []).length > 0 ? (
+      {showProperties && (
+        <div style={{
+          padding: 0,
+          opacity: propertiesOpacity,
+          transition: 'opacity 0.3s ease-in-out'
+        }}>
+          {(topLevel.length > 0 ? topLevel : []).length > 0 ? (
           topLevel.flatMap((prop, idx) => {
             let rowIndex = 0;
             const renderProperty = (p: ClassProperty, depth: number): React.JSX.Element[] => {
@@ -547,7 +584,8 @@ function ClassNode({ data, selected }: NodeProps) {
             No properties
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Bottom handle for composition relationships */}
       {typedData.schema && (() => {

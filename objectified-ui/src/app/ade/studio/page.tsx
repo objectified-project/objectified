@@ -117,6 +117,9 @@ const StudioContent = () => {
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const { fitView } = useReactFlow();
 
+  // Zoom level state for level-of-detail rendering
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+
   // Class-property edit dialog state
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
 
@@ -185,11 +188,12 @@ const StudioContent = () => {
           ...(node.data as any),
           isReadOnly,
           expandedProperties: globalExpandedProperties,
+          zoomLevel,
           onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
         },
       }))
     );
-  }, [globalExpandedProperties, isReadOnly, setNodes]);
+  }, [globalExpandedProperties, isReadOnly, zoomLevel, setNodes]);
 
   // Handle expand all properties
   const handleExpandAll = useCallback(() => {
@@ -738,7 +742,8 @@ const StudioContent = () => {
         onCreateReference: (...args: any[]) => handleCreateReferenceRef.current?.(...args),
         isReadOnly: isReadOnly,
         expandedProperties: globalExpandedProperties,
-        onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args)
+        onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
+        zoomLevel: 1 // Initial zoom level
       }
     }));
   };
@@ -1907,6 +1912,7 @@ const StudioContent = () => {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
+              onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
               fitView
               attributionPosition="bottom-left"
               className={`dark:bg-gray-900 ${isAnimating ? 'layout-animating' : ''}`}
