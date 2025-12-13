@@ -22,6 +22,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "not" support for properties - define schemas that must not be matched
   - Added support for custom "x-" tags and values to classes and properties
   - Added support for external documentation on a per-class level
+  - Added support for discriminator mapping to x- tags, propertyName, and values
   - Marking for deprecation is now available for properties and classes
   - prefixItems:
     - Define ordered schemas for specific array positions (e.g., `[string, number, boolean]`)

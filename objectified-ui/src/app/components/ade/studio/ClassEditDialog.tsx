@@ -79,6 +79,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     oneOf: [] as string[],
     discriminatorProperty: '',
     discriminatorUseAuto: true,
+    discriminatorMapping: {} as Record<string, string>, // Maps property value to schema name
     additionalProperties: null as boolean | null,
     deprecated: false,
     deprecationMessage: '',
@@ -105,6 +106,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         const anyOf = schema.anyOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
         const oneOf = schema.oneOf?.map((item: any) => item.$ref?.split('/').pop()).filter(Boolean) || [];
 
+        // Extract discriminator mapping if present
+        const discriminatorMapping: Record<string, string> = {};
+        if (schema.discriminator?.mapping) {
+          Object.entries(schema.discriminator.mapping).forEach(([key, value]) => {
+            // Extract schema name from reference (e.g., "#/components/schemas/Dog" -> "Dog")
+            const schemaName = typeof value === 'string' ? value.split('/').pop() || '' : '';
+            if (schemaName) {
+              discriminatorMapping[key] = schemaName;
+            }
+          });
+        }
+
         // Extract extensions (x- prefixed properties)
         const extensions: Record<string, any> = {};
         Object.keys(schema).forEach(key => {
@@ -128,6 +141,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               oneOf,
               discriminatorProperty: schema.discriminator?.propertyName || '',
               discriminatorUseAuto: !schema.discriminator?.mapping,
+              discriminatorMapping,
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
@@ -147,6 +161,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               oneOf,
               discriminatorProperty: schema.discriminator?.propertyName || '',
               discriminatorUseAuto: !schema.discriminator?.mapping,
+              discriminatorMapping,
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
@@ -170,6 +185,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           oneOf: [],
           discriminatorProperty: '',
           discriminatorUseAuto: true,
+          discriminatorMapping: {},
           additionalProperties: null,
           deprecated: false,
           deprecationMessage: '',
@@ -201,11 +217,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     // Add discriminator if specified
     if (formData.discriminatorProperty && (formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0)) {
       schema.discriminator = { propertyName: formData.discriminatorProperty };
-      if (!formData.discriminatorUseAuto) {
+      if (!formData.discriminatorUseAuto && Object.keys(formData.discriminatorMapping).length > 0) {
+        // Use custom mapping
         schema.discriminator.mapping = {};
-        const list = formData.allOf.length > 0 ? formData.allOf : formData.anyOf.length > 0 ? formData.anyOf : formData.oneOf;
-        list.forEach((name: string) => {
-          schema.discriminator.mapping[name] = `#/components/schemas/${name}`;
+        Object.entries(formData.discriminatorMapping).forEach(([propertyValue, schemaName]) => {
+          schema.discriminator.mapping[propertyValue] = `#/components/schemas/${schemaName}`;
         });
       }
     }
@@ -854,8 +870,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
               <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Discriminator (Optional)
+                  Discriminator Configuration
                 </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  The discriminator helps code generators and documentation tools understand polymorphic types.
+                  {formData.oneOf.length > 0 && " It's especially important for oneOf where exactly one schema must match."}
+                </Typography>
+
                 <TextField
                   margin="dense"
                   label="Discriminator Property Name"
@@ -863,21 +884,128 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   placeholder="e.g., type, petType, kind"
                   value={formData.discriminatorProperty}
                   onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
-                  helperText="Property name that indicates which schema variant to use for polymorphic objects. This is used for (de)serialization operations."
+                  helperText="Property name that indicates which schema variant to use for polymorphic objects"
                   sx={{ mb: 2 }}
                   disabled={isReadOnly}
                 />
+
                 {formData.discriminatorProperty && (
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={formData.discriminatorUseAuto}
-                        onChange={(e) => setFormData(prev => ({ ...prev, discriminatorUseAuto: e.target.checked }))}
-                        disabled={isReadOnly}
-                      />
-                    }
-                    label="Use automatic mapping"
-                  />
+                  <>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={formData.discriminatorUseAuto}
+                          onChange={(e) => {
+                            const useAuto = e.target.checked;
+                            setFormData(prev => ({
+                              ...prev,
+                              discriminatorUseAuto: useAuto,
+                              // Clear mapping when switching to auto
+                              discriminatorMapping: useAuto ? {} : prev.discriminatorMapping
+                            }));
+                          }}
+                          disabled={isReadOnly}
+                        />
+                      }
+                      label="Use automatic mapping (implicit mapping based on schema names)"
+                      sx={{ mb: 2 }}
+                    />
+
+                    {!formData.discriminatorUseAuto && (
+                      <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                          Explicit Mapping
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                          Map property values to schema references. Example: "dog" → Dog, "cat" → Cat
+                        </Typography>
+
+                        {/* Mapping Editor */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {/* Get list of schemas from composition */}
+                          {(() => {
+                            const schemas = formData.oneOf.length > 0 ? formData.oneOf :
+                                          formData.anyOf.length > 0 ? formData.anyOf :
+                                          formData.allOf;
+
+                            return schemas.map((schemaName) => {
+                              const currentValue = Object.entries(formData.discriminatorMapping)
+                                .find(([_, name]) => name === schemaName)?.[0] || '';
+
+                              return (
+                                <Box key={schemaName} sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 1, alignItems: 'center' }}>
+                                  <TextField
+                                    size="small"
+                                    placeholder={`e.g., ${schemaName.toLowerCase()}`}
+                                    value={currentValue}
+                                    onChange={(e) => {
+                                      const newValue = e.target.value;
+                                      setFormData(prev => {
+                                        const newMapping = { ...prev.discriminatorMapping };
+
+                                        // Remove old entry for this schema if value changed
+                                        Object.keys(newMapping).forEach(key => {
+                                          if (newMapping[key] === schemaName) {
+                                            delete newMapping[key];
+                                          }
+                                        });
+
+                                        // Add new entry if value is not empty
+                                        if (newValue.trim()) {
+                                          newMapping[newValue.trim()] = schemaName;
+                                        }
+
+                                        return { ...prev, discriminatorMapping: newMapping };
+                                      });
+                                    }}
+                                    disabled={isReadOnly}
+                                    label="Property Value"
+                                  />
+                                  <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                                    →
+                                  </Typography>
+                                  <Box sx={{
+                                    p: 1,
+                                    bgcolor: 'primary.lighter',
+                                    borderRadius: 1,
+                                    border: 1,
+                                    borderColor: 'primary.main',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                                      {schemaName}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              );
+                            });
+                          })()}
+                        </Box>
+
+                        {/* Validation warning */}
+                        {(() => {
+                          const schemas = formData.oneOf.length > 0 ? formData.oneOf :
+                                        formData.anyOf.length > 0 ? formData.anyOf :
+                                        formData.allOf;
+                          const mappedSchemas = new Set(Object.values(formData.discriminatorMapping));
+                          const unmappedSchemas = schemas.filter(s => !mappedSchemas.has(s));
+
+                          return unmappedSchemas.length > 0 && (
+                            <Alert severity="warning" sx={{ mt: 2 }}>
+                              <Typography variant="caption">
+                                <strong>Unmapped schemas:</strong> {unmappedSchemas.join(', ')}
+                              </Typography>
+                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                                These schemas won't be reachable via the discriminator property.
+                              </Typography>
+                            </Alert>
+                          );
+                        })()}
+                      </Box>
+                    )}
+                  </>
                 )}
               </Box>
             )}
