@@ -186,6 +186,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             String((property as any).items)) : '',
         // Enum and default come from items for array types
         enum: minMaxSource.enum || [],
+        const: minMaxSource.const !== undefined ? (typeof minMaxSource.const === 'string' ? minMaxSource.const : JSON.stringify(minMaxSource.const)) : '',
         default: minMaxSource.default?.toString() || '',
         required: property.required || false,
         // Metadata fields
@@ -312,7 +313,17 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             itemsSchema.multipleOf = multipleOfValue;
           }
         }
-        if (formData.enum && formData.enum.length > 0) itemsSchema.enum = formData.enum;
+        // Handle const (mutually exclusive with enum)
+        if (formData.const && formData.const.trim()) {
+          try {
+            itemsSchema.const = JSON.parse(formData.const);
+          } catch (e) {
+            // If not valid JSON, use as string
+            itemsSchema.const = formData.const;
+          }
+        } else if (formData.enum && formData.enum.length > 0) {
+          itemsSchema.enum = formData.enum;
+        }
         if (formData.default) itemsSchema.default = formData.default;
 
         // Handle additionalProperties for array items that are objects
@@ -362,7 +373,17 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           schema.multipleOf = multipleOfValue;
         }
       }
-      if (formData.enum && formData.enum.length > 0) schema.enum = formData.enum;
+      // Handle const (mutually exclusive with enum)
+      if (formData.const && formData.const.trim()) {
+        try {
+          schema.const = JSON.parse(formData.const);
+        } catch (e) {
+          // If not valid JSON, use as string
+          schema.const = formData.const;
+        }
+      } else if (formData.enum && formData.enum.length > 0) {
+        schema.enum = formData.enum;
+      }
       if (formData.default) schema.default = formData.default;
 
       // Handle additionalProperties for object types
@@ -545,8 +566,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           delete itemsSchema.multipleOf;
         }
 
-        if (formData.enum && formData.enum.length > 0) itemsSchema.enum = formData.enum;
-        else delete itemsSchema.enum;
+        // Handle const (mutually exclusive with enum)
+        if (formData.const && formData.const.trim()) {
+          try {
+            itemsSchema.const = JSON.parse(formData.const);
+          } catch (e) {
+            // If not valid JSON, use as string
+            itemsSchema.const = formData.const;
+          }
+          delete itemsSchema.enum;
+        } else {
+          delete itemsSchema.const;
+          if (formData.enum && formData.enum.length > 0) {
+            itemsSchema.enum = formData.enum;
+          } else {
+            delete itemsSchema.enum;
+          }
+        }
+
         if (formData.default) itemsSchema.default = formData.default;
         else delete itemsSchema.default;
 
@@ -626,8 +663,24 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           delete dataObject.multipleOf;
         }
 
-        if (formData.enum && formData.enum.length > 0) dataObject.enum = formData.enum;
-        else delete dataObject.enum;
+        // Handle const (mutually exclusive with enum)
+        if (formData.const && formData.const.trim()) {
+          try {
+            dataObject.const = JSON.parse(formData.const);
+          } catch (e) {
+            // If not valid JSON, use as string
+            dataObject.const = formData.const;
+          }
+          delete dataObject.enum;
+        } else {
+          delete dataObject.const;
+          if (formData.enum && formData.enum.length > 0) {
+            dataObject.enum = formData.enum;
+          } else {
+            delete dataObject.enum;
+          }
+        }
+
         if (formData.default) dataObject.default = formData.default;
         else delete dataObject.default;
 

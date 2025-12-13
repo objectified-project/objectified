@@ -151,6 +151,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
       // Common constraints
       default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
+      const: schema.const !== undefined ? (typeof schema.const === 'string' ? schema.const : JSON.stringify(schema.const)) : '',
       enum: schema.enum || [],
 
       // Object constraints
@@ -351,9 +352,23 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         }
       }
 
-      // Enum values
-      if (formData.enum && formData.enum.length > 0) targetSchema.enum = formData.enum;
-      else delete targetSchema.enum;
+      // Enum values and const (mutually exclusive)
+      if (formData.const && formData.const.trim()) {
+        try {
+          targetSchema.const = JSON.parse(formData.const);
+        } catch (e) {
+          // If not valid JSON, use as string
+          targetSchema.const = formData.const;
+        }
+        delete targetSchema.enum;
+      } else {
+        delete targetSchema.const;
+        if (formData.enum && formData.enum.length > 0) {
+          targetSchema.enum = formData.enum;
+        } else {
+          delete targetSchema.enum;
+        }
+      }
 
       // Default value
       if (formData.default?.trim()) {

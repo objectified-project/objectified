@@ -439,6 +439,8 @@ const StudioContent = () => {
           maxContains: propertyData.maxContains,
           tupleMode: propertyData.tupleMode,
           prefixItems: propertyData.prefixItems,
+          // Constant value (OpenAPI 3.1)
+          const: propertyData.const,
           enum: propertyData.enum,
           default: propertyData.default,
           required: propertyData.required,

@@ -70,6 +70,7 @@ export interface PropertyFormData {
 
   // Common constraints
   enum?: string[];
+  const?: string; // OpenAPI 3.1: Constant value (mutually exclusive with enum)
   default?: string;
 
   // Metadata
@@ -340,6 +341,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
     if (data.enum?.includes(trimmedValue)) {
       setEnumError('This value already exists');
       return;
+    }
+
+    // Clear const if it's set when adding enum values
+    if (data.const) {
+      onChange('const', undefined);
     }
 
     onChange('enum', [...(data.enum || []), trimmedValue]);
@@ -903,6 +909,74 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           </Box>
         )}
 
+        {/* Constant Value */}
+        {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'boolean') && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Constant Value
+            </Typography>
+            {isArray && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Constant value applies to each item in the array
+              </Typography>
+            )}
+            <TextField
+              label="Constant Value"
+              size={size}
+              fullWidth
+              type={baseType === 'string' || baseType === 'boolean' ? 'text' : 'number'}
+              value={data.const || ''}
+              onChange={(e) => {
+                onChange('const', e.target.value);
+                // Clear enum if const is set
+                if (e.target.value && data.enum && data.enum.length > 0) {
+                  onChange('enum', []);
+                }
+              }}
+              placeholder={
+                baseType === 'boolean' ? 'e.g., true or false' :
+                baseType === 'integer' ? 'e.g., 42' :
+                baseType === 'number' ? 'e.g., 3.14' :
+                'e.g., "active"'
+              }
+              helperText={
+                data.const
+                  ? 'Property can only have this specific value (overrides enum)'
+                  : 'Use const when a property should only have one specific value (e.g., discriminator fields)'
+              }
+              disabled={!!data.enum && data.enum.length > 0}
+              sx={{
+                mb: 1,
+                '& .MuiInputBase-input': {
+                  fontFamily: baseType !== 'string' ? 'monospace' : 'inherit',
+                },
+              }}
+            />
+            {data.const && (
+              <Box
+                sx={{
+                  mt: 1,
+                  p: 1.5,
+                  bgcolor: 'info.lighter',
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: 'info.main',
+                }}
+              >
+                <Typography variant="caption" color="info.dark" sx={{ fontWeight: 600 }}>
+                  ℹ️ Constant Value Set
+                </Typography>
+                <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
+                  This property will only accept the value: <code style={{ background: 'rgba(0,0,0,0.1)', padding: '2px 4px', borderRadius: '2px' }}>{data.const}</code>
+                </Typography>
+                <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
+                  Useful for discriminator fields or fixed configuration values.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
         {/* Enum Values */}
         {(baseType === 'string' || baseType === 'number' || baseType === 'integer') && (
           <Box sx={{ mb: 2 }}>
@@ -916,6 +990,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     <IconButton
                       onClick={handleSortEnumAZ}
                       size="small"
+                      disabled={!!data.const}
                       sx={{
                         border: 1,
                         borderColor: 'divider',
@@ -930,6 +1005,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     <IconButton
                       onClick={handleSortEnumZA}
                       size="small"
+                      disabled={!!data.const}
                       sx={{
                         border: 1,
                         borderColor: 'divider',
@@ -944,7 +1020,12 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 </Box>
               )}
             </Box>
-            {isArray && (
+            {data.const && (
+              <Typography variant="caption" color="warning.main" sx={{ display: 'block', mb: 1, fontWeight: 600 }}>
+                ⚠️ Constant value is set - enum is disabled
+              </Typography>
+            )}
+            {!data.const && isArray && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                 Enum values apply to each item in the array
               </Typography>
@@ -963,17 +1044,18 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 }}
                 onKeyDown={handleEnumKeyPress}
                 error={!!enumError}
-                helperText={enumError || `Enter a ${baseType} value and press Enter`}
+                helperText={enumError || (data.const ? 'Disabled when constant value is set' : `Enter a ${baseType} value and press Enter`)}
                 placeholder={
                   baseType === 'integer' ? 'e.g., 1, 2, 3' :
                   baseType === 'number' ? 'e.g., 1.5, 2.0, 3.14' :
                   'e.g., "active", "pending"'
                 }
+                disabled={!!data.const}
               />
             <IconButton
               onClick={handleAddEnum}
               color="primary"
-              disabled={!enumInput.trim()}
+              disabled={!enumInput.trim() || !!data.const}
             >
               <AddIcon />
             </IconButton>
