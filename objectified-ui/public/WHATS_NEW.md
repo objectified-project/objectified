@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "minProperties" and "maxProperties" fields for object types
   - Added "constant" field for properties
   - Added "not" support for properties - define schemas that must not be matched
+  - Added support for property name constraints using a format, min/max length, and regex pattern
   - Added support for custom "x-" tags and values to classes and properties
   - Added support for external documentation on a class and property level
   - Added support for discriminator mapping to x- tags, propertyName, and values

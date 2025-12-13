@@ -95,6 +95,9 @@ export interface PropertyFormData {
   additionalProperties?: 'default' | 'true' | 'false';
   minProperties?: string;
   maxProperties?: string;
+  propertyNamesPattern?: string;
+  propertyNamesMinLength?: string;
+  propertyNamesMaxLength?: string;
 
   // Extensions (x- prefixed properties)
   extensions?: Record<string, any>;
@@ -1437,6 +1440,148 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   sx={{ m: 0 }}
                 />
               </Box>
+            </Box>
+
+            {/* Property Name Constraints */}
+            <Box sx={{
+              mt: 2.5,
+              p: 2.5,
+              bgcolor: 'white',
+              borderRadius: 2.5,
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                mb: 2,
+                pb: 1.5,
+                borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
+              }}>
+                <Box sx={{
+                  p: 0.75,
+                  borderRadius: 1.5,
+                  bgcolor: 'rgba(139, 92, 246, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <SortByAlphaIcon sx={{ color: '#8b5cf6', fontSize: 16 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    Property Name Constraints
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748b' }}>
+                    Validate the names of properties, not their values
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{
+                  px: 1,
+                  py: 0.25,
+                  bgcolor: 'rgba(139, 92, 246, 0.1)',
+                  color: '#7c3aed',
+                  borderRadius: 1,
+                  fontWeight: 600,
+                  fontSize: '0.65rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  OpenAPI 3.1
+                </Typography>
+              </Box>
+
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 2 }}>
+                Define constraints for property names (keys) in this object. Useful for objects with dynamic keys like dictionaries or maps.
+              </Typography>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                <TextField
+                  label="Min Length"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.propertyNamesMinLength ?? ''}
+                  onChange={(e) => onChange('propertyNamesMinLength', e.target.value)}
+                  inputProps={{ min: 0 }}
+                  placeholder="e.g., 1"
+                  helperText="Minimum name length"
+                  sx={{
+                    bgcolor: 'white',
+                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                  }}
+                />
+                <TextField
+                  label="Max Length"
+                  type="number"
+                  size={size}
+                  fullWidth
+                  value={data.propertyNamesMaxLength ?? ''}
+                  onChange={(e) => onChange('propertyNamesMaxLength', e.target.value)}
+                  inputProps={{ min: 0 }}
+                  placeholder="e.g., 50"
+                  helperText="Maximum name length"
+                  sx={{
+                    bgcolor: 'white',
+                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                  }}
+                />
+              </Box>
+
+              <TextField
+                label="Pattern (Regex)"
+                size={size}
+                fullWidth
+                value={data.propertyNamesPattern ?? ''}
+                onChange={(e) => onChange('propertyNamesPattern', e.target.value)}
+                placeholder="e.g., ^[a-z][a-zA-Z0-9]*$"
+                helperText="Regular expression that all property names must match"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Typography sx={{ fontFamily: 'monospace', color: '#94a3b8', fontSize: '0.875rem' }}>/</Typography>
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Typography sx={{ fontFamily: 'monospace', color: '#94a3b8', fontSize: '0.875rem' }}>/</Typography>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace' },
+                  '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                  '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                }}
+              />
+
+              {(data.propertyNamesPattern ?? data.propertyNamesMinLength ?? data.propertyNamesMaxLength) && (
+                <Box sx={{
+                  mt: 2,
+                  p: 2,
+                  bgcolor: 'rgba(139, 92, 246, 0.06)',
+                  borderRadius: 2,
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
+                }}>
+                  <Typography variant="caption" sx={{ color: '#6d28d9', display: 'block', fontWeight: 600, mb: 1 }}>
+                    Property Name Rules:
+                  </Typography>
+                  <Box component="ul" sx={{ m: 0, pl: 2, '& li': { fontSize: '0.75rem', color: '#7c3aed', mb: 0.5 } }}>
+                    {data.propertyNamesMinLength && (
+                      <li>Names must be at least <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMinLength}</code> characters</li>
+                    )}
+                    {data.propertyNamesMaxLength && (
+                      <li>Names must be at most <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMaxLength}</code> characters</li>
+                    )}
+                    {data.propertyNamesPattern && (
+                      <li>Names must match: <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>/{data.propertyNamesPattern}/</code></li>
+                    )}
+                  </Box>
+                </Box>
+              )}
             </Box>
           </Box>
         )}

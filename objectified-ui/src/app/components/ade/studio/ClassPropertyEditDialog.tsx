@@ -167,6 +167,11 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       minProperties: schema.minProperties?.toString() || '',
       maxProperties: schema.maxProperties?.toString() || '',
 
+      // Property Name Constraints (OpenAPI 3.1)
+      propertyNamesPattern: schema.propertyNames?.pattern || '',
+      propertyNamesMinLength: schema.propertyNames?.minLength?.toString() || '',
+      propertyNamesMaxLength: schema.propertyNames?.maxLength?.toString() || '',
+
       // NOT composition (OpenAPI 3.1)
       not: schema.not ? JSON.stringify(schema.not, null, 2) : '',
 
@@ -245,6 +250,23 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         targetSchema.maxProperties = parseInt(formData.maxProperties);
       } else {
         delete targetSchema.maxProperties;
+      }
+
+      // Handle propertyNames constraints (OpenAPI 3.1)
+      const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
+      if (hasPropertyNamesConstraints) {
+        targetSchema.propertyNames = { type: 'string' };
+        if (formData.propertyNamesPattern) {
+          targetSchema.propertyNames.pattern = formData.propertyNamesPattern;
+        }
+        if (formData.propertyNamesMinLength) {
+          targetSchema.propertyNames.minLength = parseInt(formData.propertyNamesMinLength);
+        }
+        if (formData.propertyNamesMaxLength) {
+          targetSchema.propertyNames.maxLength = parseInt(formData.propertyNamesMaxLength);
+        }
+      } else {
+        delete targetSchema.propertyNames;
       }
 
       // String constraints
