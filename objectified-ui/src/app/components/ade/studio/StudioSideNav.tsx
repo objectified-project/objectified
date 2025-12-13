@@ -467,7 +467,31 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                             }}
                             title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
                           >
-                            {propertyItem.name}
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>{propertyItem.name}</span>
+                              {propertyItem.enum && Array.isArray(propertyItem.enum) && propertyItem.enum.length > 0 && (
+                                <span
+                                  title={`Enumeration: ${propertyItem.enum.join(', ')}`}
+                                  style={{
+                                    backgroundColor: '#dbeafe',
+                                    color: '#1e40af',
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    flexShrink: 0,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
+                                  ENUM
+                                </span>
+                              )}
+                            </span>
                           </Typography>
                           <Typography
                             variant="caption"
