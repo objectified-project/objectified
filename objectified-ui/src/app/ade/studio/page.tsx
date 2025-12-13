@@ -447,7 +447,9 @@ const StudioContent = () => {
           deprecated: propertyData.deprecated,
           deprecationMessage: propertyData.deprecationMessage,
           example: propertyData.example,
-          additionalProperties: propertyData.additionalProperties
+          additionalProperties: propertyData.additionalProperties,
+          minProperties: propertyData.minProperties,
+          maxProperties: propertyData.maxProperties
         },
         parentId || null
       );

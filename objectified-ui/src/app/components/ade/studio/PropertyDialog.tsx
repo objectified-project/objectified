@@ -54,6 +54,8 @@ export interface PropertyItem {
   deprecationMessage?: string;
   example?: any;
   additionalProperties?: boolean | any;
+  minProperties?: number;
+  maxProperties?: number;
   // Tuple mode (OpenAPI 3.1)
   tupleMode?: boolean;
   prefixItems?: any[]; // OpenAPI 3.1: Array of schemas for specific positions
@@ -194,6 +196,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         example: property.example ? JSON.stringify(property.example) : '',
         // Object constraints
         additionalProperties: additionalPropsValue,
+        minProperties: minMaxSource.minProperties?.toString() || '',
+        maxProperties: minMaxSource.maxProperties?.toString() || '',
       });
       setPropertyError('');
     } else if (open && mode === 'add') {
@@ -318,6 +322,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           } else if (formData.additionalProperties === 'false') {
             itemsSchema.additionalProperties = false;
           }
+
+          // Handle minProperties and maxProperties for object items
+          if (formData.minProperties) itemsSchema.minProperties = parseInt(formData.minProperties);
+          if (formData.maxProperties) itemsSchema.maxProperties = parseInt(formData.maxProperties);
         }
 
         schema.items = itemsSchema;
@@ -364,6 +372,10 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         } else if (formData.additionalProperties === 'false') {
           schema.additionalProperties = false;
         }
+
+        // Handle minProperties and maxProperties
+        if (formData.minProperties) schema.minProperties = parseInt(formData.minProperties);
+        if (formData.maxProperties) schema.maxProperties = parseInt(formData.maxProperties);
       }
     }
 
@@ -545,6 +557,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             } else if (formData.additionalProperties === 'false') {
               itemsSchema.additionalProperties = false;
             }
+
+            // Handle minProperties and maxProperties for object items
+            if (formData.minProperties) {
+              itemsSchema.minProperties = parseInt(formData.minProperties);
+            } else {
+              delete itemsSchema.minProperties;
+            }
+            if (formData.maxProperties) {
+              itemsSchema.maxProperties = parseInt(formData.maxProperties);
+            } else {
+              delete itemsSchema.maxProperties;
+            }
           }
 
           dataObject.items = itemsSchema;
@@ -615,6 +639,18 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             dataObject.additionalProperties = false;
           } else {
             delete dataObject.additionalProperties;
+          }
+
+          // Handle minProperties and maxProperties
+          if (formData.minProperties) {
+            dataObject.minProperties = parseInt(formData.minProperties);
+          } else {
+            delete dataObject.minProperties;
+          }
+          if (formData.maxProperties) {
+            dataObject.maxProperties = parseInt(formData.maxProperties);
+          } else {
+            delete dataObject.maxProperties;
           }
         }
       }

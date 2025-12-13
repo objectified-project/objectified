@@ -82,6 +82,8 @@ export interface PropertyFormData {
 
   // Object constraints
   additionalProperties?: 'default' | 'true' | 'false';
+  minProperties?: string;
+  maxProperties?: string;
 }
 
 interface SortableEnumItemProps {
@@ -1017,9 +1019,34 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         {baseType === 'object' && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Schema Settings
+              Object Constraints
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+
+            {/* Min/Max Properties */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <TextField
+                label="Min Properties"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.minProperties || ''}
+                onChange={(e) => onChange('minProperties', e.target.value)}
+                inputProps={{ min: 0 }}
+                helperText="Minimum number of properties"
+              />
+              <TextField
+                label="Max Properties"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.maxProperties || ''}
+                onChange={(e) => onChange('maxProperties', e.target.value)}
+                inputProps={{ min: 0 }}
+                helperText="Maximum number of properties"
+              />
+            </Box>
+
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
               Additional Properties
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, ml: 1 }}>

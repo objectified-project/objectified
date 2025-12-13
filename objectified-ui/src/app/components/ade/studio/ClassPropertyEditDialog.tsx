@@ -155,6 +155,8 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
       // Object constraints
       additionalProperties: additionalPropsValue,
+      minProperties: schema.minProperties?.toString() || '',
+      maxProperties: schema.maxProperties?.toString() || '',
     });
 
     setEditPropertyError('');
@@ -212,6 +214,18 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         targetSchema.additionalProperties = false;
       } else {
         delete targetSchema.additionalProperties;
+      }
+
+      // Handle minProperties and maxProperties for objects
+      if (formData.minProperties) {
+        targetSchema.minProperties = parseInt(formData.minProperties);
+      } else {
+        delete targetSchema.minProperties;
+      }
+      if (formData.maxProperties) {
+        targetSchema.maxProperties = parseInt(formData.maxProperties);
+      } else {
+        delete targetSchema.maxProperties;
       }
 
       // String constraints
