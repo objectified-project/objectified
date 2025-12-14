@@ -1,5 +1,43 @@
 # Troubleshooting Common Issues
 
+## Next.js 15+ Dynamic Route Errors
+
+### Issue: `params is a Promise and must be unwrapped`
+
+**Error Message**:
+```
+Error: Route used `params.slug`. params is a Promise and must be 
+unwrapped with `await` or `React.use()` before accessing its properties.
+```
+
+**Problem**: In Next.js 15+ (including 16.x), `params` and `searchParams` are Promises and must be awaited.
+
+**Solution**: Update your page component to await the params:
+
+```typescript
+// ✅ Correct
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const data = await fetchData(slug);
+  // ...
+}
+
+// ❌ Incorrect (causes error)
+export default async function Page({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const data = await fetchData(params.slug);  // Error!
+}
+```
+
+See [NEXTJS_15_PARAMS_FIX.md](./NEXTJS_15_PARAMS_FIX.md) for complete details.
+
 ## Module Resolution Errors
 
 ### Issue: `Module not found: Can't resolve '@/lib/db/helper'`
@@ -66,6 +104,34 @@ npm run dev # will auto-select next available port
    ```bash
    psql $DATABASE_URL -c "SELECT 1;"
    ```
+
+### Issue: `column does not exist` errors
+
+**Error Message**:
+```
+error: column v.published_by does not exist
+```
+
+**Problem**: The database schema doesn't have all the columns that the query expects. This can happen if:
+- The database schema is from an older version of Objectified
+- The column names are different in your database
+- A migration hasn't been run
+
+**Solutions**:
+1. Check which columns exist in your database:
+   ```sql
+   SELECT column_name, data_type 
+   FROM information_schema.columns 
+   WHERE table_schema = 'odb' 
+     AND table_name = 'versions'
+   ORDER BY column_name;
+   ```
+
+2. If columns like `published_by`, `publisher_name`, or `publisher_email` don't exist, they've been removed from the queries in `lib/db/helper.ts`
+
+3. If other columns are missing, check the Objectified database migration scripts in `objectified-db/scripts/`
+
+4. Ensure your database schema matches the version expected by the browse application
 
 ## REST API Connection Issues
 

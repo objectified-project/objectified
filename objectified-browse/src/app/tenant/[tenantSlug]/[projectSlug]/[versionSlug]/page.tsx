@@ -6,12 +6,13 @@ import { SpecViewer } from "../../../../components/SpecViewer";
 export default async function VersionPage({
   params,
 }: {
-  params: { tenantSlug: string; projectSlug: string; versionSlug: string };
+  params: Promise<{ tenantSlug: string; projectSlug: string; versionSlug: string }>;
 }) {
+  const { tenantSlug, projectSlug, versionSlug } = await params;
   const version = await getPublicVersionDetails(
-    params.tenantSlug,
-    params.projectSlug,
-    params.versionSlug
+    tenantSlug,
+    projectSlug,
+    versionSlug
   );
 
   if (!version) {
@@ -29,11 +30,11 @@ export default async function VersionPage({
               Organizations
             </Link>
             <span>/</span>
-            <Link href={`/tenant/${params.tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+            <Link href={`/tenant/${tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
               {version.tenant_name}
             </Link>
             <span>/</span>
-            <Link href={`/tenant/${params.tenantSlug}/${params.projectSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+            <Link href={`/tenant/${tenantSlug}/${projectSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
               {version.project_name}
             </Link>
           </div>
@@ -71,9 +72,9 @@ export default async function VersionPage({
         )}
 
         <SpecViewer
-          tenantSlug={params.tenantSlug}
-          projectSlug={params.projectSlug}
-          versionSlug={params.versionSlug}
+          tenantSlug={tenantSlug}
+          projectSlug={projectSlug}
+          versionSlug={versionSlug}
           restApiBaseUrl={restApiBaseUrl}
         />
       </main>

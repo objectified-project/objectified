@@ -5,15 +5,16 @@ import { getPublicProjectBySlug, getPublicVersionsForProject } from "../../../..
 export default async function ProjectPage({
   params,
 }: {
-  params: { tenantSlug: string; projectSlug: string };
+  params: Promise<{ tenantSlug: string; projectSlug: string }>;
 }) {
-  const project = await getPublicProjectBySlug(params.tenantSlug, params.projectSlug);
+  const { tenantSlug, projectSlug } = await params;
+  const project = await getPublicProjectBySlug(tenantSlug, projectSlug);
 
   if (!project) {
     notFound();
   }
 
-  const versions = await getPublicVersionsForProject(params.tenantSlug, params.projectSlug);
+  const versions = await getPublicVersionsForProject(tenantSlug, projectSlug);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
@@ -24,7 +25,7 @@ export default async function ProjectPage({
               Organizations
             </Link>
             <span>/</span>
-            <Link href={`/tenant/${params.tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+            <Link href={`/tenant/${tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
               {project.tenant_name}
             </Link>
           </div>
@@ -47,7 +48,7 @@ export default async function ProjectPage({
           </h2>
           {versions.length > 1 && (
             <Link
-              href={`/tenant/${params.tenantSlug}/${params.projectSlug}/compare`}
+              href={`/tenant/${tenantSlug}/${projectSlug}/compare`}
               className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
             >
               Compare versions →
@@ -66,7 +67,7 @@ export default async function ProjectPage({
             {versions.map((version: any) => (
               <Link
                 key={version.id}
-                href={`/tenant/${params.tenantSlug}/${params.projectSlug}/${version.version_id}`}
+                href={`/tenant/${tenantSlug}/${projectSlug}/${version.version_id}`}
                 className="group block rounded-lg border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
               >
                 <div className="flex items-start justify-between">

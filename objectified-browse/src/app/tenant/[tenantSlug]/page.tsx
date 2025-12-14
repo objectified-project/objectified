@@ -5,15 +5,16 @@ import { getPublicTenantBySlug, getPublicProjectsForTenant } from "../../../../l
 export default async function TenantPage({
   params,
 }: {
-  params: { tenantSlug: string };
+  params: Promise<{ tenantSlug: string }>;
 }) {
-  const tenant = await getPublicTenantBySlug(params.tenantSlug);
+  const { tenantSlug } = await params;
+  const tenant = await getPublicTenantBySlug(tenantSlug);
 
   if (!tenant) {
     notFound();
   }
 
-  const projects = await getPublicProjectsForTenant(params.tenantSlug);
+  const projects = await getPublicProjectsForTenant(tenantSlug);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
@@ -51,7 +52,7 @@ export default async function TenantPage({
               {projects.map((project: any) => (
                 <Link
                   key={project.id}
-                  href={`/tenant/${params.tenantSlug}/${project.slug}`}
+                  href={`/tenant/${tenantSlug}/${project.slug}`}
                   className="group rounded-lg border border-zinc-200 bg-white p-6 transition-all hover:border-zinc-300 hover:shadow-md dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
                 >
                   <h3 className="text-xl font-semibold text-zinc-900 group-hover:text-blue-600 dark:text-zinc-50 dark:group-hover:text-blue-400">

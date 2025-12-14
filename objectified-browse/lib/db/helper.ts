@@ -59,12 +59,10 @@ export async function getPublicVersionsForProject(tenantSlug: string, projectSlu
   try {
     const result = await connectionPool.query(
       `SELECT v.id, v.version_id, v.description, v.change_log, v.published, v.visibility, 
-              v.created_at, v.updated_at, v.published_at, v.published_by,
-              u.name as publisher_name, u.email as publisher_email
+              v.created_at, v.updated_at, v.published_at
        FROM odb.versions v
        JOIN odb.projects p ON v.project_id = p.id
        JOIN odb.tenants t ON p.tenant_id = t.id
-       LEFT JOIN odb.users u ON v.published_by = u.id
        WHERE t.slug = $1
          AND p.slug = $2
          AND v.published = true
@@ -89,14 +87,12 @@ export async function getPublicVersionDetails(tenantSlug: string, projectSlug: s
   try {
     const result = await connectionPool.query(
       `SELECT v.id, v.version_id, v.description, v.change_log, v.published, v.visibility,
-              v.created_at, v.updated_at, v.published_at, v.published_by,
+              v.created_at, v.updated_at, v.published_at,
               p.name as project_name, p.slug as project_slug, p.description as project_description,
-              t.name as tenant_name, t.slug as tenant_slug, t.description as tenant_description,
-              u.name as publisher_name, u.email as publisher_email
+              t.name as tenant_name, t.slug as tenant_slug, t.description as tenant_description
        FROM odb.versions v
        JOIN odb.projects p ON v.project_id = p.id
        JOIN odb.tenants t ON p.tenant_id = t.id
-       LEFT JOIN odb.users u ON v.published_by = u.id
        WHERE t.slug = $1
          AND p.slug = $2
          AND v.version_id = $3

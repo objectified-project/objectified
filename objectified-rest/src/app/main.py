@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Response, Header
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from typing import Dict, Any, Optional
@@ -16,6 +17,17 @@ app = FastAPI(
     title="Objectified REST API",
     description="REST API for serving OpenAPI specifications from the Objectified database",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",  # Next.js default port
+        "http://localhost:3001",  # Next.js when 3000 is taken
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

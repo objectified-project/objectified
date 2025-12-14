@@ -7,16 +7,18 @@ export default async function ComparePage({
   params,
   searchParams,
 }: {
-  params: { tenantSlug: string; projectSlug: string };
-  searchParams: { v1?: string; v2?: string };
+  params: Promise<{ tenantSlug: string; projectSlug: string }>;
+  searchParams: Promise<{ v1?: string; v2?: string }>;
 }) {
-  const project = await getPublicProjectBySlug(params.tenantSlug, params.projectSlug);
+  const { tenantSlug, projectSlug } = await params;
+  const { v1, v2 } = await searchParams;
+  const project = await getPublicProjectBySlug(tenantSlug, projectSlug);
 
   if (!project) {
     notFound();
   }
 
-  const versions = await getPublicVersionsForProject(params.tenantSlug, params.projectSlug);
+  const versions = await getPublicVersionsForProject(tenantSlug, projectSlug);
 
   if (versions.length < 2) {
     return (
@@ -28,11 +30,11 @@ export default async function ComparePage({
                 Organizations
               </Link>
               <span>/</span>
-              <Link href={`/tenant/${params.tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+              <Link href={`/tenant/${tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
                 {project.tenant_name}
               </Link>
               <span>/</span>
-              <Link href={`/tenant/${params.tenantSlug}/${params.projectSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+              <Link href={`/tenant/${tenantSlug}/${projectSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
                 {project.name}
               </Link>
             </div>
@@ -48,7 +50,7 @@ export default async function ComparePage({
               At least two versions are required to compare.
             </p>
             <Link
-              href={`/tenant/${params.tenantSlug}/${params.projectSlug}`}
+              href={`/tenant/${tenantSlug}/${projectSlug}`}
               className="mt-4 inline-block text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
             >
               ← Back to project
@@ -70,11 +72,11 @@ export default async function ComparePage({
               Organizations
             </Link>
             <span>/</span>
-            <Link href={`/tenant/${params.tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+            <Link href={`/tenant/${tenantSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
               {project.tenant_name}
             </Link>
             <span>/</span>
-            <Link href={`/tenant/${params.tenantSlug}/${params.projectSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+            <Link href={`/tenant/${tenantSlug}/${projectSlug}`} className="hover:text-blue-600 dark:hover:text-blue-400">
               {project.name}
             </Link>
           </div>
@@ -86,12 +88,12 @@ export default async function ComparePage({
 
       <main className="container mx-auto px-4 py-8">
         <CompareViewer
-          tenantSlug={params.tenantSlug}
-          projectSlug={params.projectSlug}
+          tenantSlug={tenantSlug}
+          projectSlug={projectSlug}
           versions={versions}
           restApiBaseUrl={restApiBaseUrl}
-          initialV1={searchParams.v1}
-          initialV2={searchParams.v2}
+          initialV1={v1}
+          initialV2={v2}
         />
       </main>
     </div>

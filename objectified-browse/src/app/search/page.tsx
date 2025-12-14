@@ -5,9 +5,10 @@ import { Search } from "../components/Search";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: Promise<{ q?: string }>;
 }) {
-  const query = searchParams.q || '';
+  const { q } = await searchParams;
+  const query = q || '';
   const results = query ? await searchPublicTenantsAndProjects(query) : [];
 
   // Group results by tenant
