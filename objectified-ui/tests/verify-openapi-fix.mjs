@@ -16,7 +16,7 @@ async function testTemplateRendering() {
 
   try {
     // Load and compile template
-    const templatePath = join(process.cwd(), 'src', 'app', 'utils', 'templates', 'openapi-spec.hbs');
+    const templatePath = join(process.cwd(), 'src', 'app', 'utils', 'templates', 'openapi', 'openapi-spec.hbs');
     const templateSource = readFileSync(templatePath, 'utf-8');
     const template = Handlebars.compile(templateSource);
 

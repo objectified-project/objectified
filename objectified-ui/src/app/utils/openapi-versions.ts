@@ -18,7 +18,7 @@ export interface OpenAPIVersion {
 export const OPENAPI_VERSIONS: Record<string, OpenAPIVersion> = {
   '3.1.0': {
     version: '3.1.0',
-    templateFile: 'openapi-spec.hbs',
+    templateFile: 'openapi/openapi-spec.hbs',
     description: 'OpenAPI 3.1.0 specification (JSON Schema 2020-12 compatible)',
     supportedFeatures: [
       'JSON Schema 2020-12',
