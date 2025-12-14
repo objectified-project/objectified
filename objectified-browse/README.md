@@ -63,6 +63,31 @@ POSTGRES_PORT=5432
 
 # REST API Base URL (for fetching specifications)
 NEXT_PUBLIC_REST_API_BASE_URL=http://localhost:8000/v1
+
+# Base path for sub-path hosting (optional)
+# Example: NEXT_PUBLIC_BASE_PATH=/browse
+NEXT_PUBLIC_BASE_PATH=
+```
+
+### Sub-Path Hosting
+
+To host the application at a sub-path (e.g., `https://example.com/browse/`), set the `NEXT_PUBLIC_BASE_PATH` environment variable:
+
+```env
+NEXT_PUBLIC_BASE_PATH=/browse
+```
+
+**Important Notes:**
+- The path must start with `/` but not end with `/`
+- You must rebuild the application after changing this value
+- All internal links will automatically use the base path
+
+**Example with Docker:**
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_BASE_PATH=/browse \
+  --build-arg NEXT_PUBLIC_REST_API_BASE_URL=https://api.example.com/v1 \
+  -t objectified-browse:latest .
 ```
 
 ### Development
