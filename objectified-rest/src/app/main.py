@@ -25,6 +25,7 @@ app.add_middleware(
         "http://localhost:3000",  # Next.js default port
         "http://localhost:3001",  # Next.js when 3000 is taken
     ],
+    allow_origin_regex=r"https://.*\.objectified\.dev",  # Allow all *.objectified.dev subdomains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
