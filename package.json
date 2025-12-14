@@ -2,7 +2,8 @@
   "name": "objectified",
   "private": true,
   "workspaces": [
-    "objectified-ui"
+    "objectified-ui",
+    "objectified-browse"
   ],
   "packageManager": "yarn@4.10.3"
 }
