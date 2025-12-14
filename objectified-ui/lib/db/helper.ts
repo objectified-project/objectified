@@ -735,6 +735,87 @@ export async function deleteProperty(propertyId: string) {
 
 // Class Management Functions
 
+/**
+ * Bulk load all classes with their properties and tags for a version.
+ * This is much more efficient than loading properties/tags one class at a time.
+ * Uses 3 queries instead of 2N+1 queries (where N is number of classes).
+ */
+export async function getClassesWithPropertiesAndTags(versionId: string) {
+  try {
+    // Query 1: Get all classes for the version
+    const classesResult = await connectionPool.query(
+      `SELECT id, version_id, name, description, schema, enabled, created_at, updated_at
+       FROM odb.classes
+       WHERE version_id = $1 AND deleted_at IS NULL
+       ORDER BY name ASC`,
+      [versionId]
+    );
+
+    const classes = classesResult.rows;
+
+    if (classes.length === 0) {
+      return JSON.stringify([]);
+    }
+
+    const classIds = classes.map((c: any) => c.id);
+
+    // Query 2: Get all properties for all classes in one query
+    const propertiesResult = await connectionPool.query(
+      `SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+              p.id as property_source_id, p.name as property_source_name
+       FROM odb.class_properties cp
+       LEFT JOIN odb.properties p ON cp.property_id = p.id
+       WHERE cp.class_id = ANY($1)
+       ORDER BY cp.class_id, cp.parent_id NULLS FIRST, cp.name ASC`,
+      [classIds]
+    );
+
+    // Query 3: Get all tags for all classes in one query
+    const tagsResult = await connectionPool.query(
+      `SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+              t.name as tag_name, t.color as tag_color, t.description as tag_description,
+              t.project_id
+       FROM odb.class_tags ct
+       JOIN odb.tags t ON ct.tag_id = t.id
+       WHERE ct.class_id = ANY($1)
+       ORDER BY ct.class_id, t.name ASC`,
+      [classIds]
+    );
+
+    // Group properties by class_id
+    const propertiesByClass = new Map<string, any[]>();
+    for (const prop of propertiesResult.rows) {
+      const classId = prop.class_id;
+      if (!propertiesByClass.has(classId)) {
+        propertiesByClass.set(classId, []);
+      }
+      propertiesByClass.get(classId)!.push(prop);
+    }
+
+    // Group tags by class_id
+    const tagsByClass = new Map<string, any[]>();
+    for (const tag of tagsResult.rows) {
+      const classId = tag.class_id;
+      if (!tagsByClass.has(classId)) {
+        tagsByClass.set(classId, []);
+      }
+      tagsByClass.get(classId)!.push(tag);
+    }
+
+    // Combine classes with their properties and tags
+    const classesWithData = classes.map((cls: any) => ({
+      ...cls,
+      properties: propertiesByClass.get(cls.id) || [],
+      tags: tagsByClass.get(cls.id) || []
+    }));
+
+    return JSON.stringify(classesWithData);
+  } catch (error: any) {
+    console.error('Error bulk loading classes with properties and tags:', error);
+    return JSON.stringify([]);
+  }
+}
+
 export async function getClassesForVersion(versionId: string) {
   try {
     const result = await connectionPool.query(

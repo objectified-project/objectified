@@ -10,132 +10,165 @@
 
 ### ✅ Completed Features (33 items)
 
-| Category | Feature | Description |
-|----------|---------|-------------|
-| **Canvas** | Auto Layout | 8 algorithms (hierarchical, force, circular, grid) |
-| **Canvas** | Level of Detail | Dynamic detail based on zoom level |
-| **Canvas** | Progress Bar | Visual loading feedback |
-| **Canvas** | Edge Cardinality | Visual relationship types |
-| **Canvas** | Class Tags | Tags displayed on nodes |
-| **Canvas** | Mermaid Export | Preview/code modes, PNG/SVG export |
-| **Code Gen** | TypeScript | Interfaces with composition |
-| **Code Gen** | Python - Pydantic | Models with validation |
-| **Code Gen** | Python - Dataclasses | Standard library classes |
-| **Code Gen** | Python - SQLAlchemy | ORM models |
-| **Code Gen** | Java | POJOs, Records, JPA entities |
-| **Code Gen** | Scala | Case classes with play-json |
-| **Code Gen** | GraphQL SDL | Schema definitions |
-| **Code Gen** | SQL DDL | PostgreSQL, MySQL, SQLite, SQL Server, Oracle |
-| **OpenAPI** | 3.1 Full Support | allOf, anyOf, oneOf, discriminators |
-| **OpenAPI** | Tuple Mode | prefixItems for ordered arrays |
-| **OpenAPI** | Property Extensions | Custom x- properties |
-| **OpenAPI** | Discriminator Config | Visual mapping editor |
-| **OpenAPI** | Deprecated Support | With deprecation messages |
-| **OpenAPI** | External Docs | URL references per class |
-| **OpenAPI** | Array Validation | contains, minContains, maxContains |
-| **OpenAPI** | Nested Properties | Inline object definitions |
-| **Auth** | API Keys | Full CRUD, expiration, usage tracking |
-| **Auth** | GitHub OAuth | SSO + account linking |
-| **Auth** | GitLab OAuth | SSO + account linking |
-| **Auth** | External Providers | Linked accounts management |
-| **Auth** | Super Admin | Password-protected portal |
-| **DevEx** | Swagger UI | Integrated in Studio |
-| **DevEx** | Git Browser | GitHub/GitLab via SSO |
-| **DevEx** | PAT Support | Personal Access Tokens |
-| **DevEx** | Version Copy | Copy classes between versions |
-| **Infra** | Docker | Multi-stage production builds |
-| **UI** | Dark Mode | System preference detection |
+| Category     | Feature              | Description                                        |
+|--------------|----------------------|----------------------------------------------------|
+| **Canvas**   | Auto Layout          | 8 algorithms (hierarchical, force, circular, grid) |
+| **Canvas**   | Level of Detail      | Dynamic detail based on zoom level                 |
+| **Canvas**   | Progress Bar         | Visual loading feedback                            |
+| **Canvas**   | Edge Cardinality     | Visual relationship types                          |
+| **Canvas**   | Class Tags           | Tags displayed on nodes                            |
+| **Canvas**   | Mermaid Export       | Preview/code modes, PNG/SVG export                 |
+| **Code Gen** | TypeScript           | Interfaces with composition                        |
+| **Code Gen** | Python - Pydantic    | Models with validation                             |
+| **Code Gen** | Python - Dataclasses | Standard library classes                           |
+| **Code Gen** | Python - SQLAlchemy  | ORM models                                         |
+| **Code Gen** | Java                 | POJOs, Records, JPA entities                       |
+| **Code Gen** | Scala                | Case classes with play-json                        |
+| **Code Gen** | GraphQL SDL          | Schema definitions                                 |
+| **Code Gen** | SQL DDL              | PostgreSQL, MySQL, SQLite, SQL Server, Oracle      |
+| **OpenAPI**  | 3.1 Full Support     | allOf, anyOf, oneOf, discriminators                |
+| **OpenAPI**  | Tuple Mode           | prefixItems for ordered arrays                     |
+| **OpenAPI**  | Property Extensions  | Custom x- properties                               |
+| **OpenAPI**  | Discriminator Config | Visual mapping editor                              |
+| **OpenAPI**  | Deprecated Support   | With deprecation messages                          |
+| **OpenAPI**  | External Docs        | URL references per class                           |
+| **OpenAPI**  | Array Validation     | contains, minContains, maxContains                 |
+| **OpenAPI**  | Nested Properties    | Inline object definitions                          |
+| **Auth**     | API Keys             | Full CRUD, expiration, usage tracking              |
+| **Auth**     | GitHub OAuth         | SSO + account linking                              |
+| **Auth**     | GitLab OAuth         | SSO + account linking                              |
+| **Auth**     | External Providers   | Linked accounts management                         |
+| **Auth**     | Super Admin          | Password-protected portal                          |
+| **DevEx**    | Swagger UI           | Integrated in Studio                               |
+| **DevEx**    | Git Browser          | GitHub/GitLab via SSO                              |
+| **DevEx**    | PAT Support          | Personal Access Tokens                             |
+| **DevEx**    | Version Copy         | Copy classes between versions                      |
+| **Infra**    | Docker               | Multi-stage production builds                      |
+| **UI**       | Dark Mode            | System preference detection                        |
 
 ### 🎯 High Priority - Next Quarter (Q1 2026)
 
-| Feature | Effort | Impact | Description |
-|---------|--------|--------|-------------|
-| CLI Tool | 3 weeks | 🔴 Critical | `pull/push/validate/generate` commands |
-| Undo/Redo | 2 weeks | 🔴 Critical | Canvas action history |
-| Node Grouping | 3 weeks | 🔴 Critical | Visual containers for classes |
-| Rate Limiting | 1 week | 🔴 Critical | API throttling |
-| Audit Logging | 2 weeks | 🔴 Critical | Change tracking for compliance |
-| SAML 2.0 SSO | 2 weeks | 🔴 Critical | Okta, Azure AD integration |
-| Schema Diff | 2 weeks | 🟠 High | Version comparison |
-| Schema Templates | 2 weeks | 🟠 High | Pre-built schema patterns |
+| Feature          | Effort  | Impact      | Description                            |
+|------------------|---------|-------------|----------------------------------------|
+| CLI Tool         | 3 weeks | 🔴 Critical | `pull/push/validate/generate` commands |
+| Undo/Redo        | 2 weeks | 🔴 Critical | Canvas action history                  |
+| Node Grouping    | 3 weeks | 🔴 Critical | Visual containers for classes          |
+| Rate Limiting    | 1 week  | 🔴 Critical | API throttling                         |
+| Audit Logging    | 2 weeks | 🔴 Critical | Change tracking for compliance         |
+| SAML 2.0 SSO     | 2 weeks | 🔴 Critical | Okta, Azure AD integration             |
+| User Permissions | 3 weeks | 🔴 Critical | RBAC with granular access control      |
+| Schema Diff      | 2 weeks | 🟠 High     | Version comparison                     |
+| Schema Templates | 2 weeks | 🟠 High     | Pre-built schema patterns              |
 
 ### 📋 Planned Features - Medium Priority
 
-| Category | Feature | Timeline |
-|----------|---------|----------|
-| **Paths** | Path Editor & Designer | Q1 2026 |
-| **Paths** | Operation Builder (CRUD) | Q1 2026 |
-| **Paths** | Request/Response Body Editor | Q1 2026 |
-| **Paths** | Path Tags & Grouping | Q1 2026 |
-| **Paths** | Content Encoding Support | Q1 2026 |
-| **Paths** | Parameter Editor (query, path, header) | Q1 2026 |
-| **Collaboration** | Real-Time Editing | Q2 2026 |
-| **Collaboration** | Comments & Discussions | Q2 2026 |
-| **Collaboration** | Review Workflows | Q2 2026 |
-| **API Gateway** | AWS API Gateway Connector | Q3 2026 |
-| **API Gateway** | Kong/Apigee Connectors | Q3 2026 |
-| **Testing** | Contract Testing (Pact) | Q3 2026 |
-| **Testing** | Mock Server | Q3 2026 |
-| **Enterprise** | Kubernetes Helm Charts | Q4 2026 |
-| **Enterprise** | Schema Governance | Q4 2026 |
-| **Enterprise** | Multi-Region Deployment | Q4 2026 |
-| **Code Gen** | C# Classes | Q2 2026 |
-| **Code Gen** | Go Structs | Q2 2026 |
-| **Code Gen** | Rust Structs | Q3 2026 |
+| Category          | Feature                                | Timeline  |
+|-------------------|----------------------------------------|-----------|
+| **Permissions**   | Role-Based Access Control (RBAC)       | Q1 2026   |
+| **Permissions**   | Custom Roles & Permissions             | Q1 2026   |
+| **Permissions**   | Team Management                        | Q2 2026   |
+| **Permissions**   | Resource-Level Permissions             | Q2 2026   |
+| **Paths**         | Path Editor & Designer                 | Q1 2026   |
+| **Paths**         | Operation Builder (CRUD)               | Q1 2026   |
+| **Paths**         | Request/Response Body Editor           | Q1 2026   |
+| **Paths**         | Path Tags & Grouping                   | Q1 2026   |
+| **Paths**         | Content Encoding Support               | Q1 2026   |
+| **Paths**         | Parameter Editor (query, path, header) | Q1 2026   |
+| **Collaboration** | Real-Time Editing                      | Q2 2026   |
+| **Collaboration** | Comments & Discussions                 | Q2 2026   |
+| **Collaboration** | Review Workflows                       | Q2 2026   |
+| **API Gateway**   | AWS API Gateway Connector              | Q3 2026   |
+| **API Gateway**   | Kong/Apigee Connectors                 | Q3 2026   |
+| **Testing**       | Contract Testing (Pact)                | Q3 2026   |
+| **Testing**       | Mock Server                            | Q3 2026   |
+| **Enterprise**    | Kubernetes Helm Charts                 | Q4 2026   |
+| **Enterprise**    | Schema Governance                      | Q4 2026   |
+| **Enterprise**    | Multi-Region Deployment                | Q4 2026   |
+| **Code Gen**      | C# Classes                             | Q2 2026   |
+| **Code Gen**      | Go Structs                             | Q2 2026   |
+| **Code Gen**      | Rust Structs                           | Q3 2026   |
 
 ### 🔮 Long-Term Vision (2026+)
 
-| Feature | Description |
-|---------|-------------|
-| AI Schema Generation | Natural language to OpenAPI |
+| Feature              | Description                     |
+|----------------------|---------------------------------|
+| AI Schema Generation | Natural language to OpenAPI     |
 | White-Label Platform | Custom branding for enterprises |
-| GraphQL Federation | Federated schema design |
-| AsyncAPI Support | Event-driven API design |
-| gRPC/Protobuf | Multi-protocol support |
-| Mobile App | iOS/Android access |
-| Schema Marketplace | Community templates |
-| Voice Control | Voice-powered schema editing |
-| AR/VR Visualization | 3D schema exploration |
+| GraphQL Federation   | Federated schema design         |
+| AsyncAPI Support     | Event-driven API design         |
+| gRPC/Protobuf        | Multi-protocol support          |
+| Mobile App           | iOS/Android access              |
+| Schema Marketplace   | Community templates             |
+| Voice Control        | Voice-powered schema editing    |
+| AR/VR Visualization  | 3D schema exploration           |
 
 ### 🛤️ API Paths & Operations (Coming Q1 2026)
 
-| Feature | Description |
-|---------|-------------|
-| Path Designer | Visual path tree with drag-and-drop |
-| Operation Builder | HTTP methods with full configuration |
-| Request Body Editor | Multiple content types, file uploads |
-| Response Builder | Status codes, headers, examples |
-| Path Tags | Tag management and grouping |
-| Security Schemes | OAuth2, API Key, JWT configuration |
-| Server Config | Multi-environment server definitions |
-| API Client Generation | TypeScript, Python, Java SDKs |
-| Server Stub Generation | Express, FastAPI, Spring Boot stubs |
+| Feature                | Description                          |
+|------------------------|--------------------------------------|
+| Path Designer          | Visual path tree with drag-and-drop  |
+| Operation Builder      | HTTP methods with full configuration |
+| Request Body Editor    | Multiple content types, file uploads |
+| Response Builder       | Status codes, headers, examples      |
+| Path Tags              | Tag management and grouping          |
+| Security Schemes       | OAuth2, API Key, JWT configuration   |
+| Server Config          | Multi-environment server definitions |
+| API Client Generation  | TypeScript, Python, Java SDKs        |
+| Server Stub Generation | Express, FastAPI, Spring Boot stubs  |
 
 ### 🎨 Modern UX Enhancements (Suggested)
 
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| Command Palette | `Cmd+K` for quick actions | 🔴 High |
-| Global Search | Search schemas, paths, properties | 🔴 High |
-| Inline Editing | Double-click to edit in place | 🔴 High |
-| Split Views | Side-by-side schema comparison | 🟠 Medium |
-| Drag & Drop Import | Drop files to import specs | 🟠 Medium |
-| Smart Autocomplete | Context-aware suggestions | 🟠 Medium |
-| Real-Time Validation | Validate as you type | 🟠 Medium |
-| Breadcrumb Navigation | Easy path navigation | 🟡 Low |
-| Keyboard Shortcuts | Full keyboard control | 🟡 Low |
-| Interactive Tutorials | First-run product tour | 🟡 Low |
+| Feature               | Description                       | Priority  |
+|-----------------------|-----------------------------------|-----------|
+| Command Palette       | `Cmd+K` for quick actions         | 🔴 High   |
+| Global Search         | Search schemas, paths, properties | 🔴 High   |
+| Inline Editing        | Double-click to edit in place     | 🔴 High   |
+| Split Views           | Side-by-side schema comparison    | 🟠 Medium |
+| Drag & Drop Import    | Drop files to import specs        | 🟠 Medium |
+| Smart Autocomplete    | Context-aware suggestions         | 🟠 Medium |
+| Real-Time Validation  | Validate as you type              | 🟠 Medium |
+| Breadcrumb Navigation | Easy path navigation              | 🟡 Low    |
+| Keyboard Shortcuts    | Full keyboard control             | 🟡 Low    |
+| Interactive Tutorials | First-run product tour            | 🟡 Low    |
+
+### 🤖 AI Assistant & Ollama Integration (NEW)
+
+| Feature                   | Description                          | Priority  |
+|---------------------------|--------------------------------------|-----------|
+| Studio Chatbot            | AI assistant panel in Studio         | 🔴 High   |
+| Natural Language → Schema | "Create a User with email and roles" | 🔴 High   |
+| Scenario-Based Generation | Generate APIs from user stories      | 🔴 High   |
+| Property Suggestions      | AI suggests properties for classes   | 🟠 Medium |
+| Schema Review             | AI reviews and suggests improvements | 🟠 Medium |
+| Documentation Generation  | AI writes descriptions and examples  | 🟠 Medium |
+| Ollama Model Selection    | Choose Qwen 2.5, Llama 3.2, etc.     | 🟠 Medium |
+| Conversation History      | Persistent chat across sessions      | 🟡 Low    |
+| Context-Aware Prompts     | AI understands current schema state  | 🟡 Low    |
+
+### 🔐 User Permissions & Access Control (NEW)
+
+| Feature                    | Description                                | Priority  |
+|----------------------------|--------------------------------------------|-----------|
+| Role-Based Access (RBAC)   | Built-in roles: Owner, Admin, Editor, etc. | 🔴 High   |
+| Custom Roles               | Create custom roles with granular perms    | 🔴 High   |
+| Permission Categories      | Tenant, Project, Version, Schema, Path     | 🔴 High   |
+| User Management            | Invite, suspend, deactivate users          | 🔴 High   |
+| Team Management            | Create teams, assign roles to teams        | 🟠 Medium |
+| Resource-Level Permissions | Per-project, per-version, per-class perms  | 🟠 Medium |
+| Permission Matrix UI       | Visual grid of roles vs permissions        | 🟠 Medium |
+| Access Request Workflow    | Request access, approval workflow          | 🟡 Low    |
+| Permission Audit           | Log changes, compliance reports            | 🟡 Low    |
 
 ---
 
 ## Implementation Status Legend
 
-| Status | Meaning |
-|--------|---------|
-| ✅ | Fully implemented and tested |
-| 🚧 | In progress / Partially implemented |
-| 📋 | Planned / Not started |
-| 🎯 | High priority for next release |
+| Status  | Meaning                             |
+|---------|-------------------------------------|
+| ✅       | Fully implemented and tested        |
+| 🚧      | In progress / Partially implemented |
+| 📋      | Planned / Not started               |
+| 🎯      | High priority for next release      |
 
 ---
 
@@ -150,10 +183,12 @@
 - [Security](#security--authentication)
 - [Operations](#monitoring--observability)
 - [Testing](#testing--quality-assurance)
-- [Enterprise Features](#enterprise-features-new) ⭐ NEW
-- [API Gateway Integration](#api-gateway-integration-new) ⭐ NEW
-- [DevOps & CI/CD](#devops--cicd-new) ⭐ NEW
-- [Modern UX Features](#modern-ux-features-new) ⭐ NEW
+- [Enterprise Features](#enterprise-features-new)
+- [API Gateway Integration](#api-gateway-integration-new)
+- [DevOps & CI/CD](#devops--cicd-new)
+- [AI Assistant & Ollama](#ai-assistant--ollama-integration-new) ⭐ NEW
+- [Analytics & Insights](#analytics--insights-new)
+- [Modern UX Features](#modern-ux-features-new)
 - [Priority Recommendations](#priority-recommendations)
 
 ---
@@ -201,6 +236,19 @@
 - Save custom groups as reusable templates
 - Share group templates across projects/tenants
 
+| Ticket | Feature Description                                                                                     |
+|--------|---------------------------------------------------------------------------------------------------------|
+| [#152] | Create visual containers to group related classes together                                              |
+| [#153] | Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain") |
+| [#154] | Collapsible groups to reduce canvas clutter                                                             |
+| [#155] | Nested groups for hierarchical organization                                                             |
+| [#156] | Group-level operations: move, delete, export, duplicate, bulk edit                                      |
+| [#157] | Named groups with descriptions and metadata                                                             |
+| [#158] | Visual styling options for group containers                                                             |
+| [#159] | Pre-defined group templates for common patterns                                                         |
+| [#160] | Save and share custom group templates                                                                   |
+| [#161] | Share group templates across projects/tenants                                                           |
+
 ### Canvas Layout Management
 
 **Save & Load Layouts**
@@ -231,6 +279,26 @@
 - Layout permissions (view, edit, delete)
 - Layout comments and annotations
 - Layout versioning with diff viewer
+
+| Ticket | Feature Description                                  |
+|--------|------------------------------------------------------|
+| [#162] | Save current canvas arrangement with a name          |
+| [#163] | Multiple saved layouts per version                   |
+| [#164] | Auto-save layout changes every 30 seconds (tuneable) |
+| [#165] | Version control for layouts                          |
+| [#166] | Default layout setting per user or per team          |
+| [#167] | Export/import layouts                               |
+| [#168] | Take quick snapshots of current layout              |
+| [#169] | Thumbnail preview of each snapshot                  |
+| [#170] | Restore any snapshot with one click                  |
+| [#171] | Compare two snapshots side-by-side                  |
+| [#172] | Snapshot gallery view with search/filter            |
+| [#173] | Snapshot metadata: timestamp, author, description |
+| [#174] | Share layout configurations with team members       |
+| [#175] | "Pin" layout as team default                        |
+| [#176] | Layout permissions (view, edit, delete)            |
+| [#177] | Layout comments and annotations                     |
+| [#178] | Layout versioning with diff viewer                  |
 
 ### Canvas Navigation & Controls
 
@@ -383,7 +451,7 @@
   - Whiteboard (minimal)
   - Solarized
   - Nord
-  - Dracula
+  - Darcula
 - Custom theme creator:
   - Canvas background color
   - Grid color and opacity
@@ -973,51 +1041,51 @@
 
 ## 💻 Developer Experience Improvements
 
-> **Section Status**: ✅ Mostly Implemented (Code generation, Swagger UI, Mermaid diagrams complete)
+> **Section Status**: Needs redesigning due to recent changes in code generation approach
 
 ### Code Generation
 
-**Schema-to-Code** ✅ IMPLEMENTED
+**Schema-to-Code** 
 - Generate code from schemas in multiple languages:
-  - ✅ **TypeScript**: Interfaces, types with full composition support
-  - ✅ **Python - Pydantic**: Models with validation and constraints
-  - ✅ **Python - Dataclasses**: Native Python dataclasses with type hints
+  - **TypeScript**: Interfaces, types with full composition support
+  - **Python - Pydantic**: Models with validation and constraints
+  - **Python - Dataclasses**: Native Python dataclasses with type hints
     - Standard library dataclasses (Python 3.7+)
     - Optional field defaults and factories
     - JSON serialization/deserialization support
     - Immutable (frozen) option
     - Post-init validation hooks
     - Inheritance and composition support
-  - ✅ **Python - SQLAlchemy**: ORM models for database mapping
-    - ✅ SQLAlchemy 2.0+ declarative models
-    - ✅ Automatic table name generation
-    - ✅ Primary key and foreign key constraints
-    - ✅ Relationship mappings (one-to-many, many-to-many)
-    - ✅ Column types from OpenAPI formats
-    - ✅ Indexes and unique constraints
-    - 📋 Alembic migration generation support
-    - ✅ Optional type hints for mypy compatibility
-  - ✅ **Python - Mixed**: Combine multiple approaches
-    - ✅ Pydantic + SQLAlchemy hybrid models
-    - ✅ Dataclasses with validation decorators
-    - ✅ Choose per-class basis
-  - 📋 **TypeScript (Extended)**: Zod validators, runtime type checking
-  - ✅ **Java**: POJOs, Records, JPA entities
-  - 📋 **C#**: Classes, records, EF Core models
-  - 📋 **Go**: Structs with JSON tags
-  - 📋 **Rust**: Structs with Serde
-  - ✅ **Scala**: Case classes with play-json support
-  - ✅ **GraphQL**: SDL schema definitions
-  - ✅ **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
-- ✅ Customizable generation templates
-- ✅ Code generation settings per language:
-  - ✅ Naming conventions (camelCase, snake_case, PascalCase)
-  - ✅ Nullable vs Optional handling
-  - ✅ Validation annotations
-  - ✅ Documentation comments
-- ✅ Preview generated code before download
-- ✅ Download as single file or project structure
-- 📋 Generate with tests/mocks included
+  - **Python - SQLAlchemy**: ORM models for database mapping
+    - SQLAlchemy 2.0+ declarative models
+    - Automatic table name generation
+    - Primary key and foreign key constraints
+    - Relationship mappings (one-to-many, many-to-many)
+    - Column types from OpenAPI formats
+    - Indexes and unique constraints
+    - Alembic migration generation support
+    - Optional type hints for mypy compatibility
+  - **Python - Mixed**: Combine multiple approaches
+    - Pydantic + SQLAlchemy hybrid models
+    - Dataclasses with validation decorators
+    - Choose per-class basis
+  - **TypeScript (Extended)**: Zod validators, runtime type checking
+  - **Java**: POJOs, Records, JPA entities
+  - **C#**: Classes, records, EF Core models
+  - **Go**: Structs with JSON tags
+  - **Rust**: Structs with Serde
+  - **Scala**: Case classes with play-json support
+  - **GraphQL**: SDL schema definitions
+  - **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
+- Customizable generation templates
+- Code generation settings per language:
+  - Naming conventions (camelCase, snake_case, PascalCase)
+  - Nullable vs Optional handling
+  - Validation annotations
+  - Documentation comments
+- Preview generated code before download
+- Download as single file or project structure
+- Generate with tests/mocks included
 
 **Python Code Generation Options**
 
@@ -1810,6 +1878,149 @@
 - 📋 GDPR compliance tools
 - 📋 Penetration testing reports
 
+### User Permissions & Access Control 📋 PLANNED
+
+**Role-Based Access Control (RBAC)** 📋 PLANNED
+- **Built-in Roles**:
+  - **Super Admin**: Full system access, manage all tenants
+  - **Tenant Owner**: Full tenant access, billing, delete tenant
+  - **Tenant Admin**: Manage tenant users, projects, settings (no billing/delete)
+  - **Project Admin**: Full project access, manage project members
+  - **Editor**: Create/edit schemas, paths, versions (no project settings)
+  - **Reviewer**: Comment, approve/reject, read-only schema access
+  - **Viewer**: Read-only access to schemas and documentation
+  - **API Consumer**: API key access only, no UI access
+- **Role Hierarchy**:
+  - Higher roles inherit permissions from lower roles
+  - Clear role comparison matrix
+  - Role descriptions in UI
+
+**Custom Roles** 📋 PLANNED
+- Create custom roles with granular permissions
+- Clone existing role as starting point
+- Name, description, and icon for custom roles
+- Enable/disable custom roles
+- Audit trail for role changes
+- Role templates for common use cases
+
+**Permission Categories** 📋 PLANNED
+- **Tenant Permissions**:
+  - `tenant:read` - View tenant details
+  - `tenant:update` - Edit tenant settings
+  - `tenant:delete` - Delete tenant
+  - `tenant:billing` - Access billing and subscription
+  - `tenant:users:read` - View tenant users
+  - `tenant:users:manage` - Invite/remove users, assign roles
+  - `tenant:api-keys:read` - View API keys
+  - `tenant:api-keys:manage` - Create/revoke API keys
+- **Project Permissions**:
+  - `project:create` - Create new projects
+  - `project:read` - View project details
+  - `project:update` - Edit project settings
+  - `project:delete` - Delete project
+  - `project:members:read` - View project members
+  - `project:members:manage` - Add/remove project members
+- **Version Permissions**:
+  - `version:create` - Create new versions
+  - `version:read` - View versions
+  - `version:update` - Edit version settings
+  - `version:delete` - Delete versions
+  - `version:publish` - Publish versions
+  - `version:copy` - Copy versions
+- **Schema Permissions**:
+  - `class:create` - Create classes
+  - `class:read` - View classes
+  - `class:update` - Edit classes
+  - `class:delete` - Delete classes
+  - `property:create` - Create properties
+  - `property:update` - Edit properties
+  - `property:delete` - Delete properties
+- **Path Permissions**:
+  - `path:create` - Create paths/operations
+  - `path:read` - View paths
+  - `path:update` - Edit paths/operations
+  - `path:delete` - Delete paths
+  - `path:publish` - Publish paths to gateway
+- **Export Permissions**:
+  - `export:openapi` - Export OpenAPI specs
+  - `export:code` - Generate code
+  - `export:documentation` - Export documentation
+  - `export:diagram` - Export diagrams
+- **AI Permissions**:
+  - `ai:chat` - Use AI chatbot
+  - `ai:generate` - Generate schemas via AI
+  - `ai:review` - Request AI reviews
+  - `ai:configure` - Configure AI settings
+
+**Resource-Level Permissions** 📋 PLANNED
+- Permissions at project level (all versions inherit)
+- Permissions at version level (override project)
+- Permissions at class level (sensitive schemas)
+- Permissions at path level (restricted endpoints)
+- Permission inheritance with override capability
+
+**User Management** 📋 PLANNED
+- **User Invitation**:
+  - Invite by email with role assignment
+  - Bulk invite via CSV upload
+  - Invitation expiration (configurable)
+  - Resend invitation option
+  - Invitation link sharing
+- **User Profile**:
+  - Display name and avatar
+  - Email and contact info
+  - Linked accounts (SSO providers)
+  - Activity history
+  - Permission summary
+- **User Status**:
+  - Active / Inactive / Pending
+  - Suspend user (temporary disable)
+  - Deactivate user (permanent)
+  - Last login timestamp
+  - Session management
+
+**Team Management** 📋 PLANNED
+- Create teams within tenants
+- Assign roles to teams (not just users)
+- Add/remove users from teams
+- Team leads with elevated permissions
+- Team-based project access
+- Cross-team collaboration
+- Team activity dashboard
+
+**Permission UI** 📋 PLANNED
+- **Role Assignment**:
+  - User profile → Roles tab
+  - Dropdown or multi-select for roles
+  - Role effective date (future scheduling)
+  - Role expiration date (temporary access)
+- **Permission Matrix View**:
+  - Grid showing roles vs permissions
+  - Visual checkmarks for granted permissions
+  - Compare multiple roles side-by-side
+  - Export permission matrix as CSV
+- **Access Request Workflow**:
+  - Users can request access to projects
+  - Approval workflow for access requests
+  - Notification to approvers
+  - Request history and audit trail
+
+**Permission Checks** 📋 PLANNED
+- Real-time permission validation
+- Graceful degradation (hide unauthorized features)
+- Clear error messages for denied actions
+- "Request Access" button for denied resources
+- Permission caching for performance
+
+**Audit & Compliance** 📋 PLANNED
+- Log all permission changes
+- Who granted/revoked what permission, when
+- Permission change notifications
+- Periodic access reviews
+- Compliance reports (who has access to what)
+- Detect over-privileged users
+- Recommend permission cleanup
+
 ---
 
 ## 📈 Monitoring & Observability
@@ -2325,50 +2536,308 @@
 
 ---
 
-## 🤖 AI & Automation (NEW)
+## 🤖 AI Assistant & Ollama Integration (NEW)
 
-> **Section Status**: 📋 Planned - AI-powered features for productivity
+> **Section Status**: 📋 Planned - AI-powered features using self-hosted Ollama cluster
+> 
+> **Infrastructure**: Self-hosted Ollama cluster with Qwen 2.5 and Llama 3.2 models
 
-### AI-Powered Schema Design
+### Studio AI Chatbot
 
-**Schema Generation**
-- 📋 Natural language to schema ("Create a User with email and password")
-- 📋 Database schema to OpenAPI conversion
-- 📋 Sample JSON to schema inference
-- 📋 CSV/Excel to schema mapping
-- 📋 Existing code to schema extraction
+**Chatbot Panel** 📋 PLANNED
+- **Panel Location**:
+  - Slide-out panel from right side of Studio
+  - Floating chat bubble option
+  - Full-screen chat mode for complex conversations
+  - Keyboard shortcut to toggle (`Cmd+Shift+A`)
+- **Chat Interface**:
+  - Modern chat UI with message bubbles
+  - User messages vs AI responses clearly distinguished
+  - Typing indicators while AI processes
+  - Markdown rendering in responses
+  - Code blocks with syntax highlighting
+  - Copy button for code snippets
+  - Regenerate response button
+  - Thumbs up/down for feedback
 
-**Smart Suggestions**
-- 📋 Property name suggestions based on context
-- 📋 Type inference from property names
-- 📋 Constraint suggestions based on property type
-- 📋 Example value generation
-- 📋 Description auto-generation
-- 📋 Similar schema detection
+**Conversation Features** 📋 PLANNED
+- **Conversation History**:
+  - Persist conversations per project/version
+  - Browse past conversations
+  - Search conversation history
+  - Export conversations as markdown
+  - Clear conversation option
+- **Context Awareness**:
+  - AI knows current project, version, classes
+  - AI can reference existing schemas in responses
+  - AI understands selected items on canvas
+  - AI can see property definitions
+  - Automatic context injection into prompts
+- **Multi-Turn Conversations**:
+  - Follow-up questions with context
+  - Clarification requests
+  - Iterative refinement of schemas
+  - "Make it more like X" type instructions
 
-**AI-Assisted Documentation**
-- 📋 Auto-generate property descriptions
-- 📋 Generate API usage examples
-- 📋 Create integration guides
-- 📋 Generate error response documentation
-- 📋 Translate documentation to multiple languages
+**Quick Actions from Chat** 📋 PLANNED
+- AI responses include action buttons:
+  - "Create this class" → One-click class creation
+  - "Add these properties" → Batch property addition
+  - "Apply to current class" → Modify selected class
+  - "Generate path for this" → Create CRUD endpoints
+  - "Copy to clipboard" → Copy generated JSON/YAML
+- Preview changes before applying
+- Undo AI-generated changes
 
-### Automation Rules
+### Ollama Integration
 
-**Event-Driven Automation**
-- 📋 Webhooks for all events
-- 📋 Trigger actions on schema changes
-- 📋 Automated code generation on publish
-- 📋 Slack/Teams notifications
-- 📋 Jira ticket creation on breaking changes
-- 📋 Email digest of changes
+**Ollama Connection** 📋 PLANNED
+- **Configuration**:
+  - Ollama server URL configuration (cluster support)
+  - Multiple server endpoints for load balancing
+  - Health check and failover
+  - Connection timeout settings
+  - Retry policies
+- **Model Selection**:
+  - Choose from available models:
+    - Qwen 2.5 (7B, 14B, 32B, 72B)
+    - Llama 3.2 (1B, 3B, 11B, 90B)
+    - CodeLlama for code-specific tasks
+    - Custom fine-tuned models
+  - Model switching per task type
+  - Model performance comparison
+  - Default model per tenant/project
+- **Resource Management**:
+  - GPU memory monitoring
+  - Request queuing for high load
+  - Priority queues for different users
+  - Rate limiting per user/tenant
+  - Usage tracking and quotas
 
-**Scheduled Jobs**
-- 📋 Scheduled schema backups
-- 📋 Periodic validation reports
-- 📋 Usage analytics reports
-- 📋 Stale schema detection
-- 📋 License expiration alerts
+**Ollama API Integration** 📋 PLANNED
+- **API Endpoints**:
+  - `/api/ai/chat` - Chat completions
+  - `/api/ai/generate` - Schema generation
+  - `/api/ai/suggest` - Property suggestions
+  - `/api/ai/review` - Schema review
+  - `/api/ai/document` - Documentation generation
+- **Streaming Responses**:
+  - Server-Sent Events (SSE) for streaming
+  - Token-by-token display
+  - Cancel generation mid-stream
+  - Progress indication
+- **Caching**:
+  - Cache common queries
+  - Semantic similarity matching
+  - Cache invalidation on schema changes
+
+### Natural Language to Schema
+
+**Schema Generation from Description** 📋 PLANNED
+- **Input Methods**:
+  - Free-form text description
+  - Structured prompts with templates
+  - Voice input (speech-to-text)
+  - Paste requirements document
+- **Example Prompts**:
+  - "Create a User class with email, password hash, created date, and roles array"
+  - "I need an e-commerce order with line items, shipping address, and payment info"
+  - "Generate a blog post schema with author reference, tags, and comments"
+  - "Create a REST API for managing a todo list application"
+- **Generation Output**:
+  - Preview generated schema before creation
+  - JSON Schema format display
+  - Property list with types
+  - Relationship suggestions
+  - Edit before applying
+- **Iterative Refinement**:
+  - "Add a phone number field"
+  - "Make email required"
+  - "Add validation for password length"
+  - "Include timestamps for audit"
+
+**Scenario-Based API Generation** 📋 PLANNED
+- **User Story Input**:
+  - "As a user, I want to register, login, and manage my profile"
+  - "As an admin, I want to manage products, categories, and inventory"
+  - "As a customer, I want to browse products, add to cart, and checkout"
+- **Generated Output**:
+  - Complete schema set for scenario
+  - CRUD endpoints for each resource
+  - Request/response bodies
+  - Authentication requirements
+  - Error responses
+- **Domain Templates**:
+  - E-commerce (products, orders, customers)
+  - SaaS (users, subscriptions, billing)
+  - Social (posts, comments, likes, follows)
+  - Healthcare (patients, appointments, records)
+  - Education (courses, students, enrollments)
+
+### AI-Powered Property Suggestions
+
+**Smart Property Recommendations** 📋 PLANNED
+- **Trigger Conditions**:
+  - When creating a new class
+  - When class name is entered
+  - On-demand via chat or button
+  - After adding first few properties
+- **Suggestion Types**:
+  - Common properties for class type (e.g., "User" → email, password, name)
+  - Missing standard properties (e.g., id, createdAt, updatedAt)
+  - Related properties based on existing ones
+  - Industry-standard properties (FHIR for healthcare, etc.)
+- **Suggestion UI**:
+  - Property suggestion dropdown
+  - Bulk accept/reject
+  - Customize before adding
+  - "Add all suggested" button
+  - Explanation for each suggestion
+
+**Type and Constraint Inference** 📋 PLANNED
+- Suggest type based on property name:
+  - `email` → string with email format
+  - `createdAt` → string with date-time format
+  - `age` → integer with minimum 0
+  - `price` → number with minimum 0
+  - `isActive` → boolean
+- Suggest constraints:
+  - String length limits
+  - Numeric ranges
+  - Pattern validation
+  - Required vs optional
+
+### AI Schema Review & Improvement
+
+**Schema Quality Analysis** 📋 PLANNED
+- **Review Triggers**:
+  - On-demand via chat command
+  - Before version publish
+  - Scheduled periodic reviews
+  - On significant changes
+- **Review Categories**:
+  - **Naming Conventions**: Consistent naming (camelCase, PascalCase)
+  - **Documentation**: Missing descriptions, examples
+  - **Validation**: Missing constraints, weak validation
+  - **Relationships**: Orphaned schemas, missing references
+  - **Best Practices**: OpenAPI best practices compliance
+  - **Security**: Sensitive data exposure, PII handling
+- **Review Output**:
+  - Severity levels (error, warning, info)
+  - Specific recommendations
+  - One-click fixes
+  - Explanation of why each issue matters
+
+**Improvement Suggestions** 📋 PLANNED
+- "Consider adding pagination to this list endpoint"
+- "This schema could benefit from inheritance using allOf"
+- "Add a discriminator for this polymorphic type"
+- "Consider breaking this large schema into smaller components"
+- "Add error responses for common failure scenarios"
+
+### AI Documentation Generation
+
+**Auto-Generate Descriptions** 📋 PLANNED
+- Generate property descriptions from names and types
+- Generate class descriptions from properties
+- Generate operation summaries from path and method
+- Generate example values that make sense
+- Support multiple languages (i18n)
+
+**API Usage Examples** 📋 PLANNED
+- Generate curl commands for each operation
+- Generate code snippets in multiple languages:
+  - JavaScript/TypeScript (fetch, axios)
+  - Python (requests, httpx)
+  - Java (OkHttp, HttpClient)
+  - Go (net/http)
+- Generate realistic example payloads
+- Generate test scenarios
+
+**Integration Guides** 📋 PLANNED
+- Generate getting started guide
+- Generate authentication guide
+- Generate error handling guide
+- Generate migration guides between versions
+- Generate SDK usage examples
+
+### AI Chat Commands
+
+**Schema Commands** 📋 PLANNED
+- `/create <description>` - Create class from description
+- `/properties <class>` - Suggest properties for class
+- `/validate` - Validate current schema
+- `/review` - Get AI review of current schema
+- `/explain <class>` - Explain what a class represents
+- `/refactor <class>` - Suggest refactoring improvements
+
+**Path Commands** 📋 PLANNED
+- `/crud <class>` - Generate CRUD endpoints for class
+- `/endpoint <description>` - Create endpoint from description
+- `/security <path>` - Suggest security for path
+- `/responses <path>` - Generate response schemas
+
+**Documentation Commands** 📋 PLANNED
+- `/document <class>` - Generate documentation for class
+- `/examples <class>` - Generate example values
+- `/describe <property>` - Write property description
+- `/translate <lang>` - Translate descriptions
+
+**Query Commands** 📋 PLANNED
+- `/help` - Show available commands
+- `/status` - Show AI system status
+- `/models` - List available models
+- `/switch <model>` - Switch to different model
+- `/clear` - Clear conversation history
+
+### AI Learning & Personalization
+
+**Learn from Usage** 📋 PLANNED
+- Track accepted vs rejected suggestions
+- Learn project-specific naming conventions
+- Learn team's preferred patterns
+- Improve suggestions over time
+- Per-tenant model fine-tuning (future)
+
+**Custom Prompts & Templates** 📋 PLANNED
+- Save custom prompt templates
+- Share prompts across team
+- Prompt library with categories
+- Import prompts from community
+
+### AI Configuration
+
+**Admin Settings** 📋 PLANNED
+- **Ollama Cluster Configuration**:
+  - Primary server URL
+  - Failover server URLs
+  - Load balancing strategy (round-robin, least-connections)
+  - Health check interval
+  - Connection pool size
+- **Model Configuration**:
+  - Default model for chat
+  - Default model for generation
+  - Default model for review
+  - Model temperature settings
+  - Max tokens per request
+  - Context window size
+- **Usage Limits**:
+  - Requests per user per hour
+  - Requests per tenant per day
+  - Token budget per request
+  - Queue depth limits
+- **Feature Toggles**:
+  - Enable/disable AI features per tenant
+  - Enable/disable specific AI capabilities
+  - Beta feature flags
+
+**Security & Privacy** 📋 PLANNED
+- All AI processing on self-hosted Ollama
+- No data sent to external services
+- Conversation encryption at rest
+- Audit logging of AI interactions
+- PII detection and redaction in prompts
+- Role-based access to AI features
 
 ---
 
@@ -2416,6 +2885,61 @@
 - 📋 Export to PDF/Excel
 - 📋 Embed reports in dashboards
 - 📋 API for report data
+
+---
+
+## ⚙️ Automation & Workflows (NEW)
+
+> **Section Status**: 📋 Planned - Event-driven automation and scheduled tasks
+
+### Event-Driven Automation
+
+**Webhooks** 📋 PLANNED
+- Webhooks for all major events:
+  - Schema created/updated/deleted
+  - Version published
+  - Class added/modified/removed
+  - Path created/updated
+  - User invited/removed
+  - API key created/used
+- Webhook configuration UI
+- Webhook testing tools
+- Webhook logs and retry
+- Webhook security (signing, verification)
+
+**Trigger Actions** 📋 PLANNED
+- Automated code generation on publish
+- Slack/Teams notifications on changes
+- Jira/Linear ticket creation on breaking changes
+- Email digest of changes (daily/weekly)
+- GitHub Actions trigger
+- Custom webhook integrations
+
+### Scheduled Jobs
+
+**Periodic Tasks** 📋 PLANNED
+- Scheduled schema backups
+- Periodic validation reports
+- Usage analytics reports
+- Stale schema detection
+- Deprecated endpoint cleanup reminders
+- License expiration alerts
+- Certificate expiration warnings
+
+### Workflow Automation
+
+**Approval Workflows** 📋 PLANNED
+- Configurable approval chains
+- Auto-approve for minor changes
+- Required reviews for breaking changes
+- Escalation on timeout
+- Notification at each step
+
+**CI/CD Triggers** 📋 PLANNED
+- Trigger pipeline on version publish
+- Trigger tests on schema change
+- Deploy mock server on draft
+- Generate SDK on release
 
 ---
 
@@ -2690,30 +3214,83 @@ These features should be implemented next for maximum enterprise value:
    - Breaking change detection
    - Auto-generated changelogs
 
-4. 🎯 **Rate Limiting** - Production security requirement
+9. 🎯 **Rate Limiting** - Production security requirement
    - Per API key limits
    - Per tenant limits
    - Rate limit dashboard
 
-5. 🎯 **Schema Templates** - Accelerate onboarding
-   - Pre-built templates (REST, E-commerce, Auth)
-   - Custom template creation
-   - Template marketplace
+10. 🎯 **Comprehensive Audit Logging** - Compliance requirement
+    - All schema changes tracked
+    - Export for compliance
+    - Real-time alerts
 
-6. 🎯 **Comprehensive Audit Logging** - Compliance requirement
-   - All schema changes tracked
-   - Export for compliance
-   - Real-time alerts
+#### AI Assistant & Ollama Integration
+11. 🎯 **Studio AI Chatbot** - AI assistant panel in Studio
+    - Slide-out chat panel with conversation history
+    - Context-aware (knows current project, classes, properties)
+    - Quick action buttons in AI responses
+    - Ollama cluster integration (Qwen 2.5, Llama 3.2)
 
-7. 🎯 **Node Grouping & Containers** - Large schema management
-   - Visual group containers
-   - Collapsible groups
-   - Group operations
+12. 🎯 **Natural Language → Schema** - Generate schemas from descriptions
+    - "Create a User class with email, password, and roles"
+    - Preview before applying
+    - Iterative refinement via chat
 
-8. 🎯 **SAML 2.0 SSO** - Enterprise authentication requirement
-   - Okta integration
-   - Azure AD integration
-   - SCIM provisioning
+13. 🎯 **Scenario-Based API Generation** - Generate from user stories
+    - "As a user, I want to register and login"
+    - Complete schema sets with CRUD endpoints
+    - Domain templates (e-commerce, SaaS, healthcare)
+
+14. 🎯 **AI Property Suggestions** - Smart property recommendations
+    - Suggest properties based on class name
+    - Type and constraint inference
+    - Bulk accept/reject suggestions
+
+15. 🎯 **AI Schema Review** - Quality analysis and improvements
+    - Naming convention checks
+    - Missing documentation detection
+    - Best practices recommendations
+    - One-click fixes
+
+#### Additional High Priority
+16. 🎯 **Schema Templates** - Accelerate onboarding
+    - Pre-built templates (REST, E-commerce, Auth)
+    - Custom template creation
+    - Template marketplace
+
+17. 🎯 **Node Grouping & Containers** - Large schema management
+    - Visual group containers
+    - Collapsible groups
+    - Group operations
+
+18. 🎯 **SAML 2.0 SSO** - Enterprise authentication requirement
+    - Okta integration
+    - Azure AD integration
+    - SCIM provisioning
+
+#### User Permissions & Access Control
+19. 🎯 **Role-Based Access Control (RBAC)** - Granular permissions
+    - Built-in roles: Super Admin, Tenant Owner, Admin, Editor, Reviewer, Viewer
+    - Role hierarchy with inheritance
+    - Clear permission descriptions
+
+20. 🎯 **Custom Roles** - Flexible permission management
+    - Create custom roles with specific permissions
+    - Clone existing roles as starting point
+    - Enable/disable custom roles
+
+21. 🎯 **Permission Categories** - Comprehensive access control
+    - Tenant permissions (billing, users, API keys)
+    - Project permissions (create, read, update, delete)
+    - Schema permissions (class, property, path)
+    - Export permissions (OpenAPI, code, docs)
+    - AI permissions (chat, generate, review)
+
+22. 🎯 **User & Team Management** - Organization management
+    - Invite users by email with role assignment
+    - Create teams, assign roles to teams
+    - User status (active, suspended, pending)
+    - Team-based project access
 
 ### 📅 Medium Priority (Q2-Q3 2026)
 
@@ -2799,10 +3376,16 @@ These can be implemented quickly:
 ## 🎯 Enterprise Implementation Roadmap
 
 ### Phase 1: Foundation (Q1 2026)
-**Focus**: Core enterprise features and CLI
+**Focus**: Core enterprise features, Paths, AI Assistant, and User Permissions
 
 | Feature | Effort | Priority | Dependencies |
 |---------|--------|----------|--------------|
+| Path Designer & Operations | 4 weeks | 🔴 Critical | None |
+| Studio AI Chatbot (Ollama) | 3 weeks | 🔴 Critical | Ollama cluster |
+| Natural Language → Schema | 2 weeks | 🔴 Critical | AI Chatbot |
+| Role-Based Access Control | 3 weeks | 🔴 Critical | None |
+| Custom Roles & Permissions | 2 weeks | 🔴 Critical | RBAC |
+| User Management | 2 weeks | 🔴 Critical | RBAC |
 | CLI Tool | 3 weeks | 🔴 Critical | None |
 | Undo/Redo System | 2 weeks | 🔴 Critical | None |
 | Node Grouping | 3 weeks | 🔴 Critical | Canvas refactor |
@@ -2810,16 +3393,19 @@ These can be implemented quickly:
 | Audit Logging | 2 weeks | 🔴 Critical | None |
 | SAML 2.0 SSO | 2 weeks | 🔴 Critical | None |
 
-### Phase 2: Collaboration (Q2 2026)
-**Focus**: Real-time features and team workflows
+### Phase 2: AI Enhancement & Collaboration (Q2 2026)
+**Focus**: Advanced AI features, team workflows, and advanced permissions
 
 | Feature | Effort | Priority | Dependencies |
 |---------|--------|----------|--------------|
+| Team Management | 2 weeks | 🟠 High | RBAC |
+| Resource-Level Permissions | 2 weeks | 🟠 High | RBAC |
 | Real-Time Collaboration | 4 weeks | 🟠 High | WebSocket infrastructure |
 | Comments & Discussions | 2 weeks | 🟠 High | None |
 | Review Workflows | 3 weeks | 🟠 High | None |
 | Schema Diff & Changelog | 2 weeks | 🟠 High | None |
 | Schema Templates | 2 weeks | 🟠 High | None |
+| Permission Matrix UI | 1 week | 🟠 High | RBAC |
 
 ### Phase 3: API Management (Q3 2026)
 **Focus**: Gateway integration and lifecycle management
@@ -2838,6 +3424,8 @@ These can be implemented quickly:
 |---------|--------|----------|--------------|
 | Kubernetes Helm Charts | 2 weeks | 🟡 Medium | Docker |
 | Schema Governance | 3 weeks | 🟡 Medium | Review Workflows |
+| Access Request Workflow | 2 weeks | 🟡 Medium | RBAC |
+| Permission Audit & Compliance | 2 weeks | 🟡 Medium | Audit Logging |
 | Compliance Dashboard | 2 weeks | 🟡 Medium | Audit Logging |
 | Multi-Region | 4 weeks | 🟡 Medium | Infrastructure |
 
@@ -2917,10 +3505,26 @@ These can be implemented quickly:
 | PAT Support | ✅ | Token auth |
 | CLI Tool | 📋 | High priority |
 | IDE Extensions | 📋 | Planned |
+| **AI Assistant (Ollama)** | | |
+| Studio Chatbot | 📋 | Q1 2026 - High priority |
+| Natural Language → Schema | 📋 | Q1 2026 - High priority |
+| Scenario-Based Generation | 📋 | Q1 2026 |
+| Property Suggestions | 📋 | Q1 2026 |
+| Schema Review | 📋 | Q2 2026 |
+| Documentation Generation | 📋 | Q2 2026 |
 | **Collaboration** | | |
 | Real-Time Editing | 📋 | High priority |
 | Comments | 📋 | Planned |
 | Review Workflows | 📋 | Planned |
+| **User Permissions** | | |
+| Role-Based Access (RBAC) | 📋 | Q1 2026 - High priority |
+| Built-in Roles | 📋 | Q1 2026 - 8 roles |
+| Custom Roles | 📋 | Q1 2026 |
+| Permission Categories | 📋 | Q1 2026 - 6 categories |
+| User Management | 📋 | Q1 2026 |
+| Team Management | 📋 | Q2 2026 |
+| Resource-Level Permissions | 📋 | Q2 2026 |
+| Permission Matrix UI | 📋 | Q2 2026 |
 | **Enterprise** | | |
 | Docker | ✅ | Production ready |
 | Kubernetes | 📋 | Planned |
@@ -2951,21 +3555,25 @@ This roadmap represents a comprehensive vision for Objectified as an enterprise-
 - Need fast, intuitive schema design
 - Want code generation that works out of the box
 - Require CI/CD integration for workflow
+- Want AI assistance for faster development
 
 **API Architects**
 - Need governance and approval workflows
 - Want visibility into API portfolio
 - Require compliance and audit capabilities
+- Want AI-powered schema review
 
 **Platform Teams**
 - Need multi-tenant management
 - Want API gateway integration
 - Require self-service for development teams
+- Want natural language API specification
 
 **Enterprise IT**
 - Need SSO and identity integration
-- Want on-premise deployment options
+- Want on-premise deployment options (including AI)
 - Require compliance certifications
+- Need self-hosted AI (no external data sharing)
 
 ### Competitive Advantages
 
@@ -2976,6 +3584,8 @@ Objectified differentiates through:
 - **Enterprise Ready**: SSO, API keys, multi-tenant architecture
 - **Developer Experience**: Swagger UI, Git integration, modern tooling
 - **Modern UX**: Command palette, inline editing, real-time validation
+- **Self-Hosted AI**: Ollama integration with Qwen 2.5 and Llama 3.2 - no data leaves your infrastructure
+- **AI-Powered Design**: Natural language to schema, intelligent suggestions, automated reviews
 
 Focus on shipping high-impact features that users will love, rather than building everything. Get feedback early and iterate.
 
@@ -3003,6 +3613,48 @@ Focus on shipping high-impact features that users will love, rather than buildin
 - Updated TL;DR with Paths and Modern UX tables
 - Updated Priority Recommendations with Paths as Q1 2026 priority
 
+### December 13, 2025 (Update 3)
+- Added comprehensive AI Assistant & Ollama Integration section
+  - Studio AI Chatbot with slide-out panel
+  - Ollama cluster integration (Qwen 2.5, Llama 3.2)
+  - Natural Language → Schema generation
+  - Scenario-Based API Generation from user stories
+  - AI-Powered Property Suggestions
+  - AI Schema Review & Improvement
+  - AI Documentation Generation
+  - AI Chat Commands reference
+  - AI Learning & Personalization
+  - Ollama Admin Configuration
+  - Security & Privacy (self-hosted, no external data)
+- Added Automation & Workflows section
+  - Event-Driven Automation with webhooks
+  - Scheduled Jobs
+  - Approval Workflows
+  - CI/CD Triggers
+- Updated TL;DR with AI Assistant table
+- Updated Priority Recommendations with AI features (items 11-15)
+- Updated Enterprise Implementation Roadmap Phase 1 with AI
+- Updated Feature Comparison Matrix with AI features
+- Updated Competitive Advantages with AI differentiation
+- Updated Target User Personas with AI use cases
+
+### December 14, 2025
+- Added comprehensive User Permissions & Access Control section
+  - Role-Based Access Control (RBAC) with 8 built-in roles
+  - Custom Roles with granular permissions
+  - Permission Categories (Tenant, Project, Version, Schema, Path, Export, AI)
+  - Resource-Level Permissions (project, version, class level)
+  - User Management (invite, suspend, deactivate)
+  - Team Management with team-based access
+  - Permission UI (role assignment, permission matrix)
+  - Access Request Workflow
+  - Permission Audit & Compliance
+- Updated TL;DR with User Permissions table
+- Updated High Priority section with User Permissions (items 19-22)
+- Updated Planned Features table with Permissions category
+- Updated Feature Comparison Matrix with User Permissions section
+- Updated Enterprise Implementation Roadmap with permissions in Phase 1 & 2
+
 ### December 13, 2025 (Update 1)
 - Major roadmap update with implementation status
 - Added Enterprise Features section
@@ -3023,8 +3675,8 @@ Focus on shipping high-impact features that users will love, rather than buildin
 
 ---
 
-**Document Version**: 2.1
-**Last Updated**: December 13, 2025
+**Document Version**: 2.3
+**Last Updated**: December 14, 2025
 **Next Review**: Q1 2026
 **Maintainer**: Engineering Team
 

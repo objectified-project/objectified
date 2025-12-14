@@ -1592,6 +1592,180 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 </Box>
               )}
             </Box>
+
+            {/* Nested Properties Display */}
+            {nestedProperties && nestedProperties.length > 0 && (
+              <Box sx={{
+                mt: 2.5,
+                p: 2.5,
+                bgcolor: isDark ? '#0f172a' : 'white',
+                borderRadius: 2.5,
+                border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  mb: 2,
+                  pb: 1.5,
+                  borderBottom: '1px solid rgba(34, 197, 94, 0.15)',
+                }}>
+                  <Box sx={{
+                    p: 0.75,
+                    borderRadius: 1.5,
+                    bgcolor: 'rgba(34, 197, 94, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <CodeIcon sx={{ color: '#22c55e', fontSize: 16 }} />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                      Nested Properties
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {nestedProperties.length} propert{nestedProperties.length === 1 ? 'y' : 'ies'} defined within this object
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" sx={{
+                    px: 1,
+                    py: 0.25,
+                    bgcolor: 'rgba(34, 197, 94, 0.1)',
+                    color: '#16a34a',
+                    borderRadius: 1,
+                    fontWeight: 600,
+                    fontSize: '0.65rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    Read-Only
+                  </Typography>
+                </Box>
+
+                <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+                  These are the nested properties contained within this object. To edit them, close this dialog and expand the object property in the class node.
+                </Typography>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {nestedProperties.map((prop) => {
+                    const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : (prop.data || {});
+                    const propType = propData.type || (propData.$ref ? 'reference' : 'object');
+                    const isRequired = propData.required === true;
+                    const isDeprecated = propData.deprecated === true;
+                    const hasRef = !!propData.$ref;
+                    const refName = hasRef ? propData.$ref.split('/').pop() : null;
+
+                    // Determine type display
+                    let typeDisplay = propType;
+                    if (propType === 'array') {
+                      const itemType = propData.items?.type || propData.items?.$ref?.split('/').pop() || 'any';
+                      typeDisplay = `${itemType}[]`;
+                    } else if (hasRef && refName) {
+                      typeDisplay = refName;
+                    }
+
+                    return (
+                      <Box
+                        key={prop.id}
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          p: 1.5,
+                          bgcolor: isDark ? '#1e293b' : '#f8fafc',
+                          borderRadius: 1.5,
+                          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                          opacity: isDeprecated ? 0.6 : 1,
+                        }}
+                      >
+                        {/* Property Name */}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                            fontWeight: 600,
+                            color: isDark ? '#e2e8f0' : '#1e293b',
+                            textDecoration: isDeprecated ? 'line-through' : 'none',
+                            minWidth: 120,
+                          }}
+                        >
+                          {prop.name}
+                        </Typography>
+
+                        {/* Type Chip */}
+                        <Box
+                          sx={{
+                            px: 1,
+                            py: 0.25,
+                            bgcolor: hasRef
+                              ? 'rgba(139, 92, 246, 0.1)'
+                              : propType === 'array'
+                                ? 'rgba(59, 130, 246, 0.1)'
+                                : 'rgba(100, 116, 139, 0.1)',
+                            color: hasRef
+                              ? '#8b5cf6'
+                              : propType === 'array'
+                                ? '#3b82f6'
+                                : isDark ? '#94a3b8' : '#64748b',
+                            borderRadius: 1,
+                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                          }}
+                        >
+                          {typeDisplay}
+                        </Box>
+
+                        {/* Required Badge */}
+                        {isRequired && (
+                          <Box
+                            sx={{
+                              px: 0.75,
+                              py: 0.25,
+                              bgcolor: 'rgba(239, 68, 68, 0.1)',
+                              color: '#ef4444',
+                              borderRadius: 1,
+                              fontSize: '0.6rem',
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Required
+                          </Box>
+                        )}
+
+                        {/* Deprecated Badge */}
+                        {isDeprecated && (
+                          <Box
+                            sx={{
+                              px: 0.75,
+                              py: 0.25,
+                              bgcolor: 'rgba(245, 158, 11, 0.1)',
+                              color: '#f59e0b',
+                              borderRadius: 1,
+                              fontSize: '0.6rem',
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Deprecated
+                          </Box>
+                        )}
+
+                        {/* Description (if available) */}
+                        {prop.description && (
+                          <Tooltip title={prop.description} placement="top">
+                            <InfoOutlinedIcon sx={{ fontSize: 14, color: isDark ? '#64748b' : '#94a3b8', ml: 'auto', cursor: 'help' }} />
+                          </Tooltip>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            )}
           </Box>
         )}
       </Box>

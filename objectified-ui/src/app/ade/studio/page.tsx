@@ -37,7 +37,7 @@ import '@xyflow/react/dist/style.css';
 import {
   getProjectsForTenant,
   getVersionsForProject,
-  getClassesForVersion,
+  getClassesWithPropertiesAndTags,
   getPropertiesForClass,
   addPropertyToClass,
   removePropertyFromClass,
@@ -228,23 +228,9 @@ const StudioContent = () => {
     setLoadingMessage('Refreshing canvas...');
 
     try {
-      const classesResult = await getClassesForVersion(selectedVersionId);
-      const classesData = JSON.parse(classesResult);
-
-      setLoadingMessage('Reloading properties...');
-
-      const classesWithProperties = await Promise.all(
-        classesData.map(async (cls: any) => {
-          const propsResult = await getPropertiesForClass(cls.id);
-          const properties = JSON.parse(propsResult);
-
-          // Load tags for this class
-          const tagsResult = await getTagsForClass(cls.id);
-          const tags = JSON.parse(tagsResult);
-
-          return { ...cls, properties, tags };
-        })
-      );
+      // Bulk load all classes with properties and tags in 3 queries
+      const result = await getClassesWithPropertiesAndTags(selectedVersionId);
+      const classesWithProperties = JSON.parse(result);
 
       setLoadingMessage('Updating nodes and edges...');
 
@@ -1427,27 +1413,14 @@ const StudioContent = () => {
       }
 
       setIsLoadingCanvas(true);
-      setLoadingMessage('Loading classes from database...');
+      setLoadingMessage('Loading classes, properties, and tags...');
 
       try {
-        const result = await getClassesForVersion(selectedVersionId);
-        const classesData = JSON.parse(result);
+        // Bulk load all classes with properties and tags in 3 queries instead of N*2+1
+        const result = await getClassesWithPropertiesAndTags(selectedVersionId);
+        const classesWithProperties = JSON.parse(result);
 
-        setLoadingMessage(`Loading properties for ${classesData.length} class${classesData.length !== 1 ? 'es' : ''}...`);
-
-        // Load properties and tags for each class
-        const classesWithProperties = await Promise.all(
-          classesData.map(async (cls: any) => {
-            const propsResult = await getPropertiesForClass(cls.id);
-            const properties = JSON.parse(propsResult);
-
-            // Load tags for this class
-            const tagsResult = await getTagsForClass(cls.id);
-            const tags = JSON.parse(tagsResult);
-
-            return { ...cls, properties, tags };
-          })
-        );
+        setLoadingMessage(`Processing ${classesWithProperties.length} class${classesWithProperties.length !== 1 ? 'es' : ''}...`);
 
         setLoadingMessage('Creating canvas nodes...');
 
@@ -1482,7 +1455,7 @@ const StudioContent = () => {
           fitView({ padding: 0.2, duration: 400 });
         }, 50);
 
-        console.log('Loaded classes for version:', selectedVersionId, 'Classes:', classesData.length);
+        console.log('Loaded classes for version:', selectedVersionId, 'Classes:', classesWithProperties.length);
       } catch (error) {
         console.error('Failed to load classes:', error);
         setNodes([]);

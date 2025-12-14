@@ -8,7 +8,13 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Even more look and feel improvements
 - Numerous bug fixes and performance enhancements
+- Improved canvas performance for large schemas
 - Properties form and editor have an improved layout
+- **Nested Properties Visibility**: When editing an object property, you can now see all nested properties
+  - Displays property name, type, required status, and deprecated status
+  - Shows description on hover
+  - Clear indication of how many nested properties exist
+  - Helpful guidance on how to edit nested properties
 - Properties options have been improved:
   - Numeric constraints now use OpenAPI 3.1 / JSON Schema draft 2020-12 format
   - Added radio button options for minimum/maximum constraints: Inclusive (≥/≤) vs Exclusive (>/<)
@@ -67,5 +73,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: December 10, 2025*
+*Last updated: December 14, 2025*
 
