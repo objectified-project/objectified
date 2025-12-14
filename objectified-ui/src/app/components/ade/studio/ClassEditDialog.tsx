@@ -26,6 +26,11 @@ import { generateClassOpenApiSpec } from '../../../utils/openapi';
 import { createClass, updateClass, assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
 import Chip from '@mui/material/Chip';
 import { ExtensionsEditor } from './ExtensionsEditor';
+import ConditionalSchemaBuilder, {
+  ConditionalRule,
+  conditionalRulesToJsonSchema,
+  jsonSchemaToConditionalRules
+} from './ConditionalSchemaBuilder';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -91,6 +96,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     extensions: {} as Record<string, any>,
     externalDocsUrl: '',
     externalDocsDescription: '',
+    conditionalRules: [] as ConditionalRule[],
     error: ''
   });
 
@@ -130,6 +136,22 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           }
         });
 
+        // Extract conditional rules (if/then/else) from schema
+        let conditionalRules: ConditionalRule[] = [];
+        // Check for if/then/else in allOf array
+        if (schema.allOf && Array.isArray(schema.allOf)) {
+          conditionalRules = jsonSchemaToConditionalRules(schema.allOf);
+        }
+        // Also check for top-level if/then/else
+        if (schema.if) {
+          const topLevelRules = jsonSchemaToConditionalRules([{
+            if: schema.if,
+            then: schema.then,
+            else: schema.else
+          }]);
+          conditionalRules.push(...topLevelRules);
+        }
+
         // Load tags for this class
         const loadTags = async () => {
           try {
@@ -153,6 +175,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               extensions,
               externalDocsUrl: schema.externalDocs?.url || '',
               externalDocsDescription: schema.externalDocs?.description || '',
+              conditionalRules,
               error: ''
             });
           } catch (error) {
@@ -173,6 +196,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               extensions,
               externalDocsUrl: schema.externalDocs?.url || '',
               externalDocsDescription: schema.externalDocs?.description || '',
+              conditionalRules,
               error: ''
             });
           }
@@ -197,6 +221,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           extensions: {},
           externalDocsUrl: '',
           externalDocsDescription: '',
+          conditionalRules: [],
           error: ''
         });
       }
@@ -259,6 +284,25 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         schema[key] = formData.extensions[key];
       }
     });
+
+    // Add conditional rules (if/then/else)
+    if (formData.conditionalRules.length > 0) {
+      const conditionalSchemas = conditionalRulesToJsonSchema(formData.conditionalRules);
+      if (conditionalSchemas.length === 1) {
+        // Single rule: add at top level
+        schema.if = conditionalSchemas[0].if;
+        schema.then = conditionalSchemas[0].then;
+        if (conditionalSchemas[0].else) {
+          schema.else = conditionalSchemas[0].else;
+        }
+      } else if (conditionalSchemas.length > 1) {
+        // Multiple rules: add to allOf array
+        if (!schema.allOf) {
+          schema.allOf = [];
+        }
+        schema.allOf.push(...conditionalSchemas);
+      }
+    }
 
     return schema;
   };
@@ -1130,6 +1174,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   )}
                 </Box>
               )}
+            </Box>
+
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 3.5: Conditional Schema (if/then/else)
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: isDark ? '#0f172a' : '#fafafa' }}>
+              <ConditionalSchemaBuilder
+                rules={formData.conditionalRules}
+                onChange={(rules) => setFormData(prev => ({ ...prev, conditionalRules: rules }))}
+                availableProperties={
+                  editingClassData?.properties?.map((p: any) => p.name) || []
+                }
+                disabled={isReadOnly}
+              />
             </Box>
 
             {/* ═══════════════════════════════════════════════════════════════════════════

@@ -24,6 +24,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added support for custom "x-" tags and values to classes and properties
   - Added support for external documentation on a class and property level
   - Added support for discriminator mapping to x- tags, propertyName, and values
+  - Added support for if/then/else class composition support
   - Marking for deprecation is now available for properties and classes
   - prefixItems:
     - Define ordered schemas for specific array positions (e.g., `[string, number, boolean]`)
