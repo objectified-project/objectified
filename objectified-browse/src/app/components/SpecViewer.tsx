@@ -1,7 +1,24 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useTheme, specThemes, SpecTheme } from './ThemeProvider';
+
+// Dynamically import Monaco Editor with SSR disabled
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[600px] bg-zinc-50 dark:bg-zinc-900">
+      <div className="flex items-center gap-3">
+        <svg className="h-5 w-5 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-zinc-600 dark:text-zinc-400">Loading editor...</span>
+      </div>
+    </div>
+  ),
+});
 
 interface SpecViewerProps {
   tenantSlug: string;
@@ -12,42 +29,15 @@ interface SpecViewerProps {
 
 type SpecFormat = 'openapi' | 'arazzo' | 'jsonschema';
 
-// Syntax highlighting component
-function SyntaxHighlighter({ json, theme }: { json: string; theme: SpecTheme }) {
-  const themeColors = specThemes[theme];
-
-  const highlighted = useMemo(() => {
-    const lines = json.split('\n');
-    return lines.map((line, lineIndex) => {
-      const parts: { text: string; className: string }[] = [];
-      let remaining = line;
-      let lastIndex = 0;
-
-      // Match patterns for JSON syntax
-      const patterns = [
-        { regex: /("(?:\\.|[^"\\])*")\s*:/g, className: themeColors.property }, // property names
-        { regex: /:\s*("(?:\\.|[^"\\])*")/g, className: themeColors.string }, // string values
-        { regex: /:\s*(-?\d+\.?\d*)/g, className: themeColors.number }, // numbers
-        { regex: /:\s*(true|false|null)/g, className: themeColors.keyword }, // keywords
-        { regex: /([{}\[\]])/g, className: themeColors.bracket }, // brackets
-      ];
-
-      // Simple approach: just colorize the whole line based on content
-      let colorClass = themeColors.text;
-      if (line.includes('":')) {
-        colorClass = themeColors.text;
-      }
-
-      return (
-        <div key={lineIndex} className={`${colorClass} whitespace-pre`}>
-          {line || '\u00A0'}
-        </div>
-      );
-    });
-  }, [json, theme, themeColors]);
-
-  return <>{highlighted}</>;
-}
+// Map our theme names to Monaco themes
+const monacoThemeMap: Record<SpecTheme, string> = {
+  default: 'vs',
+  monokai: 'vs-dark',
+  github: 'vs',
+  darcula: 'vs-dark',
+  solarized: 'vs-dark',
+  nord: 'vs-dark',
+};
 
 export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUrl }: SpecViewerProps) {
   const { specTheme, setSpecTheme } = useTheme();
@@ -123,7 +113,6 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
 
   const specJson = spec ? JSON.stringify(spec, null, 2) : '';
   const lineCount = specJson.split('\n').length;
-  const themeColors = specThemes[specTheme];
 
   return (
     <div className="space-y-4">
@@ -184,7 +173,10 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
               onClick={() => setShowThemePicker(!showThemePicker)}
               className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
             >
-              <div className={`h-4 w-4 rounded ${themeColors.bg}`}></div>
+              <div
+                className="h-4 w-4 rounded border border-zinc-300 dark:border-zinc-600"
+                style={{ backgroundColor: specThemes[specTheme].bgColor }}
+              ></div>
               <span>{specThemes[specTheme].name}</span>
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -211,7 +203,10 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
                           : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
                       }`}
                     >
-                      <div className={`h-4 w-4 rounded ${value.bg} border border-zinc-200 dark:border-zinc-700`}></div>
+                      <div
+                        className="h-4 w-4 rounded border border-zinc-200 dark:border-zinc-700"
+                        style={{ backgroundColor: value.bgColor }}
+                      ></div>
                       {value.name}
                       {specTheme === key && (
                         <svg className="ml-auto h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,10 +285,7 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
       )}
 
       {!loading && !error && spec && (
-        <div
-          className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-800"
-          style={{ backgroundColor: themeColors.bgColor }}
-        >
+        <div className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-800">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
             <div className="flex items-center gap-3">
@@ -310,27 +302,30 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
             </div>
           </div>
 
-          {/* Code Area */}
-          <div className="overflow-auto max-h-[700px]">
-            <div className="flex min-w-max">
-              {/* Line Numbers */}
-              {lineNumbers && (
-                <div className="sticky left-0 select-none bg-zinc-100/80 dark:bg-zinc-900/80 backdrop-blur-sm border-r border-zinc-200 dark:border-zinc-800 text-right pr-3 pl-3 py-4 font-mono text-xs text-zinc-400 dark:text-zinc-600">
-                  {specJson.split('\n').map((_, i) => (
-                    <div key={i} className="leading-6">{i + 1}</div>
-                  ))}
-                </div>
-              )}
-
-              {/* Code */}
-              <pre
-                className={`flex-1 p-4 font-mono text-sm leading-6 ${wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'}`}
-                style={{ color: themeColors.textColor }}
-              >
-                <code>{specJson}</code>
-              </pre>
-            </div>
-          </div>
+          {/* Monaco Editor */}
+          <Editor
+            height="600px"
+            language="json"
+            value={specJson}
+            theme={monacoThemeMap[specTheme]}
+            options={{
+              readOnly: true,
+              minimap: { enabled: true },
+              lineNumbers: lineNumbers ? 'on' : 'off',
+              wordWrap: wordWrap ? 'on' : 'off',
+              scrollBeyondLastLine: false,
+              fontSize: 13,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              automaticLayout: true,
+              folding: true,
+              foldingHighlight: true,
+              renderLineHighlight: 'line',
+              scrollbar: {
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10,
+              },
+            }}
+          />
         </div>
       )}
     </div>

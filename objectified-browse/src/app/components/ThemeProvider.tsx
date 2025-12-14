@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
-export type SpecTheme = 'default' | 'monokai' | 'github' | 'dracula' | 'solarized' | 'nord';
+export type SpecTheme = 'default' | 'monokai' | 'github' | 'darcula' | 'solarized' | 'nord';
 
 interface ThemeContextType {
   theme: Theme;
@@ -63,8 +63,8 @@ export const specThemes: Record<SpecTheme, {
     property: 'text-[#953800] dark:text-[#ffa657]',
     bracket: 'text-[#24292f] dark:text-[#c9d1d9]',
   },
-  dracula: {
-    name: 'Dracula',
+  darcula: {
+    name: 'Darcula',
     bgColor: '#282a36',
     textColor: '#f8f8f2',
     bg: 'bg-[#282a36]',
