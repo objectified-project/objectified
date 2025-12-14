@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useTheme, specThemes, SpecTheme } from './ThemeProvider';
 
 interface SpecViewerProps {
   tenantSlug: string;
@@ -11,26 +12,53 @@ interface SpecViewerProps {
 
 type SpecFormat = 'openapi' | 'arazzo' | 'jsonschema';
 
+// Syntax highlighting component
+function SyntaxHighlighter({ json, theme }: { json: string; theme: SpecTheme }) {
+  const themeColors = specThemes[theme];
+
+  const highlighted = useMemo(() => {
+    const lines = json.split('\n');
+    return lines.map((line, lineIndex) => {
+      const parts: { text: string; className: string }[] = [];
+      let remaining = line;
+      let lastIndex = 0;
+
+      // Match patterns for JSON syntax
+      const patterns = [
+        { regex: /("(?:\\.|[^"\\])*")\s*:/g, className: themeColors.property }, // property names
+        { regex: /:\s*("(?:\\.|[^"\\])*")/g, className: themeColors.string }, // string values
+        { regex: /:\s*(-?\d+\.?\d*)/g, className: themeColors.number }, // numbers
+        { regex: /:\s*(true|false|null)/g, className: themeColors.keyword }, // keywords
+        { regex: /([{}\[\]])/g, className: themeColors.bracket }, // brackets
+      ];
+
+      // Simple approach: just colorize the whole line based on content
+      let colorClass = themeColors.text;
+      if (line.includes('":')) {
+        colorClass = themeColors.text;
+      }
+
+      return (
+        <div key={lineIndex} className={`${colorClass} whitespace-pre`}>
+          {line || '\u00A0'}
+        </div>
+      );
+    });
+  }, [json, theme, themeColors]);
+
+  return <>{highlighted}</>;
+}
+
 export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUrl }: SpecViewerProps) {
+  const { specTheme, setSpecTheme } = useTheme();
   const [format, setFormat] = useState<SpecFormat>('openapi');
   const [spec, setSpec] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-
-  // Check if REST API is accessible on mount
-  useEffect(() => {
-    const checkApiHealth = async () => {
-      try {
-        const baseUrl = restApiBaseUrl.replace('/v1', '');
-        const response = await fetch(baseUrl, { method: 'GET' });
-        setApiStatus(response.ok ? 'online' : 'offline');
-      } catch {
-        setApiStatus('offline');
-      }
-    };
-    checkApiHealth();
-  }, [restApiBaseUrl]);
+  const [copied, setCopied] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [lineNumbers, setLineNumbers] = useState(true);
+  const [wordWrap, setWordWrap] = useState(false);
 
   useEffect(() => {
     loadSpec();
@@ -54,19 +82,20 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
           break;
       }
 
-      console.log('Requesting URL:', url);
-
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to load specification: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Failed to load specification (${response.status}): ${response.statusText}${errorText ? `. ${errorText.substring(0, 100)}` : ''}`);
       }
 
       const data = await response.json();
-
-      console.log('Data', data);
       setSpec(data);
     } catch (err: any) {
-      setError(err.message);
+      if (err.message.includes('Failed to fetch')) {
+        setError(`Cannot connect to API. Please ensure the REST API is running at ${restApiBaseUrl} and CORS is configured.`);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -74,7 +103,6 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
 
   const downloadSpec = () => {
     if (!spec) return;
-
     const blob = new Blob([JSON.stringify(spec, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -86,157 +114,223 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
     URL.revokeObjectURL(url);
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     if (!spec) return;
-    navigator.clipboard.writeText(JSON.stringify(spec, null, 2));
+    await navigator.clipboard.writeText(JSON.stringify(spec, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
+  const specJson = spec ? JSON.stringify(spec, null, 2) : '';
+  const lineCount = specJson.split('\n').length;
+  const themeColors = specThemes[specTheme];
+
   return (
-    <div>
-      {apiStatus === 'offline' && (
-        <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/20">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">⚠️</span>
-            <div className="flex-1">
-              <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 mb-2">
-                REST API Connection Issue
-              </h3>
-              <p className="text-sm text-yellow-800 dark:text-yellow-400 mb-3">
-                Cannot connect to the Objectified REST API at <code className="bg-yellow-100 dark:bg-yellow-900/30 px-1 rounded">{restApiBaseUrl}</code>
-              </p>
-              <details className="text-sm">
-                <summary className="cursor-pointer font-medium text-yellow-700 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200">
-                  How to fix this
-                </summary>
-                <div className="mt-2 space-y-2 text-yellow-800 dark:text-yellow-400">
-                  <p><strong>1. Start the REST API server:</strong></p>
-                  <pre className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded text-xs overflow-x-auto">
-cd ../objectified-rest
-python -m uvicorn app.main:app --reload
-                  </pre>
-                  <p><strong>2. Verify it's running:</strong></p>
-                  <pre className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded text-xs">
-curl http://localhost:8000/
-                  </pre>
-                  <p><strong>3. Update .env.local if needed:</strong></p>
-                  <pre className="bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded text-xs">
-NEXT_PUBLIC_REST_API_BASE_URL=http://localhost:8000/v1
-                  </pre>
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+        {/* Format Tabs */}
+        <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+          {(['openapi', 'arazzo', 'jsonschema'] as SpecFormat[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFormat(f)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                format === f
+                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
+              }`}
+            >
+              {f === 'openapi' ? 'OpenAPI' : f === 'arazzo' ? 'Arazzo' : 'JSON Schema'}
+            </button>
+          ))}
+        </div>
+
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
+          {/* View Options */}
+          <div className="flex items-center gap-1 border-r border-zinc-200 pr-2 dark:border-zinc-700">
+            <button
+              onClick={() => setLineNumbers(!lineNumbers)}
+              className={`rounded-md p-2 text-sm transition-colors ${
+                lineNumbers
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+              title="Toggle line numbers"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setWordWrap(!wordWrap)}
+              className={`rounded-md p-2 text-sm transition-colors ${
+                wordWrap
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              }`}
+              title="Toggle word wrap"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h11m-11 6h7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Theme Picker */}
+          <div className="relative">
+            <button
+              onClick={() => setShowThemePicker(!showThemePicker)}
+              className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            >
+              <div className={`h-4 w-4 rounded ${themeColors.bg}`}></div>
+              <span>{specThemes[specTheme].name}</span>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showThemePicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowThemePicker(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                  <div className="text-xs font-medium text-zinc-500 px-2 py-1 uppercase tracking-wider mb-1">
+                    Code Theme
+                  </div>
+                  {(Object.entries(specThemes) as [SpecTheme, typeof specThemes.default][]).map(([key, value]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setSpecTheme(key);
+                        setShowThemePicker(false);
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sm ${
+                        specTheme === key
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <div className={`h-4 w-4 rounded ${value.bg} border border-zinc-200 dark:border-zinc-700`}></div>
+                      {value.name}
+                      {specTheme === key && (
+                        <svg className="ml-auto h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
                 </div>
-              </details>
-            </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
 
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex gap-2">
+          {/* Copy Button */}
           <button
-            onClick={() => setFormat('openapi')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              format === 'openapi'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-zinc-900 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800'
-            }`}
+            onClick={copyToClipboard}
+            disabled={!spec}
+            className="flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
-            OpenAPI
+            {copied ? (
+              <>
+                <svg className="h-4 w-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy
+              </>
+            )}
           </button>
+
+          {/* Download Button */}
           <button
-            onClick={() => setFormat('arazzo')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              format === 'arazzo'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-zinc-900 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800'
-            }`}
+            onClick={downloadSpec}
+            disabled={!spec}
+            className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Arazzo
-          </button>
-          <button
-            onClick={() => setFormat('jsonschema')}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              format === 'jsonschema'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-zinc-900 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800'
-            }`}
-          >
-            JSON Schema
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download
           </button>
         </div>
-
-        {spec && (
-          <div className="flex gap-2">
-            <button
-              onClick={copyToClipboard}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800"
-            >
-              Copy
-            </button>
-            <button
-              onClick={downloadSpec}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800"
-            >
-              Download
-            </button>
-          </div>
-        )}
       </div>
 
+      {/* Content Area */}
       {loading && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-950">
-          <p className="text-zinc-600 dark:text-zinc-400">Loading specification...</p>
+        <div className="flex items-center justify-center rounded-lg border border-zinc-200 bg-white p-16 dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="flex items-center gap-3">
+            <svg className="h-5 w-5 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-zinc-600 dark:text-zinc-400">Loading specification...</span>
+          </div>
         </div>
       )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-950/20">
-          <h3 className="font-semibold text-red-900 dark:text-red-300 mb-2">Error Loading Specification</h3>
-          <p className="text-sm text-red-800 dark:text-red-400 mb-3">{error}</p>
-          <details className="text-xs" open={error.includes('CORS')}>
-            <summary className="cursor-pointer text-red-700 dark:text-red-400 hover:text-red-900 dark:hover:text-red-200 font-medium">
-              {error.includes('CORS') ? '🔧 CORS Fix Required' : 'Troubleshooting'}
-            </summary>
-            <div className="mt-3 space-y-3 text-red-800 dark:text-red-400">
-              {error.includes('CORS') ? (
-                <>
-                  <div>
-                    <p className="font-semibold mb-1">The REST API needs to allow requests from this origin:</p>
-                    <code className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded block">{typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}</code>
-                  </div>
-                  <div>
-                    <p className="font-semibold mb-1">Add this to your REST API (FastAPI example):</p>
-                    <pre className="bg-red-100 dark:bg-red-900/30 p-2 rounded overflow-x-auto text-xs">
-{`from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)`}</pre>
-                  </div>
-                  <p>Then restart the REST API server.</p>
-                </>
-              ) : (
-                <>
-                  <p>• Check that the REST API is running at: <code className="bg-red-100 dark:bg-red-900/30 px-1 rounded">{restApiBaseUrl}</code></p>
-                  <p>• Verify the version exists and is published</p>
-                  <p>• Check browser console (F12) for detailed error messages</p>
-                  <p>• Ensure CORS is configured to allow {typeof window !== 'undefined' ? window.location.origin : 'localhost:3000'}</p>
-                </>
-              )}
+          <div className="flex items-start gap-3">
+            <svg className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h3 className="font-semibold text-red-900 dark:text-red-300 mb-1">Error Loading Specification</h3>
+              <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
             </div>
-          </details>
+          </div>
         </div>
       )}
 
       {!loading && !error && spec && (
-        <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 overflow-hidden">
-          <pre className="overflow-x-auto p-6 text-sm">
-            <code className="text-zinc-900 dark:text-zinc-50">
-              {JSON.stringify(spec, null, 2)}
-            </code>
-          </pre>
+        <div
+          className="rounded-lg border border-zinc-200 overflow-hidden dark:border-zinc-800"
+          style={{ backgroundColor: themeColors.bgColor }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {format === 'openapi' ? 'openapi.json' : format === 'arazzo' ? 'arazzo.json' : 'schema.json'}
+              </span>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {lineCount} lines
+              </span>
+            </div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              {format === 'openapi' && spec.info?.version && `v${spec.info.version}`}
+              {format === 'openapi' && spec.openapi && ` • OpenAPI ${spec.openapi}`}
+            </div>
+          </div>
+
+          {/* Code Area */}
+          <div className="overflow-auto max-h-[700px]">
+            <div className="flex min-w-max">
+              {/* Line Numbers */}
+              {lineNumbers && (
+                <div className="sticky left-0 select-none bg-zinc-100/80 dark:bg-zinc-900/80 backdrop-blur-sm border-r border-zinc-200 dark:border-zinc-800 text-right pr-3 pl-3 py-4 font-mono text-xs text-zinc-400 dark:text-zinc-600">
+                  {specJson.split('\n').map((_, i) => (
+                    <div key={i} className="leading-6">{i + 1}</div>
+                  ))}
+                </div>
+              )}
+
+              {/* Code */}
+              <pre
+                className={`flex-1 p-4 font-mono text-sm leading-6 ${wordWrap ? 'whitespace-pre-wrap' : 'whitespace-pre'}`}
+                style={{ color: themeColors.textColor }}
+              >
+                <code>{specJson}</code>
+              </pre>
+            </div>
+          </div>
         </div>
       )}
     </div>

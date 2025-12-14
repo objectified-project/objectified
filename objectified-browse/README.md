@@ -1,14 +1,30 @@
 # Objectified Browse
 
-A public-facing web application for browsing and exploring published OpenAPI specifications from Objectified.
+A public-facing enterprise web application for browsing and exploring published OpenAPI specifications from Objectified.
 
 ## Features
 
+### Core Features
 - **Browse by Organization**: Navigate through tenants, projects, and versions
 - **Search**: Full-text search across organizations and projects  
 - **View Specifications**: Display OpenAPI, Arazzo, and JSON Schema formats
 - **Version Comparison**: Side-by-side and unified diff views between versions
 - **Public Access**: No authentication required - only displays published public versions
+
+### Enterprise UI/UX
+- **Sticky Navigation Bar**: Persistent navigation with quick search
+- **Data Tables**: Sortable, searchable, paginated tables for all listings
+- **Breadcrumb Navigation**: Visual hierarchy showing current location
+- **Theme Support**: Light, Dark, and System themes for the application
+- **Code Themes**: 6 color themes for specification viewing (Default, Monokai, GitHub, Dracula, Solarized, Nord)
+- **Responsive Design**: Works on desktop and mobile devices
+
+### Specification Viewer
+- **Format Switching**: Toggle between OpenAPI, Arazzo, and JSON Schema
+- **Line Numbers**: Toggle line number display
+- **Word Wrap**: Toggle word wrapping for long lines
+- **Copy/Download**: Export specifications easily
+- **Theme Selector**: Choose from 6 code color themes
 
 ## Architecture
 
