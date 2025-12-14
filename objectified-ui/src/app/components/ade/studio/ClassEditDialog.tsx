@@ -18,6 +18,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Autocomplete from '@mui/material/Autocomplete';
+import { useColorScheme } from '@mui/material/styles';
 import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
@@ -63,6 +64,9 @@ interface ClassEditDialogProps {
 }
 
 const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = false, onSave, projectId = '', versionId = '', projectTags = [], projectMetadata }: ClassEditDialogProps) => {
+  const { mode: colorMode, systemMode } = useColorScheme();
+  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+
   const [tabValue, setTabValue] = useState(0);
   const [exampleRefreshKey, setExampleRefreshKey] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -675,6 +679,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           sx: {
             height: '90vh',
             maxHeight: '900px',
+            bgcolor: isDark ? '#1e293b' : 'background.paper',
           }
         }
       }}
@@ -727,7 +732,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <FileText size={18} style={{ color: '#6366f1' }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
                   Basic Information
                 </Typography>
               </Box>
@@ -823,18 +828,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             {/* ═══════════════════════════════════════════════════════════════════════════
                 SECTION 2: Schema Behavior (Two-column layout)
                 ═══════════════════════════════════════════════════════════════════════════ */}
-            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: '#fafafa' }}>
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: isDark ? '#0f172a' : '#fafafa' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <Settings size={18} style={{ color: '#6366f1' }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
                   Schema Settings
                 </Typography>
               </Box>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
                 {/* Additional Properties */}
-                <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                <Box sx={{ p: 2, bgcolor: isDark ? '#1e293b' : 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5, color: isDark ? '#e2e8f0' : 'inherit' }}>
                     Additional Properties
                   </Typography>
                   <RadioGroup
@@ -872,7 +877,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 {/* Deprecation Status */}
                 <Box sx={{
                   p: 2,
-                  bgcolor: formData.deprecated ? '#fef3c7' : 'white',
+                  bgcolor: formData.deprecated ? (isDark ? '#78350f' : '#fef3c7') : (isDark ? '#1e293b' : 'white'),
                   borderRadius: 2,
                   border: 1,
                   borderColor: formData.deprecated ? '#fbbf24' : 'divider',
@@ -890,7 +895,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <AlertTriangle size={16} style={{ color: formData.deprecated ? '#d97706' : '#9ca3af' }} />
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
                           Mark as Deprecated
                         </Typography>
                       </Box>
@@ -920,21 +925,21 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Layers size={18} style={{ color: '#6366f1' }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
                   Composition & Inheritance
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', ml: 1 }}>
+                <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : 'text.secondary', ml: 1 }}>
                   (Optional)
                 </Typography>
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+              <Typography variant="caption" sx={{ display: 'block', mb: 2, color: isDark ? '#94a3b8' : 'text.secondary' }}>
                 Define relationships with other classes using OpenAPI composition keywords
               </Typography>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
                 {/* allOf */}
-                <Box sx={{ p: 2, bgcolor: '#eef2ff', borderRadius: 2, border: '1px solid #c7d2fe' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#4338ca' }}>
+                <Box sx={{ p: 2, bgcolor: isDark ? '#312e81' : '#eef2ff', borderRadius: 2, border: '1px solid #c7d2fe' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#c7d2fe' : '#4338ca' }}>
                     allOf (Inheritance)
                   </Typography>
                   <Autocomplete
@@ -959,8 +964,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </Box>
 
                 {/* anyOf */}
-                <Box sx={{ p: 2, bgcolor: '#fef3c7', borderRadius: 2, border: '1px solid #fcd34d' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#b45309' }}>
+                <Box sx={{ p: 2, bgcolor: isDark ? '#78350f' : '#fef3c7', borderRadius: 2, border: '1px solid #fcd34d' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#fcd34d' : '#b45309' }}>
                     anyOf (Alternatives)
                   </Typography>
                   <Autocomplete
@@ -985,8 +990,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </Box>
 
                 {/* oneOf */}
-                <Box sx={{ p: 2, bgcolor: '#f3e8ff', borderRadius: 2, border: '1px solid #d8b4fe' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#7c3aed' }}>
+                <Box sx={{ p: 2, bgcolor: isDark ? '#581c87' : '#f3e8ff', borderRadius: 2, border: '1px solid #d8b4fe' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#e9d5ff' : '#7c3aed' }}>
                     oneOf (Exclusive)
                   </Typography>
                   <Autocomplete
@@ -1013,11 +1018,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
               {/* Discriminator - Only show when composition is used */}
               {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
-                <Box sx={{ mt: 3, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                <Box sx={{ mt: 3, p: 2, bgcolor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 2, border: isDark ? '1px dashed #475569' : '1px dashed #cbd5e1' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#e2e8f0' : 'inherit' }}>
                     Discriminator Configuration
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  <Typography variant="caption" sx={{ display: 'block', mb: 2, color: isDark ? '#94a3b8' : 'text.secondary' }}>
                     Helps tools understand which schema variant to use for polymorphic types
                   </Typography>
 
@@ -1056,8 +1061,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       />
 
                       {!formData.discriminatorUseAuto && (
-                        <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1, border: 1, borderColor: 'divider' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                        <Box sx={{ p: 2, bgcolor: isDark ? '#0f172a' : 'white', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#e2e8f0' : 'inherit' }}>
                             Explicit Mapping
                           </Typography>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -1130,13 +1135,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             {/* ═══════════════════════════════════════════════════════════════════════════
                 SECTION 4: Documentation & Extensions (Two-column)
                 ═══════════════════════════════════════════════════════════════════════════ */}
-            <Box sx={{ p: 3, bgcolor: '#fafafa' }}>
+            <Box sx={{ p: 3, bgcolor: isDark ? '#0f172a' : '#fafafa' }}>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
                 {/* External Documentation */}
-                <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                <Box sx={{ p: 2, bgcolor: isDark ? '#1e293b' : 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                     <ExternalLink size={16} style={{ color: '#6366f1' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
                       External Documentation
                     </Typography>
                   </Box>
@@ -1182,10 +1187,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </Box>
 
                 {/* Extensions */}
-                <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+                <Box sx={{ p: 2, bgcolor: isDark ? '#1e293b' : 'white', borderRadius: 2, border: 1, borderColor: 'divider' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                     <Code size={16} style={{ color: '#6366f1' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
                       Custom Extensions
                     </Typography>
                   </Box>

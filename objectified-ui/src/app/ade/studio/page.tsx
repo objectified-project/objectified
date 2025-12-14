@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
+import { useColorScheme } from '@mui/material/styles';
 import { useStudio } from './StudioContext';
 import { Copy, Download, Check, Eye, Code } from 'lucide-react';
 import Switch from '@mui/material/Switch';
@@ -77,6 +78,8 @@ type ViewMode = 'canvas' | 'code' | 'mermaid';
 
 const StudioContent = () => {
   const { data: session } = useSession();
+  const { mode: colorMode, systemMode } = useColorScheme();
+  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const {
     setSelectedProjectId: setContextProjectId,
@@ -1945,23 +1948,26 @@ const StudioContent = () => {
               onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
               fitView
               attributionPosition="bottom-left"
-              className={`dark:bg-gray-900 ${isAnimating ? 'layout-animating' : ''}`}
+              className={`${isDark ? 'bg-gray-900' : ''} ${isAnimating ? 'layout-animating' : ''}`}
               nodesDraggable={true}
               nodesConnectable={!isReadOnly}
               elementsSelectable={true}
               nodesFocusable={true}
               edgesFocusable={true}
-              style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)' }}
+              style={{
+                background: isDark
+                  ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
+                  : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
+              }}
             >
             <Background
               variant={BackgroundVariant.Dots}
               gap={20}
               size={1.5}
-              className="dark:bg-gray-900"
               color="currentColor"
               style={{
                 color: 'rgb(99, 102, 241)',
-                opacity: 0.15
+                opacity: isDark ? 0.25 : 0.15
               }}
             />
             <Controls

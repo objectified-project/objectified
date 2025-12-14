@@ -15,6 +15,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import { useColorScheme } from '@mui/material/styles';
 
 interface NavItem {
   label: string;
@@ -31,6 +32,8 @@ interface NavSection {
 const DashboardSideNav: React.FC = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { mode, systemMode } = useColorScheme();
+  const isDark = mode === 'dark' || (mode === 'system' && systemMode === 'dark');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const hasTenant = !!currentTenantId;
@@ -76,8 +79,12 @@ const DashboardSideNav: React.FC = () => {
           top: 48, // Offset for top header
           height: 'calc(100vh - 48px)',
           borderRight: 'none',
-          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.06)',
+          background: isDark
+            ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
+            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+          boxShadow: isDark
+            ? '4px 0 24px rgba(0, 0, 0, 0.3)'
+            : '4px 0 24px rgba(0, 0, 0, 0.06)',
         },
       }}
     >
@@ -93,7 +100,7 @@ const DashboardSideNav: React.FC = () => {
                 alignItems: 'center',
                 gap: 1,
                 fontWeight: 700,
-                color: '#64748b',
+                color: isDark ? '#94a3b8' : '#64748b',
                 letterSpacing: '0.08em',
                 fontSize: '0.65rem',
               }}
@@ -155,7 +162,7 @@ const DashboardSideNav: React.FC = () => {
                       <ListItemIcon
                         sx={{
                           minWidth: 40,
-                          color: active ? '#6366f1' : '#64748b',
+                          color: active ? '#6366f1' : (isDark ? '#94a3b8' : '#64748b'),
                           transition: 'color 0.2s ease',
                         }}
                       >
@@ -167,7 +174,7 @@ const DashboardSideNav: React.FC = () => {
                           primary: {
                             fontSize: '0.875rem',
                             fontWeight: active ? 600 : 500,
-                            color: active ? '#6366f1' : '#334155',
+                            color: active ? '#6366f1' : (isDark ? '#e2e8f0' : '#334155'),
                           },
                         }}
                       />

@@ -15,6 +15,7 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
+import { useColorScheme } from '@mui/material/styles';
 import { Search, Add, Edit, Delete } from '@mui/icons-material';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 
@@ -95,6 +96,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   selectedVersionId = null,
   isReadOnly = false,
 }) => {
+  const { mode, systemMode } = useColorScheme();
+  const isDark = mode === 'dark' || (mode === 'system' && systemMode === 'dark');
+
   const [currentTab, setCurrentTab] = useState<'classes' | 'properties'>('classes');
   const [classesSearchQuery, setClassesSearchQuery] = useState('');
   const [propertiesSearchQuery, setPropertiesSearchQuery] = useState('');
@@ -175,8 +179,12 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
           top: 48, // Offset for top header
           height: 'calc(100vh - 48px)',
           borderRight: 'none',
-          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          boxShadow: '4px 0 24px rgba(0, 0, 0, 0.06)',
+          background: isDark
+            ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
+            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+          boxShadow: isDark
+            ? '4px 0 24px rgba(0, 0, 0, 0.3)'
+            : '4px 0 24px rgba(0, 0, 0, 0.06)',
         },
       }}
     >
@@ -211,7 +219,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
           onChange={handleTabChange}
           variant="fullWidth"
           sx={{
-            borderBottom: '1px solid #e2e8f0',
+            borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
             minHeight: 52,
             '& .MuiTabs-indicator': {
               height: 3,
@@ -227,7 +235,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               minHeight: 52,
               fontWeight: currentTab === 'classes' ? 700 : 500,
               fontSize: '0.875rem',
-              color: currentTab === 'classes' ? '#6366f1' : '#64748b',
+              color: currentTab === 'classes'
+                ? '#6366f1'
+                : (isDark ? '#94a3b8' : '#64748b'),
               transition: 'all 0.2s ease',
               '&:hover': {
                 color: '#6366f1',
@@ -242,7 +252,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
               minHeight: 52,
               fontWeight: currentTab === 'properties' ? 700 : 500,
               fontSize: '0.875rem',
-              color: currentTab === 'properties' ? '#6366f1' : '#64748b',
+              color: currentTab === 'properties'
+                ? '#6366f1'
+                : (isDark ? '#94a3b8' : '#64748b'),
               transition: 'all 0.2s ease',
               '&:hover': {
                 color: '#6366f1',
@@ -268,13 +280,23 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
-                      backgroundColor: '#f8fafc',
+                      backgroundColor: isDark ? '#334155' : '#f8fafc',
                       transition: 'all 0.2s ease',
+                      '& input': {
+                        color: isDark ? '#e2e8f0' : 'inherit',
+                      },
+                      '& input::placeholder': {
+                        color: isDark ? '#94a3b8' : 'inherit',
+                        opacity: 1,
+                      },
+                      '& fieldset': {
+                        borderColor: isDark ? '#475569' : 'rgba(0, 0, 0, 0.23)',
+                      },
                       '&:hover': {
-                        backgroundColor: '#f1f5f9',
+                        backgroundColor: isDark ? '#475569' : '#f1f5f9',
                       },
                       '&.Mui-focused': {
-                        backgroundColor: '#ffffff',
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
                         boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
                       },
                     },
@@ -313,14 +335,14 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     </Box>
                     <Typography
                       variant="body2"
-                      sx={{ color: '#64748b', fontWeight: 500, mb: 0.5 }}
+                      sx={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, mb: 0.5 }}
                     >
                       {classes.length === 0
                         ? 'No classes yet'
                         : 'No classes match your search'}
                     </Typography>
                     {classes.length === 0 && (
-                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8' }}>
                         Click the + button to add one
                       </Typography>
                     )}
@@ -443,7 +465,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       boxShadow: '0 6px 20px rgba(99, 102, 241, 0.5)',
                     },
                     '&:disabled': {
-                      background: '#e2e8f0',
+                      background: isDark ? '#475569' : '#e2e8f0',
                       boxShadow: 'none',
                     },
                   }}
@@ -466,13 +488,23 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
-                      backgroundColor: '#f8fafc',
+                      backgroundColor: isDark ? '#334155' : '#f8fafc',
                       transition: 'all 0.2s ease',
+                      '& input': {
+                        color: isDark ? '#e2e8f0' : 'inherit',
+                      },
+                      '& input::placeholder': {
+                        color: isDark ? '#94a3b8' : 'inherit',
+                        opacity: 1,
+                      },
+                      '& fieldset': {
+                        borderColor: isDark ? '#475569' : 'rgba(0, 0, 0, 0.23)',
+                      },
                       '&:hover': {
-                        backgroundColor: '#f1f5f9',
+                        backgroundColor: isDark ? '#475569' : '#f1f5f9',
                       },
                       '&.Mui-focused': {
-                        backgroundColor: '#ffffff',
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
                         boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
                       },
                     },
@@ -552,14 +584,14 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     </Box>
                     <Typography
                       variant="body2"
-                      sx={{ color: '#64748b', fontWeight: 500, mb: 0.5 }}
+                      sx={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, mb: 0.5 }}
                     >
                       {properties.length === 0
                         ? 'No properties yet'
                         : 'No properties match your search'}
                     </Typography>
                     {properties.length === 0 && (
-                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8' }}>
                         Click the + button to add one
                       </Typography>
                     )}
@@ -621,7 +653,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               textDecoration: propertyItem.deprecated ? 'line-through' : 'none',
-                              color: propertyItem.deprecated ? '#94a3b8' : '#334155',
+                              color: propertyItem.deprecated
+                                ? '#94a3b8'
+                                : (isDark ? '#e2e8f0' : '#334155'),
                             }}
                             title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
                           >
@@ -658,7 +692,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               display: 'block',
-                              color: '#64748b',
+                              color: isDark ? '#94a3b8' : '#64748b',
                               mt: 0.25,
                             }}
                           >
@@ -733,7 +767,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       boxShadow: '0 6px 20px rgba(99, 102, 241, 0.5)',
                     },
                     '&:disabled': {
-                      background: '#e2e8f0',
+                      background: isDark ? '#475569' : '#e2e8f0',
                       boxShadow: 'none',
                     },
                   }}

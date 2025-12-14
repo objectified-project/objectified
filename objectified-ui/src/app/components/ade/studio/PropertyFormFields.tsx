@@ -13,6 +13,7 @@ import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
+import { useColorScheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -204,54 +205,59 @@ interface SectionHeaderProps {
   badge?: string;
 }
 
-const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, badge }) => (
-  <Box sx={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: 1.5,
-    mb: 2.5,
-    pb: 1.5,
-    borderBottom: '1px solid',
-    borderColor: 'rgba(99, 102, 241, 0.1)',
-  }}>
+const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, badge }) => {
+  const { mode: colorMode, systemMode } = useColorScheme();
+  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+
+  return (
     <Box sx={{
-      p: 1,
-      borderRadius: 1.5,
-      bgcolor: 'rgba(99, 102, 241, 0.1)',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 1.5,
+      mb: 2.5,
+      pb: 1.5,
+      borderBottom: '1px solid',
+      borderColor: 'rgba(99, 102, 241, 0.1)',
     }}>
-      {icon}
-    </Box>
-    <Box sx={{ flex: 1 }}>
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b', letterSpacing: '-0.01em' }}>
-        {title}
-      </Typography>
-      {subtitle && (
-        <Typography variant="caption" sx={{ color: '#64748b' }}>
-          {subtitle}
+      <Box sx={{
+        p: 1,
+        borderRadius: 1.5,
+        bgcolor: 'rgba(99, 102, 241, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        {icon}
+      </Box>
+      <Box sx={{ flex: 1 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', letterSpacing: '-0.01em' }}>
+          {title}
+        </Typography>
+        {subtitle && (
+          <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+            {subtitle}
+          </Typography>
+        )}
+      </Box>
+      {badge && (
+        <Typography variant="caption" sx={{
+          px: 1.5,
+          py: 0.5,
+          bgcolor: isDark ? 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+          background: isDark ? 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+          color: isDark ? '#c7d2fe' : '#4338ca',
+          borderRadius: 2,
+          fontWeight: 600,
+          fontSize: '0.7rem',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}>
+          {badge}
         </Typography>
       )}
     </Box>
-    {badge && (
-      <Typography variant="caption" sx={{
-        px: 1.5,
-        py: 0.5,
-        bgcolor: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-        background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-        color: '#4338ca',
-        borderRadius: 2,
-        fontWeight: 600,
-        fontSize: '0.7rem',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-      }}>
-        {badge}
-      </Typography>
-    )}
-  </Box>
-);
+  );
+};
 
 export interface PropertyFormFieldsProps {
   // Property type info
@@ -288,6 +294,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   size = 'medium',
   nestedProperties,
 }) => {
+  const { mode: colorMode, systemMode } = useColorScheme();
+  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+
   const [enumInput, setEnumInput] = React.useState('');
   const [enumError, setEnumError] = React.useState('');
 
@@ -506,7 +515,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       display: 'flex',
       flexDirection: 'column',
       gap: 0,
-      bgcolor: '#f8fafc',
+      bgcolor: isDark ? '#0f172a' : '#f8fafc',
       minHeight: '100%',
     }}>
       {/* ═══════════════════════════════════════════════════════════════════════════
@@ -514,7 +523,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           ═══════════════════════════════════════════════════════════════════════════ */}
       <Box sx={{
         p: 3,
-        bgcolor: 'white',
+        bgcolor: isDark ? '#1e293b' : 'white',
         borderBottom: '1px solid #e2e8f0',
       }}>
         <SectionHeader
@@ -630,9 +639,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       {showMetadata && (
         <Box sx={{
           p: 3,
-          borderBottom: '1px solid #e2e8f0',
-          bgcolor: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
         }}>
           <SectionHeader
             icon={<TuneIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
@@ -837,7 +846,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               placeholder="e.g., Use newProperty instead. Will be removed in v2.0."
               sx={{
                 mt: 2.5,
-                bgcolor: 'white',
+                bgcolor: isDark ? '#0f172a' : 'white',
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 2,
                   borderColor: 'rgba(245, 158, 11, 0.3)',
@@ -853,8 +862,8 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           ═══════════════════════════════════════════════════════════════════════════ */}
       <Box sx={{
         p: 3,
-        borderBottom: '1px solid #e2e8f0',
-        bgcolor: 'white',
+        borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+        bgcolor: isDark ? '#1e293b' : 'white',
       }}>
         <SectionHeader
           icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
@@ -868,7 +877,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           <Box sx={{
             mb: 2.5,
             p: 2.5,
-            bgcolor: 'rgba(59, 130, 246, 0.06)',
+            bgcolor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.06)',
             border: '1px solid rgba(59, 130, 246, 0.2)',
             borderRadius: 2.5,
             display: 'flex',
@@ -878,7 +887,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             <Box sx={{
               p: 0.75,
               borderRadius: 1.5,
-              bgcolor: 'rgba(59, 130, 246, 0.15)',
+              bgcolor: isDark ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -901,15 +910,15 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         {(baseType === 'boolean' || baseType === 'null') && (
           <Box sx={{
             p: 4,
-            bgcolor: '#f8fafc',
+            bgcolor: isDark ? '#1e293b' : '#f8fafc',
             borderRadius: 2.5,
-            border: '2px dashed #e2e8f0',
+            border: isDark ? '2px dashed #475569' : '2px dashed #e2e8f0',
             textAlign: 'center',
           }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic', mb: 0.5 }}>
+            <Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#64748b', fontStyle: 'italic', mb: 0.5 }}>
               No additional constraints available
             </Typography>
-            <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+            <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8' }}>
               {baseType === 'boolean'
                 ? 'Boolean values are either true or false'
                 : 'Null type is always null'}
@@ -921,13 +930,13 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         {baseType === 'string' && !data.tupleMode && (
           <Box sx={{
             p: 2.5,
-            bgcolor: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
             borderRadius: 2.5,
-            border: '1px solid #e2e8f0',
+            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box component="span" sx={{
                 width: 6,
                 height: 6,
@@ -935,7 +944,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 bgcolor: '#6366f1',
               }} />
               String Constraints
-              {isArray && <Typography component="span" variant="caption" sx={{ color: '#64748b', ml: 1 }}>(per item)</Typography>}
+              {isArray && <Typography component="span" variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', ml: 1 }}>(per item)</Typography>}
             </Typography>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
@@ -948,7 +957,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 placeholder="date, email, uri, uuid..."
                 helperText="Standard format hint"
                 sx={{
-                  bgcolor: 'white',
+                  bgcolor: isDark ? '#0f172a' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
@@ -963,7 +972,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   onChange={(e) => onChange('minLength', e.target.value)}
                   inputProps={{ min: 0 }}
                   sx={{
-                    bgcolor: 'white',
+                    bgcolor: isDark ? '#0f172a' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                   }}
                 />
@@ -976,7 +985,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   onChange={(e) => onChange('maxLength', e.target.value)}
                   inputProps={{ min: 0 }}
                   sx={{
-                    bgcolor: 'white',
+                    bgcolor: isDark ? '#0f172a' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                   }}
                 />
@@ -993,7 +1002,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               helperText="Regular expression for validation"
               sx={{
                 mb: 1.5,
-                bgcolor: 'white',
+                bgcolor: isDark ? '#0f172a' : 'white',
                 '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.875rem' },
                 '& .MuiOutlinedInput-root': { borderRadius: 2 },
               }}
@@ -1007,13 +1016,13 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         {(baseType === 'number' || baseType === 'integer') && !data.tupleMode && (
           <Box sx={{
             p: 2.5,
-            bgcolor: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+            background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
             borderRadius: 2.5,
-            border: '1px solid #e2e8f0',
+            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box component="span" sx={{
                 width: 6,
                 height: 6,
@@ -1028,9 +1037,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               {/* Minimum */}
               <Box sx={{
                 p: 2,
-                bgcolor: 'white',
+                bgcolor: isDark ? '#0f172a' : 'white',
                 borderRadius: 2,
-                border: '1px solid #e2e8f0',
+                border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
               }}>
                 <TextField
@@ -1063,7 +1072,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: '#475569' }}>≥ inclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≥ inclusive</Typography>}
                     sx={{ m: 0 }}
                   />
                   <FormControlLabel
@@ -1076,7 +1085,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: '#475569' }}>&gt; exclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&gt; exclusive</Typography>}
                     sx={{ m: 0 }}
                   />
                 </Box>
@@ -1085,9 +1094,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               {/* Maximum */}
               <Box sx={{
                 p: 2,
-                bgcolor: 'white',
+                bgcolor: isDark ? '#0f172a' : 'white',
                 borderRadius: 2,
-                border: '1px solid #e2e8f0',
+                border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
               }}>
                 <TextField
@@ -1120,7 +1129,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: '#475569' }}>≤ inclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≤ inclusive</Typography>}
                     sx={{ m: 0 }}
                   />
                   <FormControlLabel
@@ -1133,7 +1142,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: '#475569' }}>&lt; exclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&lt; exclusive</Typography>}
                     sx={{ m: 0 }}
                   />
                 </Box>
@@ -1149,7 +1158,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               onChange={(e) => onChange('multipleOf', e.target.value)}
               helperText="Value must be divisible by this number"
               sx={{
-                bgcolor: 'white',
+                bgcolor: isDark ? '#0f172a' : 'white',
                 '& .MuiOutlinedInput-root': { borderRadius: 2 },
               }}
             />
@@ -1160,14 +1169,14 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         {isArray && (
           <Box sx={{
             p: 2.5,
-            bgcolor: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-            background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+            bgcolor: isDark ? 'linear-gradient(135deg, #422006 0%, #713f12 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+            background: isDark ? 'linear-gradient(135deg, #422006 0%, #713f12 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
             borderRadius: 2.5,
             border: '1px solid rgba(250, 204, 21, 0.4)',
             mt: 2.5,
             boxShadow: '0 2px 8px rgba(250, 204, 21, 0.1)',
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#854d0e', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#fcd34d' : '#854d0e', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box component="span" sx={{
                 width: 6,
                 height: 6,
@@ -1187,7 +1196,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 onChange={(e) => onChange('minItems', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
-                  bgcolor: 'white',
+                  bgcolor: isDark ? '#1e293b' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
@@ -1200,7 +1209,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 onChange={(e) => onChange('maxItems', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
-                  bgcolor: 'white',
+                  bgcolor: isDark ? '#1e293b' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
@@ -1208,10 +1217,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 p: 1.5,
-                bgcolor: data.uniqueItems ? 'rgba(34, 197, 94, 0.1)' : 'white',
+                bgcolor: data.uniqueItems ? 'rgba(34, 197, 94, 0.1)' : (isDark ? '#1e293b' : 'white'),
                 borderRadius: 2,
                 border: '1px solid',
-                borderColor: data.uniqueItems ? 'rgba(34, 197, 94, 0.4)' : '#e2e8f0',
+                borderColor: data.uniqueItems ? 'rgba(34, 197, 94, 0.4)' : (isDark ? '#475569' : '#e2e8f0'),
                 cursor: 'pointer',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 boxShadow: data.uniqueItems ? '0 2px 8px rgba(34, 197, 94, 0.15)' : 'none',
@@ -1231,7 +1240,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       sx={{ '&.Mui-checked': { color: '#22c55e' } }}
                     />
                   }
-                  label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.uniqueItems ? '#16a34a' : '#475569' }}>Unique Items</Typography>}
+                  label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.uniqueItems ? '#16a34a' : (isDark ? '#94a3b8' : '#475569') }}>Unique Items</Typography>}
                   sx={{ m: 0 }}
                 />
               </Box>
@@ -1240,11 +1249,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             {/* Contains Schema - collapsible advanced feature */}
             <Box sx={{
               p: 2,
-              bgcolor: 'white',
+              bgcolor: isDark ? '#1e293b' : 'white',
               borderRadius: 2,
-              border: '2px dashed #e2e8f0',
+              border: isDark ? '2px dashed #475569' : '2px dashed #e2e8f0',
             }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <CodeIcon sx={{ fontSize: 14 }} />
                 Contains Schema (OpenAPI 3.1)
               </Typography>
@@ -1299,9 +1308,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             <Box sx={{
               mt: 2.5,
               p: 2,
-              bgcolor: 'white',
+              bgcolor: isDark ? '#1e293b' : 'white',
               borderRadius: 2,
-              border: '1px solid #e2e8f0',
+              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
             }}>
               <FormControlLabel
                 control={
@@ -1321,10 +1330,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 }
                 label={
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
                       Tuple Mode (prefixItems)
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                    <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
                       Define ordered schemas for specific array positions
                     </Typography>
                   </Box>
@@ -1369,13 +1378,13 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         {baseType === 'object' && (
           <Box sx={{
             p: 2.5,
-            bgcolor: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            bgcolor: isDark ? 'linear-gradient(135deg, #14532d 0%, #166534 100%)' : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            background: isDark ? 'linear-gradient(135deg, #14532d 0%, #166534 100%)' : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
             borderRadius: 2.5,
             border: '1px solid rgba(34, 197, 94, 0.3)',
             boxShadow: '0 2px 8px rgba(34, 197, 94, 0.1)',
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: '#166534', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#86efac' : '#166534', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box component="span" sx={{
                 width: 6,
                 height: 6,
@@ -1395,7 +1404,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 onChange={(e) => onChange('minProperties', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
-                  bgcolor: 'white',
+                  bgcolor: isDark ? '#0f172a' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
@@ -1408,7 +1417,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 onChange={(e) => onChange('maxProperties', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
-                  bgcolor: 'white',
+                  bgcolor: isDark ? '#0f172a' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
@@ -1416,27 +1425,27 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
             <Box sx={{
               p: 2,
-              bgcolor: 'white',
+              bgcolor: isDark ? '#0f172a' : 'white',
               borderRadius: 2,
-              border: '1px solid #e2e8f0',
+              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
             }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', display: 'block', mb: 1.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 1.5 }}>
                 Additional Properties
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <FormControlLabel
                   control={<Radio checked={data.additionalProperties === 'default'} onChange={() => onChange('additionalProperties', 'default')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: '#475569' }}>Default (allows additional)</Typography>}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Default (allows additional)</Typography>}
                   sx={{ m: 0 }}
                 />
                 <FormControlLabel
                   control={<Radio checked={data.additionalProperties === 'true'} onChange={() => onChange('additionalProperties', 'true')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: '#475569' }}>Allow additional properties</Typography>}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Allow additional properties</Typography>}
                   sx={{ m: 0 }}
                 />
                 <FormControlLabel
                   control={<Radio checked={data.additionalProperties === 'false'} onChange={() => onChange('additionalProperties', 'false')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: '#475569' }}>Strict (no extra properties)</Typography>}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Strict (no extra properties)</Typography>}
                   sx={{ m: 0 }}
                 />
               </Box>
@@ -1446,9 +1455,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             <Box sx={{
               mt: 2.5,
               p: 2.5,
-              bgcolor: 'white',
+              bgcolor: isDark ? '#0f172a' : 'white',
               borderRadius: 2.5,
-              border: '1px solid #e2e8f0',
+              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             }}>
               <Box sx={{
@@ -1470,10 +1479,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   <SortByAlphaIcon sx={{ color: '#8b5cf6', fontSize: 16 }} />
                 </Box>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
                     Property Name Constraints
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
                     Validate the names of properties, not their values
                   </Typography>
                 </Box>
@@ -1508,7 +1517,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   placeholder="e.g., 1"
                   helperText="Minimum name length"
                   sx={{
-                    bgcolor: 'white',
+                    bgcolor: isDark ? '#1e293b' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                     '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
                   }}
@@ -1524,7 +1533,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   placeholder="e.g., 50"
                   helperText="Maximum name length"
                   sx={{
-                    bgcolor: 'white',
+                    bgcolor: isDark ? '#1e293b' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                     '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
                   }}
@@ -1593,9 +1602,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'boolean') && (
         <Box sx={{
           p: 3,
-          borderBottom: '1px solid #e2e8f0',
-          bgcolor: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
         }}>
           <SectionHeader
             icon={<CodeIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
@@ -1607,12 +1616,12 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             {/* Constant Value */}
             <Box sx={{
               p: 2.5,
-              bgcolor: 'white',
+              bgcolor: isDark ? '#0f172a' : 'white',
               borderRadius: 2.5,
-              border: '1px solid #e2e8f0',
+              border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Box component="span" sx={{
                   width: 6,
                   height: 6,
@@ -1667,14 +1676,14 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             {baseType !== 'boolean' && (
               <Box sx={{
                 p: 2.5,
-                bgcolor: 'white',
+                bgcolor: isDark ? '#0f172a' : 'white',
                 borderRadius: 2.5,
-                border: '1px solid #e2e8f0',
+                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Box component="span" sx={{
                         width: 6,
                         height: 6,
@@ -1758,11 +1767,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 {data.enum && data.enum.length > 0 && (
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleEnumDragEnd}>
                     <List dense sx={{
-                      bgcolor: '#f8fafc',
+                      bgcolor: isDark ? '#1e293b' : '#f8fafc',
                       borderRadius: 2,
                       maxHeight: 150,
                       overflow: 'auto',
-                      border: '1px solid #e2e8f0',
+                      border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
                     }}>
                       <SortableContext items={data.enum} strategy={verticalListSortingStrategy}>
                         {data.enum.map((value) => (
@@ -1781,7 +1790,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 5: Advanced (NOT Composition, External Docs, Extensions)
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{ p: 3, bgcolor: 'white' }}>
+      <Box sx={{ p: 3, bgcolor: isDark ? '#1e293b' : 'white' }}>
         <SectionHeader
           icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
           title="Advanced"
@@ -1792,13 +1801,13 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           {/* NOT Composition */}
           <Box sx={{
             p: 2.5,
-            bgcolor: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-            background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            bgcolor: isDark ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+            background: isDark ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
             borderRadius: 2.5,
             border: '1px solid rgba(239, 68, 68, 0.25)',
             boxShadow: '0 2px 8px rgba(239, 68, 68, 0.08)',
           }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#991b1b', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#fecaca' : '#991b1b', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box component="span" sx={{
                 width: 6,
                 height: 6,
@@ -1807,7 +1816,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }} />
               NOT Schema
             </Typography>
-            <Typography variant="caption" sx={{ color: '#7f1d1d', display: 'block', mb: 2 }}>
+            <Typography variant="caption" sx={{ color: isDark ? '#fca5a5' : '#7f1d1d', display: 'block', mb: 2 }}>
               Data must NOT match this schema (exclusion rule)
             </Typography>
             <TextField
@@ -1819,7 +1828,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               onChange={(e) => onChange('not', e.target.value)}
               placeholder='{"type": "string", "maxLength": 0}'
               sx={{
-                bgcolor: 'white',
+                bgcolor: isDark ? '#1e293b' : 'white',
                 '& textarea': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.8rem' },
                 '& .MuiOutlinedInput-root': { borderRadius: 2 },
               }}
@@ -1828,11 +1837,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               <Box sx={{
                 mt: 2,
                 p: 2,
-                bgcolor: 'white',
+                bgcolor: isDark ? '#1e293b' : 'white',
                 borderRadius: 2,
                 border: '1px solid rgba(239, 68, 68, 0.25)',
               }}>
-                <Typography variant="caption" sx={{ color: '#991b1b', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ color: isDark ? '#fca5a5' : '#991b1b', display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box component="span" sx={{ color: '#ef4444' }}>✗</Box>
                   Values matching this schema will be rejected
                 </Typography>
@@ -1843,9 +1852,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           {/* External Documentation */}
           <Box sx={{
             p: 2.5,
-            bgcolor: 'white',
+            bgcolor: isDark ? '#0f172a' : 'white',
             borderRadius: 2.5,
-            border: '1px solid #e2e8f0',
+            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
@@ -1859,7 +1868,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }}>
                 <OpenInNewIcon sx={{ color: '#6366f1', fontSize: 16 }} />
               </Box>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
                 External Documentation
               </Typography>
             </Box>
@@ -1917,10 +1926,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         <Box sx={{
           mt: 3,
           p: 2.5,
-          bgcolor: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
           borderRadius: 2.5,
-          border: '1px solid #e2e8f0',
+          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
         }}>
           <ExtensionsEditor
             value={data.extensions || {}}
