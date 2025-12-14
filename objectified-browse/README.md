@@ -184,7 +184,7 @@ import { getPublicTenants } from "../../lib/db/helper";
 import { getPublicTenants } from "@/lib/db/helper";
 ```
 
-See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for path reference table.
+See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for path reference table.
 
 ## Security
 
@@ -212,7 +212,7 @@ See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for path reference table.
 
 ## Troubleshooting
 
-For common issues and solutions, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
+For common issues and solutions, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 Quick fixes:
 - **Module not found**: Use relative imports for `lib` directory

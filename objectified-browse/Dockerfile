@@ -1,4 +1,4 @@
-# Dockerfile for Objectified UI (Next.js)
+# Dockerfile for Objectified Browse (Next.js)
 # Supports: linux/amd64, linux/arm64
 
 # Stage 1: Dependencies
@@ -9,12 +9,11 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 # Copy package files
-COPY package.json package-lock.json* ./
+COPY package.json ./
 
 # Install ALL dependencies (including dev deps) for build
 # TypeScript is needed to transpile next.config.ts
-#RUN npm install
-
+RUN yarn install
 
 # Stage 2: Builder
 FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
@@ -30,7 +29,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build Next.js application
-RUN npm run build
+RUN yarn build
 
 # Stage 3: Runner (Production)
 FROM node:20-alpine AS runner
@@ -44,10 +43,20 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy necessary files from builder
+# Copy package files for yarn start command
+COPY --from=builder /app/package.json ./package.json
+
+# Copy node_modules (production dependencies)
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy Next.js build output
+COPY --from=builder /app/.next ./.next
+
+# Copy public directory
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+
+# Copy next.config.ts if it exists
+COPY --from=builder /app/next.config.ts* ./
 
 # Set ownership to non-root user
 RUN chown -R nextjs:nodejs /app
@@ -64,4 +73,3 @@ ENV PORT=3000
 
 # Start the application
 CMD ["yarn", "start"]
-

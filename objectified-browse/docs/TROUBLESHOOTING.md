@@ -36,7 +36,7 @@ export default async function Page({
 }
 ```
 
-See [NEXTJS_15_PARAMS_FIX.md](./NEXTJS_15_PARAMS_FIX.md) for complete details.
+See [NEXTJS_15_PARAMS_FIX.md](NEXTJS_15_PARAMS_FIX.md) for complete details.
 
 ## Module Resolution Errors
 

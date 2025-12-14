@@ -6583,6 +6583,7 @@ __metadata:
     "@types/pg": "npm:^8.16.0"
     "@types/react": "npm:^19"
     "@types/react-dom": "npm:^19"
+    diff: "npm:^8.0.2"
     eslint: "npm:^9"
     eslint-config-next: "npm:16.0.10"
     next: "npm:16.0.10"

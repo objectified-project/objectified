@@ -125,5 +125,5 @@ The application now works with the current database schema. All queries have bee
 - ✅ No remaining references to `published_by`, `publisher_name`, or `publisher_email`
 - ✅ Application ready for use
 
-See [DATABASE_SCHEMA_FIX_VERIFICATION.md](./DATABASE_SCHEMA_FIX_VERIFICATION.md) for detailed verification results.
+See [DATABASE_SCHEMA_FIX_VERIFICATION.md](DATABASE_SCHEMA_FIX_VERIFICATION.md) for detailed verification results.
 
