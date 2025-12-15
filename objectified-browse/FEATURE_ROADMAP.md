@@ -48,7 +48,6 @@ This document outlines the planned features, improvements, and enhancements for 
 
 - [ ] Full-text search within specification content
 - [ ] Filter by date range (published date)
-- [ ] Filter by OpenAPI version (3.0.x, 3.1.x)
 - [ ] Search suggestions/autocomplete
 - [ ] Search history (recent searches)
 - [ ] Highlight search terms in results
@@ -117,8 +116,8 @@ This document outlines the planned features, improvements, and enhancements for 
 **Status:** Planned  
 **Description:** Export specifications in various formats.
 
-- [ ] Download as JSON (current)
-- [ ] Download as YAML
+- ✅ Download as JSON (current)
+- [ ] Download as YAML [#182]
 - [ ] Download as HTML documentation
 - [ ] Download as PDF
 - [ ] Download as Markdown

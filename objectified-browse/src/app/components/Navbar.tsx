@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useTheme, specThemes, SpecTheme, Theme } from './ThemeProvider';
@@ -17,16 +18,23 @@ export function Navbar() {
           {/* Logo and Brand */}
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold text-lg shadow-sm">
-                O
-              </div>
-              <div className="hidden sm:block">
-                <div className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                  Objectified
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 -mt-0.5">
-                  API Specification Browser
-                </div>
+              <div className="flex h-12 items-center justify-center relative">
+                <Image
+                  src="/Objectified-02.png"
+                  alt="Objectified Logo"
+                  width={120}
+                  height={48}
+                  className="object-contain dark:hidden h-12 w-auto"
+                  priority
+                />
+                <Image
+                  src="/Objectified-05.png"
+                  alt="Objectified Logo"
+                  width={120}
+                  height={48}
+                  className="object-contain hidden dark:block h-12 w-auto"
+                  priority
+                />
               </div>
             </Link>
 
