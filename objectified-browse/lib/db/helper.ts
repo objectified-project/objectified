@@ -1,11 +1,13 @@
 'use server';
 
+import { unstable_noStore as noStore } from 'next/cache';
 import connectionPool from './db';
 
 /**
  * Get all tenants that have at least one published public version
  */
 export async function getPublicTenants() {
+  noStore();
   try {
     const result = await connectionPool.query(
       `SELECT DISTINCT t.id, t.name, t.slug, t.description, t.created_at

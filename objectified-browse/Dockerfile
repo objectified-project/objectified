@@ -19,24 +19,16 @@ RUN yarn install
 FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 
-# Build arguments for configuration
-ARG NEXT_PUBLIC_BASE_PATH=""
-ARG NEXT_PUBLIC_REST_API_BASE_URL="http://localhost:8000/v1"
-
-# Set environment variables from build args
-ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
-ENV NEXT_PUBLIC_REST_API_BASE_URL=$NEXT_PUBLIC_REST_API_BASE_URL
-
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy application code
+# Copy application code (including .env.production)
 COPY . .
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build Next.js application
+# Build Next.js application (will read from .env.production automatically)
 RUN yarn build
 
 # Stage 3: Runner (Production)
