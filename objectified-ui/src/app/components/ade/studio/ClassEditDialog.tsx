@@ -607,7 +607,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     schemaContent = JSON.stringify(openApiDoc, null, 2);
   } else if (tabValue === 2) {
     // YAML view
-    schemaContent = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+    schemaContent = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
   } else if (tabValue === 3) {
     // Example view - regenerate when exampleRefreshKey changes
     try {
@@ -655,7 +655,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       }
     } else if (tabValue === 2) {
       // YAML view
-      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
     } else {
       // JSON view
       content = JSON.stringify(openApiDoc, null, 2);
@@ -689,7 +689,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       extension = 'json';
     } else if (tabValue === 2) {
       // YAML view
-      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false });
+      content = YAML.stringify(openApiDoc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
       filenameSuffix = 'schema';
       mimeType = 'text/yaml';
       extension = 'yaml';
