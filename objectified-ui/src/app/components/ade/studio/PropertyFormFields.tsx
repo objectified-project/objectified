@@ -76,6 +76,10 @@ export interface PropertyFormData {
   prefixItems?: any[]; // OpenAPI 3.1: Array of schemas for specific positions
   itemsSchema?: string; // JSON string of items schema for positions beyond prefix
 
+  // unevaluatedItems (OpenAPI 3.1/JSON Schema 2020-12)
+  unevaluatedItems?: 'default' | 'allow' | 'disallow' | 'schema'; // Control for items not matched by prefixItems, items, or contains
+  unevaluatedItemsSchema?: string; // JSON string of schema when unevaluatedItems is 'schema'
+
   // Common constraints
   enum?: string[];
   const?: string; // OpenAPI 3.1: Constant value (mutually exclusive with enum)
@@ -1370,6 +1374,104 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   </Box>
                 </Box>
               </Collapse>
+            </Box>
+
+            {/* Unevaluated Items - OpenAPI 3.1/JSON Schema 2020-12 advanced feature */}
+            <Box sx={{
+              mt: 2.5,
+              p: 2,
+              bgcolor: isDark ? '#1e293b' : 'white',
+              borderRadius: 2,
+              border: isDark ? '2px dashed #475569' : '2px dashed #e2e8f0',
+            }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <TuneIcon sx={{ fontSize: 14 }} />
+                Unevaluated Items (OpenAPI 3.1)
+                <Tooltip title="Controls array items not matched by prefixItems, items, or contains. This is an advanced validation feature from JSON Schema 2020-12.">
+                  <InfoOutlinedIcon sx={{ fontSize: 14, ml: 0.5, color: isDark ? '#64748b' : '#94a3b8', cursor: 'help' }} />
+                </Tooltip>
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={!data.unevaluatedItems || data.unevaluatedItems === 'default'}
+                        onChange={() => {
+                          onChange('unevaluatedItems', 'default');
+                          onChange('unevaluatedItemsSchema', undefined);
+                        }}
+                        size="small"
+                        sx={{ '&.Mui-checked': { color: '#6366f1' } }}
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Default (not set)</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.unevaluatedItems === 'allow'}
+                        onChange={() => {
+                          onChange('unevaluatedItems', 'allow');
+                          onChange('unevaluatedItemsSchema', undefined);
+                        }}
+                        size="small"
+                        sx={{ '&.Mui-checked': { color: '#22c55e' } }}
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Allow any</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.unevaluatedItems === 'disallow'}
+                        onChange={() => {
+                          onChange('unevaluatedItems', 'disallow');
+                          onChange('unevaluatedItemsSchema', undefined);
+                        }}
+                        size="small"
+                        sx={{ '&.Mui-checked': { color: '#ef4444' } }}
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Disallow</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Radio
+                        checked={data.unevaluatedItems === 'schema'}
+                        onChange={() => onChange('unevaluatedItems', 'schema')}
+                        size="small"
+                        sx={{ '&.Mui-checked': { color: '#f59e0b' } }}
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Specify schema</Typography>}
+                    sx={{ m: 0 }}
+                  />
+                </Box>
+
+                <Collapse in={data.unevaluatedItems === 'schema'} timeout={300}>
+                  <Box sx={{ mt: 1.5 }}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      size={size}
+                      value={data.unevaluatedItemsSchema || ''}
+                      onChange={(e) => onChange('unevaluatedItemsSchema', e.target.value)}
+                      placeholder='{"type": "string", "maxLength": 100}'
+                      helperText="Schema that unevaluated items must match"
+                      sx={{
+                        '& textarea': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.8rem' },
+                        '& .MuiOutlinedInput-root': { borderRadius: 1.5 },
+                      }}
+                    />
+                  </Box>
+                </Collapse>
+              </Box>
             </Box>
           </Box>
         )}

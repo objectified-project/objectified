@@ -196,6 +196,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           (typeof (property as any).items === 'object' ?
             JSON.stringify((property as any).items, null, 2) :
             String((property as any).items)) : '',
+        // unevaluatedItems (OpenAPI 3.1/JSON Schema 2020-12)
+        unevaluatedItems: (property as any).unevaluatedItems === true ? 'allow' :
+          (property as any).unevaluatedItems === false ? 'disallow' :
+          (typeof (property as any).unevaluatedItems === 'object' ? 'schema' : 'default'),
+        unevaluatedItemsSchema: typeof (property as any).unevaluatedItems === 'object' ?
+          JSON.stringify((property as any).unevaluatedItems, null, 2) : '',
         // Enum and default come from items for array types
         enum: minMaxSource.enum || [],
         const: minMaxSource.const !== undefined ? (typeof minMaxSource.const === 'string' ? minMaxSource.const : JSON.stringify(minMaxSource.const)) : '',
@@ -548,6 +554,22 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           delete dataObject.contains;
           delete dataObject.minContains;
           delete dataObject.maxContains;
+        }
+
+        // Handle unevaluatedItems (OpenAPI 3.1/JSON Schema 2020-12)
+        if (formData.unevaluatedItems === 'allow') {
+          dataObject.unevaluatedItems = true;
+        } else if (formData.unevaluatedItems === 'disallow') {
+          dataObject.unevaluatedItems = false;
+        } else if (formData.unevaluatedItems === 'schema' && formData.unevaluatedItemsSchema?.trim()) {
+          try {
+            dataObject.unevaluatedItems = JSON.parse(formData.unevaluatedItemsSchema);
+          } catch (e) {
+            // If not valid JSON, treat as a simple type
+            dataObject.unevaluatedItems = { type: formData.unevaluatedItemsSchema };
+          }
+        } else {
+          delete dataObject.unevaluatedItems;
         }
 
         // Handle Tuple Mode (OpenAPI 3.1 prefixItems)

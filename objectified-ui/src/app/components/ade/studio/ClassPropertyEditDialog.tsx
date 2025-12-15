@@ -157,6 +157,13 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
           JSON.stringify(propData.items, null, 2) :
           String(propData.items)) : '',
 
+      // unevaluatedItems (OpenAPI 3.1/JSON Schema 2020-12)
+      unevaluatedItems: propData.unevaluatedItems === true ? 'allow' :
+        propData.unevaluatedItems === false ? 'disallow' :
+        (typeof propData.unevaluatedItems === 'object' ? 'schema' : 'default'),
+      unevaluatedItemsSchema: typeof propData.unevaluatedItems === 'object' ?
+        JSON.stringify(propData.unevaluatedItems, null, 2) : '',
+
       // Common constraints
       default: schema.default !== undefined ? JSON.stringify(schema.default) : '',
       const: schema.const !== undefined ? (typeof schema.const === 'string' ? schema.const : JSON.stringify(schema.const)) : '',
@@ -389,6 +396,22 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         } else {
           // Not in tuple mode - delete prefixItems if present
           delete updatedData.prefixItems;
+        }
+
+        // Handle unevaluatedItems (OpenAPI 3.1/JSON Schema 2020-12)
+        if (formData.unevaluatedItems === 'allow') {
+          updatedData.unevaluatedItems = true;
+        } else if (formData.unevaluatedItems === 'disallow') {
+          updatedData.unevaluatedItems = false;
+        } else if (formData.unevaluatedItems === 'schema' && formData.unevaluatedItemsSchema?.trim()) {
+          try {
+            updatedData.unevaluatedItems = JSON.parse(formData.unevaluatedItemsSchema);
+          } catch (e) {
+            // If not valid JSON, treat as a simple type
+            updatedData.unevaluatedItems = { type: formData.unevaluatedItemsSchema };
+          }
+        } else {
+          delete updatedData.unevaluatedItems;
         }
       }
 
