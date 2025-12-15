@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { DataTable } from '../components/DataTable';
+import { sanitizeSearchInput, SAFE_SEARCH_HTML_PATTERN } from '../utils/searchValidation';
 
 interface SearchResult {
   tenant_id: string;
@@ -77,7 +78,9 @@ export function SearchClient({
               <input
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => setQuery(sanitizeSearchInput(e.target.value))}
+                pattern={SAFE_SEARCH_HTML_PATTERN}
+                title="Only letters, numbers, spaces, dashes, and underscores are allowed"
                 placeholder="Search by organization name, project name, or description..."
                 className="w-full rounded-lg border border-zinc-200 bg-white py-3 pl-12 pr-4 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
                 autoFocus

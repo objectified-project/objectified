@@ -1,5 +1,6 @@
 import { searchPublicTenantsAndProjects } from "../../../lib/db/helper";
 import { SearchClient } from "./SearchClient";
+import { sanitizeSearchInput } from "../utils/searchValidation";
 
 export default async function SearchPage({
   searchParams,
@@ -7,7 +8,8 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  const query = q || "";
+  // Sanitize the query parameter to prevent injection attacks
+  const query = sanitizeSearchInput(q || "");
   const results = query ? await searchPublicTenantsAndProjects(query) : [];
 
   return <SearchClient initialQuery={query} initialResults={results} />;

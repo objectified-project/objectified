@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { sanitizeSearchInput, SAFE_SEARCH_HTML_PATTERN } from '../utils/searchValidation';
 
 interface Column<T> {
   key: string;
@@ -95,26 +96,41 @@ export function DataTable<T extends Record<string, any>>({
     );
   };
 
+  const router = useRouter();
+
   const RowWrapper = ({ item, children }: { item: T; children: React.ReactNode }) => {
-    const className = "group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer";
+    const baseClassName = "hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors";
+    const clickableClassName = `${baseClassName} cursor-pointer group`;
 
     if (getRowHref) {
+      const href = getRowHref(item);
       return (
-        <Link href={getRowHref(item)} className={`table-row ${className}`}>
-          {children}
-        </Link>
-      );
-    }
-
-    if (onRowClick) {
-      return (
-        <tr className={className} onClick={() => onRowClick(item)}>
+        <tr
+          className={clickableClassName}
+          onClick={() => router.push(href)}
+          role="link"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              router.push(href);
+            }
+          }}
+        >
           {children}
         </tr>
       );
     }
 
-    return <tr>{children}</tr>;
+    if (onRowClick) {
+      return (
+        <tr className={clickableClassName} onClick={() => onRowClick(item)}>
+          {children}
+        </tr>
+      );
+    }
+
+    return <tr className={baseClassName}>{children}</tr>;
   };
 
   return (
@@ -135,9 +151,11 @@ export function DataTable<T extends Record<string, any>>({
               type="text"
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
+                setSearchQuery(sanitizeSearchInput(e.target.value));
                 setCurrentPage(1);
               }}
+              pattern={SAFE_SEARCH_HTML_PATTERN}
+              title="Only letters, numbers, spaces, dashes, and underscores are allowed"
               placeholder={searchPlaceholder}
               className="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500"
             />
