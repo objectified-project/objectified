@@ -52,11 +52,13 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
 
   useEffect(() => {
     loadSpec();
-  }, [format]);
+  }, [format, restApiBaseUrl, tenantSlug, projectSlug, versionSlug]);
 
   const loadSpec = async () => {
     setLoading(true);
     setError(null);
+
+    console.log('SpecViewer: restApiBaseUrl =', restApiBaseUrl);
 
     try {
       let url = '';
@@ -71,6 +73,8 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
           url = `${restApiBaseUrl}/json/${tenantSlug}/${projectSlug}/${versionSlug}`;
           break;
       }
+
+      console.log('SpecViewer: Fetching from URL =', url);
 
       const response = await fetch(url);
       if (!response.ok) {

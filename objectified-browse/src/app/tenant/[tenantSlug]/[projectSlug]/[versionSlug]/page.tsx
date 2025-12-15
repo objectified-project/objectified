@@ -12,6 +12,8 @@ export default async function VersionPage({
     notFound();
   }
   const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
+  console.log('VersionPage: NEXT_PUBLIC_REST_API_BASE_URL =', process.env.NEXT_PUBLIC_REST_API_BASE_URL);
+  console.log('VersionPage: restApiBaseUrl =', restApiBaseUrl);
   return (
     <VersionClient
       version={version}
