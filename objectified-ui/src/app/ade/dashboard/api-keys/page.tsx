@@ -19,6 +19,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import { useColorScheme } from '@mui/material/styles';
 import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface ApiKey {
@@ -37,6 +38,7 @@ interface ApiKey {
 const ApiKeys = () => {
   const { data: session } = useSession();
   const { confirm: confirmDialog } = useDialog();
+  const { mode, systemMode } = useColorScheme();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -49,6 +51,10 @@ const ApiKeys = () => {
   const [copiedKey, setCopiedKey] = useState(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+
+  // Get the actual active mode (systemMode is used when mode is 'system')
+  const activeMode = mode === 'system' ? systemMode : mode;
+  const isDarkMode = activeMode === 'dark';
 
   useEffect(() => {
     if (currentTenantId) {
@@ -229,7 +235,7 @@ const ApiKeys = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">API Keys</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-gray-500 dark:text-gray-300 mt-1">
               Manage API keys for external REST API access to your tenant data
             </p>
           </div>
@@ -258,7 +264,7 @@ const ApiKeys = () => {
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
                 No API Keys Yet
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+              <p className="text-gray-500 dark:text-gray-300 max-w-md mx-auto">
                 Create your first API key to access your tenant data via REST API using the &quot;Create API Key&quot; button above
               </p>
             </div>
@@ -270,14 +276,18 @@ const ApiKeys = () => {
               sx={{
                 borderRadius: 3,
                 border: '1px solid',
-                borderColor: isExpired(apiKey.expires_at) ? 'rgba(239, 68, 68, 0.3)' : 'rgba(0, 0, 0, 0.06)',
+                borderColor: isExpired(apiKey.expires_at)
+                  ? 'rgba(239, 68, 68, 0.3)'
+                  : isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
                 boxShadow: 'none',
                 transition: 'all 0.2s ease',
                 background: isExpired(apiKey.expires_at)
-                  ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(249, 115, 22, 0.03) 100%)'
+                  ? isDarkMode
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)'
+                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(249, 115, 22, 0.03) 100%)'
                   : !apiKey.enabled
-                    ? 'rgba(148, 163, 184, 0.05)'
-                    : 'white',
+                    ? isDarkMode ? 'rgba(51, 65, 85, 0.5)' : 'rgba(148, 163, 184, 0.05)'
+                    : isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'white',
                 '&:hover': {
                   borderColor: 'rgba(245, 158, 11, 0.3)',
                   boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)',
@@ -313,27 +323,27 @@ const ApiKeys = () => {
                     </div>
 
                     {apiKey.description && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 ml-13">{apiKey.description}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-300 mb-4 ml-13">{apiKey.description}</p>
                     )}
 
                     <div className="grid grid-cols-2 gap-4 text-sm ml-13">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Key Prefix:</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Key Prefix:</span>
                         <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg text-gray-900 dark:text-gray-100 text-xs">
                           {apiKey.key_prefix}...
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Last Used:</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Last Used:</span>
                         <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.last_used_at)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Created:</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Created:</span>
                         <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.created_at)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Expires:</span>
-                        <span className={isExpired(apiKey.expires_at) ? 'text-red-600 font-semibold' : 'text-gray-600 dark:text-gray-300'}>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Expires:</span>
+                        <span className={isExpired(apiKey.expires_at) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-600 dark:text-gray-300'}>
                           {apiKey.expires_at ? formatDate(apiKey.expires_at) : 'Never'}
                         </span>
                       </div>
@@ -357,7 +367,7 @@ const ApiKeys = () => {
                         />
                       }
                       label={
-                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
                           {apiKey.enabled ? 'Enabled' : 'Disabled'}
                         </span>
                       }
@@ -411,7 +421,7 @@ const ApiKeys = () => {
             }}>
               <Key size={20} color="#f59e0b" />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
               Create API Key
             </Typography>
           </Box>
@@ -512,7 +522,7 @@ const ApiKeys = () => {
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600,
-              color: '#64748b',
+              color: isDarkMode ? '#d1d5db' : '#64748b',
             }}
           >
             Cancel
@@ -572,7 +582,7 @@ const ApiKeys = () => {
             }}>
               <Check size={20} color="#10b981" />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
               API Key Created Successfully
             </Typography>
           </Box>
@@ -597,7 +607,7 @@ const ApiKeys = () => {
             border: '1px solid',
             borderColor: 'rgba(245, 158, 11, 0.2)',
           }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1.5, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <Typography variant="body2" sx={{ color: isDarkMode ? '#d1d5db' : '#64748b', fontWeight: 600, mb: 1.5, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Your API Key:
             </Typography>
             <div className="flex items-center gap-2">

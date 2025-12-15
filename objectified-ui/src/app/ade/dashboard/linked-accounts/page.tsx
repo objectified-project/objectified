@@ -16,6 +16,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import { useColorScheme } from '@mui/material/styles';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import { getLinkedAccountsForUser, unlinkExternalAccount, updatePersonalAccessToken, removePersonalAccessToken } from '../../../../../lib/db/helper';
 
@@ -72,6 +73,7 @@ const providerConfigs: Record<string, ProviderConfig> = {
 const LinkedAccounts = () => {
   const { data: session } = useSession();
   const { confirm: confirmDialog } = useDialog();
+  const { mode, systemMode } = useColorScheme();
   const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -82,6 +84,9 @@ const LinkedAccounts = () => {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 
   const userId = (session?.user as any)?.user_id;
+  // Get the actual active mode (systemMode is used when mode is 'system')
+  const activeMode = mode === 'system' ? systemMode : mode;
+  const isDarkMode = activeMode === 'dark';
 
   useEffect(() => {
     if (userId) {
@@ -290,7 +295,7 @@ const LinkedAccounts = () => {
   if (!session) {
     return (
       <div className="p-6 flex items-center justify-center min-h-64">
-        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+        <p className="text-gray-500 dark:text-gray-300">Loading...</p>
       </div>
     );
   }
@@ -304,7 +309,7 @@ const LinkedAccounts = () => {
         </div>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Linked Accounts</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-gray-500 dark:text-gray-300 mt-1">
             Link external accounts to enable single sign-on (SSO) authentication
           </p>
         </div>
@@ -365,7 +370,7 @@ const LinkedAccounts = () => {
           }}>
             <Check size={18} color="#6366f1" />
           </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
             Your Linked Accounts
           </Typography>
         </Box>
@@ -374,8 +379,9 @@ const LinkedAccounts = () => {
           <Card sx={{
             borderRadius: 3,
             border: '1px solid',
-            borderColor: 'rgba(0, 0, 0, 0.06)',
+            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
             boxShadow: 'none',
+            bgcolor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'white',
           }}>
             <CardContent>
               <Box sx={{ textAlign: 'center', py: 6 }}>
@@ -392,10 +398,10 @@ const LinkedAccounts = () => {
                 }}>
                   <LinkIcon size={32} color="#6366f1" />
                 </Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#334155', mb: 0.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDarkMode ? '#ffffff' : '#334155', mb: 0.5 }}>
                   No linked accounts
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                <Typography variant="body2" sx={{ color: isDarkMode ? '#e5e7eb' : '#94a3b8' }}>
                   Link an external account below to enable SSO authentication
                 </Typography>
               </Box>
@@ -413,8 +419,9 @@ const LinkedAccounts = () => {
                   sx={{
                     borderRadius: 3,
                     border: '1px solid',
-                    borderColor: 'rgba(0, 0, 0, 0.06)',
+                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
                     boxShadow: 'none',
+                    bgcolor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'white',
                     transition: 'all 0.2s ease',
                     '&:hover': {
                       borderColor: 'rgba(99, 102, 241, 0.3)',
@@ -441,10 +448,10 @@ const LinkedAccounts = () => {
                           <Icon size={28} color={providerConfigs[account.provider]?.color || 'inherit'} />
                         </Box>
                         <Box>
-                          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.25 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b', mb: 0.25 }}>
                             {displayName}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
+                          <Typography variant="body2" sx={{ color: isDarkMode ? '#e5e7eb' : '#64748b', fontWeight: 500 }}>
                             {account.provider_username || account.provider_email}
                           </Typography>
                           <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
@@ -527,7 +534,7 @@ const LinkedAccounts = () => {
           }}>
             <Plus size={18} color="#8b5cf6" />
           </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
             Available Providers
           </Typography>
         </Box>
@@ -547,16 +554,20 @@ const LinkedAccounts = () => {
                   opacity: !isAvailable ? 0.6 : 1,
                   borderRadius: 3,
                   border: '1px solid',
-                  borderColor: isLinked ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 0, 0, 0.06)',
+                  borderColor: isLinked
+                    ? 'rgba(16, 185, 129, 0.3)'
+                    : isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
                   boxShadow: 'none',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   background: isLinked
-                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%)'
-                    : 'white',
+                    ? isDarkMode
+                      ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%)'
+                      : 'linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%)'
+                    : isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'white',
                   '&:hover': {
                     transform: isAvailable ? 'translateY(-2px)' : 'none',
                     boxShadow: isAvailable ? `0 8px 24px ${provider.color}15` : 'none',
-                    borderColor: isAvailable ? `${provider.color}40` : 'rgba(0, 0, 0, 0.06)',
+                    borderColor: isAvailable ? `${provider.color}40` : isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
                   },
                 }}
               >
@@ -579,7 +590,7 @@ const LinkedAccounts = () => {
                         <Icon size={24} color={provider.color} />
                       </Box>
                       <Box>
-                        <Typography variant="body1" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
                           {provider.displayName}
                         </Typography>
                         {!isAvailable && (
@@ -668,7 +679,7 @@ const LinkedAccounts = () => {
                       borderColor: 'rgba(99, 102, 241, 0.1)',
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75, color: '#334155' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.75, color: isDarkMode ? '#ffffff' : '#334155' }}>
                           <Key size={14} color="#f59e0b" />
                           Personal Access Token
                         </Typography>
@@ -719,7 +730,7 @@ const LinkedAccounts = () => {
                           )}
                         </Box>
                       </Box>
-                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                      <Typography variant="caption" sx={{ color: isDarkMode ? '#d1d5db' : '#94a3b8' }}>
                         {linkedAccount?.access_token
                           ? 'PAT configured for direct repository access'
                           : 'Add a PAT for direct repository access'}
@@ -743,7 +754,7 @@ const LinkedAccounts = () => {
             bgcolor: 'rgba(6, 182, 212, 0.05)',
           }}
         >
-          <Typography variant="body2" sx={{ color: '#334155' }}>
+          <Typography variant="body2" sx={{ color: isDarkMode ? '#f3f4f6' : '#334155' }}>
             <strong>Note:</strong> You can link multiple provider accounts to your Objectified account.
             Once linked, you can sign in using any of these providers. Your primary email and account
             data will always be tied to your main Objectified account.
@@ -781,11 +792,11 @@ const LinkedAccounts = () => {
               <Key size={20} color="#f59e0b" />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
                 {linkedAccounts.find(a => a.id === editingAccountId)?.access_token ? 'Update' : 'Add'} Personal Access Token
               </Typography>
               {patProvider && (
-                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                <Typography variant="caption" sx={{ color: isDarkMode ? '#d1d5db' : '#64748b' }}>
                   {providerConfigs[patProvider]?.displayName} • {linkedAccounts.find(a => a.id === editingAccountId)?.provider_username || linkedAccounts.find(a => a.id === editingAccountId)?.provider_email}
                 </Typography>
               )}
@@ -871,7 +882,7 @@ const LinkedAccounts = () => {
               borderRadius: 2,
               textTransform: 'none',
               fontWeight: 600,
-              color: '#64748b',
+              color: isDarkMode ? '#d1d5db' : '#64748b',
             }}
           >
             Cancel

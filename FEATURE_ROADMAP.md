@@ -1276,22 +1276,6 @@
 - Share playground links
 - Embed playground in docs
 
-**CLI Tool**
-- Command-line interface for power users:
-  - `objectified init` - Initialize new project
-  - `objectified push` - Push local schemas to cloud
-  - `objectified pull` - Pull schemas from cloud
-  - `objectified diff` - Compare versions
-  - `objectified validate` - Validate schemas locally
-  - `objectified generate` - Generate code
-  - `objectified export` - Export schemas
-  - `objectified deploy` - Deploy to environments
-- CI/CD integration
-- Git hooks integration
-- Configuration file support
-- Authentication with API keys
-- Offline mode with sync
-
 **IDE Extensions**
 - **VS Code Extension**: 
   - Edit schemas in VS Code
