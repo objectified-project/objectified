@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import Divider from '@mui/material/Divider';
 import { useTheme, specThemes, SpecTheme } from './ThemeProvider';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -169,6 +170,25 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h11m-11 6h7" />
               </svg>
             </button>
+          </div>
+
+          {/* Swagger UI Button */}
+          <div className="flex items-center gap-1 border-r border-zinc-200 pr-2 dark:border-zinc-700">
+            <a
+              href={`${restApiBaseUrl}/swagger/${tenantSlug}/${projectSlug}/${versionSlug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+              title="Open in Swagger UI"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Swagger UI
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
           </div>
 
           {/* Theme Picker */}
