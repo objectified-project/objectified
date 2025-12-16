@@ -46,6 +46,7 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [lineNumbers, setLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState(false);
@@ -115,6 +116,24 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyUrl = async () => {
+    let url = '';
+    switch (format) {
+      case 'openapi':
+        url = `${restApiBaseUrl}/schema/${tenantSlug}/${projectSlug}/${versionSlug}`;
+        break;
+      case 'arazzo':
+        url = `${restApiBaseUrl}/arazzo/${tenantSlug}/${projectSlug}/${versionSlug}`;
+        break;
+      case 'jsonschema':
+        url = `${restApiBaseUrl}/json/${tenantSlug}/${projectSlug}/${versionSlug}`;
+        break;
+    }
+    await navigator.clipboard.writeText(url);
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 2000);
+  };
+
   const specJson = spec ? JSON.stringify(spec, null, 2) : '';
   const lineCount = specJson.split('\n').length;
 
@@ -122,21 +141,50 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-        {/* Format Tabs */}
-        <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
-          {(['openapi', 'arazzo', 'jsonschema'] as SpecFormat[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFormat(f)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-                format === f
-                  ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50'
-                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
-              }`}
-            >
-              {f === 'openapi' ? 'OpenAPI' : f === 'arazzo' ? 'Arazzo' : 'JSON Schema'}
-            </button>
-          ))}
+        {/* Left Side: Format Tabs and Copy URL */}
+        <div className="flex items-center gap-3">
+          {/* Format Tabs */}
+          <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+            {(['openapi', 'arazzo', 'jsonschema'] as SpecFormat[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFormat(f)}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  format === f
+                    ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50'
+                    : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
+                }`}
+              >
+                {f === 'openapi' ? 'OpenAPI' : f === 'arazzo' ? 'Arazzo' : 'JSON Schema'}
+              </button>
+            ))}
+          </div>
+
+          {/* Separator */}
+          <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+
+          {/* Copy URL Button */}
+          <button
+            onClick={copyUrl}
+            className="flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            title="Copy document URL"
+          >
+            {urlCopied ? (
+              <>
+                <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                Copy URL
+              </>
+            )}
+          </button>
         </div>
 
         {/* Right Actions */}
