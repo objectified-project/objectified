@@ -19,7 +19,7 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Autocomplete from '@mui/material/Autocomplete';
 import { useColorScheme } from '@mui/material/styles';
-import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
@@ -93,6 +93,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema',
     additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
     patternProperties: [] as Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }>,
+    dependentSchemas: [] as Array<{ triggerProperty: string; schemaRef: string }>, // When triggerProperty is present, apply the referenced schema
     deprecated: false,
     deprecationMessage: '',
     selectedTags: [] as string[],
@@ -190,6 +191,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               });
             }
 
+            // Extract dependentSchemas
+            const dependentSchemasArray: Array<{ triggerProperty: string; schemaRef: string }> = [];
+            if (schema.dependentSchemas && typeof schema.dependentSchemas === 'object') {
+              Object.entries(schema.dependentSchemas).forEach(([triggerProperty, schemaValue]: [string, any]) => {
+                if (schemaValue.$ref) {
+                  dependentSchemasArray.push({ triggerProperty, schemaRef: schemaValue.$ref.split('/').pop() || '' });
+                }
+              });
+            }
+
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -203,6 +214,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
               patternProperties: patternPropsArray,
+              dependentSchemas: dependentSchemasArray,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: tagIds,
@@ -240,6 +252,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 }
               });
             }
+            // Extract dependentSchemas for error case
+            const dependentSchemasArrayError: Array<{ triggerProperty: string; schemaRef: string }> = [];
+            if (schema.dependentSchemas && typeof schema.dependentSchemas === 'object') {
+              Object.entries(schema.dependentSchemas).forEach(([triggerProperty, schemaValue]: [string, any]) => {
+                if (schemaValue.$ref) {
+                  dependentSchemasArrayError.push({ triggerProperty, schemaRef: schemaValue.$ref.split('/').pop() || '' });
+                }
+              });
+            }
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -253,6 +274,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
               patternProperties: patternPropsArrayError,
+              dependentSchemas: dependentSchemasArrayError,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: [],
@@ -281,6 +303,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           additionalPropertiesType: 'default',
           additionalPropertiesSchema: '',
           patternProperties: [],
+          dependentSchemas: [],
           deprecated: false,
           deprecationMessage: '',
           selectedTags: [],
@@ -346,6 +369,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       // Remove patternProperties if empty after filtering
       if (Object.keys(schema.patternProperties).length === 0) {
         delete schema.patternProperties;
+      }
+    }
+
+    // Add dependentSchemas if defined
+    if (formData.dependentSchemas.length > 0) {
+      schema.dependentSchemas = {};
+      formData.dependentSchemas.forEach(({ triggerProperty, schemaRef }) => {
+        if (triggerProperty.trim() && schemaRef) {
+          schema.dependentSchemas[triggerProperty] = { $ref: `#/components/schemas/${schemaRef}` };
+        }
+      });
+      // Remove dependentSchemas if empty after filtering
+      if (Object.keys(schema.dependentSchemas).length === 0) {
+        delete schema.dependentSchemas;
       }
     }
 
@@ -1204,6 +1241,114 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                           onClick={() => {
                             const newPatternProps = formData.patternProperties.filter((_, i) => i !== index);
                             setFormData(prev => ({ ...prev, patternProperties: newPatternProps }));
+                          }}
+                          sx={{ minWidth: 'auto', p: 1 }}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 2.6: Dependent Schemas
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider', bgcolor: isDark ? '#0f172a' : '#fafafa' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Link size={18} style={{ color: '#6366f1' }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
+                    Dependent Schemas
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : 'text.secondary', ml: 1 }}>
+                    (Optional)
+                  </Typography>
+                </Box>
+                {!isReadOnly && (
+                  <Button
+                    size="small"
+                    startIcon={<Plus size={14} />}
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      dependentSchemas: [...prev.dependentSchemas, { triggerProperty: '', schemaRef: '' }]
+                    }))}
+                    variant="outlined"
+                  >
+                    Add Dependency
+                  </Button>
+                )}
+              </Box>
+              <Typography variant="caption" sx={{ display: 'block', mb: 2, color: isDark ? '#94a3b8' : 'text.secondary' }}>
+                When a trigger property is present, apply additional schema constraints. Example: if "paymentMethod" is present, require credit card validation schema.
+              </Typography>
+
+              {formData.dependentSchemas.length === 0 ? (
+                <Box sx={{ p: 3, textAlign: 'center', bgcolor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 2, border: '1px dashed', borderColor: isDark ? '#475569' : '#cbd5e1' }}>
+                  <Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : 'text.secondary' }}>
+                    No dependent schemas defined. Click "Add Dependency" to create one.
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {formData.dependentSchemas.map((depSchema, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 2,
+                        bgcolor: isDark ? '#1e293b' : 'white',
+                        borderRadius: 2,
+                        border: 1,
+                        borderColor: 'divider',
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr auto' },
+                        gap: 2,
+                        alignItems: 'start'
+                      }}
+                    >
+                      <TextField
+                        label="Trigger Property"
+                        value={depSchema.triggerProperty}
+                        onChange={(e) => {
+                          const newDeps = [...formData.dependentSchemas];
+                          newDeps[index] = { ...newDeps[index], triggerProperty: e.target.value };
+                          setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                        }}
+                        disabled={isReadOnly}
+                        size="small"
+                        placeholder="e.g., paymentMethod"
+                        helperText="Property name that triggers the schema"
+                      />
+
+                      <Autocomplete
+                        options={availableClasses}
+                        value={depSchema.schemaRef || null}
+                        onChange={(_, newValue) => {
+                          const newDeps = [...formData.dependentSchemas];
+                          newDeps[index] = { ...newDeps[index], schemaRef: newValue || '' };
+                          setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                        }}
+                        disabled={isReadOnly}
+                        size="small"
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Required Schema"
+                            placeholder="Select class..."
+                            helperText="Schema to apply when property is present"
+                          />
+                        )}
+                      />
+
+                      {!isReadOnly && (
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            const newDeps = formData.dependentSchemas.filter((_, i) => i !== index);
+                            setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
                           }}
                           sx={{ minWidth: 'auto', p: 1 }}
                         >
