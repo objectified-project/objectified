@@ -32,6 +32,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added support for discriminator mapping to x- tags, propertyName, and values
   - Added support for if/then/else class composition support
   - Added support for "unevaluatedItems"
+  - Updated additionalProperties handling to support matching of a schema by reference
   - Corrected "required" handling for dragged properties to classes
   - Marking for deprecation is now available for properties and classes
   - prefixItems:

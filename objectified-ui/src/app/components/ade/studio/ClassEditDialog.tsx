@@ -90,6 +90,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     discriminatorUseAuto: true,
     discriminatorMapping: {} as Record<string, string>, // Maps property value to schema name
     additionalProperties: null as boolean | null,
+    additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema',
+    additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
     deprecated: false,
     deprecationMessage: '',
     selectedTags: [] as string[],
@@ -159,6 +161,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             const classTags = JSON.parse(result);
             const tagIds = classTags.map((ct: any) => ct.tag_id);
 
+            // Determine additionalProperties type and schema
+            let additionalPropsType: 'default' | 'allow' | 'disallow' | 'schema' = 'default';
+            let additionalPropsSchema = '';
+            if (schema.additionalProperties !== undefined) {
+              if (schema.additionalProperties === true) {
+                additionalPropsType = 'allow';
+              } else if (schema.additionalProperties === false) {
+                additionalPropsType = 'disallow';
+              } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.$ref) {
+                additionalPropsType = 'schema';
+                additionalPropsSchema = schema.additionalProperties.$ref.split('/').pop() || '';
+              }
+            }
+
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -169,6 +185,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               discriminatorUseAuto: !schema.discriminator?.mapping,
               discriminatorMapping,
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+              additionalPropertiesType: additionalPropsType,
+              additionalPropertiesSchema: additionalPropsSchema,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: tagIds,
@@ -180,6 +198,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             });
           } catch (error) {
             console.error('Error loading tags:', error);
+            // Determine additionalProperties type and schema for error case
+            let additionalPropsType: 'default' | 'allow' | 'disallow' | 'schema' = 'default';
+            let additionalPropsSchema = '';
+            if (schema.additionalProperties !== undefined) {
+              if (schema.additionalProperties === true) {
+                additionalPropsType = 'allow';
+              } else if (schema.additionalProperties === false) {
+                additionalPropsType = 'disallow';
+              } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.$ref) {
+                additionalPropsType = 'schema';
+                additionalPropsSchema = schema.additionalProperties.$ref.split('/').pop() || '';
+              }
+            }
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -190,6 +221,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               discriminatorUseAuto: !schema.discriminator?.mapping,
               discriminatorMapping,
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
+              additionalPropertiesType: additionalPropsType,
+              additionalPropertiesSchema: additionalPropsSchema,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: [],
@@ -215,6 +248,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           discriminatorUseAuto: true,
           discriminatorMapping: {},
           additionalProperties: null,
+          additionalPropertiesType: 'default',
+          additionalPropertiesSchema: '',
           deprecated: false,
           deprecationMessage: '',
           selectedTags: [],
@@ -255,10 +290,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       }
     }
 
-    // Add additionalProperties if set
-    if (formData.additionalProperties !== null) {
-      schema.additionalProperties = formData.additionalProperties;
+    // Add additionalProperties based on the selected type
+    if (formData.additionalPropertiesType === 'allow') {
+      schema.additionalProperties = true;
+    } else if (formData.additionalPropertiesType === 'disallow') {
+      schema.additionalProperties = false;
+    } else if (formData.additionalPropertiesType === 'schema' && formData.additionalPropertiesSchema) {
+      schema.additionalProperties = { $ref: `#/components/schemas/${formData.additionalPropertiesSchema}` };
     }
+    // 'default' means no additionalProperties field is added
 
     // Add deprecated if true
     if (formData.deprecated) {
@@ -887,10 +927,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     Additional Properties
                   </Typography>
                   <RadioGroup
-                    value={formData.additionalProperties === null ? 'default' : formData.additionalProperties ? 'allow' : 'disallow'}
+                    value={formData.additionalPropertiesType}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData(prev => ({ ...prev, additionalProperties: value === 'default' ? null : value === 'allow' }));
+                      const value = e.target.value as 'default' | 'allow' | 'disallow' | 'schema';
+                      setFormData(prev => ({
+                        ...prev,
+                        additionalPropertiesType: value,
+                        additionalProperties: value === 'default' ? null : value === 'allow' ? true : value === 'disallow' ? false : null,
+                        additionalPropertiesSchema: value === 'schema' ? prev.additionalPropertiesSchema : ''
+                      }));
                     }}
                     sx={{ gap: 0.5 }}
                   >
@@ -904,18 +949,44 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     <FormControlLabel
                       value="allow"
                       control={<Radio size="small" />}
-                      label={<Typography variant="body2">Allow additional properties</Typography>}
+                      label={<Typography variant="body2">Allow Any (true)</Typography>}
                       disabled={isReadOnly}
                       sx={{ m: 0 }}
                     />
                     <FormControlLabel
                       value="disallow"
                       control={<Radio size="small" />}
-                      label={<Typography variant="body2">Strict mode (no extra props)</Typography>}
+                      label={<Typography variant="body2">Disallow (false)</Typography>}
+                      disabled={isReadOnly}
+                      sx={{ m: 0 }}
+                    />
+                    <FormControlLabel
+                      value="schema"
+                      control={<Radio size="small" />}
+                      label={<Typography variant="body2">Must Match Schema</Typography>}
                       disabled={isReadOnly}
                       sx={{ m: 0 }}
                     />
                   </RadioGroup>
+                  {formData.additionalPropertiesType === 'schema' && (
+                    <Box sx={{ mt: 1.5, ml: 3 }}>
+                      <Autocomplete
+                        options={availableClasses}
+                        value={formData.additionalPropertiesSchema || null}
+                        onChange={(_, newValue) => setFormData(prev => ({ ...prev, additionalPropertiesSchema: newValue || '' }))}
+                        disabled={isReadOnly}
+                        size="small"
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Schema Reference"
+                            placeholder="Select a class..."
+                            helperText="Additional properties must conform to this schema"
+                          />
+                        )}
+                      />
+                    </Box>
+                  )}
                 </Box>
 
                 {/* Deprecation Status */}
