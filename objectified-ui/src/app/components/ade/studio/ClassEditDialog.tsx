@@ -19,7 +19,7 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Autocomplete from '@mui/material/Autocomplete';
 import { useColorScheme } from '@mui/material/styles';
-import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link, ListChecks } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
@@ -94,6 +94,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
     patternProperties: [] as Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }>,
     dependentSchemas: [] as Array<{ triggerProperty: string; schemaRef: string }>, // When triggerProperty is present, apply the referenced schema
+    dependentRequired: [] as Array<{ triggerProperty: string; requiredProperties: string[] }>, // When triggerProperty is present, these properties become required
     deprecated: false,
     deprecationMessage: '',
     selectedTags: [] as string[],
@@ -201,6 +202,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               });
             }
 
+            // Extract dependentRequired
+            const dependentRequiredArray: Array<{ triggerProperty: string; requiredProperties: string[] }> = [];
+            if (schema.dependentRequired && typeof schema.dependentRequired === 'object') {
+              Object.entries(schema.dependentRequired).forEach(([triggerProperty, requiredProps]: [string, any]) => {
+                if (Array.isArray(requiredProps)) {
+                  dependentRequiredArray.push({ triggerProperty, requiredProperties: requiredProps });
+                }
+              });
+            }
+
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -215,6 +226,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalPropertiesSchema: additionalPropsSchema,
               patternProperties: patternPropsArray,
               dependentSchemas: dependentSchemasArray,
+              dependentRequired: dependentRequiredArray,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: tagIds,
@@ -261,6 +273,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 }
               });
             }
+            // Extract dependentRequired for error case
+            const dependentRequiredArrayError: Array<{ triggerProperty: string; requiredProperties: string[] }> = [];
+            if (schema.dependentRequired && typeof schema.dependentRequired === 'object') {
+              Object.entries(schema.dependentRequired).forEach(([triggerProperty, requiredProps]: [string, any]) => {
+                if (Array.isArray(requiredProps)) {
+                  dependentRequiredArrayError.push({ triggerProperty, requiredProperties: requiredProps });
+                }
+              });
+            }
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -275,6 +296,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalPropertiesSchema: additionalPropsSchema,
               patternProperties: patternPropsArrayError,
               dependentSchemas: dependentSchemasArrayError,
+              dependentRequired: dependentRequiredArrayError,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: [],
@@ -304,6 +326,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           additionalPropertiesSchema: '',
           patternProperties: [],
           dependentSchemas: [],
+          dependentRequired: [],
           deprecated: false,
           deprecationMessage: '',
           selectedTags: [],
@@ -383,6 +406,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       // Remove dependentSchemas if empty after filtering
       if (Object.keys(schema.dependentSchemas).length === 0) {
         delete schema.dependentSchemas;
+      }
+    }
+
+    // Add dependentRequired if defined
+    if (formData.dependentRequired.length > 0) {
+      schema.dependentRequired = {};
+      formData.dependentRequired.forEach(({ triggerProperty, requiredProperties }) => {
+        if (triggerProperty.trim() && requiredProperties.length > 0) {
+          schema.dependentRequired[triggerProperty] = requiredProperties;
+        }
+      });
+      // Remove dependentRequired if empty after filtering
+      if (Object.keys(schema.dependentRequired).length === 0) {
+        delete schema.dependentRequired;
       }
     }
 
@@ -1349,6 +1386,109 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                           onClick={() => {
                             const newDeps = formData.dependentSchemas.filter((_, i) => i !== index);
                             setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                          }}
+                          sx={{ minWidth: 'auto', p: 1 }}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 2.7: Dependent Required
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <ListChecks size={18} style={{ color: '#6366f1' }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
+                    Dependent Required
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : 'text.secondary', ml: 1 }}>
+                    (Optional)
+                  </Typography>
+                </Box>
+                {!isReadOnly && (
+                  <Button
+                    size="small"
+                    startIcon={<Plus size={14} />}
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      dependentRequired: [...prev.dependentRequired, { triggerProperty: '', requiredProperties: [] }]
+                    }))}
+                    variant="outlined"
+                  >
+                    Add Rule
+                  </Button>
+                )}
+              </Box>
+              <Typography variant="caption" sx={{ display: 'block', mb: 2, color: isDark ? '#94a3b8' : 'text.secondary' }}>
+                When a trigger property is present, other properties become required. Example: if "billingAddress" is present, "billingCity" and "billingZip" become required.
+              </Typography>
+
+              {formData.dependentRequired.length === 0 ? (
+                <Box sx={{ p: 3, textAlign: 'center', bgcolor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 2, border: '1px dashed', borderColor: isDark ? '#475569' : '#cbd5e1' }}>
+                  <Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : 'text.secondary' }}>
+                    No dependent required rules defined. Click "Add Rule" to create one.
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {formData.dependentRequired.map((depReq, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 2,
+                        bgcolor: isDark ? '#1e293b' : 'white',
+                        borderRadius: 2,
+                        border: 1,
+                        borderColor: 'divider',
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 2fr auto' },
+                        gap: 2,
+                        alignItems: 'start'
+                      }}
+                    >
+                      <TextField
+                        label="Trigger Property"
+                        value={depReq.triggerProperty}
+                        onChange={(e) => {
+                          const newDeps = [...formData.dependentRequired];
+                          newDeps[index] = { ...newDeps[index], triggerProperty: e.target.value };
+                          setFormData(prev => ({ ...prev, dependentRequired: newDeps }));
+                        }}
+                        disabled={isReadOnly}
+                        size="small"
+                        placeholder="e.g., billingAddress"
+                        helperText="Property that triggers requirement"
+                      />
+
+                      <TextField
+                        label="Required Properties"
+                        value={depReq.requiredProperties.join(', ')}
+                        onChange={(e) => {
+                          const newDeps = [...formData.dependentRequired];
+                          const props = e.target.value.split(',').map(p => p.trim()).filter(p => p);
+                          newDeps[index] = { ...newDeps[index], requiredProperties: props };
+                          setFormData(prev => ({ ...prev, dependentRequired: newDeps }));
+                        }}
+                        disabled={isReadOnly}
+                        size="small"
+                        placeholder="e.g., billingCity, billingZip, billingCountry"
+                        helperText="Comma-separated list of properties that become required"
+                      />
+
+                      {!isReadOnly && (
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            const newDeps = formData.dependentRequired.filter((_, i) => i !== index);
+                            setFormData(prev => ({ ...prev, dependentRequired: newDeps }));
                           }}
                           sx={{ minWidth: 'auto', p: 1 }}
                         >
