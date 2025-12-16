@@ -26,13 +26,14 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "minProperties" and "maxProperties" fields for object types
   - Added "constant" field for properties
   - Added "not" support for properties - define schemas that must not be matched
+  - Added "patternProperties" allowing for regex patterns mapped to schemas
+  - Added "if/then/else" class composition support
+  - Added "unevaluatedItems" support
+  - Updated "additionalProperties" handling to support matching of a schema by reference
   - Added support for property name constraints using a format, min/max length, and regex pattern
   - Added support for custom "x-" tags and values to classes and properties
   - Added support for external documentation on a class and property level
   - Added support for discriminator mapping to x- tags, propertyName, and values
-  - Added support for if/then/else class composition support
-  - Added support for "unevaluatedItems"
-  - Updated additionalProperties handling to support matching of a schema by reference
   - Corrected "required" handling for dragged properties to classes
   - Marking for deprecation is now available for properties and classes
   - prefixItems:

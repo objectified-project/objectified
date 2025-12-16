@@ -19,7 +19,7 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Autocomplete from '@mui/material/Autocomplete';
 import { useColorScheme } from '@mui/material/styles';
-import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex } from 'lucide-react';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
@@ -92,6 +92,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     additionalProperties: null as boolean | null,
     additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema',
     additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
+    patternProperties: [] as Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }>,
     deprecated: false,
     deprecationMessage: '',
     selectedTags: [] as string[],
@@ -175,6 +176,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               }
             }
 
+            // Extract patternProperties
+            const patternPropsArray: Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }> = [];
+            if (schema.patternProperties && typeof schema.patternProperties === 'object') {
+              Object.entries(schema.patternProperties).forEach(([pattern, schemaValue]: [string, any]) => {
+                if (schemaValue.$ref) {
+                  patternPropsArray.push({ pattern, schemaType: 'ref', schemaRef: schemaValue.$ref.split('/').pop() || '' });
+                } else if (schemaValue.type) {
+                  patternPropsArray.push({ pattern, schemaType: schemaValue.type, schemaRef: '' });
+                } else {
+                  patternPropsArray.push({ pattern, schemaType: 'string', schemaRef: '' });
+                }
+              });
+            }
+
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -187,6 +202,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
+              patternProperties: patternPropsArray,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: tagIds,
@@ -211,6 +227,19 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 additionalPropsSchema = schema.additionalProperties.$ref.split('/').pop() || '';
               }
             }
+            // Extract patternProperties for error case
+            const patternPropsArrayError: Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }> = [];
+            if (schema.patternProperties && typeof schema.patternProperties === 'object') {
+              Object.entries(schema.patternProperties).forEach(([pattern, schemaValue]: [string, any]) => {
+                if (schemaValue.$ref) {
+                  patternPropsArrayError.push({ pattern, schemaType: 'ref', schemaRef: schemaValue.$ref.split('/').pop() || '' });
+                } else if (schemaValue.type) {
+                  patternPropsArrayError.push({ pattern, schemaType: schemaValue.type, schemaRef: '' });
+                } else {
+                  patternPropsArrayError.push({ pattern, schemaType: 'string', schemaRef: '' });
+                }
+              });
+            }
             setFormData({
               name: editingClassData.name || '',
               description: editingClassData.description || '',
@@ -223,6 +252,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
+              patternProperties: patternPropsArrayError,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
               selectedTags: [],
@@ -250,6 +280,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           additionalProperties: null,
           additionalPropertiesType: 'default',
           additionalPropertiesSchema: '',
+          patternProperties: [],
           deprecated: false,
           deprecationMessage: '',
           selectedTags: [],
@@ -299,6 +330,24 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       schema.additionalProperties = { $ref: `#/components/schemas/${formData.additionalPropertiesSchema}` };
     }
     // 'default' means no additionalProperties field is added
+
+    // Add patternProperties if defined
+    if (formData.patternProperties.length > 0) {
+      schema.patternProperties = {};
+      formData.patternProperties.forEach(({ pattern, schemaType, schemaRef }) => {
+        if (pattern.trim()) {
+          if (schemaType === 'ref' && schemaRef) {
+            schema.patternProperties[pattern] = { $ref: `#/components/schemas/${schemaRef}` };
+          } else {
+            schema.patternProperties[pattern] = { type: schemaType };
+          }
+        }
+      });
+      // Remove patternProperties if empty after filtering
+      if (Object.keys(schema.patternProperties).length === 0) {
+        delete schema.patternProperties;
+      }
+    }
 
     // Add deprecated if true
     if (formData.deprecated) {
@@ -1032,6 +1081,139 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   )}
                 </Box>
               </Box>
+            </Box>
+
+            {/* ═══════════════════════════════════════════════════════════════════════════
+                SECTION 2.5: Pattern Properties
+                ═══════════════════════════════════════════════════════════════════════════ */}
+            <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Regex size={18} style={{ color: '#6366f1' }} />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
+                    Pattern Properties
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : 'text.secondary', ml: 1 }}>
+                    (Optional)
+                  </Typography>
+                </Box>
+                {!isReadOnly && (
+                  <Button
+                    size="small"
+                    startIcon={<Plus size={14} />}
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      patternProperties: [...prev.patternProperties, { pattern: '', schemaType: 'string', schemaRef: '' }]
+                    }))}
+                    variant="outlined"
+                  >
+                    Add Pattern
+                  </Button>
+                )}
+              </Box>
+              <Typography variant="caption" sx={{ display: 'block', mb: 2, color: isDark ? '#94a3b8' : 'text.secondary' }}>
+                Define regex patterns that map dynamic property names to schemas. Example: <code>^x-</code> matches all extension properties.
+              </Typography>
+
+              {formData.patternProperties.length === 0 ? (
+                <Box sx={{ p: 3, textAlign: 'center', bgcolor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 2, border: '1px dashed', borderColor: isDark ? '#475569' : '#cbd5e1' }}>
+                  <Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : 'text.secondary' }}>
+                    No pattern properties defined. Click "Add Pattern" to create one.
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {formData.patternProperties.map((patternProp, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 2,
+                        bgcolor: isDark ? '#1e293b' : 'white',
+                        borderRadius: 2,
+                        border: 1,
+                        borderColor: 'divider',
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr auto' },
+                        gap: 2,
+                        alignItems: 'start'
+                      }}
+                    >
+                      <TextField
+                        label="Regex Pattern"
+                        value={patternProp.pattern}
+                        onChange={(e) => {
+                          const newPatternProps = [...formData.patternProperties];
+                          newPatternProps[index] = { ...newPatternProps[index], pattern: e.target.value };
+                          setFormData(prev => ({ ...prev, patternProperties: newPatternProps }));
+                        }}
+                        disabled={isReadOnly}
+                        size="small"
+                        placeholder="^x-.*$"
+                        helperText="JavaScript regex pattern"
+                        InputProps={{
+                          sx: { fontFamily: 'monospace' }
+                        }}
+                      />
+
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Autocomplete
+                          options={['string', 'number', 'integer', 'boolean', 'object', 'array', 'ref'] as const}
+                          value={patternProp.schemaType}
+                          onChange={(_, newValue) => {
+                            const newPatternProps = [...formData.patternProperties];
+                            newPatternProps[index] = {
+                              ...newPatternProps[index],
+                              schemaType: newValue || 'string',
+                              schemaRef: newValue === 'ref' ? newPatternProps[index].schemaRef : ''
+                            };
+                            setFormData(prev => ({ ...prev, patternProperties: newPatternProps }));
+                          }}
+                          disabled={isReadOnly}
+                          size="small"
+                          disableClearable
+                          sx={{ flex: 1 }}
+                          getOptionLabel={(option) => option === 'ref' ? 'Schema Reference' : option.charAt(0).toUpperCase() + option.slice(1)}
+                          renderInput={(params) => (
+                            <TextField {...params} label="Type" />
+                          )}
+                        />
+
+                        {patternProp.schemaType === 'ref' && (
+                          <Autocomplete
+                            options={availableClasses}
+                            value={patternProp.schemaRef || null}
+                            onChange={(_, newValue) => {
+                              const newPatternProps = [...formData.patternProperties];
+                              newPatternProps[index] = { ...newPatternProps[index], schemaRef: newValue || '' };
+                              setFormData(prev => ({ ...prev, patternProperties: newPatternProps }));
+                            }}
+                            disabled={isReadOnly}
+                            size="small"
+                            sx={{ flex: 1 }}
+                            renderInput={(params) => (
+                              <TextField {...params} label="Schema" placeholder="Select class..." />
+                            )}
+                          />
+                        )}
+                      </Box>
+
+                      {!isReadOnly && (
+                        <Button
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            const newPatternProps = formData.patternProperties.filter((_, i) => i !== index);
+                            setFormData(prev => ({ ...prev, patternProperties: newPatternProps }));
+                          }}
+                          sx={{ minWidth: 'auto', p: 1 }}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Box>
 
             {/* ═══════════════════════════════════════════════════════════════════════════
