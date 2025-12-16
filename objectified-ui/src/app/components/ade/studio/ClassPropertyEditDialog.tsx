@@ -167,7 +167,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       deprecationMessage: propData.deprecationMessage || '',
       readOnly: !!propData.readOnly,
       writeOnly: !!propData.writeOnly,
-      example: propData.example ? JSON.stringify(propData.example) : '',
+      examples: propData.examples ? propData.examples.map((ex: any) => JSON.stringify(ex)) : [],
 
       // String constraints
       minLength: schema.minLength?.toString() || '',
@@ -272,14 +272,14 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         delete updatedData.deprecationMessage;
       }
 
-      if (formData.example?.trim()) {
+      if (formData.examples && formData.examples.length > 0) {
         try {
-          updatedData.example = JSON.parse(formData.example);
+          updatedData.examples = formData.examples.map((ex: string) => JSON.parse(ex));
         } catch (e) {
-          updatedData.example = formData.example;
+          updatedData.examples = formData.examples;
         }
       } else {
-        delete updatedData.example;
+        delete updatedData.examples;
       }
 
       // Handle nullable - update type to be an array with 'null' (OpenAPI 3.1 style)

@@ -95,7 +95,7 @@ export interface PropertyFormData {
   writeOnly?: boolean;
   deprecated?: boolean;
   deprecationMessage?: string;
-  example?: string;
+  examples?: string[]; // Array of example values (JSON strings)
 
   // Object constraints
   additionalProperties?: 'default' | 'true' | 'false';
@@ -308,6 +308,8 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
   const [enumInput, setEnumInput] = React.useState('');
   const [enumError, setEnumError] = React.useState('');
+  const [exampleInput, setExampleInput] = React.useState('');
+  const [exampleError, setExampleError] = React.useState('');
 
   // DnD sensors for enum reordering
   const sensors = useSensors(
@@ -423,9 +425,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       exampleValue = [exampleValue];
     }
 
-    // Convert to JSON string
+    // Convert to JSON string and add to examples array
     const jsonString = JSON.stringify(exampleValue, null, 2);
-    onChange('example', jsonString);
+    const currentExamples = data.examples || [];
+    onChange('examples', [...currentExamples, jsonString]);
   };
 
   const handleAddEnum = () => {
@@ -519,6 +522,37 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
     onChange('enum', newEnumArray);
   };
 
+  const handleAddExample = () => {
+    const trimmedValue = exampleInput.trim();
+    if (!trimmedValue) {
+      setExampleError('Example value cannot be empty');
+      return;
+    }
+
+    // Validate JSON
+    try {
+      JSON.parse(trimmedValue);
+    } catch (e) {
+      setExampleError('Example must be valid JSON');
+      return;
+    }
+
+    onChange('examples', [...(data.examples || []), trimmedValue]);
+    setExampleInput('');
+    setExampleError('');
+  };
+
+  const handleRemoveExample = (index: number) => {
+    onChange('examples', (data.examples || []).filter((_, i) => i !== index));
+  };
+
+  const handleExampleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAddExample();
+    }
+  };
+
   return (
     <Box sx={{
       display: 'flex',
@@ -601,44 +635,138 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             }}
           />
 
-          <TextField
-            label="Example"
-            size={size}
-            fullWidth
-            value={data.example || ''}
-            onChange={(e) => onChange('example', e.target.value)}
-            helperText="JSON example value"
-            sx={{
-              '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.875rem' },
-              '& .MuiOutlinedInput-root': {
+          <Box sx={{ gridColumn: showTitle ? 'auto' : '1 / -1' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
+                Examples
+              </Typography>
+              <Tooltip title="Generate example based on schema" arrow>
+                <IconButton
+                  onClick={generateExample}
+                  size="small"
+                  sx={{
+                    color: '#6366f1',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: 'rgba(99, 102, 241, 0.1)',
+                      transform: 'scale(1.1)',
+                    },
+                  }}
+                >
+                  <AutoAwesomeIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
+            <TextField
+              label="Add Example"
+              size={size}
+              fullWidth
+              multiline
+              rows={2}
+              value={exampleInput}
+              onChange={(e) => {
+                setExampleInput(e.target.value);
+                setExampleError('');
+              }}
+              onKeyDown={handleExampleKeyPress}
+              error={!!exampleError}
+              helperText={exampleError || "Enter JSON value (Shift+Enter for new line, Enter to add)"}
+              sx={{
+                '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.875rem' },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  transition: 'all 0.2s ease',
+                  '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.02)' },
+                },
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Tooltip title="Add example" arrow>
+                      <IconButton
+                        onClick={handleAddExample}
+                        size="small"
+                        disabled={!exampleInput.trim()}
+                        sx={{
+                          color: '#6366f1',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: 'rgba(99, 102, 241, 0.1)',
+                          },
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            {/* Examples List */}
+            {data.examples && data.examples.length > 0 && (
+              <Box sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: isDark ? '#1e293b' : '#f8fafc',
                 borderRadius: 2,
-                transition: 'all 0.2s ease',
-                '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.02)' },
-              },
-            }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <Tooltip title="Generate example based on schema" arrow>
-                    <IconButton
-                      onClick={generateExample}
-                      size="small"
+                border: '1px solid',
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+              }}>
+                <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', mb: 1, display: 'block' }}>
+                  {data.examples.length} example{data.examples.length !== 1 ? 's' : ''}
+                </Typography>
+                <List sx={{ p: 0 }}>
+                  {data.examples.map((example, index) => (
+                    <ListItem
+                      key={index}
                       sx={{
-                        color: '#6366f1',
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          bgcolor: 'rgba(99, 102, 241, 0.1)',
-                          transform: 'scale(1.1)',
-                        },
+                        borderBottom: index < data.examples!.length - 1 ? '1px solid' : 'none',
+                        borderColor: isDark ? '#334155' : '#e2e8f0',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1,
+                        px: 0,
+                        py: 1.5,
                       }}
                     >
-                      <AutoAwesomeIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </InputAdornment>
-              ),
-            }}
-          />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                            fontSize: '0.75rem',
+                            color: isDark ? '#cbd5e1' : '#334155',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {example}
+                        </Typography>
+                      </Box>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleRemoveExample(index)}
+                        size="small"
+                        sx={{
+                          flex: 0,
+                          color: '#94a3b8',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            color: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          },
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            )}
+          </Box>
         </Box>
       </Box>
 

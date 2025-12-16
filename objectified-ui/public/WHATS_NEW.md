@@ -31,6 +31,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "dependentRequired" support - when a trigger property is present, other properties become required (e.g., if "billingAddress" is present, "billingCity" and "billingZip" become required)
   - Added "Nullable" checkbox (OpenAPI 3.1) - outputs type as an array like `['string', 'null']` instead of the deprecated `nullable: true` from OpenAPI 3.0
     - Nullable now shows as a "?" indicator in the type field when displayed in classes and properties
+  - Changed "Example" to "Examples" - now supports multiple examples per property
+    - Add multiple JSON examples for each property
+    - Auto-generate examples based on schema with one click
+    - Examples are stored as an array in OpenAPI 3.1 format
   - Added "unevaluatedProperties" for object properties - advanced control for inheritance scenarios (controls properties not matched by properties, patternProperties, or inherited schemas)
   - Added "if/then/else" class composition support
   - Added "unevaluatedItems" support

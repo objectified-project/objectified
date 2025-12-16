@@ -53,7 +53,7 @@ export interface PropertyItem {
   writeOnly?: boolean;
   deprecated?: boolean;
   deprecationMessage?: string;
-  example?: any;
+  examples?: any[];
   additionalProperties?: boolean | any;
   minProperties?: number;
   maxProperties?: number;
@@ -231,7 +231,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         writeOnly: property.writeOnly || false,
         deprecated: property.deprecated || false,
         deprecationMessage: property.deprecationMessage || '',
-        example: property.example ? JSON.stringify(property.example) : '',
+        examples: property.examples ? property.examples.map((ex: any) => JSON.stringify(ex)) : [],
         // Object constraints
         additionalProperties: additionalPropsValue,
         minProperties: minMaxSource.minProperties?.toString() || '',
@@ -274,11 +274,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         schema.deprecationMessage = formData.deprecationMessage.trim();
       }
     }
-    if (formData.example) {
+    if (formData.examples && formData.examples.length > 0) {
       try {
-        schema.example = JSON.parse(formData.example);
+        schema.examples = formData.examples.map(ex => JSON.parse(ex));
       } catch (e) {
-        schema.example = formData.example;
+        // If parsing fails, use as-is
+        schema.examples = formData.examples;
       }
     }
     if (formData.required) schema.required = formData.required;
@@ -530,14 +531,14 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       if (formData.title) dataObject.title = formData.title;
       else delete dataObject.title;
 
-      if (formData.example) {
+      if (formData.examples && formData.examples.length > 0) {
         try {
-          dataObject.example = JSON.parse(formData.example);
+          dataObject.examples = formData.examples.map(ex => JSON.parse(ex));
         } catch (e) {
-          dataObject.example = formData.example;
+          dataObject.examples = formData.examples;
         }
       } else {
-        delete dataObject.example;
+        delete dataObject.examples;
       }
 
       if (propertyIsArray) {
