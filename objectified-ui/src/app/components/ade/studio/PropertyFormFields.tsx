@@ -90,6 +90,7 @@ export interface PropertyFormData {
 
   // Metadata
   required?: boolean;
+  nullable?: boolean; // OpenAPI 3.1: Outputs type as array like ['string', 'null']
   readOnly?: boolean;
   writeOnly?: boolean;
   deprecated?: boolean;
@@ -659,7 +660,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
           <Box sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' },
             gap: 2
           }}>
             {/* Required */}
@@ -701,6 +702,49 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
                   Must be provided
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Nullable (OpenAPI 3.1) */}
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: data.nullable ? 'rgba(168, 85, 247, 0.08)' : 'white',
+                borderRadius: 2.5,
+                border: '1px solid',
+                borderColor: data.nullable ? 'rgba(168, 85, 247, 0.3)' : '#e2e8f0',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1.5,
+                boxShadow: data.nullable ? '0 4px 12px rgba(168, 85, 247, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
+                '&:hover': {
+                  borderColor: data.nullable ? '#a855f7' : '#94a3b8',
+                  transform: 'translateY(-2px)',
+                  boxShadow: data.nullable ? '0 6px 16px rgba(168, 85, 247, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
+                }
+              }}
+              onClick={() => onChange('nullable', !data.nullable)}
+            >
+              <Checkbox
+                checked={data.nullable || false}
+                size="small"
+                sx={{
+                  p: 0,
+                  pointerEvents: 'none',
+                  color: data.nullable ? '#a855f7' : undefined,
+                  '&.Mui-checked': { color: '#a855f7' },
+                }}
+                tabIndex={-1}
+              />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: data.nullable ? '#9333ea' : '#334155' }}>
+                  Nullable
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
+                  Can be null
                 </Typography>
               </Box>
             </Box>
@@ -1868,7 +1912,16 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {nestedProperties.map((prop) => {
                     const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : (prop.data || {});
-                    const propType = propData.type || (propData.$ref ? 'reference' : 'object');
+
+                    // Handle nullable type arrays (OpenAPI 3.1 style like ['string', 'null'])
+                    let baseType = propData.type;
+                    let isNullable = false;
+                    if (Array.isArray(propData.type)) {
+                      isNullable = propData.type.includes('null');
+                      baseType = propData.type.find((t: string) => t !== 'null');
+                    }
+
+                    const propType = baseType || (propData.$ref ? 'reference' : 'object');
                     const isRequired = propData.required === true;
                     const isDeprecated = propData.deprecated === true;
                     const hasRef = !!propData.$ref;
@@ -1881,6 +1934,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       typeDisplay = `${itemType}[]`;
                     } else if (hasRef && refName) {
                       typeDisplay = refName;
+                    }
+
+                    // Add nullable indicator
+                    if (isNullable) {
+                      typeDisplay = `${typeDisplay}?`;
                     }
 
                     return (

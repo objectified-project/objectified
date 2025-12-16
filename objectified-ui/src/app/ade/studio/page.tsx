@@ -725,7 +725,12 @@ const StudioContent = () => {
 
       cls.properties.forEach((prop: any) => {
         const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
-        const isSourceArray = propData.type === 'array';
+        // Handle nullable type arrays for isSourceArray check
+        let sourceBaseType = propData.type;
+        if (Array.isArray(propData.type)) {
+          sourceBaseType = propData.type.find((t: string) => t !== 'null');
+        }
+        const isSourceArray = sourceBaseType === 'array';
 
         // Helper function to create composition edges
         const createCompositionEdges = (compositionType: 'allOf' | 'anyOf' | 'oneOf', refs: any[]) => {
@@ -827,7 +832,7 @@ const StudioContent = () => {
           refClassName = extractClassNameFromRef(propData.$ref);
         }
         // $ref in items (one-to-many or many-to-many)
-        else if (propData.type === 'array' && propData.items?.$ref) {
+        else if (sourceBaseType === 'array' && propData.items?.$ref) {
           refClassName = extractClassNameFromRef(propData.items.$ref);
         }
 
@@ -844,15 +849,20 @@ const StudioContent = () => {
             const sourceClassName = cls.name;
             targetClass.properties.forEach((targetProp: any) => {
               const targetPropData = typeof targetProp.data === 'string' ? JSON.parse(targetProp.data) : targetProp.data;
+              // Handle nullable type arrays for target property
+              let targetBaseType = targetPropData.type;
+              if (Array.isArray(targetPropData.type)) {
+                targetBaseType = targetPropData.type.find((t: string) => t !== 'null');
+              }
               const targetRefName = targetPropData.$ref
                 ? extractClassNameFromRef(targetPropData.$ref)
-                : (targetPropData.type === 'array' && targetPropData.items?.$ref
+                : (targetBaseType === 'array' && targetPropData.items?.$ref
                     ? extractClassNameFromRef(targetPropData.items.$ref)
                     : null);
 
               if (targetRefName === sourceClassName) {
                 hasReverseRef = true;
-                isTargetArray = targetPropData.type === 'array';
+                isTargetArray = targetBaseType === 'array';
               }
             });
           }
@@ -1078,7 +1088,15 @@ const StudioContent = () => {
       if (cls.properties && cls.properties.length > 0) {
         cls.properties.forEach((prop: any) => {
           const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
-          let propType = propData.type || 'any';
+
+          // Handle nullable type arrays (OpenAPI 3.1 style like ['string', 'null'])
+          let baseType = propData.type;
+          let isNullable = false;
+          if (Array.isArray(propData.type)) {
+            isNullable = propData.type.includes('null');
+            baseType = propData.type.find((t: string) => t !== 'null') || 'any';
+          }
+          let propType = baseType || 'any';
 
           // Handle composition types (anyOf, oneOf, allOf) at property level
           if (propData.anyOf && Array.isArray(propData.anyOf)) {
@@ -1110,7 +1128,7 @@ const StudioContent = () => {
             propType = types.length > 0 ? types.join(' & ') : 'allOf';
           }
           // Handle array types with composition in items
-          else if (propData.type === 'array' && propData.items) {
+          else if (baseType === 'array' && propData.items) {
             if (propData.items.anyOf && Array.isArray(propData.items.anyOf)) {
               const types = propData.items.anyOf
                 .map((item: any) => {
@@ -1152,7 +1170,9 @@ const StudioContent = () => {
             propType = extractClassNameFromRef(propData.$ref) || 'Object';
           }
 
-          lines.push(`        +${propType} ${prop.name}`);
+          // Add nullable indicator if the type is nullable
+          const displayType = isNullable ? `${propType}?` : propType;
+          lines.push(`        +${displayType} ${prop.name}`);
         });
       } else {
         lines.push(`        // No properties`);
@@ -1170,7 +1190,12 @@ const StudioContent = () => {
       if (cls.properties) {
         cls.properties.forEach((prop: any) => {
           const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data;
-          const isSourceArray = propData.type === 'array';
+          // Handle nullable type arrays for isSourceArray check
+          let sourceBaseType = propData.type;
+          if (Array.isArray(propData.type)) {
+            sourceBaseType = propData.type.find((t: string) => t !== 'null');
+          }
+          const isSourceArray = sourceBaseType === 'array';
 
           // Helper to add relationship for a single reference
           const addRelationship = (refClassName: string | null, relationLabel: string, compositionType?: 'anyOf' | 'oneOf' | 'allOf') => {
@@ -1255,7 +1280,7 @@ const StudioContent = () => {
             });
           }
           // Handle composition in array items
-          else if (propData.type === 'array' && propData.items) {
+          else if (sourceBaseType === 'array' && propData.items) {
             if (propData.items.anyOf && Array.isArray(propData.items.anyOf)) {
               propData.items.anyOf.forEach((item: any, index: number) => {
                 if (item.$ref) {

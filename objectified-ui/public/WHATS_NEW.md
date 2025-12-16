@@ -29,6 +29,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "patternProperties" allowing for regex patterns mapped to schemas
   - Added "dependentSchemas" composition support - when a trigger property is present, apply additional schema constraints (e.g., if "paymentMethod" is present, require credit card validation schema)
   - Added "dependentRequired" support - when a trigger property is present, other properties become required (e.g., if "billingAddress" is present, "billingCity" and "billingZip" become required)
+  - Added "Nullable" checkbox (OpenAPI 3.1) - outputs type as an array like `['string', 'null']` instead of the deprecated `nullable: true` from OpenAPI 3.0
+    - Nullable now shows as a "?" indicator in the type field when displayed in classes and properties
   - Added "unevaluatedProperties" for object properties - advanced control for inheritance scenarios (controls properties not matched by properties, patternProperties, or inherited schemas)
   - Added "if/then/else" class composition support
   - Added "unevaluatedItems" support

@@ -106,10 +106,20 @@ export default function ExtractToClassDialog({
       ? JSON.parse(classProperty.data)
       : classProperty.data;
 
-    if (propData.type === 'array' && propData.items?.type === 'object') {
-      return 'object[]';
+    // Handle nullable type arrays (OpenAPI 3.1 style)
+    let baseType = propData.type;
+    let isNullable = false;
+    if (Array.isArray(propData.type)) {
+      isNullable = propData.type.includes('null');
+      baseType = propData.type.find((t: string) => t !== 'null');
     }
-    return 'object';
+
+    const nullableSuffix = isNullable ? '?' : '';
+
+    if (baseType === 'array' && propData.items?.type === 'object') {
+      return `object[]${nullableSuffix}`;
+    }
+    return `object${nullableSuffix}`;
   };
 
   return (

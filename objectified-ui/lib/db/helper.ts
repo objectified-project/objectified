@@ -1243,6 +1243,7 @@ export async function addPropertyToClass(classId: string, propertyId: string | n
 
 export async function updateClassProperty(classPropertyId: string, name: string, description: string | null, data: any) {
   try {
+
     if (!name || name.trim().length === 0) {
       return JSON.stringify({ success: false, error: 'Property name is required' });
     }

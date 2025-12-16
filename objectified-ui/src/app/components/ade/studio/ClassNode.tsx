@@ -93,16 +93,25 @@ function ClassNode({ data, selected }: NodeProps) {
   // Helpers for schema parsing
   const parseData = (prop: ClassProperty) => (typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data || {});
 
+  // Helper to get base type from nullable type arrays (OpenAPI 3.1 style like ['string', 'null'])
+  const getBaseType = (propData: any): string | undefined => {
+    if (Array.isArray(propData?.type)) {
+      return propData.type.find((t: string) => t !== 'null');
+    }
+    return propData?.type;
+  };
+
   const hasRef = (prop: ClassProperty): boolean => {
     const d = parseData(prop);
+    const baseType = getBaseType(d);
     // Check for direct $ref
     if (d?.$ref) return true;
     // Check for array items $ref
-    if (d?.type === 'array' && d?.items?.$ref) return true;
+    if (baseType === 'array' && d?.items?.$ref) return true;
     // Check for composition types (allOf/anyOf/oneOf)
     if (d?.allOf || d?.anyOf || d?.oneOf) return true;
     // Check for composition types in array items
-    if (d?.type === 'array' && d?.items) {
+    if (baseType === 'array' && d?.items) {
       if (d.items.allOf || d.items.anyOf || d.items.oneOf) return true;
     }
     return false;
@@ -110,8 +119,9 @@ function ClassNode({ data, selected }: NodeProps) {
 
   const isInlineObjectContainer = (prop: ClassProperty): boolean => {
     const d = parseData(prop);
-    if (d?.type === 'object' && !d.$ref) return true;
-    if (d?.type === 'array') {
+    const baseType = getBaseType(d);
+    if (baseType === 'object' && !d.$ref) return true;
+    if (baseType === 'array') {
       const items = d.items || {};
       if (items.type === 'object' && !items.$ref) return true;
       // If items is missing but we have inline children attached, treat as container
@@ -197,12 +207,61 @@ function ClassNode({ data, selected }: NodeProps) {
       const hasInlineChildren = (typedData.properties || []).some((p) => p.parent_id === prop.id);
       return hasInlineChildren ? 'object[]' : 'any[]';
     }
+
+    // Handle nullable type arrays (OpenAPI 3.1 style like ['string', 'null'])
+    const baseType = getBaseType(d);
+    const isNullable = Array.isArray(d?.type) && d.type.includes('null');
+
+    if (baseType === 'array') {
+      // Handle composition in array items
+      if (d.items?.allOf && Array.isArray(d.items.allOf)) {
+        const types = d.items.allOf.map((item: any) => {
+          if (item.$ref) return item.$ref.split('/').pop();
+          return item.type || 'schema';
+        }).filter(Boolean);
+        const suffix = isNullable ? '?' : '';
+        return types.length > 0 ? `allOf(${types.length})[]${suffix}` : `allOf[]${suffix}`;
+      }
+      if (d.items?.anyOf && Array.isArray(d.items.anyOf)) {
+        const types = d.items.anyOf.map((item: any) => {
+          if (item.$ref) return item.$ref.split('/').pop();
+          return item.type || 'schema';
+        }).filter(Boolean);
+        const suffix = isNullable ? '?' : '';
+        return types.length > 0 ? `anyOf(${types.length})[]${suffix}` : `anyOf[]${suffix}`;
+      }
+      if (d.items?.oneOf && Array.isArray(d.items.oneOf)) {
+        const types = d.items.oneOf.map((item: any) => {
+          if (item.$ref) return item.$ref.split('/').pop();
+          return item.type || 'schema';
+        }).filter(Boolean);
+        const suffix = isNullable ? '?' : '';
+        return types.length > 0 ? `oneOf(${types.length})[]${suffix}` : `oneOf[]${suffix}`;
+      }
+      if (d.items?.$ref) {
+        const refName = d.items.$ref.split('/').pop();
+        const suffix = isNullable ? '?' : '';
+        return `${refName}[]${suffix}`;
+      }
+      if (d.items?.type) {
+        const suffix = isNullable ? '?' : '';
+        return `${d.items.type}[]${suffix}`;
+      }
+      const hasInlineChildren = (typedData.properties || []).some((p) => p.parent_id === prop.id);
+      const suffix = isNullable ? '?' : '';
+      return hasInlineChildren ? `object[]${suffix}` : `any[]${suffix}`;
+    }
+
     if (d?.$ref) {
       const refName = d.$ref.split('/').pop();
       if (refName === '__unassigned__') return '(unassigned)';
-      return '$ref';
+      const suffix = isNullable ? '?' : '';
+      return `$ref${suffix}`;
     }
-    return d?.type || prop.type || 'object';
+
+    const typeName = baseType || prop.type || 'object';
+    const suffix = isNullable ? '?' : '';
+    return `${typeName}${suffix}`;
   };
 
   // DnD Handlers (top-level)

@@ -45,13 +45,30 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
   // Helper to get property type display
   const getPropertyTypeInfo = () => {
-    if (!editingClassProperty) return { type: 'unknown', baseType: 'unknown', isArray: false };
+    if (!editingClassProperty) return { type: 'unknown', baseType: 'unknown', isArray: false, isNullable: false };
 
     const propData = typeof editingClassProperty.data === 'string'
       ? JSON.parse(editingClassProperty.data)
       : (editingClassProperty.data || {});
 
-    const isArray = propData.type === 'array';
+    // Handle nullable type arrays (OpenAPI 3.1 style)
+    let actualType = propData.type;
+    let isNullable = false;
+    if (Array.isArray(propData.type)) {
+      isNullable = propData.type.includes('null');
+      actualType = propData.type.find((t: string) => t !== 'null') || 'string';
+    }
+
+    // Also check for oneOf pattern with null (used for nullable references)
+    if (propData.oneOf && Array.isArray(propData.oneOf)) {
+      const hasNullType = propData.oneOf.some((item: any) => item.type === 'null');
+      const hasRef = propData.oneOf.some((item: any) => item.$ref);
+      if (hasNullType && hasRef) {
+        isNullable = true;
+      }
+    }
+
+    const isArray = actualType === 'array';
     const schema = isArray ? (propData.items || {}) : propData;
 
     let baseType = 'unknown';
@@ -62,10 +79,12 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       baseType = schema.type || 'object';
     }
 
+    const nullableSuffix = isNullable ? '?' : '';
     return {
-      type: isArray ? `${baseType}[]` : baseType,
+      type: isArray ? `${baseType}[]${nullableSuffix}` : `${baseType}${nullableSuffix}`,
       baseType,
       isArray,
+      isNullable,
       hasRef: !!schema.$ref
     };
   };
@@ -101,8 +120,29 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       ? JSON.parse(editingClassProperty.data)
       : (editingClassProperty.data || {});
 
+    // Detect nullable - can be from:
+    // 1. Type array like ['string', 'null']
+    // 2. oneOf pattern like [{ $ref: '...' }, { type: 'null' }] for references
+    let isNullable = false;
+    let actualType = propData.type;
+
+    // Check for type array pattern
+    if (Array.isArray(propData.type)) {
+      isNullable = propData.type.includes('null');
+      actualType = propData.type.find((t: string) => t !== 'null');
+    }
+
+    // Check for oneOf pattern with null (used for nullable references)
+    if (propData.oneOf && Array.isArray(propData.oneOf)) {
+      const hasNullType = propData.oneOf.some((item: any) => item.type === 'null');
+      const hasRef = propData.oneOf.some((item: any) => item.$ref);
+      if (hasNullType && hasRef) {
+        isNullable = true;
+      }
+    }
+
     // Get the actual schema (handle array types)
-    const schema = propData.type === 'array' ? (propData.items || {}) : propData;
+    const schema = actualType === 'array' ? (propData.items || {}) : propData;
 
     // Determine additionalProperties value
     let additionalPropsValue: 'default' | 'true' | 'false' = 'default';
@@ -122,6 +162,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     setFormData({
       description: editingClassProperty.description || '',
       required: !!propData.required,
+      nullable: isNullable,
       deprecated: !!propData.deprecated,
       deprecationMessage: propData.deprecationMessage || '',
       readOnly: !!propData.readOnly,
@@ -241,8 +282,56 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         delete updatedData.example;
       }
 
+      // Handle nullable - update type to be an array with 'null' (OpenAPI 3.1 style)
+      // For properties with $ref, we need to use oneOf with null instead
+      // For properties with type, we use type array like ['string', 'null']
+
+      // Check if this is a reference type (has $ref at top level or in items for arrays)
+      const hasDirectRef = updatedData.$ref && !updatedData.type;
+
+      if (hasDirectRef) {
+        // For direct references like { $ref: '...' }, use oneOf pattern for nullable
+        if (formData.nullable) {
+          // Convert to oneOf: [{ $ref: '...' }, { type: 'null' }]
+          const refValue = updatedData.$ref;
+          delete updatedData.$ref;
+          updatedData.oneOf = [
+            { $ref: refValue },
+            { type: 'null' }
+          ];
+        } else {
+          // If there's a oneOf with null, convert back to simple $ref
+          if (updatedData.oneOf && Array.isArray(updatedData.oneOf)) {
+            const refItem = updatedData.oneOf.find((item: any) => item.$ref);
+            if (refItem) {
+              delete updatedData.oneOf;
+              updatedData.$ref = refItem.$ref;
+            }
+          }
+        }
+      } else {
+        // For regular types (string, number, object, array, etc.)
+        let currentBaseType = updatedData.type;
+        if (Array.isArray(updatedData.type)) {
+          currentBaseType = updatedData.type.find((t: string) => t !== 'null');
+        }
+
+        // Only set type if we have a valid base type
+        if (currentBaseType) {
+          if (formData.nullable) {
+            updatedData.type = [currentBaseType, 'null'];
+          } else {
+            updatedData.type = currentBaseType;
+          }
+        }
+      }
+
       // Determine where to apply constraints (array items vs direct)
-      const isArray = updatedData.type === 'array';
+      let currentBaseType = updatedData.type;
+      if (Array.isArray(updatedData.type)) {
+        currentBaseType = updatedData.type.find((t: string) => t !== 'null');
+      }
+      const isArray = currentBaseType === 'array';
       const targetSchema = isArray ? (updatedData.items || {}) : updatedData;
 
       // Handle additionalProperties field (apply to direct object or array items object)

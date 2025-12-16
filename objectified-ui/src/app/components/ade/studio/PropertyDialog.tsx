@@ -100,8 +100,20 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
     if (open && property && mode === 'edit') {
       setPropertyName(property.name);
 
+      // Check if property type is an array (for nullable detection)
+      // Type can be 'array', ['array', 'null'], 'string', ['string', 'null'], etc.
+      const typeValue = property.type;
+      let isNullable = false;
+      let actualType = typeValue;
+
+      if (Array.isArray(typeValue)) {
+        // Type is an array like ['string', 'null'] or ['array', 'null']
+        isNullable = typeValue.includes('null');
+        actualType = typeValue.find((t: string) => t !== 'null') || 'string';
+      }
+
       // Check if property is an array type
-      const isArray = property.type === 'array';
+      const isArray = actualType === 'array';
       setPropertyIsArray(isArray);
 
       // Check if tuple mode is active (prefixItems exists)
@@ -124,7 +136,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         // Has a direct $ref - this is a reference type
         setPropertyType('$ref');
       } else {
-        setPropertyType(property.type || 'string');
+        // Handle nullable type arrays - extract base type
+        let baseType = actualType;
+        if (!baseType && property.type) {
+          baseType = property.type;
+        }
+        setPropertyType(baseType || 'string');
       }
 
       // Determine minimum type (inclusive vs exclusive)
@@ -207,6 +224,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         const: minMaxSource.const !== undefined ? (typeof minMaxSource.const === 'string' ? minMaxSource.const : JSON.stringify(minMaxSource.const)) : '',
         default: minMaxSource.default?.toString() || '',
         required: property.required || false,
+        // Nullable (OpenAPI 3.1 - type array with 'null')
+        nullable: isNullable,
         // Metadata fields
         readOnly: property.readOnly || false,
         writeOnly: property.writeOnly || false,
@@ -265,7 +284,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
     if (formData.required) schema.required = formData.required;
 
     if (propertyIsArray) {
-      schema.type = 'array';
+      // Handle nullable for arrays (OpenAPI 3.1 style)
+      schema.type = formData.nullable ? ['array', 'null'] : 'array';
       if (formData.minItems) schema.minItems = parseInt(formData.minItems);
       if (formData.maxItems) schema.maxItems = parseInt(formData.maxItems);
       if (formData.uniqueItems) schema.uniqueItems = true;
@@ -390,7 +410,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         schema.items = itemsSchema;
       }
     } else {
-      schema.type = propertyType;
+      // Handle nullable for non-array types (OpenAPI 3.1 style)
+      schema.type = formData.nullable ? [propertyType, 'null'] : propertyType;
       if (formData.format) schema.format = formData.format;
       if (formData.pattern) schema.pattern = formData.pattern;
       if (formData.minLength) schema.minLength = parseInt(formData.minLength);
@@ -520,7 +541,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       }
 
       if (propertyIsArray) {
-        dataObject.type = 'array';
+        // Handle nullable for arrays (OpenAPI 3.1 style)
+        dataObject.type = formData.nullable ? ['array', 'null'] : 'array';
         if (formData.minItems) dataObject.minItems = parseInt(formData.minItems);
         else delete dataObject.minItems;
         if (formData.maxItems) dataObject.maxItems = parseInt(formData.maxItems);
@@ -723,7 +745,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           dataObject.items = itemsSchema;
         }
       } else {
-        dataObject.type = propertyType;
+        // Handle nullable for non-array types (OpenAPI 3.1 style)
+        dataObject.type = formData.nullable ? [propertyType, 'null'] : propertyType;
         if (formData.format) dataObject.format = formData.format;
         else delete dataObject.format;
         if (formData.pattern) dataObject.pattern = formData.pattern;

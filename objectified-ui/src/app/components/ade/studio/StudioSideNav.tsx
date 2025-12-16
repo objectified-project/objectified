@@ -696,7 +696,15 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                               mt: 0.25,
                             }}
                           >
-                            {propertyItem.type || propertyItem.description}
+                            {propertyItem.type && (Array.isArray(propertyItem.type) ? (
+                              <>
+                                {propertyItem.type[0]}{propertyItem.type[1] === 'null' && ' [nullable]'}
+                              </>
+                            ) : (
+                              <>
+                                {propertyItem.type}
+                              </>
+                            )) || propertyItem.description}
                           </Typography>
                         </Box>
 
