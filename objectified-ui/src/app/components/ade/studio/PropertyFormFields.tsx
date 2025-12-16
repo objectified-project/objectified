@@ -104,6 +104,10 @@ export interface PropertyFormData {
   propertyNamesMinLength?: string;
   propertyNamesMaxLength?: string;
 
+  // unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects
+  unevaluatedProperties?: 'default' | 'allow' | 'disallow' | 'schema'; // Control for properties not matched by properties, patternProperties, or inherited schemas
+  unevaluatedPropertiesSchema?: string; // JSON string of schema when unevaluatedProperties is 'schema'
+
   // Extensions (x- prefixed properties)
   extensions?: Record<string, any>;
 
@@ -1551,6 +1555,117 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   sx={{ m: 0 }}
                 />
               </Box>
+            </Box>
+
+            {/* Unevaluated Properties (OpenAPI 3.1 / JSON Schema 2020-12) */}
+            <Box sx={{
+              mt: 2.5,
+              p: 2.5,
+              bgcolor: isDark ? '#0f172a' : 'white',
+              borderRadius: 2.5,
+              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                mb: 2,
+                pb: 1.5,
+                borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
+              }}>
+                <Box sx={{
+                  p: 0.75,
+                  borderRadius: 1.5,
+                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <SettingsIcon sx={{ color: '#6366f1', fontSize: 16 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    Unevaluated Properties
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Advanced control for inheritance scenarios
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{
+                  px: 1,
+                  py: 0.25,
+                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  color: '#4f46e5',
+                  borderRadius: 1,
+                  fontWeight: 600,
+                  fontSize: '0.65rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  OpenAPI 3.1
+                </Typography>
+              </Box>
+
+              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+                Controls properties not matched by <code style={{ background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>properties</code>, <code style={{ background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>patternProperties</code>, or inherited schemas via <code style={{ background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>allOf</code>.
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: data.unevaluatedProperties === 'schema' ? 2 : 0 }}>
+                <FormControlLabel
+                  control={<Radio checked={!data.unevaluatedProperties || data.unevaluatedProperties === 'default'} onChange={() => onChange('unevaluatedProperties', 'default')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Not specified (default)</Typography>}
+                  sx={{ m: 0 }}
+                />
+                <FormControlLabel
+                  control={<Radio checked={data.unevaluatedProperties === 'allow'} onChange={() => onChange('unevaluatedProperties', 'allow')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Allow unevaluated properties</Typography>}
+                  sx={{ m: 0 }}
+                />
+                <FormControlLabel
+                  control={<Radio checked={data.unevaluatedProperties === 'disallow'} onChange={() => onChange('unevaluatedProperties', 'disallow')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Disallow unevaluated properties</Typography>}
+                  sx={{ m: 0 }}
+                />
+                <FormControlLabel
+                  control={<Radio checked={data.unevaluatedProperties === 'schema'} onChange={() => onChange('unevaluatedProperties', 'schema')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Must match schema</Typography>}
+                  sx={{ m: 0 }}
+                />
+              </Box>
+
+              {data.unevaluatedProperties === 'schema' && (
+                <TextField
+                  label="Schema for Unevaluated Properties"
+                  size={size}
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={data.unevaluatedPropertiesSchema ?? ''}
+                  onChange={(e) => onChange('unevaluatedPropertiesSchema', e.target.value)}
+                  placeholder='{ "type": "string" }'
+                  helperText="JSON Schema that unevaluated properties must match"
+                  sx={{
+                    '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.85rem' },
+                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                  }}
+                />
+              )}
+
+              {data.unevaluatedProperties && data.unevaluatedProperties !== 'default' && (
+                <Box sx={{
+                  mt: 2,
+                  p: 1.5,
+                  bgcolor: 'rgba(99, 102, 241, 0.06)',
+                  borderRadius: 1.5,
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                }}>
+                  <Typography variant="caption" sx={{ color: '#4f46e5', display: 'block' }}>
+                    <strong>Tip:</strong> Use <code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>unevaluatedProperties</code> when using schema composition (<code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>allOf</code>) to control properties from all composed schemas. Unlike <code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>additionalProperties</code>, it considers properties from inherited schemas.
+                  </Typography>
+                </Box>
+              )}
             </Box>
 
             {/* Property Name Constraints */}

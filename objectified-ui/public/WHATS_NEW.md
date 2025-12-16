@@ -27,8 +27,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Added "constant" field for properties
   - Added "not" support for properties - define schemas that must not be matched
   - Added "patternProperties" allowing for regex patterns mapped to schemas
+  - Added "unevaluatedProperties" for object properties - advanced control for inheritance scenarios (controls properties not matched by properties, patternProperties, or inherited schemas)
   - Added "if/then/else" class composition support
   - Added "unevaluatedItems" support
+  - Added "unevaluatedProperties" support
   - Updated "additionalProperties" handling to support matching of a schema by reference
   - Added support for property name constraints using a format, min/max length, and regex pattern
   - Added support for custom "x-" tags and values to classes and properties

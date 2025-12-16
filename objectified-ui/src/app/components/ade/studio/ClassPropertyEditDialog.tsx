@@ -174,6 +174,13 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       minProperties: schema.minProperties?.toString() || '',
       maxProperties: schema.maxProperties?.toString() || '',
 
+      // unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects
+      unevaluatedProperties: schema.unevaluatedProperties === true ? 'allow' :
+        schema.unevaluatedProperties === false ? 'disallow' :
+        (typeof schema.unevaluatedProperties === 'object' ? 'schema' : 'default'),
+      unevaluatedPropertiesSchema: typeof schema.unevaluatedProperties === 'object' ?
+        JSON.stringify(schema.unevaluatedProperties, null, 2) : '',
+
       // Property Name Constraints (OpenAPI 3.1)
       propertyNamesPattern: schema.propertyNames?.pattern || '',
       propertyNamesMinLength: schema.propertyNames?.minLength?.toString() || '',
@@ -257,6 +264,22 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         targetSchema.maxProperties = parseInt(formData.maxProperties);
       } else {
         delete targetSchema.maxProperties;
+      }
+
+      // Handle unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects
+      if (formData.unevaluatedProperties === 'allow') {
+        targetSchema.unevaluatedProperties = true;
+      } else if (formData.unevaluatedProperties === 'disallow') {
+        targetSchema.unevaluatedProperties = false;
+      } else if (formData.unevaluatedProperties === 'schema' && formData.unevaluatedPropertiesSchema?.trim()) {
+        try {
+          targetSchema.unevaluatedProperties = JSON.parse(formData.unevaluatedPropertiesSchema);
+        } catch (e) {
+          // If not valid JSON, treat as a simple type
+          targetSchema.unevaluatedProperties = { type: formData.unevaluatedPropertiesSchema };
+        }
+      } else {
+        delete targetSchema.unevaluatedProperties;
       }
 
       // Handle propertyNames constraints (OpenAPI 3.1)
