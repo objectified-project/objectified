@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import YAML from 'yaml';
 import { useTheme, specThemes, SpecTheme } from './ThemeProvider';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -42,6 +43,7 @@ const monacoThemeMap: Record<SpecTheme, string> = {
 export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUrl }: SpecViewerProps) {
   const { specTheme, setSpecTheme } = useTheme();
   const [format, setFormat] = useState<SpecFormat>('openapi');
+  const [viewFormat, setViewFormat] = useState<'json' | 'yaml'>('json');
   const [spec, setSpec] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,11 +100,16 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
 
   const downloadSpec = () => {
     if (!spec) return;
-    const blob = new Blob([JSON.stringify(spec, null, 2)], { type: 'application/json' });
+    const content = viewFormat === 'json'
+      ? JSON.stringify(spec, null, 2)
+      : YAML.stringify(spec);
+    const blob = new Blob([content], {
+      type: viewFormat === 'json' ? 'application/json' : 'text/yaml'
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${projectSlug}-${versionSlug}-${format}.json`;
+    a.download = `${projectSlug}-${versionSlug}-${format}.${viewFormat === 'json' ? 'json' : 'yaml'}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -111,7 +118,10 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
 
   const copyToClipboard = async () => {
     if (!spec) return;
-    await navigator.clipboard.writeText(JSON.stringify(spec, null, 2));
+    const content = viewFormat === 'json'
+      ? JSON.stringify(spec, null, 2)
+      : YAML.stringify(spec);
+    await navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -134,14 +144,16 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
     setTimeout(() => setUrlCopied(false), 2000);
   };
 
-  const specJson = spec ? JSON.stringify(spec, null, 2) : '';
-  const lineCount = specJson.split('\n').length;
+  const specContent = spec
+    ? (viewFormat === 'json' ? JSON.stringify(spec, null, 2) : YAML.stringify(spec))
+    : '';
+  const lineCount = specContent.split('\n').length;
 
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-        {/* Left Side: Format Tabs and Copy URL */}
+        {/* Left Side: Format Tabs, JSON/YAML Toggles, and Copy URL */}
         <div className="flex items-center gap-3">
           {/* Format Tabs */}
           <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
@@ -158,6 +170,33 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
                 {f === 'openapi' ? 'OpenAPI' : f === 'arazzo' ? 'Arazzo' : 'JSON Schema'}
               </button>
             ))}
+          </div>
+
+          {/* Separator */}
+          <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
+
+          {/* JSON/YAML Toggle */}
+          <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
+            <button
+              onClick={() => setViewFormat('json')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewFormat === 'json'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
+              }`}
+            >
+              JSON
+            </button>
+            <button
+              onClick={() => setViewFormat('yaml')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewFormat === 'yaml'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
+              }`}
+            >
+              YAML
+            </button>
           </div>
 
           {/* Separator */}
@@ -361,7 +400,7 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
           <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {format === 'openapi' ? 'openapi.json' : format === 'arazzo' ? 'arazzo.json' : 'schema.json'}
+                {format === 'openapi' ? `openapi.${viewFormat}` : format === 'arazzo' ? `arazzo.${viewFormat}` : `schema.${viewFormat}`}
               </span>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 {lineCount} lines
@@ -376,8 +415,8 @@ export function SpecViewer({ tenantSlug, projectSlug, versionSlug, restApiBaseUr
           {/* Monaco Editor */}
           <Editor
             height="600px"
-            language="json"
-            value={specJson}
+            language={viewFormat}
+            value={specContent}
             theme={monacoThemeMap[specTheme]}
             options={{
               readOnly: true,
