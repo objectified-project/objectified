@@ -2,49 +2,69 @@
 
 > Comprehensive list of features and improvements to make Objectified a world-class enterprise schema development platform
 > 
-> **Last Updated**: December 13, 2025
+> **Last Updated**: December 16, 2025
 
 ---
 
 ## 📊 TL;DR - Feature Status Summary
 
-### ✅ Completed Features (33 items)
+### ✅ Completed Features (53 items)
 
-| Category     | Feature              | Description                                        |
-|--------------|----------------------|----------------------------------------------------|
-| **Canvas**   | Auto Layout          | 8 algorithms (hierarchical, force, circular, grid) |
-| **Canvas**   | Level of Detail      | Dynamic detail based on zoom level                 |
-| **Canvas**   | Progress Bar         | Visual loading feedback                            |
-| **Canvas**   | Edge Cardinality     | Visual relationship types                          |
-| **Canvas**   | Class Tags           | Tags displayed on nodes                            |
-| **Canvas**   | Mermaid Export       | Preview/code modes, PNG/SVG export                 |
-| **Code Gen** | TypeScript           | Interfaces with composition                        |
-| **Code Gen** | Python - Pydantic    | Models with validation                             |
-| **Code Gen** | Python - Dataclasses | Standard library classes                           |
-| **Code Gen** | Python - SQLAlchemy  | ORM models                                         |
-| **Code Gen** | Java                 | POJOs, Records, JPA entities                       |
-| **Code Gen** | Scala                | Case classes with play-json                        |
-| **Code Gen** | GraphQL SDL          | Schema definitions                                 |
-| **Code Gen** | SQL DDL              | PostgreSQL, MySQL, SQLite, SQL Server, Oracle      |
-| **OpenAPI**  | 3.1 Full Support     | allOf, anyOf, oneOf, discriminators                |
-| **OpenAPI**  | Tuple Mode           | prefixItems for ordered arrays                     |
-| **OpenAPI**  | Property Extensions  | Custom x- properties                               |
-| **OpenAPI**  | Discriminator Config | Visual mapping editor                              |
-| **OpenAPI**  | Deprecated Support   | With deprecation messages                          |
-| **OpenAPI**  | External Docs        | URL references per class                           |
-| **OpenAPI**  | Array Validation     | contains, minContains, maxContains                 |
-| **OpenAPI**  | Nested Properties    | Inline object definitions                          |
-| **Auth**     | API Keys             | Full CRUD, expiration, usage tracking              |
-| **Auth**     | GitHub OAuth         | SSO + account linking                              |
-| **Auth**     | GitLab OAuth         | SSO + account linking                              |
-| **Auth**     | External Providers   | Linked accounts management                         |
-| **Auth**     | Super Admin          | Password-protected portal                          |
-| **DevEx**    | Swagger UI           | Integrated in Studio                               |
-| **DevEx**    | Git Browser          | GitHub/GitLab via SSO                              |
-| **DevEx**    | PAT Support          | Personal Access Tokens                             |
-| **DevEx**    | Version Copy         | Copy classes between versions                      |
-| **Infra**    | Docker               | Multi-stage production builds                      |
-| **UI**       | Dark Mode            | System preference detection                        |
+| Category     | Feature                        | Description                                        |
+|--------------|--------------------------------|----------------------------------------------------|
+| **Canvas**   | Auto Layout                    | 8 algorithms (hierarchical, force, circular, grid) |
+| **Canvas**   | Level of Detail                | Dynamic detail based on zoom level                 |
+| **Canvas**   | Progress Bar                   | Visual loading feedback                            |
+| **Canvas**   | Edge Cardinality               | Visual relationship types                          |
+| **Canvas**   | Class Tags                     | Tags displayed on nodes                            |
+| **Canvas**   | Mermaid Export                 | Preview/code modes, PNG/SVG export                 |
+| **Code Gen** | TypeScript                     | Interfaces with composition                        |
+| **Code Gen** | Python - Pydantic              | Models with validation                             |
+| **Code Gen** | Python - Dataclasses           | Standard library classes                           |
+| **Code Gen** | Python - SQLAlchemy            | ORM models                                         |
+| **Code Gen** | Java                           | POJOs, Records, JPA entities                       |
+| **Code Gen** | Scala                          | Case classes with play-json                        |
+| **Code Gen** | GraphQL SDL                    | Schema definitions                                 |
+| **Code Gen** | SQL DDL                        | PostgreSQL, MySQL, SQLite, SQL Server, Oracle      |
+| **OpenAPI**  | Composition (allOf/anyOf/oneOf)| Full schema composition support                    |
+| **OpenAPI**  | Discriminator                  | Property + mapping with auto/manual modes          |
+| **OpenAPI**  | Type Arrays (nullable)         | `['string', 'null']` for nullable types            |
+| **OpenAPI**  | Exclusive Min/Max              | `exclusiveMinimum`, `exclusiveMaximum`             |
+| **OpenAPI**  | const Keyword                  | Single constant value constraint                   |
+| **OpenAPI**  | prefixItems (Tuple Mode)       | Ordered array schemas with position-specific types |
+| **OpenAPI**  | contains/minContains/maxContains| Array item matching constraints                   |
+| **OpenAPI**  | unevaluatedItems               | Control for unmatched array items                  |
+| **OpenAPI**  | unevaluatedProperties          | Control for unmatched object properties            |
+| **OpenAPI**  | not Keyword                    | Negation schemas                                   |
+| **OpenAPI**  | if/then/else                   | Conditional schema application                     |
+| **OpenAPI**  | patternProperties              | Regex-based property schemas                       |
+| **OpenAPI**  | dependentSchemas               | Property-triggered schema constraints              |
+| **OpenAPI**  | dependentRequired              | Property-triggered required fields                 |
+| **OpenAPI**  | propertyNames                  | Property name validation (pattern, min/max length) |
+| **OpenAPI**  | deprecated                     | With custom deprecation messages                   |
+| **OpenAPI**  | examples Array                 | Multiple example values                            |
+| **OpenAPI**  | readOnly/writeOnly             | Access control flags                               |
+| **OpenAPI**  | Extension Properties (x-)      | Custom vendor extensions                           |
+| **OpenAPI**  | External Documentation         | externalDocs with URL and description              |
+| **OpenAPI**  | String Constraints             | minLength, maxLength, pattern, format              |
+| **OpenAPI**  | Numeric Constraints            | minimum, maximum, multipleOf                       |
+| **OpenAPI**  | Array Constraints              | minItems, maxItems, uniqueItems                    |
+| **OpenAPI**  | Object Constraints             | minProperties, maxProperties, additionalProperties |
+| **OpenAPI**  | Enum Values                    | With drag-and-drop reordering                      |
+| **OpenAPI**  | Default Values                 | Property defaults                                  |
+| **Auth**     | API Keys                       | Full CRUD, expiration, usage tracking              |
+| **Auth**     | GitHub OAuth                   | SSO + account linking                              |
+| **Auth**     | GitLab OAuth                   | SSO + account linking                              |
+| **Auth**     | External Providers             | Linked accounts management                         |
+| **Auth**     | Super Admin                    | Password-protected portal                          |
+| **DevEx**    | Swagger UI                     | Integrated in Studio                               |
+| **DevEx**    | Git Browser                    | GitHub/GitLab via SSO                              |
+| **DevEx**    | PAT Support                    | Personal Access Tokens                             |
+| **DevEx**    | Version Copy                   | Copy classes between versions                      |
+| **DevEx**    | Spec Viewer (Browse)           | JSON/YAML toggle, theme selector                   |
+| **Infra**    | Docker                         | Multi-stage production builds                      |
+| **UI**       | Dark Mode                      | System preference detection                        |
+| **UI**       | Radix UI Migration             | Modern component library (Studio & Dashboard)      |
 
 ### 🎯 High Priority - Next Quarter (Q1 2026)
 
@@ -1365,6 +1385,99 @@
 - ✅ Constraint tooltips on hover
 - ✅ Constraint summary panel
 - ✅ Tags displayed on class nodes
+
+### OpenAPI 3.1 / JSON Schema 2020-12 Feature Coverage
+
+**Schema Composition** ✅ FULLY IMPLEMENTED
+- ✅ `allOf`: Combine multiple schemas (inheritance/mixins)
+- ✅ `anyOf`: Match at least one schema (union types)
+- ✅ `oneOf`: Match exactly one schema (discriminated unions)
+- ✅ `not`: Negation - must NOT match schema
+- ✅ Discriminator with property name and mapping
+- ✅ Auto-discriminator generation from property values
+- ✅ Manual discriminator mapping editor
+
+**Type System** ✅ FULLY IMPLEMENTED
+- ✅ Type arrays for nullable: `['string', 'null']` (replaces deprecated `nullable: true`)
+- ✅ `const`: Single constant value
+- ✅ `enum`: Enumerated values with drag-and-drop reordering
+- ✅ `default`: Default values
+- ✅ `type`: All JSON Schema types (string, number, integer, boolean, object, array, null)
+
+**String Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `minLength`: Minimum string length
+- ✅ `maxLength`: Maximum string length
+- ✅ `pattern`: Regular expression validation with live tester
+- ✅ `format`: Standard formats (date, date-time, time, email, uri, uuid, etc.)
+
+**Numeric Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `minimum`: Minimum value (inclusive by default)
+- ✅ `maximum`: Maximum value (inclusive by default)
+- ✅ `exclusiveMinimum`: Exclusive minimum (OpenAPI 3.1 style)
+- ✅ `exclusiveMaximum`: Exclusive maximum (OpenAPI 3.1 style)
+- ✅ `multipleOf`: Value must be multiple of specified number
+- ✅ Radio buttons for inclusive (≥) vs exclusive (>) boundaries
+
+**Array Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `minItems`: Minimum array length
+- ✅ `maxItems`: Maximum array length
+- ✅ `uniqueItems`: All items must be unique
+- ✅ `items`: Schema for all array items
+- ✅ `prefixItems`: Tuple mode - ordered schemas for specific positions (OpenAPI 3.1)
+- ✅ `contains`: At least one item must match this schema (OpenAPI 3.1)
+- ✅ `minContains`: Minimum items matching contains schema (OpenAPI 3.1)
+- ✅ `maxContains`: Maximum items matching contains schema (OpenAPI 3.1)
+- ✅ `unevaluatedItems`: Control for items not matched by prefixItems/items/contains (JSON Schema 2020-12)
+
+**Object Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `properties`: Define object properties
+- ✅ `required`: Array of required property names
+- ✅ `additionalProperties`: Allow/disallow/schema for extra properties
+- ✅ `minProperties`: Minimum number of properties
+- ✅ `maxProperties`: Maximum number of properties
+- ✅ `patternProperties`: Regex-based property schemas (e.g., `^x-` for extensions)
+- ✅ `propertyNames`: Validate property names with pattern/minLength/maxLength (OpenAPI 3.1)
+- ✅ `dependentRequired`: Properties that require other properties (OpenAPI 3.1)
+- ✅ `dependentSchemas`: Apply schema when specific property exists (OpenAPI 3.1)
+- ✅ `unevaluatedProperties`: Control for properties not matched by properties/patternProperties/allOf (JSON Schema 2020-12)
+
+**Conditional Schemas** ✅ FULLY IMPLEMENTED
+- ✅ `if`/`then`/`else`: Conditional schema application (OpenAPI 3.1)
+  - Visual conditional rule builder
+  - Multiple operators: equals, enum, type, required, pattern, minimum, maximum
+  - THEN schema with required properties and constraints
+  - Optional ELSE schema for when condition is false
+  - Support for complex nested conditions
+
+**Metadata & Documentation** ✅ FULLY IMPLEMENTED
+- ✅ `title`: Display title for schemas
+- ✅ `description`: Rich text descriptions
+- ✅ `examples`: Array of example values (replaces deprecated `example`)
+- ✅ `deprecated`: Mark as deprecated with custom deprecation message
+- ✅ `readOnly`: Property is read-only (response only)
+- ✅ `writeOnly`: Property is write-only (request only)
+- ✅ `externalDocs`: Link to external documentation with URL and description
+
+**Extension Properties** ✅ FULLY IMPLEMENTED
+- ✅ Custom `x-` prefixed vendor extensions
+- ✅ Extensions at class/schema level
+- ✅ Extensions at property level
+- ✅ JSON editor for extension values
+- ✅ Support for any valid JSON structure in extensions
+
+**Not Yet Implemented** 📋 PLANNED (Low Priority)
+- 📋 `$id`: Schema identifier for referencing
+- 📋 `$schema`: JSON Schema version declaration
+- 📋 `$ref`: Schema references (currently handled via class references)
+- 📋 `$defs`: Reusable schema definitions
+- 📋 `$anchor`: Named anchors for deep linking
+- 📋 `$dynamicRef`/`$dynamicAnchor`: Dynamic references (advanced)
+- 📋 `$vocabulary`: Custom vocabulary definitions
+- 📋 `contentMediaType`: Media type for string content
+- 📋 `contentEncoding`: Content encoding (base64, etc.)
+- 📋 `contentSchema`: Schema for decoded content
+
+**Summary**: Objectified implements **95%+ of OpenAPI 3.1 / JSON Schema 2020-12** features relevant to schema design. Missing features are primarily meta-schema features (`$id`, `$schema`, `$vocabulary`) and content encoding, which are rarely used in typical API development.
 
 ### Version Management
 
