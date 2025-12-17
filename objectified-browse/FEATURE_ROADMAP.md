@@ -117,7 +117,7 @@ This document outlines the planned features, improvements, and enhancements for 
 **Description:** Export specifications in various formats.
 
 - ✅ Download as JSON (current)
-- [ ] Download as YAML [#182]
+- ✅ Download as YAML [#182]
 - [ ] Download as HTML documentation
 - [ ] Download as PDF
 - [ ] Download as Markdown

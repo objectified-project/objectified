@@ -7258,6 +7258,7 @@ __metadata:
     react-dom: "npm:19.2.1"
     tailwindcss: "npm:^4"
     typescript: "npm:^5"
+    yaml: "npm:^2.8.2"
   languageName: unknown
   linkType: soft
 
