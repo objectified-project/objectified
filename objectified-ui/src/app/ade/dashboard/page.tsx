@@ -4,29 +4,17 @@ import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import {
+  Folder,
+  GitBranch,
   Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
-  Paper,
-  Skeleton,
-  Chip,
-} from '@mui/material';
-import {
-  Folder as FolderIcon,
-  AccountTree as VersionIcon,
-  Class as ClassIcon,
-  Code as PropertyIcon,
-  ArrowForward as ArrowForwardIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
-} from '@mui/icons-material';
+  Code,
+  Clock,
+  TrendingUp,
+} from 'lucide-react';
+import { Card, CardContent } from '../../components/ui/Card';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { Badge } from '../../components/ui/Badge';
+import { cn } from '../../../../lib/utils';
 import { getDashboardStats, getRecentActivity } from '../../../../lib/db/helper';
 
 interface DashboardStats {
@@ -98,64 +86,29 @@ const Dashboard = () => {
     loadDashboardData();
   }, [userId]);
 
-  // const quickActions = [
-  //   {
-  //     title: 'Manage Tenants',
-  //     description: 'Create and manage your tenants',
-  //     icon: <FolderIcon />,
-  //     href: '/ade/dashboard/tenants',
-  //     color: '#3b82f6',
-  //   },
-  //   {
-  //     title: 'View Projects',
-  //     description: 'Browse and manage projects',
-  //     icon: <FolderIcon />,
-  //     href: '/ade/dashboard/projects',
-  //     color: '#8b5cf6',
-  //   },
-  //   {
-  //     title: 'Open Studio',
-  //     description: 'Design schemas visually',
-  //     icon: <ClassIcon />,
-  //     href: '/ade/studio',
-  //     color: '#06b6d4',
-  //   },
-  //   {
-  //     title: 'Manage Versions',
-  //     description: 'Track schema versions',
-  //     icon: <VersionIcon />,
-  //     href: '/ade/dashboard/versions',
-  //     color: '#10b981',
-  //   },
-  // ];
-
   const getActivityIcon = (type: string) => {
+    const iconClass = "h-5 w-5";
     switch (type) {
       case 'project':
-        return <FolderIcon sx={{ fontSize: 20, color: '#8b5cf6' }} />;
+        return <Folder className={cn(iconClass, "text-purple-500")} />;
       case 'version':
-        return <VersionIcon sx={{ fontSize: 20, color: '#10b981' }} />;
+        return <GitBranch className={cn(iconClass, "text-emerald-500")} />;
       case 'class':
-        return <ClassIcon sx={{ fontSize: 20, color: '#06b6d4' }} />;
+        return <Box className={cn(iconClass, "text-cyan-500")} />;
       case 'property':
-        return <PropertyIcon sx={{ fontSize: 20, color: '#f59e0b' }} />;
+        return <Code className={cn(iconClass, "text-amber-500")} />;
       default:
-        return <ScheduleIcon sx={{ fontSize: 20, color: 'text.secondary' }} />;
+        return <Clock className={cn(iconClass, "text-gray-500")} />;
     }
   };
 
   const getActivityLabel = (type: string) => {
     switch (type) {
-      case 'project':
-        return 'Created project';
-      case 'version':
-        return 'Created version';
-      case 'class':
-        return 'Created class';
-      case 'property':
-        return 'Created property';
-      default:
-        return 'Activity';
+      case 'project': return 'Created project';
+      case 'version': return 'Created version';
+      case 'class': return 'Created class';
+      case 'property': return 'Created property';
+      default: return 'Activity';
     }
   };
 
@@ -177,399 +130,212 @@ const Dashboard = () => {
     return `${years} year${years !== 1 ? 's' : ''} ago`;
   };
 
+  const statsConfig = [
+    {
+      icon: Folder,
+      label: 'Tenants',
+      value: stats.total_tenants,
+      subtitle: `${stats.admin_tenants} admin`,
+      color: 'blue',
+      bgClass: 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30',
+      iconColor: 'text-blue-600 dark:text-blue-400',
+      hoverBorder: 'hover:border-blue-400',
+      hoverShadow: 'hover:shadow-blue-500/20',
+    },
+    {
+      icon: Folder,
+      label: 'Projects',
+      value: stats.total_projects,
+      subtitle: `${stats.created_projects} created`,
+      color: 'purple',
+      bgClass: 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30',
+      iconColor: 'text-purple-600 dark:text-purple-400',
+      hoverBorder: 'hover:border-purple-400',
+      hoverShadow: 'hover:shadow-purple-500/20',
+    },
+    {
+      icon: GitBranch,
+      label: 'Versions',
+      value: stats.total_versions,
+      subtitle: `${stats.published_versions} published`,
+      color: 'emerald',
+      bgClass: 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30',
+      iconColor: 'text-emerald-600 dark:text-emerald-400',
+      hoverBorder: 'hover:border-emerald-400',
+      hoverShadow: 'hover:shadow-emerald-500/20',
+    },
+    {
+      icon: Box,
+      label: 'Classes',
+      value: stats.total_classes,
+      subtitle: 'schema definitions',
+      color: 'cyan',
+      bgClass: 'bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/30 dark:to-cyan-800/30',
+      iconColor: 'text-cyan-600 dark:text-cyan-400',
+      hoverBorder: 'hover:border-cyan-400',
+      hoverShadow: 'hover:shadow-cyan-500/20',
+    },
+    {
+      icon: Code,
+      label: 'Properties',
+      value: stats.total_properties,
+      subtitle: `${stats.total_class_properties} in classes`,
+      color: 'amber',
+      bgClass: 'bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30',
+      iconColor: 'text-amber-600 dark:text-amber-400',
+      hoverBorder: 'hover:border-amber-400',
+      hoverShadow: 'hover:shadow-amber-500/20',
+    },
+  ];
+
   return (
-    <Box sx={{ p: 4, maxWidth: 1400, mx: 'auto' }}>
+    <div className="p-8 max-w-7xl mx-auto">
       {/* Welcome Section */}
-      <Box sx={{ mb: 5 }}>
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          mb: 1.5
-        }}>
-          <Box sx={{
-            width: 48,
-            height: 48,
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 16px rgba(99, 102, 241, 0.25)',
-          }}>
-            <TrendingUpIcon sx={{ color: 'white', fontSize: 24 }} />
-          </Box>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b', letterSpacing: '-0.02em' }}>
+      <div className="mb-10">
+        <div className="flex items-center gap-4 mb-2">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+            <TrendingUp className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
               Welcome back, {userName}!
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b', mt: 0.5 }}>
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">
               Here's an overview of your schema projects and activity.
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} sx={{ mb: 5 }}>
-        {[
-          {
-            icon: <FolderIcon sx={{ fontSize: 24 }} />,
-            label: 'Tenants',
-            value: stats.total_tenants,
-            subtitle: `${stats.admin_tenants} admin`,
-            color: '#3b82f6',
-            bgGradient: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-          },
-          {
-            icon: <FolderIcon sx={{ fontSize: 24 }} />,
-            label: 'Projects',
-            value: stats.total_projects,
-            subtitle: `${stats.created_projects} created`,
-            color: '#8b5cf6',
-            bgGradient: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
-          },
-          {
-            icon: <VersionIcon sx={{ fontSize: 24 }} />,
-            label: 'Versions',
-            value: stats.total_versions,
-            subtitle: `${stats.published_versions} published`,
-            color: '#10b981',
-            bgGradient: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-          },
-          {
-            icon: <ClassIcon sx={{ fontSize: 24 }} />,
-            label: 'Classes',
-            value: stats.total_classes,
-            subtitle: 'schema definitions',
-            color: '#06b6d4',
-            bgGradient: 'linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%)',
-          },
-          {
-            icon: <PropertyIcon sx={{ fontSize: 24 }} />,
-            label: 'Properties',
-            value: stats.total_properties,
-            subtitle: `${stats.total_class_properties} in classes`,
-            color: '#f59e0b',
-            bgGradient: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-          },
-        ].map((stat) => (
-          <Grid key={stat.label} {...({ item: true, xs: 12, sm: 6, md: 4, lg: 2.4 } as any)}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
+        {statsConfig.map((stat) => {
+          const IconComponent = stat.icon;
+          return (
             <Card
-              elevation={0}
-              sx={{
-                height: '100%',
-                background: 'white',
-                borderRadius: 3,
-                border: '1px solid',
-                borderColor: 'rgba(0, 0, 0, 0.06)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                overflow: 'visible',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: `0 12px 24px ${stat.color}20`,
-                  borderColor: `${stat.color}40`,
-                },
-              }}
+              key={stat.label}
+              className={cn(
+                "transition-all duration-300 hover:-translate-y-1",
+                stat.hoverBorder,
+                stat.hoverShadow,
+                "hover:shadow-lg"
+              )}
             >
-              <CardContent sx={{ p: 3 }}>
+              <CardContent className="p-5">
                 {isLoading ? (
-                  <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 2 }} />
+                  <div className="space-y-3">
+                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
                 ) : (
                   <>
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      mb: 2.5
-                    }}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: '#64748b',
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          fontSize: '0.7rem',
-                        }}
-                      >
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         {stat.label}
-                      </Typography>
-                      <Box sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 2.5,
-                        background: stat.bgGradient,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: stat.color,
-                      }}>
-                        {stat.icon}
-                      </Box>
-                    </Box>
-                    <Typography
-                      variant="h3"
-                      sx={{
-                        fontWeight: 800,
-                        mb: 0.5,
-                        color: '#1e293b',
-                        letterSpacing: '-0.02em',
-                      }}
-                    >
+                      </span>
+                      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", stat.bgClass)}>
+                        <IconComponent className={cn("h-5 w-5", stat.iconColor)} />
+                      </div>
+                    </div>
+                    <h3 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight mb-1">
                       {stat.value}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        color: '#94a3b8',
-                        fontSize: '0.8rem',
-                      }}
-                    >
+                    </h3>
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
                       {stat.subtitle}
-                    </Typography>
+                    </p>
                   </>
                 )}
               </CardContent>
             </Card>
-          </Grid>
-        ))}
-      </Grid>
+          );
+        })}
+      </div>
 
-      <Grid container spacing={3}>
-        {/* Quick Actions */}
-        {/*<Grid {...({ item: true, xs: 12, md: 8 } as any)}>*/}
-        {/*  <Paper elevation={0} sx={{ p: 3, border: 1, borderColor: 'divider' }}>*/}
-        {/*    <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>*/}
-        {/*      Quick Actions*/}
-        {/*    </Typography>*/}
-        {/*    <Grid container spacing={2}>*/}
-        {/*      {quickActions.map((action) => (*/}
-        {/*        <Grid key={action.title} {...({ item: true, xs: 12, sm: 6 } as any)}>*/}
-        {/*          <Card*/}
-        {/*            elevation={0}*/}
-        {/*            sx={{*/}
-        {/*              border: 1,*/}
-        {/*              borderColor: 'divider',*/}
-        {/*              cursor: 'pointer',*/}
-        {/*              transition: 'all 0.2s',*/}
-        {/*              '&:hover': {*/}
-        {/*                transform: 'translateY(-2px)',*/}
-        {/*                boxShadow: 2,*/}
-        {/*                borderColor: action.color,*/}
-        {/*              },*/}
-        {/*            }}*/}
-        {/*            onClick={() => router.push(action.href)}*/}
-        {/*          >*/}
-        {/*            <CardContent>*/}
-        {/*              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>*/}
-        {/*                <Box*/}
-        {/*                  sx={{*/}
-        {/*                    width: 40,*/}
-        {/*                    height: 40,*/}
-        {/*                    borderRadius: 2,*/}
-        {/*                    display: 'flex',*/}
-        {/*                    alignItems: 'center',*/}
-        {/*                    justifyContent: 'center',*/}
-        {/*                    bgcolor: `${action.color}15`,*/}
-        {/*                    color: action.color,*/}
-        {/*                    mr: 2,*/}
-        {/*                  }}*/}
-        {/*                >*/}
-        {/*                  {action.icon}*/}
-        {/*                </Box>*/}
-        {/*                <Box sx={{ flex: 1 }}>*/}
-        {/*                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>*/}
-        {/*                    {action.title}*/}
-        {/*                  </Typography>*/}
-        {/*                  <Typography variant="body2" color="text.secondary">*/}
-        {/*                    {action.description}*/}
-        {/*                  </Typography>*/}
-        {/*                </Box>*/}
-        {/*                <ArrowForwardIcon sx={{ color: 'text.secondary' }} />*/}
-        {/*              </Box>*/}
-        {/*            </CardContent>*/}
-        {/*          </Card>*/}
-        {/*        </Grid>*/}
-        {/*      ))}*/}
-        {/*    </Grid>*/}
-        {/*  </Paper>*/}
-        {/*</Grid>*/}
+      {/* Recent Activity Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="overflow-hidden">
+          {/* Section Header */}
+          <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700/50 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-indigo-900/10 dark:to-purple-900/10">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25">
+                <Clock className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Recent Activity
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Your latest actions
+                </p>
+              </div>
+            </div>
+          </div>
 
-        {/* Recent Activity */}
-        <Grid {...({ item: true, xs: 12, md: 6, lg: 5 } as any)}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 0,
-              borderRadius: 3,
-              border: '1px solid',
-              borderColor: 'rgba(0, 0, 0, 0.06)',
-              height: '100%',
-              overflow: 'hidden',
-              background: 'white',
-            }}
-          >
-            {/* Section Header */}
-            <Box sx={{
-              px: 3,
-              py: 2.5,
-              borderBottom: '1px solid',
-              borderColor: 'rgba(99, 102, 241, 0.1)',
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%)',
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{
-                  p: 1,
-                  borderRadius: 2,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <ScheduleIcon sx={{ color: 'white', fontSize: 18 }} />
-                </Box>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                    Recent Activity
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b' }}>
-                    Your latest actions
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-
-            {/* Activity List */}
-            <Box sx={{ p: 2 }}>
-              {isLoading ? (
-                <Box sx={{ px: 1 }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} height={70} sx={{ mb: 1, borderRadius: 2 }} />
-                  ))}
-                </Box>
-              ) : recentActivity.length > 0 ? (
-                <List sx={{ py: 0 }}>
-                  {recentActivity.map((item, index) => (
-                    <Box key={item.id}>
-                      <ListItem
-                        sx={{
-                          px: 2,
-                          py: 1.5,
-                          borderRadius: 2,
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            bgcolor: 'rgba(99, 102, 241, 0.04)',
-                          },
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 44 }}>
-                          <Box sx={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 2,
-                            bgcolor: item.type === 'project' ? 'rgba(139, 92, 246, 0.1)' :
-                                    item.type === 'version' ? 'rgba(16, 185, 129, 0.1)' :
-                                    item.type === 'class' ? 'rgba(6, 182, 212, 0.1)' :
-                                    'rgba(245, 158, 11, 0.1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                            {getActivityIcon(item.type)}
-                          </Box>
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 600,
-                                color: '#334155',
-                                mb: 0.25,
-                              }}
-                            >
-                              {getActivityLabel(item.type)}
-                            </Typography>
-                          }
-                          secondary={
-                            <Box>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  color: '#64748b',
-                                  mb: 0.75,
-                                  fontSize: '0.8rem',
-                                }}
-                              >
-                                {item.name}
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <Chip
-                                  label={item.tenant_name}
-                                  size="small"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: '0.65rem',
-                                    fontWeight: 600,
-                                    bgcolor: 'rgba(99, 102, 241, 0.1)',
-                                    color: '#6366f1',
-                                    border: 'none',
-                                  }}
-                                />
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: '#94a3b8',
-                                    fontSize: '0.7rem',
-                                  }}
-                                >
-                                  {formatTimeAgo(item.created_at)}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      {index < recentActivity.length - 1 && (
-                        <Divider sx={{ mx: 2, borderColor: 'rgba(0, 0, 0, 0.04)' }} />
-                      )}
-                    </Box>
-                  ))}
-                </List>
-              ) : (
-                <Box sx={{
-                  textAlign: 'center',
-                  py: 6,
-                  px: 3,
-                }}>
-                  <Box sx={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 3,
-                    bgcolor: 'rgba(99, 102, 241, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mx: 'auto',
-                    mb: 2,
-                  }}>
-                    <TrendingUpIcon sx={{ fontSize: 32, color: '#6366f1' }} />
-                  </Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#334155', mb: 0.5 }}>
-                    No recent activity
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
-                    Start creating projects to see your activity here!
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+          {/* Activity List */}
+          <div className="p-4">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : recentActivity.length > 0 ? (
+              <div className="space-y-2">
+                {recentActivity.map((item, index) => (
+                  <div key={item.id}>
+                    <div className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                      <div className={cn(
+                        "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
+                        item.type === 'project' ? 'bg-purple-100 dark:bg-purple-900/30' :
+                        item.type === 'version' ? 'bg-emerald-100 dark:bg-emerald-900/30' :
+                        item.type === 'class' ? 'bg-cyan-100 dark:bg-cyan-900/30' :
+                        'bg-amber-100 dark:bg-amber-900/30'
+                      )}>
+                        {getActivityIcon(item.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                          {getActivityLabel(item.type)}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                          {item.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <Badge variant="default" className="text-[10px] px-2 py-0">
+                            {item.tenant_name}
+                          </Badge>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            {formatTimeAgo(item.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    {index < recentActivity.length - 1 && (
+                      <div className="mx-3 border-t border-gray-100 dark:border-gray-800" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 px-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center mx-auto mb-4">
+                  <TrendingUp className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h3 className="font-semibold text-gray-700 dark:text-gray-200 mb-1">
+                  No recent activity
+                </h3>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Start creating projects to see your activity here!
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
   );
 };
 
 export default Dashboard;
+

@@ -3,13 +3,18 @@
 import { useSession } from 'next-auth/react';
 import { User, Mail, Hash, Clock, Building2, Edit2, Key } from 'lucide-react';
 import { useState } from 'react';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Alert from '@mui/material/Alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '../../../components/ui/Dialog';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { Label } from '../../../components/ui/Label';
+import { Alert } from '../../../components/ui/Alert';
 import { updateUserName, updateUserPassword } from '../../../../../lib/db/helper';
 
 const Profile = () => {
@@ -146,16 +151,7 @@ const Profile = () => {
 
       {/* Success Message */}
       {successMessage && (
-        <Alert
-          severity="success"
-          sx={{
-            mb: 3,
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'success.light',
-          }}
-          onClose={() => setSuccessMessage('')}
-        >
+        <Alert variant="success" className="mb-6" onClose={() => setSuccessMessage('')}>
           {successMessage}
         </Alert>
       )}
@@ -275,130 +271,129 @@ const Profile = () => {
         {/* Footer Actions */}
         <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900/50 dark:to-gray-800/50 px-8 py-5 border-t border-gray-100 dark:border-gray-700/50">
           <div className="flex justify-end space-x-3">
-            <button
-              onClick={handleEditClick}
-              className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
-            >
+            <Button onClick={handleEditClick}>
               <Edit2 className="h-4 w-4" />
               Edit Name
-            </button>
-            <button
-              onClick={handlePasswordChangeClick}
-              className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5"
-            >
+            </Button>
+            <Button variant="success" onClick={handlePasswordChangeClick}>
               <Key className="h-4 w-4" />
               Change Password
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Edit Name Dialog */}
-      <Dialog
-        open={showEditDialog}
-        onClose={() => !isLoading && setShowEditDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Edit Name</DialogTitle>
+      <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>
         <DialogContent>
-          {errorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {errorMessage}
-            </Alert>
-          )}
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Full Name"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={editedName}
-            onChange={(e) => setEditedName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSaveName()}
-            disabled={isLoading}
-          />
+          <DialogHeader>
+            <DialogTitle>Edit Name</DialogTitle>
+            <DialogDescription>
+              Update your display name below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {errorMessage && (
+              <Alert variant="error">
+                {errorMessage}
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSaveName()}
+                disabled={isLoading}
+                placeholder="Enter your name"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveName} disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowEditDialog(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSaveName} variant="contained" disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* Change Password Dialog */}
-      <Dialog
-        open={showPasswordDialog}
-        onClose={() => !isLoading && setShowPasswordDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Change Password</DialogTitle>
+      <Dialog open={showPasswordDialog} onOpenChange={(open) => !isLoading && setShowPasswordDialog(open)}>
         <DialogContent>
-          {passwordError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {passwordError}
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new one.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {passwordError && (
+              <Alert variant="error">
+                {passwordError}
+              </Alert>
+            )}
+            <Alert variant="info">
+              <div>
+                <p className="font-medium mb-2">Password must contain:</p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li>At least 8 characters</li>
+                  <li>One uppercase letter</li>
+                  <li>One lowercase letter</li>
+                  <li>One number or special character</li>
+                </ul>
+              </div>
             </Alert>
-          )}
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Password must contain:
-            <ul style={{ marginTop: '8px', marginLeft: '20px' }}>
-              <li>At least 8 characters</li>
-              <li>One uppercase letter</li>
-              <li>One lowercase letter</li>
-              <li>One number or special character</li>
-            </ul>
-          </Alert>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Current Password"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            disabled={isLoading}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="New Password"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            disabled={isLoading}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            margin="dense"
-            label="Confirm New Password"
-            type="password"
-            fullWidth
-            variant="outlined"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSavePassword()}
-            disabled={isLoading}
-          />
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Current Password</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={isLoading}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSavePassword()}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePassword} disabled={isLoading}>
+              {isLoading ? 'Changing...' : 'Change Password'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowPasswordDialog(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSavePassword} variant="contained" disabled={isLoading}>
-            {isLoading ? 'Changing...' : 'Change Password'}
-          </Button>
-        </DialogActions>
       </Dialog>
     </div>
   );
 };
 
 export default Profile;
+

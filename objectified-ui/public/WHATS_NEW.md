@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## New Features and Improvements
 
 - Even more look and feel improvements
+  - Converting from Material UI to Radix UI
 - Numerous bug fixes and performance enhancements
 - Improved canvas performance for large schemas
 - Properties form and editor have an improved layout

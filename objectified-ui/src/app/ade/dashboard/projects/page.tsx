@@ -2,21 +2,22 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import {Plus, Edit2, Trash2, FolderOpen, AlertCircle, Lock} from 'lucide-react';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Alert from '@mui/material/Alert';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Box from '@mui/material/Box';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
-import Autocomplete from '@mui/material/Autocomplete';
+import { Plus, Edit2, Trash2, FolderOpen, AlertCircle, Lock } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '../../../components/ui/Dialog';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { Label } from '../../../components/ui/Label';
+import { Alert } from '../../../components/ui/Alert';
+import { Textarea } from '../../../components/ui/Textarea';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
@@ -26,16 +27,8 @@ import { SPDX_LICENSES, getLicenseUrl, SPDXLicense } from '../../../utils/spdx-l
 interface ProjectMetadata {
   summary?: string;
   termsOfService?: string;
-  contact?: {
-    name?: string;
-    url?: string;
-    email?: string;
-  };
-  license?: {
-    name?: string;
-    identifier?: string;
-    url?: string;
-  };
+  contact?: { name?: string; url?: string; email?: string };
+  license?: { name?: string; identifier?: string; url?: string };
 }
 
 interface Project {
@@ -60,7 +53,7 @@ const Projects = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [createTabValue, setCreateTabValue] = useState(0);
+  const [createTabValue, setCreateTabValue] = useState('scratch');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
@@ -68,7 +61,7 @@ const Projects = () => {
   const [projectEnabled, setProjectEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [editTabValue, setEditTabValue] = useState(0);
+  const [editTabValue, setEditTabValue] = useState('basic');
 
   // Metadata state
   const [metadataSummary, setMetadataSummary] = useState('');
@@ -84,24 +77,15 @@ const Projects = () => {
   const currentUserId = (session?.user as any)?.user_id;
 
   const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+    return name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   };
 
   useEffect(() => {
-    if (currentTenantId) {
-      loadProjects();
-    }
+    if (currentTenantId) loadProjects();
   }, [currentTenantId]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
-
     try {
       const result = await getProjectsForTenant(currentTenantId);
       setProjects(JSON.parse(result));
@@ -116,9 +100,7 @@ const Projects = () => {
     setProjectSlug('');
     setProjectEnabled(true);
     setErrorMessage('');
-    setCreateTabValue(0);
-
-    // Reset metadata
+    setCreateTabValue('scratch');
     setMetadataSummary('');
     setMetadataTermsOfService('');
     setMetadataContactName('');
@@ -127,51 +109,28 @@ const Projects = () => {
     setMetadataLicenseName('');
     setMetadataLicenseIdentifier('');
     setMetadataLicenseUrl('');
-
     setShowCreateDialog(true);
   };
 
-  const handleImportClick = () => {
-    setShowImportDialog(true);
-  };
-
-  const handleImportSuccess = async () => {
-    await loadProjects();
-  };
+  const handleImportClick = () => setShowImportDialog(true);
+  const handleImportSuccess = async () => await loadProjects();
 
   const handleCreateSubmit = async () => {
-    if (!projectName.trim()) {
-      setErrorMessage('Project name is required');
-      return;
-    }
-
-    if (!projectSlug.trim()) {
-      setErrorMessage('Project slug is required');
-      return;
-    }
-
+    if (!projectName.trim()) { setErrorMessage('Project name is required'); return; }
+    if (!projectSlug.trim()) { setErrorMessage('Project slug is required'); return; }
     setIsLoading(true);
     setErrorMessage('');
 
     try {
-      // Build metadata object
       const metadata: ProjectMetadata = {};
-
-      if (metadataSummary.trim()) {
-        metadata.summary = metadataSummary.trim();
-      }
-
-      if (metadataTermsOfService.trim()) {
-        metadata.termsOfService = metadataTermsOfService.trim();
-      }
-
+      if (metadataSummary.trim()) metadata.summary = metadataSummary.trim();
+      if (metadataTermsOfService.trim()) metadata.termsOfService = metadataTermsOfService.trim();
       if (metadataContactName.trim() || metadataContactUrl.trim() || metadataContactEmail.trim()) {
         metadata.contact = {};
         if (metadataContactName.trim()) metadata.contact.name = metadataContactName.trim();
         if (metadataContactUrl.trim()) metadata.contact.url = metadataContactUrl.trim();
         if (metadataContactEmail.trim()) metadata.contact.email = metadataContactEmail.trim();
       }
-
       if (metadataLicenseName.trim() || metadataLicenseIdentifier.trim() || metadataLicenseUrl.trim()) {
         metadata.license = {};
         if (metadataLicenseName.trim()) metadata.license.name = metadataLicenseName.trim();
@@ -179,22 +138,10 @@ const Projects = () => {
         if (metadataLicenseUrl.trim()) metadata.license.url = metadataLicenseUrl.trim();
       }
 
-      const result = await createProject(
-        currentTenantId,
-        currentUserId,
-        projectName,
-        projectDescription,
-        projectSlug,
-        metadata
-      );
+      const result = await createProject(currentTenantId, currentUserId, projectName, projectDescription, projectSlug, metadata);
       const response = JSON.parse(result);
-
-      if (response.success) {
-        setShowCreateDialog(false);
-        await loadProjects();
-      } else {
-        setErrorMessage(response.error || 'Failed to create project');
-      }
+      if (response.success) { setShowCreateDialog(false); await loadProjects(); }
+      else setErrorMessage(response.error || 'Failed to create project');
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred');
     } finally {
@@ -209,9 +156,7 @@ const Projects = () => {
     setProjectSlug((project as any).slug || '');
     setProjectEnabled(project.enabled);
     setErrorMessage('');
-    setEditTabValue(0);
-
-    // Load metadata
+    setEditTabValue('basic');
     const metadata = project.metadata || {};
     setMetadataSummary(metadata.summary || '');
     setMetadataTermsOfService(metadata.termsOfService || '');
@@ -221,45 +166,26 @@ const Projects = () => {
     setMetadataLicenseName(metadata.license?.name || '');
     setMetadataLicenseIdentifier(metadata.license?.identifier || '');
     setMetadataLicenseUrl(metadata.license?.url || '');
-
     setShowEditDialog(true);
   };
 
   const handleEditSubmit = async () => {
-    if (!projectName.trim()) {
-      setErrorMessage('Project name is required');
-      return;
-    }
-
-    if (!projectSlug.trim()) {
-      setErrorMessage('Project slug is required');
-      return;
-    }
-
+    if (!projectName.trim()) { setErrorMessage('Project name is required'); return; }
+    if (!projectSlug.trim()) { setErrorMessage('Project slug is required'); return; }
     if (!selectedProject) return;
-
     setIsLoading(true);
     setErrorMessage('');
 
     try {
-      // Build metadata object
       const metadata: ProjectMetadata = {};
-
-      if (metadataSummary.trim()) {
-        metadata.summary = metadataSummary.trim();
-      }
-
-      if (metadataTermsOfService.trim()) {
-        metadata.termsOfService = metadataTermsOfService.trim();
-      }
-
+      if (metadataSummary.trim()) metadata.summary = metadataSummary.trim();
+      if (metadataTermsOfService.trim()) metadata.termsOfService = metadataTermsOfService.trim();
       if (metadataContactName.trim() || metadataContactUrl.trim() || metadataContactEmail.trim()) {
         metadata.contact = {};
         if (metadataContactName.trim()) metadata.contact.name = metadataContactName.trim();
         if (metadataContactUrl.trim()) metadata.contact.url = metadataContactUrl.trim();
         if (metadataContactEmail.trim()) metadata.contact.email = metadataContactEmail.trim();
       }
-
       if (metadataLicenseName.trim() || metadataLicenseIdentifier.trim() || metadataLicenseUrl.trim()) {
         metadata.license = {};
         if (metadataLicenseName.trim()) metadata.license.name = metadataLicenseName.trim();
@@ -267,22 +193,10 @@ const Projects = () => {
         if (metadataLicenseUrl.trim()) metadata.license.url = metadataLicenseUrl.trim();
       }
 
-      const result = await updateProject(
-        selectedProject.id,
-        projectName,
-        projectDescription,
-        projectSlug,
-        projectEnabled,
-        metadata
-      );
+      const result = await updateProject(selectedProject.id, projectName, projectDescription, projectSlug, projectEnabled, metadata);
       const response = JSON.parse(result);
-
-      if (response.success) {
-        setShowEditDialog(false);
-        await loadProjects();
-      } else {
-        setErrorMessage(response.error || 'Failed to update project');
-      }
+      if (response.success) { setShowEditDialog(false); await loadProjects(); }
+      else setErrorMessage(response.error || 'Failed to update project');
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred');
     } finally {
@@ -298,48 +212,33 @@ const Projects = () => {
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
     });
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const result = await deleteProject(projectId);
       const response = JSON.parse(result);
-
-      if (response.success) {
-        await loadProjects();
-      } else {
-        await alertDialog({
-          message: response.error || 'Failed to delete project',
-          variant: 'error',
-        });
-      }
+      if (response.success) await loadProjects();
+      else await alertDialog({ message: response.error || 'Failed to delete project', variant: 'error' });
     } catch (error: any) {
-      await alertDialog({
-        message: error.message || 'An error occurred',
-        variant: 'error',
-      });
+      await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  if (!session) {
-    return (
-      <div className="p-6">
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  const handleLicenseSelect = (identifier: string) => {
+    const license = SPDX_LICENSES.find((l: SPDXLicense) => l.identifier === identifier);
+    if (license) {
+      setMetadataLicenseIdentifier(license.identifier);
+      setMetadataLicenseName(license.name);
+      const url = getLicenseUrl(license.identifier);
+      if (url) setMetadataLicenseUrl(url);
+    }
+  };
+
+  if (!session) return <div className="p-6"><p>Loading...</p></div>;
 
   if (!currentTenantId) {
     return (
@@ -348,18 +247,9 @@ const Projects = () => {
           <div className="flex items-start gap-3">
             <Lock className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-1" />
             <div>
-              <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                No Tenant Selected
-              </h2>
-              <p className="text-yellow-800 dark:text-yellow-200 mb-3">
-                Please select a tenant before managing projects. Projects are associated with a specific tenant.
-              </p>
-              <a
-                href="/ade/dashboard/tenants"
-                className="inline-block px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Go to Tenants
-              </a>
+              <h2 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-2">No Tenant Selected</h2>
+              <p className="text-yellow-800 dark:text-yellow-200 mb-3">Please select a tenant before managing projects.</p>
+              <Button asChild><a href="/ade/dashboard/tenants">Go to Tenants</a></Button>
             </div>
           </div>
         </div>
@@ -367,104 +257,9 @@ const Projects = () => {
     );
   }
 
-  // Row actions dropdown component for each project
-  const RowActions = ({ project }: { project: Project }) => {
-    const [action, setAction] = useState<string>('');
-
-    const handleChange = async (value: string) => {
-      try {
-        switch (value) {
-          case 'edit':
-            handleEditClick(project);
-            break;
-          case 'delete':
-            await handleDelete(project.id);
-            break;
-        }
-      } finally {
-        setAction('');
-      }
-    };
-
-    return (
-      <FormControl
-        size="small"
-        sx={{
-          minWidth: 140,
-          '& .MuiOutlinedInput-root': {
-            color: 'var(--foreground)',
-            backgroundColor: 'var(--background)',
-            '& fieldset': {
-              borderColor: 'rgba(128, 128, 128, 0.5)',
-            },
-            '&:hover fieldset': {
-              borderColor: 'rgba(128, 128, 128, 0.7)',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: '#3b82f6',
-            },
-          },
-          '& .MuiSvgIcon-root': {
-            color: 'var(--foreground)',
-          },
-        }}
-      >
-        <Select
-          value={action}
-          onChange={(e) => handleChange(e.target.value as string)}
-          displayEmpty
-          renderValue={(selected) => {
-            if (!selected) {
-              return <span className="text-gray-600 dark:text-gray-300">Actions</span>;
-            }
-            const labels: Record<string, string> = {
-              edit: 'Edit',
-              delete: 'Delete',
-            };
-            return labels[selected as string] || 'Actions';
-          }}
-          MenuProps={{
-            PaperProps: {
-              sx: {
-                bgcolor: 'var(--background)',
-                color: 'var(--foreground)',
-                '& .MuiMenuItem-root': {
-                  '&:hover': {
-                    backgroundColor: 'rgba(128, 128, 128, 0.2)',
-                  },
-                  '&.Mui-selected': {
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    '&:hover': {
-                      backgroundColor: 'rgba(59, 130, 246, 0.3)',
-                    },
-                  },
-                },
-              },
-            },
-          }}
-        >
-          <MenuItem value="" disabled>
-            <span className="text-gray-500">Select action</span>
-          </MenuItem>
-          <MenuItem value="edit">
-            <div className="flex items-center gap-2">
-              <Edit2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <span>Edit</span>
-            </div>
-          </MenuItem>
-          <MenuItem value="delete" sx={{ color: 'error.main' }}>
-            <div className="flex items-center gap-2">
-              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-              <span>Delete</span>
-            </div>
-          </MenuItem>
-        </Select>
-      </FormControl>
-    );
-  };
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
@@ -472,36 +267,25 @@ const Projects = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Projects</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
-              Manage projects for the current tenant
-            </p>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage projects for the current tenant</p>
           </div>
         </div>
-        <button
-          onClick={handleCreateClick}
-          className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-2.5 px-5 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5"
-        >
-          <Plus className="h-5 w-5" />
-          New Project
-        </button>
+        <Button onClick={handleCreateClick} className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
+          <Plus className="h-5 w-5" />New Project
+        </Button>
       </div>
 
+      {/* Projects List */}
       {projects.length === 0 ? (
         <div className="relative">
-          {/* Decorative background */}
           <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-3xl opacity-60" />
           <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full blur-3xl opacity-60" />
-
           <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
             <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
               <FolderOpen className="h-10 w-10 text-white" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-              No Projects Yet
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-              Get started by creating your first project using the "New Project" button above
-            </p>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Projects Yet</h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">Get started by creating your first project</p>
           </div>
         </div>
       ) : (
@@ -509,53 +293,36 @@ const Projects = () => {
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
               <tr>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Project Name
-                </th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Description
-                </th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Created By
-                </th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Created
-                </th>
-                <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-
-                </th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Project Name</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created By</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
+                <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
               {projects.map((project) => (
                 <tr key={project.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {project.name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {(project as any).slug}
-                    </div>
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{project.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{(project as any).slug}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
-                      {project.description || '—'}
-                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">{project.description || '—'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {project.creator_name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {project.creator_email}
-                    </div>
+                    <div className="text-sm text-gray-900 dark:text-white">{project.creator_name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{project.creator_email}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {formatDate(project.created_at)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end">
-                      <RowActions project={project} />
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(project.created_at)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => handleEditClick(project)} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors group" title="Edit">
+                        <Edit2 className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
+                      </button>
+                      <button onClick={() => handleDelete(project.id)} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors group" title="Delete">
+                        <Trash2 className="h-4 w-4 text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -566,446 +333,151 @@ const Projects = () => {
       )}
 
       {/* Create Project Dialog */}
-      <Dialog
-        open={showCreateDialog}
-        onClose={() => !isLoading && setShowCreateDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          },
-        }}
-      >
-        <DialogTitle sx={{
-          pb: 1,
-          borderBottom: '1px solid',
-          borderColor: 'rgba(139, 92, 246, 0.1)',
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{
-              p: 1.5,
-              borderRadius: 2,
-              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <FolderOpen size={20} color="#8b5cf6" />
-            </Box>
-            <span className="text-lg font-bold text-gray-900 dark:text-white">Create New Project</span>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-            <Tabs
-              value={createTabValue}
-              onChange={(e, newValue) => setCreateTabValue(newValue)}
-              sx={{
-                '& .MuiTab-root': {
-                  textTransform: 'none',
-                  fontWeight: 600,
-                },
-                '& .Mui-selected': {
-                  color: '#8b5cf6',
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: '#8b5cf6',
-                },
-              }}
-            >
-              <Tab label="From Scratch" />
-              <Tab label="From OpenAPI Import" />
-            </Tabs>
-          </Box>
-
-          {createTabValue === 0 && (
-            <Box>
-              {errorMessage && (
-                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                  {errorMessage}
-                </Alert>
-              )}
-              <TextField
-                autoFocus
-                margin="dense"
-                label="Project Name"
-                type="text"
-                fullWidth
-                variant="outlined"
-                value={projectName}
-                onChange={(e) => {
-                  setProjectName(e.target.value);
-                  // Auto-generate slug from name if slug is empty or matches previous auto-generated value
-                  if (!projectSlug || projectSlug === generateSlug(projectName)) {
-                    setProjectSlug(generateSlug(e.target.value));
-                  }
-                }}
-                disabled={isLoading}
-                required
-                sx={{
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                  },
-                  '& .MuiInputLabel-root.Mui-focused': {
-                    color: '#8b5cf6',
-                  },
-                }}
-              />
-              <TextField
-                margin="dense"
-                label="Slug"
-                type="text"
-                fullWidth
-                variant="outlined"
-                value={projectSlug}
-                onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
-                disabled={isLoading}
-                required
-                helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
-                sx={{
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    fontFamily: 'monospace',
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                  },
-                  '& .MuiInputLabel-root.Mui-focused': {
-                    color: '#8b5cf6',
-                  },
-                }}
-              />
-              <TextField
-                margin="dense"
-                label="Description"
-                type="text"
-                fullWidth
-                variant="outlined"
-                multiline
-                rows={4}
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-                disabled={isLoading}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#8b5cf6',
-                    },
-                  },
-                  '& .MuiInputLabel-root.Mui-focused': {
-                    color: '#8b5cf6',
-                  },
-                }}
-              />
-            </Box>
-          )}
-
-          {createTabValue === 1 && (
-            <Box sx={{ textAlign: 'center', py: 6 }}>
-              <Box sx={{
-                width: 64,
-                height: 64,
-                borderRadius: 3,
-                bgcolor: 'rgba(59, 130, 246, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mx: 'auto',
-                mb: 3,
-              }}>
-                <AlertCircle size={32} color="#3b82f6" />
-              </Box>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Import a project from an OpenAPI specification file. This will create a new project with classes and properties automatically.
-              </p>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  setShowCreateDialog(false);
-                  handleImportClick();
-                }}
-                sx={{
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: 4,
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
-                  },
-                }}
-              >
-                Start Import
+      <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30">
+                <FolderOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              Create New Project
+            </DialogTitle>
+          </DialogHeader>
+          <Tabs value={createTabValue} onValueChange={setCreateTabValue} className="mt-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="scratch" className="flex-1">From Scratch</TabsTrigger>
+              <TabsTrigger value="import" className="flex-1">From OpenAPI Import</TabsTrigger>
+            </TabsList>
+            <TabsContent value="scratch" className="space-y-4 mt-4">
+              {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+              <div className="space-y-2">
+                <Label htmlFor="projectName">Project Name *</Label>
+                <Input id="projectName" value={projectName} onChange={(e) => { setProjectName(e.target.value); if (!projectSlug || projectSlug === generateSlug(projectName)) setProjectSlug(generateSlug(e.target.value)); }} disabled={isLoading} autoFocus />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="projectSlug">Slug *</Label>
+                <Input id="projectSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
+                <p className="text-xs text-gray-500 dark:text-gray-400">URL-friendly identifier (lowercase letters, numbers, and dashes only)</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="projectDescription">Description</Label>
+                <Textarea id="projectDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={3} />
+              </div>
+            </TabsContent>
+            <TabsContent value="import" className="text-center py-8">
+              <div className="w-16 h-16 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">Import a project from an OpenAPI specification file.</p>
+              <Button onClick={() => { setShowCreateDialog(false); handleImportClick(); }}>Start Import</Button>
+            </TabsContent>
+          </Tabs>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>Cancel</Button>
+            {createTabValue === 'scratch' && (
+              <Button onClick={handleCreateSubmit} disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-indigo-600">
+                {isLoading ? 'Creating...' : 'Create Project'}
               </Button>
-            </Box>
-          )}
+            )}
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'rgba(0, 0, 0, 0.06)' }}>
-          <Button
-            onClick={() => setShowCreateDialog(false)}
-            disabled={isLoading}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 600,
-              color: '#64748b',
-            }}
-          >
-            Cancel
-          </Button>
-          {createTabValue === 0 && (
-            <Button
-              onClick={handleCreateSubmit}
-              variant="contained"
-              disabled={isLoading}
-              sx={{
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 3,
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
-                  boxShadow: '0 6px 16px rgba(139, 92, 246, 0.35)',
-                },
-              }}
-            >
-              {isLoading ? 'Creating...' : 'Create Project'}
-            </Button>
-          )}
-        </DialogActions>
       </Dialog>
 
       {/* OpenAPI Import Dialog */}
-      <OpenAPIImportDialog
-        open={showImportDialog}
-        onClose={() => setShowImportDialog(false)}
-        onSuccess={handleImportSuccess}
-        tenantId={currentTenantId}
-        userId={currentUserId}
-      />
+      <OpenAPIImportDialog open={showImportDialog} onClose={() => setShowImportDialog(false)} onSuccess={handleImportSuccess} tenantId={currentTenantId} userId={currentUserId} />
 
       {/* Edit Project Dialog */}
-      <Dialog
-        open={showEditDialog}
-        onClose={() => !isLoading && setShowEditDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Edit Project</DialogTitle>
-        <DialogContent>
-          {errorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {errorMessage}
-            </Alert>
-          )}
-
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-            <Tabs value={editTabValue} onChange={(e, newValue) => setEditTabValue(newValue)}>
-              <Tab label="Basic Information" />
-              <Tab label="API Metadata" />
-            </Tabs>
-          </Box>
-
-          {editTabValue === 0 && (
-            <Box>
-              <TextField
-                autoFocus
-                margin="dense"
-                label="Project Name"
-                type="text"
-                fullWidth
-                variant="outlined"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                disabled={isLoading}
-                required
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                margin="dense"
-                label="Slug"
-                type="text"
-                fullWidth
-                variant="outlined"
-                value={projectSlug}
-                onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
-                disabled={isLoading}
-                required
-                helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                margin="dense"
-                label="Description"
-                type="text"
-                fullWidth
-                variant="outlined"
-                multiline
-                rows={4}
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-                disabled={isLoading}
-              />
-            </Box>
-          )}
-
-          {editTabValue === 1 && (
-            <Box>
-              <Box sx={{ mb: 3 }}>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">OpenAPI Metadata</h3>
-                <TextField
-                  margin="dense"
-                  label="API Summary"
-                  type="text"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataSummary}
-                  onChange={(e) => setMetadataSummary(e.target.value)}
-                  disabled={isLoading}
-                  helperText="Short summary of the API"
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  margin="dense"
-                  label="Terms of Service URL"
-                  type="url"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataTermsOfService}
-                  onChange={(e) => setMetadataTermsOfService(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="https://example.com/terms"
-                  sx={{ mb: 2 }}
-                />
-              </Box>
-
-              <Box sx={{ mb: 3 }}>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Contact Information</h3>
-                <TextField
-                  margin="dense"
-                  label="Contact Name"
-                  type="text"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataContactName}
-                  onChange={(e) => setMetadataContactName(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="API Support Team"
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  margin="dense"
-                  label="Contact URL"
-                  type="url"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataContactUrl}
-                  onChange={(e) => setMetadataContactUrl(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="https://example.com/support"
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  margin="dense"
-                  label="Contact Email"
-                  type="email"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataContactEmail}
-                  onChange={(e) => setMetadataContactEmail(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="support@example.com"
-                />
-              </Box>
-
-              <Box sx={{ mb: 2 }}>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">License Information</h3>
-                <Autocomplete
-                  freeSolo
-                  options={SPDX_LICENSES}
-                  getOptionLabel={(option) => typeof option === 'string' ? option : `${option.name} (${option.identifier})`}
-                  value={SPDX_LICENSES.find((l: SPDXLicense) => l.identifier === metadataLicenseIdentifier) || metadataLicenseIdentifier}
-                  onChange={(e, newValue) => {
-                    if (typeof newValue === 'string') {
-                      setMetadataLicenseIdentifier(newValue);
-                    } else if (newValue) {
-                      setMetadataLicenseIdentifier(newValue.identifier);
-                      setMetadataLicenseName(newValue.name);
-                      const url = getLicenseUrl(newValue.identifier);
-                      if (url) setMetadataLicenseUrl(url);
-                    }
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      margin="dense"
-                      label="License (SPDX Identifier)"
-                      variant="outlined"
-                      placeholder="Start typing to search..."
-                      helperText="Select from SPDX license list or enter custom identifier"
-                    />
-                  )}
-                  disabled={isLoading}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  margin="dense"
-                  label="License Name"
-                  type="text"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataLicenseName}
-                  onChange={(e) => setMetadataLicenseName(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="Apache License 2.0"
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  margin="dense"
-                  label="License URL"
-                  type="url"
-                  fullWidth
-                  variant="outlined"
-                  value={metadataLicenseUrl}
-                  onChange={(e) => setMetadataLicenseUrl(e.target.value)}
-                  disabled={isLoading}
-                  placeholder="https://www.apache.org/licenses/LICENSE-2.0.html"
-                />
-              </Box>
-            </Box>
-          )}
+      <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          {errorMessage && <Alert variant="error" className="mt-4">{errorMessage}</Alert>}
+          <Tabs value={editTabValue} onValueChange={setEditTabValue} className="mt-4">
+            <TabsList>
+              <TabsTrigger value="basic">Basic Information</TabsTrigger>
+              <TabsTrigger value="metadata">API Metadata</TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="editName">Project Name *</Label>
+                <Input id="editName" value={projectName} onChange={(e) => setProjectName(e.target.value)} disabled={isLoading} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editSlug">Slug *</Label>
+                <Input id="editSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editDescription">Description</Label>
+                <Textarea id="editDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
+              </div>
+            </TabsContent>
+            <TabsContent value="metadata" className="space-y-6 mt-4">
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">OpenAPI Metadata</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="summary">API Summary</Label>
+                  <Input id="summary" value={metadataSummary} onChange={(e) => setMetadataSummary(e.target.value)} disabled={isLoading} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="termsOfService">Terms of Service URL</Label>
+                  <Input id="termsOfService" type="url" value={metadataTermsOfService} onChange={(e) => setMetadataTermsOfService(e.target.value)} disabled={isLoading} placeholder="https://example.com/terms" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Contact Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contactName">Name</Label>
+                    <Input id="contactName" value={metadataContactName} onChange={(e) => setMetadataContactName(e.target.value)} disabled={isLoading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactUrl">URL</Label>
+                    <Input id="contactUrl" type="url" value={metadataContactUrl} onChange={(e) => setMetadataContactUrl(e.target.value)} disabled={isLoading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactEmail">Email</Label>
+                    <Input id="contactEmail" type="email" value={metadataContactEmail} onChange={(e) => setMetadataContactEmail(e.target.value)} disabled={isLoading} />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">License Information</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="licenseIdentifier">License (SPDX)</Label>
+                  <Select value={metadataLicenseIdentifier} onValueChange={handleLicenseSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a license..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {SPDX_LICENSES.slice(0, 50).map((license: SPDXLicense) => (
+                        <SelectItem key={license.identifier} value={license.identifier}>{license.name} ({license.identifier})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseName">License Name</Label>
+                    <Input id="licenseName" value={metadataLicenseName} onChange={(e) => setMetadataLicenseName(e.target.value)} disabled={isLoading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseUrl">License URL</Label>
+                    <Input id="licenseUrl" type="url" value={metadataLicenseUrl} onChange={(e) => setMetadataLicenseUrl(e.target.value)} disabled={isLoading} />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>Cancel</Button>
+            <Button onClick={handleEditSubmit} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowEditDialog(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleEditSubmit} variant="contained" disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </DialogActions>
       </Dialog>
     </div>
   );
-}
+};
 
 export default Projects;
+

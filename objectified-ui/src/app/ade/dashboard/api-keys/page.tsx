@@ -4,22 +4,23 @@ import { useSession } from 'next-auth/react';
 import { getApiKeysForTenant, createApiKey, deleteApiKey, toggleApiKeyStatus } from '../../../../../lib/db/helper';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Key, Copy, Check, AlertCircle } from 'lucide-react';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import Alert from '@mui/material/Alert';
-import Switch from '@mui/material/Switch';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import { useColorScheme } from '@mui/material/styles';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '../../../components/ui/Dialog';
+import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { Label } from '../../../components/ui/Label';
+import { Alert } from '../../../components/ui/Alert';
+import { Textarea } from '../../../components/ui/Textarea';
+import { Card, CardContent } from '../../../components/ui/Card';
+import { Switch } from '../../../components/ui/Switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/Tooltip';
+import { cn } from '../../../../../lib/utils';
 import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface ApiKey {
@@ -38,7 +39,6 @@ interface ApiKey {
 const ApiKeys = () => {
   const { data: session } = useSession();
   const { confirm: confirmDialog } = useDialog();
-  const { mode, systemMode } = useColorScheme();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -52,10 +52,6 @@ const ApiKeys = () => {
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
-  // Get the actual active mode (systemMode is used when mode is 'system')
-  const activeMode = mode === 'system' ? systemMode : mode;
-  const isDarkMode = activeMode === 'dark';
-
   useEffect(() => {
     if (currentTenantId) {
       loadApiKeys();
@@ -64,7 +60,6 @@ const ApiKeys = () => {
 
   const loadApiKeys = async () => {
     if (!currentTenantId) return;
-
     const result = await getApiKeysForTenant(currentTenantId);
     setApiKeys(JSON.parse(result));
   };
@@ -88,13 +83,7 @@ const ApiKeys = () => {
 
     try {
       const expiresInDays = newApiKeyExpiry ? parseInt(newApiKeyExpiry) : null;
-      const result = await createApiKey(
-        currentTenantId,
-        newApiKeyName,
-        newApiKeyDescription,
-        expiresInDays
-      );
-
+      const result = await createApiKey(currentTenantId, newApiKeyName, newApiKeyDescription, expiresInDays);
       const response = JSON.parse(result);
 
       if (response.success) {
@@ -115,7 +104,7 @@ const ApiKeys = () => {
   const handleDeleteClick = async (apiKey: ApiKey) => {
     const confirmed = await confirmDialog({
       title: 'Delete API Key',
-      message: `Are you sure you want to delete the API key "${apiKey.name}"? This action cannot be undone and will immediately revoke access for any applications using this key.`,
+      message: `Are you sure you want to delete the API key "${apiKey.name}"? This action cannot be undone.`,
       variant: 'danger',
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
@@ -126,22 +115,16 @@ const ApiKeys = () => {
     try {
       const result = await deleteApiKey(apiKey.id);
       const response = JSON.parse(result);
-
       if (response.success) {
         await loadApiKeys();
-      } else {
-        console.error('Failed to delete API key:', response.error);
       }
     } catch (error: any) {
       console.error('Failed to delete API key:', error.message);
     }
   };
 
-  const handleToggleStatus = async (apiKey: ApiKey, nextEnabledParam?: boolean) => {
+  const handleToggleStatus = async (apiKey: ApiKey, nextEnabled: boolean) => {
     try {
-      const nextEnabled = typeof nextEnabledParam === 'boolean' ? nextEnabledParam : !apiKey.enabled;
-
-      // If disabling, ask for confirmation first
       if (!nextEnabled) {
         const confirmed = await confirmDialog({
           title: 'Disable API Key',
@@ -151,7 +134,6 @@ const ApiKeys = () => {
           cancelLabel: 'Cancel',
         });
         if (!confirmed) {
-          // Force a re-render to keep the switch in sync with current value
           setApiKeys((prev) => prev.slice());
           return;
         }
@@ -159,7 +141,6 @@ const ApiKeys = () => {
 
       const result = await toggleApiKeyStatus(apiKey.id, nextEnabled);
       const response = JSON.parse(result);
-
       if (response.success) {
         await loadApiKeys();
       }
@@ -193,30 +174,23 @@ const ApiKeys = () => {
     return (
       <div className="p-6 max-w-5xl mx-auto">
         <div className="relative">
-          {/* Decorative background */}
           <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-full blur-3xl opacity-60" />
-
           <div className="relative bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-8">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-500/25 flex-shrink-0">
                 <AlertCircle className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100 mb-2">
-                  No Tenant Selected
-                </h2>
-                <p className="text-amber-800 dark:text-amber-200 mb-4">
-                  Please select a tenant before managing API Keys. API Keys are associated with a specific tenant.
-                </p>
-                <a
-                  href="/ade/dashboard/tenants"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40"
-                >
-                  Go to Tenants
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </a>
+                <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100 mb-2">No Tenant Selected</h2>
+                <p className="text-amber-800 dark:text-amber-200 mb-4">Please select a tenant before managing API Keys.</p>
+                <Button asChild>
+                  <a href="/ade/dashboard/tenants" className="inline-flex items-center gap-2">
+                    Go to Tenants
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </Button>
               </div>
             </div>
           </div>
@@ -226,437 +200,199 @@ const ApiKeys = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25">
-            <Key className="h-7 w-7 text-white" />
+    <TooltipProvider>
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25">
+              <Key className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">API Keys</h1>
+              <p className="text-gray-500 dark:text-gray-300 mt-1">Manage API keys for external REST API access</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">API Keys</h1>
-            <p className="text-gray-500 dark:text-gray-300 mt-1">
-              Manage API keys for external REST API access to your tenant data
-            </p>
-          </div>
+          <Button onClick={handleCreateApiKey} className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
+            <Plus className="h-5 w-5" />
+            Create API Key
+          </Button>
         </div>
-        <button
-          onClick={handleCreateApiKey}
-          className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-2.5 px-5 rounded-xl cursor-pointer transition-all duration-200 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:-translate-y-0.5"
-        >
-          <Plus className="h-5 w-5" />
-          Create API Key
-        </button>
-      </div>
 
-      {/* API Keys List */}
-      <div className="space-y-4">
-        {apiKeys.length === 0 ? (
-          <div className="relative">
-            {/* Decorative background */}
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 rounded-full blur-3xl opacity-60" />
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-full blur-3xl opacity-60" />
-
-            <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
-              <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <Key className="h-10 w-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                No API Keys Yet
-              </h3>
-              <p className="text-gray-500 dark:text-gray-300 max-w-md mx-auto">
-                Create your first API key to access your tenant data via REST API using the &quot;Create API Key&quot; button above
-              </p>
-            </div>
-          </div>
-        ) : (
-          apiKeys.map((apiKey) => (
-            <Card
-              key={apiKey.id}
-              sx={{
-                borderRadius: 3,
-                border: '1px solid',
-                borderColor: isExpired(apiKey.expires_at)
-                  ? 'rgba(239, 68, 68, 0.3)'
-                  : isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
-                boxShadow: 'none',
-                transition: 'all 0.2s ease',
-                background: isExpired(apiKey.expires_at)
-                  ? isDarkMode
-                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)'
-                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(249, 115, 22, 0.03) 100%)'
-                  : !apiKey.enabled
-                    ? isDarkMode ? 'rgba(51, 65, 85, 0.5)' : 'rgba(148, 163, 184, 0.05)'
-                    : isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'white',
-                '&:hover': {
-                  borderColor: 'rgba(245, 158, 11, 0.3)',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.1)',
-                },
-              }}
-            >
-              <CardContent sx={{ p: 3 }}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
-                        <Key size={20} className="text-amber-600 dark:text-amber-400" />
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{apiKey.name}</h3>
-                      {isExpired(apiKey.expires_at) && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-700 border border-red-200">
-                          <AlertCircle size={12} />
-                          Expired
-                        </span>
-                      )}
-                      {!apiKey.enabled && !isExpired(apiKey.expires_at) && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 border border-gray-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                          Disabled
-                        </span>
-                      )}
-                      {apiKey.enabled && !isExpired(apiKey.expires_at) && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                          Active
-                        </span>
-                      )}
-                    </div>
-
-                    {apiKey.description && (
-                      <p className="text-sm text-gray-500 dark:text-gray-300 mb-4 ml-13">{apiKey.description}</p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4 text-sm ml-13">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Key Prefix:</span>
-                        <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg text-gray-900 dark:text-gray-100 text-xs">
-                          {apiKey.key_prefix}...
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Last Used:</span>
-                        <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.last_used_at)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Created:</span>
-                        <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.created_at)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Expires:</span>
-                        <span className={isExpired(apiKey.expires_at) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-600 dark:text-gray-300'}>
-                          {apiKey.expires_at ? formatDate(apiKey.expires_at) : 'Never'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 ml-4">
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={apiKey.enabled}
-                          onChange={(_, checked) => handleToggleStatus(apiKey, checked)}
-                          sx={{
-                            '& .MuiSwitch-switchBase.Mui-checked': {
-                              color: '#10b981',
-                            },
-                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                              backgroundColor: '#10b981',
-                            },
-                          }}
-                        />
-                      }
-                      label={
-                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                          {apiKey.enabled ? 'Enabled' : 'Disabled'}
-                        </span>
-                      }
-                    />
-                    <Tooltip title="Delete API Key">
-                      <IconButton
-                        onClick={() => handleDeleteClick(apiKey)}
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                          },
-                        }}
-                      >
-                        <Trash2 size={18} className="text-gray-400 hover:text-red-500 transition-colors" />
-                      </IconButton>
-                    </Tooltip>
-                  </div>
+        {/* API Keys List */}
+        <div className="space-y-4">
+          {apiKeys.length === 0 ? (
+            <div className="relative">
+              <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/20 dark:to-orange-900/20 rounded-full blur-3xl opacity-60" />
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-full blur-3xl opacity-60" />
+              <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Key className="h-10 w-10 text-white" />
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {/* Create API Key Modal */}
-      <Dialog
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          },
-        }}
-      >
-        <DialogTitle sx={{
-          pb: 1,
-          borderBottom: '1px solid',
-          borderColor: 'rgba(245, 158, 11, 0.1)',
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{
-              p: 1.5,
-              borderRadius: 2,
-              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Key size={20} color="#f59e0b" />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
-              Create API Key
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          {errorMessage && (
-            <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-              {errorMessage}
-            </Alert>
-          )}
-
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Name"
-            type="text"
-            fullWidth
-            required
-            value={newApiKeyName}
-            onChange={(e) => setNewApiKeyName(e.target.value)}
-            helperText="A descriptive name for this API key"
-            sx={{
-              mb: 2,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#f59e0b',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#f59e0b',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#f59e0b',
-              },
-            }}
-          />
-
-          <TextField
-            margin="dense"
-            label="Description"
-            type="text"
-            fullWidth
-            multiline
-            rows={3}
-            value={newApiKeyDescription}
-            onChange={(e) => setNewApiKeyDescription(e.target.value)}
-            helperText="Optional description of what this key is used for"
-            sx={{
-              mb: 2,
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#f59e0b',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#f59e0b',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#f59e0b',
-              },
-            }}
-          />
-
-          <TextField
-            margin="dense"
-            label="Expires In (Days)"
-            type="number"
-            fullWidth
-            value={newApiKeyExpiry}
-            onChange={(e) => setNewApiKeyExpiry(e.target.value)}
-            helperText="Leave empty for no expiration"
-            slotProps={{
-              htmlInput: { min: 1 }
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#f59e0b',
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: '#f59e0b',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#f59e0b',
-              },
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'rgba(0, 0, 0, 0.06)' }}>
-          <Button
-            onClick={() => setShowCreateModal(false)}
-            disabled={isLoading}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 600,
-              color: isDarkMode ? '#d1d5db' : '#64748b',
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleCreateSubmit}
-            variant="contained"
-            disabled={isLoading}
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 3,
-              background: 'linear-gradient(135deg, #f59e0b 0%, #f97316 100%)',
-              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #d97706 0%, #ea580c 100%)',
-                boxShadow: '0 6px 16px rgba(245, 158, 11, 0.35)',
-              },
-            }}
-          >
-            {isLoading ? 'Creating...' : 'Create API Key'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Show Generated API Key Modal */}
-      <Dialog
-        open={showApiKeyModal}
-        onClose={() => {
-          setShowApiKeyModal(false);
-          setGeneratedApiKey('');
-          setCopiedKey(false);
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          },
-        }}
-      >
-        <DialogTitle sx={{
-          pb: 1,
-          borderBottom: '1px solid',
-          borderColor: 'rgba(16, 185, 129, 0.1)',
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{
-              p: 1.5,
-              borderRadius: 2,
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(20, 184, 166, 0.1) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Check size={20} color="#10b981" />
-            </Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#1e293b' }}>
-              API Key Created Successfully
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <Alert
-            severity="warning"
-            sx={{
-              mb: 3,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: 'warning.light',
-            }}
-          >
-            <strong>Important:</strong> This is the only time you&apos;ll see this API key. Please copy it now and store it securely.
-          </Alert>
-
-          <Box sx={{
-            p: 3,
-            borderRadius: 3,
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(249, 115, 22, 0.05) 100%)',
-            border: '1px solid',
-            borderColor: 'rgba(245, 158, 11, 0.2)',
-          }}>
-            <Typography variant="body2" sx={{ color: isDarkMode ? '#d1d5db' : '#64748b', fontWeight: 600, mb: 1.5, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Your API Key:
-            </Typography>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700 font-mono text-sm break-all text-gray-900 dark:text-gray-100 shadow-inner">
-                {generatedApiKey}
-              </code>
-              <Tooltip title={copiedKey ? 'Copied!' : 'Copy to clipboard'}>
-                <IconButton
-                  onClick={handleCopyKey}
-                  sx={{
-                    bgcolor: copiedKey ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    '&:hover': {
-                      bgcolor: copiedKey ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                    },
-                  }}
-                >
-                  {copiedKey ? <Check size={20} className="text-emerald-600" /> : <Copy size={20} className="text-amber-600" />}
-                </IconButton>
-              </Tooltip>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No API Keys Yet</h3>
+                <p className="text-gray-500 dark:text-gray-300 max-w-md mx-auto">Create your first API key to access your tenant data via REST API</p>
+              </div>
             </div>
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'rgba(0, 0, 0, 0.06)' }}>
-          <Button
-            onClick={() => {
-              setShowApiKeyModal(false);
-              setGeneratedApiKey('');
-              setCopiedKey(false);
-            }}
-            variant="contained"
-            sx={{
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 4,
-              background: 'linear-gradient(135deg, #10b981 0%, #14b8a6 100%)',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
-                boxShadow: '0 6px 16px rgba(16, 185, 129, 0.35)',
-              },
-            }}
-          >
-            I&apos;ve Saved My Key
-          </Button>
-        </DialogActions>
-      </Dialog>
+          ) : (
+            apiKeys.map((apiKey) => (
+              <Card
+                key={apiKey.id}
+                className={cn(
+                  'transition-all duration-200 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-500/10',
+                  isExpired(apiKey.expires_at) && 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/10',
+                  !apiKey.enabled && !isExpired(apiKey.expires_at) && 'bg-gray-50 dark:bg-gray-800/50'
+                )}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
+                          <Key className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{apiKey.name}</h3>
+                        {isExpired(apiKey.expires_at) && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-700">
+                            <AlertCircle className="h-3 w-3" />Expired
+                          </span>
+                        )}
+                        {!apiKey.enabled && !isExpired(apiKey.expires_at) && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Disabled
+                          </span>
+                        )}
+                        {apiKey.enabled && !isExpired(apiKey.expires_at) && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
+                          </span>
+                        )}
+                      </div>
 
-    </div>
+                      {apiKey.description && (
+                        <p className="text-sm text-gray-500 dark:text-gray-300 mb-4 ml-13">{apiKey.description}</p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4 text-sm ml-13">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Key Prefix:</span>
+                          <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-lg text-gray-900 dark:text-gray-100 text-xs">{apiKey.key_prefix}...</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Last Used:</span>
+                          <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.last_used_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Created:</span>
+                          <span className="text-gray-600 dark:text-gray-300">{formatDate(apiKey.created_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Expires:</span>
+                          <span className={isExpired(apiKey.expires_at) ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-600 dark:text-gray-300'}>
+                            {apiKey.expires_at ? formatDate(apiKey.expires_at) : 'Never'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 ml-4">
+                      <div className="flex items-center gap-2">
+                        <Switch checked={apiKey.enabled} onCheckedChange={(checked) => handleToggleStatus(apiKey, checked)} />
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{apiKey.enabled ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button onClick={() => handleDeleteClick(apiKey)} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
+                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500 transition-colors" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete API Key</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Create API Key Modal */}
+        <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30">
+                  <Key className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                Create API Key
+              </DialogTitle>
+              <DialogDescription>Create a new API key for REST API access</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
+              <div className="space-y-2">
+                <Label htmlFor="keyName">Name *</Label>
+                <Input id="keyName" value={newApiKeyName} onChange={(e) => setNewApiKeyName(e.target.value)} placeholder="My API Key" autoFocus />
+                <p className="text-xs text-gray-500 dark:text-gray-400">A descriptive name for this API key</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="keyDescription">Description</Label>
+                <Textarea id="keyDescription" value={newApiKeyDescription} onChange={(e) => setNewApiKeyDescription(e.target.value)} placeholder="What is this key used for?" rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="keyExpiry">Expires In (Days)</Label>
+                <Input id="keyExpiry" type="number" value={newApiKeyExpiry} onChange={(e) => setNewApiKeyExpiry(e.target.value)} placeholder="Leave empty for no expiration" min={1} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateModal(false)} disabled={isLoading}>Cancel</Button>
+              <Button onClick={handleCreateSubmit} disabled={isLoading} className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
+                {isLoading ? 'Creating...' : 'Create API Key'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Show Generated API Key Modal */}
+        <Dialog open={showApiKeyModal} onOpenChange={(open) => { if (!open) { setShowApiKeyModal(false); setGeneratedApiKey(''); setCopiedKey(false); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30">
+                  <Check className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                API Key Created Successfully
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Alert variant="warning">
+                <strong>Important:</strong> This is the only time you'll see this API key. Please copy it now and store it securely.
+              </Alert>
+              <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-700">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Your API Key:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700 font-mono text-sm break-all text-gray-900 dark:text-gray-100">
+                    {generatedApiKey}
+                  </code>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={handleCopyKey} className={cn("p-3 rounded-xl transition-colors", copiedKey ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-800/30")}>
+                        {copiedKey ? <Check className="h-5 w-5 text-emerald-600" /> : <Copy className="h-5 w-5 text-amber-600" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{copiedKey ? 'Copied!' : 'Copy to clipboard'}</TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="success" onClick={() => { setShowApiKeyModal(false); setGeneratedApiKey(''); setCopiedKey(false); }}>
+                I've Saved My Key
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 };
 
