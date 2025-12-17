@@ -484,10 +484,13 @@ const Versions = () => {
             {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
             <div className="space-y-2">
               <Label>Copy From Version</Label>
-              <Select value={sourceVersionId} onValueChange={setSourceVersionId}>
+              <Select
+                value={sourceVersionId || '__blank__'}
+                onValueChange={(val) => setSourceVersionId(val === '__blank__' ? '' : val)}
+              >
                 <SelectTrigger><SelectValue placeholder={versions.length === 0 ? 'No versions available' : 'Create blank version'} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Create blank version</SelectItem>
+                  <SelectItem value="__blank__">Create blank version</SelectItem>
                   {versions.map((v) => <SelectItem key={v.id} value={v.id}>{v.published ? '🔒 ' : ''}v{v.version_id} - {v.description || 'No description'}</SelectItem>)}
                 </SelectContent>
               </Select>
