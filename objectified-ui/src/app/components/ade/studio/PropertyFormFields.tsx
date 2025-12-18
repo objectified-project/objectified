@@ -1,30 +1,27 @@
 'use client';
 
 import React from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Radio from '@mui/material/Radio';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
-import InputAdornment from '@mui/material/InputAdornment';
-import Tooltip from '@mui/material/Tooltip';
-import { useColorScheme } from '@mui/material/styles';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import TuneIcon from '@mui/icons-material/Tune';
-import SettingsIcon from '@mui/icons-material/Settings';
-import CodeIcon from '@mui/icons-material/Code';
-import Collapse from '@mui/material/Collapse';
+import { cn } from '../../../../../lib/utils';
+import { Input } from '../../ui/Input';
+import { Textarea } from '../../ui/Textarea';
+import { Checkbox } from '../../ui/Checkbox';
+import { Label } from '../../ui/Label';
+import { RadioGroup, RadioGroupItem } from '../../ui/RadioGroup';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/Tooltip';
+import { Collapsible, CollapsibleContent } from '../../ui/Collapsible';
+import { FormField } from '../../ui/FormField';
+import {
+  Plus,
+  Trash2,
+  Sparkles,
+  SortAsc,
+  GripVertical,
+  ExternalLink,
+  Info,
+  Settings,
+  Sliders,
+  Code
+} from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -44,6 +41,29 @@ import { CSS } from '@dnd-kit/utilities';
 import { RegexTester } from './RegexTester';
 import { PrefixItemsEditor } from './PrefixItemsEditor';
 import { ExtensionsEditor } from './ExtensionsEditor';
+
+// Custom hook to detect dark mode
+const useDarkMode = () => {
+  const [isDark, setIsDark] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+
+    checkDarkMode();
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return isDark;
+};
 
 export interface PropertyFormData {
   // Basic fields
@@ -140,8 +160,7 @@ const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete
   };
 
   return (
-    <ListItem
-      ref={setNodeRef}
+    <div ref={setNodeRef}
       style={style}
       sx={{
         borderBottom: '1px solid #f1f5f9',
@@ -161,10 +180,8 @@ const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete
         },
       }}
     >
-      <IconButton
-        {...attributes}
+      <button {...attributes}
         {...listeners}
-        size="small"
         sx={{
           cursor: 'grab',
           '&:active': { cursor: 'grabbing' },
@@ -175,8 +192,8 @@ const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete
           '&:hover': { color: '#6366f1' },
         }}
       >
-        <DragIndicatorIcon fontSize="small" />
-      </IconButton>
+        <GripVertical className="h-4 w-4" />
+      </button>
       <ListItemText
         primary={value}
         primaryTypographyProps={{
@@ -184,12 +201,9 @@ const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete
           fontSize: '0.875rem',
           color: '#334155',
         }}
-        sx={{ flex: 1, my: 0 }}
       />
-      <IconButton
-        edge="end"
+      <button
         onClick={() => onDelete(value)}
-        size="small"
         sx={{
           flex: 0,
           color: '#94a3b8',
@@ -200,9 +214,9 @@ const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete
           },
         }}
       >
-        <DeleteIcon fontSize="small" />
-      </IconButton>
-    </ListItem>
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
   );
 };
 
@@ -215,56 +229,29 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, badge }) => {
-  const { mode: colorMode, systemMode } = useColorScheme();
-  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+  const isDark = useDarkMode();
 
   return (
-    <Box sx={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 1.5,
-      mb: 2.5,
-      pb: 1.5,
-      borderBottom: '1px solid',
-      borderColor: 'rgba(99, 102, 241, 0.1)',
-    }}>
-      <Box sx={{
-        p: 1,
-        borderRadius: 1.5,
-        bgcolor: 'rgba(99, 102, 241, 0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+    <div className={cn("flex flex-col")}>
+      <div className={cn("flex flex-col")}>
         {icon}
-      </Box>
-      <Box sx={{ flex: 1 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', letterSpacing: '-0.01em' }}>
+      </div>
+      <div className={cn("flex flex-col")}>
+        <h3 className="text-base font-semibold">
           {title}
-        </Typography>
+        </h3>
         {subtitle && (
-          <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+          <span className="text-xs">
             {subtitle}
-          </Typography>
+          </span>
         )}
-      </Box>
+      </div>
       {badge && (
-        <Typography variant="caption" sx={{
-          px: 1.5,
-          py: 0.5,
-          bgcolor: isDark ? 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-          background: isDark ? 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
-          color: isDark ? '#c7d2fe' : '#4338ca',
-          borderRadius: 2,
-          fontWeight: 600,
-          fontSize: '0.7rem',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}>
+        <span className="text-xs">
           {badge}
-        </Typography>
+        </span>
       )}
-    </Box>
+    </div>
   );
 };
 
@@ -599,436 +586,338 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         </div>
 
         {/* Default and Example in a row */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mt: 2.5 }}>
-          <TextField
-            label="Default Value"
-            size={size}
-            fullWidth
-            value={data.default || ''}
-            onChange={(e) => onChange('default', e.target.value)}
-            helperText="JSON default value"
-            sx={{
-              '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.875rem' },
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                transition: 'all 0.2s ease',
-                '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.02)' },
-              },
-            }}
-          />
-
-          <Box sx={{ gridColumn: showTitle ? 'auto' : '1 / -1' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
-                Examples
-              </Typography>
-              <Tooltip title="Generate example based on schema" arrow>
-                <IconButton
-                  onClick={generateExample}
-                  size="small"
-                  sx={{
-                    color: '#6366f1',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      bgcolor: 'rgba(99, 102, 241, 0.1)',
-                      transform: 'scale(1.1)',
-                    },
-                  }}
-                >
-                  <AutoAwesomeIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-
-            <TextField
-              label="Add Example"
-              size={size}
-              fullWidth
-              multiline
-              rows={2}
-              value={exampleInput}
-              onChange={(e) => {
-                setExampleInput(e.target.value);
-                setExampleError('');
-              }}
-              onKeyDown={handleExampleKeyPress}
-              error={!!exampleError}
-              helperText={exampleError || "Enter JSON value (Shift+Enter for new line, Enter to add)"}
-              sx={{
-                '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.875rem' },
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  transition: 'all 0.2s ease',
-                  '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.02)' },
-                },
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Tooltip title="Add example" arrow>
-                      <IconButton
-                        onClick={handleAddExample}
-                        size="small"
-                        disabled={!exampleInput.trim()}
-                        sx={{
-                          color: '#6366f1',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            bgcolor: 'rgba(99, 102, 241, 0.1)',
-                          },
-                        }}
-                      >
-                        <AddIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </InputAdornment>
-                ),
-              }}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+          <FormField label="Default Value" helperText="JSON default value">
+            <Input
+              value={data.default || ''}
+              onChange={(e) => onChange('default', e.target.value)}
+              className="font-mono text-sm rounded-lg"
             />
+          </FormField>
+
+          <div className={showTitle ? '' : 'md:col-span-2'}>
+            <div className="flex items-center justify-between mb-2">
+              <p className={cn('text-sm font-semibold', isDark ? 'text-gray-100' : 'text-gray-700')}>
+                Examples
+              </p>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={generateExample}
+                      className="p-1 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded transition-all hover:scale-110"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Generate example based on schema</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
+            <FormField
+              helperText={exampleError || "Enter JSON value (Shift+Enter for new line, Enter to add)"}
+              error={exampleError}
+            >
+              <div className="relative">
+                <Textarea
+                  rows={2}
+                  value={exampleInput}
+                  onChange={(e) => {
+                    setExampleInput(e.target.value);
+                    setExampleError('');
+                  }}
+                  onKeyDown={handleExampleKeyPress}
+                  placeholder="Add Example"
+                  className={cn('font-mono text-sm rounded-lg pr-12', exampleError && 'border-red-500')}
+                />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleAddExample}
+                        disabled={!exampleInput.trim()}
+                        className="absolute right-2 top-2 p-1 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Add example</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </FormField>
 
             {/* Examples List */}
             {data.examples && data.examples.length > 0 && (
-              <Box sx={{
-                mt: 2,
-                p: 2,
-                bgcolor: isDark ? '#1e293b' : '#f8fafc',
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: isDark ? '#334155' : '#e2e8f0',
-              }}>
-                <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', mb: 1, display: 'block' }}>
+              <div className={cn(
+                'mt-4 p-4 rounded-lg border',
+                isDark ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+              )}>
+                <span className={cn('text-xs mb-2 block', isDark ? 'text-gray-400' : 'text-gray-600')}>
                   {data.examples.length} example{data.examples.length !== 1 ? 's' : ''}
-                </Typography>
-                <List sx={{ p: 0 }}>
+                </span>
+                <div className="space-y-0">
                   {data.examples.map((example, index) => (
-                    <ListItem
+                    <div
                       key={index}
-                      sx={{
-                        borderBottom: index < data.examples!.length - 1 ? '1px solid' : 'none',
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 1,
-                        px: 0,
-                        py: 1.5,
-                      }}
+                      className={cn(
+                        'flex items-start gap-2 py-3',
+                        index < data.examples!.length - 1 && 'border-b',
+                        isDark ? 'border-gray-700' : 'border-gray-200'
+                      )}
                     >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                            fontSize: '0.75rem',
-                            color: isDark ? '#cbd5e1' : '#334155',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                          }}
-                        >
+                      <div className="flex-1 min-w-0">
+                        <pre className={cn(
+                          'font-mono text-xs whitespace-pre-wrap break-words',
+                          isDark ? 'text-gray-300' : 'text-gray-700'
+                        )}>
                           {example}
-                        </Typography>
-                      </Box>
-                      <IconButton
-                        edge="end"
+                        </pre>
+                      </div>
+                      <button
                         onClick={() => handleRemoveExample(index)}
-                        size="small"
-                        sx={{
-                          flex: 0,
-                          color: '#94a3b8',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            color: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                          },
-                        }}
+                        className="flex-shrink-0 p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded transition-all"
                       >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </ListItem>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   ))}
-                </List>
-              </Box>
+                </div>
+              </div>
             )}
-          </Box>
-        </Box>
-      </Box>
+          </div>
+        </div>
+      </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 2: Property Behavior (Metadata flags)
           ═══════════════════════════════════════════════════════════════════════════ */}
       {showMetadata && (
-        <Box sx={{
-          p: 3,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        }}>
+        <div className={cn(
+          'p-6 border-b',
+          isDark
+            ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700'
+            : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200'
+        )}>
           <SectionHeader
-            icon={<TuneIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
+            icon={<Sliders className="text-indigo-600" size={18} />}
             title="Property Behavior"
             subtitle="Access and visibility controls"
           />
 
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' },
-            gap: 2
-          }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
             {/* Required */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.required ? 'rgba(239, 68, 68, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.required ? 'rgba(239, 68, 68, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.required ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.required ? '#ef4444' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.required ? '0 6px 16px rgba(239, 68, 68, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
+            <div
+              className={cn(
+                'p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-0.5',
+                data.required
+                  ? 'bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800 shadow-lg shadow-red-500/20'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md'
+              )}
               onClick={() => onChange('required', !data.required)}
             >
-              <Checkbox
-                checked={data.required || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.required ? '#ef4444' : undefined,
-                  '&.Mui-checked': { color: '#ef4444' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.required ? '#dc2626' : '#334155' }}>
-                  Required
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Must be provided
-                </Typography>
-              </Box>
-            </Box>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={data.required || false}
+                  onCheckedChange={(checked) => onChange('required', checked)}
+                  className={cn(
+                    'pointer-events-none',
+                    data.required && 'data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600'
+                  )}
+                />
+                <div>
+                  <p className={cn(
+                    'text-sm font-semibold',
+                    data.required ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'
+                  )}>
+                    Required
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Must be provided
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Nullable (OpenAPI 3.1) */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.nullable ? 'rgba(168, 85, 247, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.nullable ? 'rgba(168, 85, 247, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.nullable ? '0 4px 12px rgba(168, 85, 247, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.nullable ? '#a855f7' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.nullable ? '0 6px 16px rgba(168, 85, 247, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
+            <div
+              className={cn(
+                'p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-0.5',
+                data.nullable
+                  ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-300 dark:border-purple-800 shadow-lg shadow-purple-500/20'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md'
+              )}
               onClick={() => onChange('nullable', !data.nullable)}
             >
-              <Checkbox
-                checked={data.nullable || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.nullable ? '#a855f7' : undefined,
-                  '&.Mui-checked': { color: '#a855f7' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.nullable ? '#9333ea' : '#334155' }}>
-                  Nullable
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Can be null
-                </Typography>
-              </Box>
-            </Box>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={data.nullable || false}
+                  onCheckedChange={(checked) => onChange('nullable', checked)}
+                  className={cn(
+                    'pointer-events-none',
+                    data.nullable && 'data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600'
+                  )}
+                />
+                <div>
+                  <p className={cn(
+                    'text-sm font-semibold',
+                    data.nullable ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'
+                  )}>
+                    Nullable
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Can be null
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Read Only */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.readOnly ? 'rgba(59, 130, 246, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.readOnly ? 'rgba(59, 130, 246, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.readOnly ? '0 4px 12px rgba(59, 130, 246, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.readOnly ? '#3b82f6' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.readOnly ? '0 6px 16px rgba(59, 130, 246, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
+            <div
+              className={cn(
+                'p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-0.5',
+                data.readOnly
+                  ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-800 shadow-lg shadow-blue-500/20'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md'
+              )}
               onClick={() => {
                 onChange('readOnly', !data.readOnly);
                 if (!data.readOnly) onChange('writeOnly', false);
               }}
             >
-              <Checkbox
-                checked={data.readOnly || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.readOnly ? '#3b82f6' : undefined,
-                  '&.Mui-checked': { color: '#3b82f6' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.readOnly ? '#2563eb' : '#334155' }}>
-                  Read Only
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Output only
-                </Typography>
-              </Box>
-            </Box>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={data.readOnly || false}
+                  onCheckedChange={(checked) => {
+                    onChange('readOnly', checked);
+                    if (checked) onChange('writeOnly', false);
+                  }}
+                  className={cn(
+                    'pointer-events-none',
+                    data.readOnly && 'data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600'
+                  )}
+                />
+                <div>
+                  <p className={cn(
+                    'text-sm font-semibold',
+                    data.readOnly ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'
+                  )}>
+                    Read Only
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Output only
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Write Only */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.writeOnly ? 'rgba(34, 197, 94, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.writeOnly ? 'rgba(34, 197, 94, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.writeOnly ? '0 4px 12px rgba(34, 197, 94, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.writeOnly ? '#22c55e' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.writeOnly ? '0 6px 16px rgba(34, 197, 94, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
+            <div
+              className={cn(
+                'p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-0.5',
+                data.writeOnly
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 shadow-lg shadow-emerald-500/20'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md'
+              )}
               onClick={() => {
                 onChange('writeOnly', !data.writeOnly);
                 if (!data.writeOnly) onChange('readOnly', false);
               }}
             >
-              <Checkbox
-                checked={data.writeOnly || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.writeOnly ? '#22c55e' : undefined,
-                  '&.Mui-checked': { color: '#22c55e' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.writeOnly ? '#16a34a' : '#334155' }}>
-                  Write Only
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Input only
-                </Typography>
-              </Box>
-            </Box>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={data.writeOnly || false}
+                  onCheckedChange={(checked) => {
+                    onChange('writeOnly', checked);
+                    if (checked) onChange('readOnly', false);
+                  }}
+                  className={cn(
+                    'pointer-events-none',
+                    data.writeOnly && 'data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600'
+                  )}
+                />
+                <div>
+                  <p className={cn(
+                    'text-sm font-semibold',
+                    data.writeOnly ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'
+                  )}>
+                    Write Only
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Input only
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Deprecated */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.deprecated ? 'rgba(245, 158, 11, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.deprecated ? 'rgba(245, 158, 11, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.deprecated ? '0 4px 12px rgba(245, 158, 11, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.deprecated ? '#f59e0b' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.deprecated ? '0 6px 16px rgba(245, 158, 11, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
+            <div
+              className={cn(
+                'p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:-translate-y-0.5',
+                data.deprecated
+                  ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 shadow-lg shadow-amber-500/20'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md'
+              )}
               onClick={() => onChange('deprecated', !data.deprecated)}
             >
-              <Checkbox
-                checked={data.deprecated || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.deprecated ? '#f59e0b' : undefined,
-                  '&.Mui-checked': { color: '#f59e0b' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.deprecated ? '#d97706' : '#334155' }}>
-                  Deprecated
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Avoid using
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  checked={data.deprecated || false}
+                  onCheckedChange={(checked) => onChange('deprecated', checked)}
+                  className={cn(
+                    'pointer-events-none',
+                    data.deprecated && 'data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600'
+                  )}
+                />
+                <div>
+                  <p className={cn(
+                    'text-sm font-semibold',
+                    data.deprecated ? 'text-amber-700 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'
+                  )}>
+                    Deprecated
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Avoid using
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Deprecation Message */}
-          <Collapse in={data.deprecated} timeout={300}>
-            <TextField
-              label="Deprecation Message"
-              size={size}
-              fullWidth
-              multiline
-              rows={2}
-              value={data.deprecationMessage || ''}
-              onChange={(e) => onChange('deprecationMessage', e.target.value)}
-              placeholder="e.g., Use newProperty instead. Will be removed in v2.0."
-              sx={{
-                mt: 2.5,
-                bgcolor: isDark ? '#0f172a' : 'white',
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  borderColor: 'rgba(245, 158, 11, 0.3)',
-                },
-              }}
-            />
-          </Collapse>
-        </Box>
+          <Collapsible open={data.deprecated} className="mt-5">
+            <CollapsibleContent className="transition-all duration-300">
+              <FormField label="Deprecation Message">
+                <Textarea
+                  rows={2}
+                  value={data.deprecationMessage || ''}
+                  onChange={(e) => onChange('deprecationMessage', e.target.value)}
+                  placeholder="e.g., Use newProperty instead. Will be removed in v2.0."
+                  className={cn(
+                    'rounded-lg border-amber-300/30',
+                    isDark ? 'bg-gray-900' : 'bg-white'
+                  )}
+                />
+              </FormField>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 3: Type-Specific Constraints
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{
-        p: 3,
-        borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        bgcolor: isDark ? '#1e293b' : 'white',
-      }}>
+      <div className={cn(
+        'p-6 border-b',
+        isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      )}>
         <SectionHeader
-          icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
+          icon={<Settings className="text-indigo-600" size={18} />}
           title="Constraints"
           subtitle="Validation rules for this property"
           badge={`${baseType}${isArray ? '[]' : ''}`}
@@ -1036,84 +925,55 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
         {/* Tuple mode message */}
         {data.tupleMode && isArray && (
-          <Box sx={{
-            mb: 2.5,
-            p: 2.5,
-            bgcolor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.06)',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
-            borderRadius: 2.5,
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 2,
-          }}>
-            <Box sx={{
-              p: 0.75,
-              borderRadius: 1.5,
-              bgcolor: isDark ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mt: 0.25,
-            }}>
-              <TuneIcon sx={{ fontSize: 16, color: '#2563eb' }} />
-            </Box>
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: '#1e40af' }}>
+          <div className={cn(
+            'mb-5 p-5 rounded-2xl border flex items-start gap-4',
+            isDark
+              ? 'bg-blue-950/30 border-blue-800/30'
+              : 'bg-blue-50/60 border-blue-200'
+          )}>
+            <div className="p-2 rounded-xl bg-blue-600/20 flex items-center justify-center mt-0.5">
+              <Sliders className="text-blue-600" size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold mb-1 text-blue-900 dark:text-blue-400">
                 Tuple Mode Active
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#475569', lineHeight: 1.5 }}>
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
                 Item-level constraints are defined per-position below. Each position can have its own type and constraints.
-              </Typography>
-            </Box>
-          </Box>
+              </p>
+            </div>
+          </div>
         )}
 
         {/* No constraints message for boolean and null types */}
         {(baseType === 'boolean' || baseType === 'null') && (
-          <Box sx={{
-            p: 4,
-            bgcolor: isDark ? '#1e293b' : '#f8fafc',
-            borderRadius: 2.5,
-            border: isDark ? '2px dashed #475569' : '2px dashed #e2e8f0',
-            textAlign: 'center',
-          }}>
-            <Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#64748b', fontStyle: 'italic', mb: 0.5 }}>
+          <div className={cn(
+            'p-8 rounded-2xl border-2 border-dashed text-center',
+            isDark ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-300'
+          )}>
+            <p className={cn('text-sm mb-1', isDark ? 'text-gray-400' : 'text-gray-600')}>
               No additional constraints available
-            </Typography>
-            <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8' }}>
+            </p>
+            <p className={cn('text-xs', isDark ? 'text-gray-500' : 'text-gray-400')}>
               {baseType === 'boolean'
                 ? 'Boolean values are either true or false'
                 : 'Null type is always null'}
-            </Typography>
-          </Box>
+            </p>
+          </div>
         )}
 
         {/* String Constraints */}
         {baseType === 'string' && !data.tupleMode && (
-          <Box sx={{
-            p: 2.5,
-            bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            borderRadius: 2.5,
-            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box component="span" sx={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                bgcolor: '#6366f1',
-              }} />
+          <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+            <p className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600"></span>
               String Constraints
-              {isArray && <Typography component="span" variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', ml: 1 }}>(per item)</Typography>}
-            </Typography>
+              {isArray && <span className="text-xs text-gray-500">(per item)</span>}
+            </p>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-              <TextField
-                label="Format"
-                size={size}
-                fullWidth
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+              <Input label="Format"
+                size={size} className="w-full"
                 value={data.format || ''}
                 onChange={(e) => onChange('format', e.target.value)}
                 placeholder="date, email, uri, uuid..."
@@ -1124,40 +984,32 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 }}
               />
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                <TextField
-                  label="Min Length"
+              <div className={cn("flex flex-col")}>
+                <Input label="Min Length"
                   type="number"
-                  size={size}
-                  fullWidth
+                  size={size} className="w-full"
                   value={data.minLength || ''}
                   onChange={(e) => onChange('minLength', e.target.value)}
-                  inputProps={{ min: 0 }}
                   sx={{
                     bgcolor: isDark ? '#0f172a' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                   }}
                 />
-                <TextField
-                  label="Max Length"
+                <Input label="Max Length"
                   type="number"
-                  size={size}
-                  fullWidth
+                  size={size} className="w-full"
                   value={data.maxLength || ''}
                   onChange={(e) => onChange('maxLength', e.target.value)}
-                  inputProps={{ min: 0 }}
                   sx={{
                     bgcolor: isDark ? '#0f172a' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                   }}
                 />
-              </Box>
-            </Box>
+              </div>
+            </div>
 
-            <TextField
-              label="Pattern (Regex)"
-              size={size}
-              fullWidth
+            <Input label="Pattern (Regex)"
+              size={size} className="w-full"
               value={data.pattern || ''}
               onChange={(e) => onChange('pattern', e.target.value)}
               placeholder="e.g., ^[A-Z]{3}$"
@@ -1171,44 +1023,24 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             />
 
             <RegexTester pattern={data.pattern || ''} />
-          </Box>
+          </div>
         )}
 
         {/* Number/Integer Constraints */}
         {(baseType === 'number' || baseType === 'integer') && !data.tupleMode && (
-          <Box sx={{
-            p: 2.5,
-            bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-            borderRadius: 2.5,
-            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box component="span" sx={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                bgcolor: '#8b5cf6',
-              }} />
+          <div className={cn("flex flex-col")}>
+            <span className="text-sm">
+              <span />
               Numeric Constraints
-              {isArray && <Typography component="span" variant="caption" sx={{ color: '#64748b', ml: 1 }}>(per item)</Typography>}
-            </Typography>
+              {isArray && <span>(per item)</span>}
+            </span>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+            <div className={cn("flex flex-col")} sx_old={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
               {/* Minimum */}
-              <Box sx={{
-                p: 2,
-                bgcolor: isDark ? '#0f172a' : 'white',
-                borderRadius: 2,
-                border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              }}>
-                <TextField
-                  label="Minimum"
+              <div className={cn("flex flex-col")}>
+                <Input label="Minimum"
                   type="number"
-                  size={size}
-                  fullWidth
+                  size={size} className="w-full"
                   value={data.minimum || ''}
                   onChange={(e) => {
                     onChange('minimum', e.target.value);
@@ -1223,49 +1055,35 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     '& .MuiOutlinedInput-root': { borderRadius: 1.5 },
                   }}
                 />
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <FormControlLabel
-                    control={
+                <div className={cn("flex flex-col")}>
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.minimumType === 'inclusive' || !data.minimumType}
                         onChange={() => onChange('minimumType', 'inclusive')}
                         disabled={!data.minimum}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≥ inclusive</Typography>}
-                    sx={{ m: 0 }}
+                    label={<span className="text-xs">≥ inclusive</span>}
                   />
-                  <FormControlLabel
-                    control={
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.minimumType === 'exclusive'}
                         onChange={() => onChange('minimumType', 'exclusive')}
                         disabled={!data.minimum}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&gt; exclusive</Typography>}
-                    sx={{ m: 0 }}
+                    label={<span className="text-xs">&gt; exclusive</span>}
                   />
-                </Box>
-              </Box>
+                </div>
+              </div>
 
               {/* Maximum */}
-              <Box sx={{
-                p: 2,
-                bgcolor: isDark ? '#0f172a' : 'white',
-                borderRadius: 2,
-                border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              }}>
-                <TextField
-                  label="Maximum"
+              <div className={cn("flex flex-col")}>
+                <Input label="Maximum"
                   type="number"
-                  size={size}
-                  fullWidth
+                  size={size} className="w-full"
                   value={data.maximum || ''}
                   onChange={(e) => {
                     onChange('maximum', e.target.value);
@@ -1280,42 +1098,34 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     '& .MuiOutlinedInput-root': { borderRadius: 1.5 },
                   }}
                 />
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <FormControlLabel
-                    control={
+                <div className={cn("flex flex-col")}>
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.maximumType === 'inclusive' || !data.maximumType}
                         onChange={() => onChange('maximumType', 'inclusive')}
                         disabled={!data.maximum}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≤ inclusive</Typography>}
-                    sx={{ m: 0 }}
+                    label={<span className="text-xs">≤ inclusive</span>}
                   />
-                  <FormControlLabel
-                    control={
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.maximumType === 'exclusive'}
                         onChange={() => onChange('maximumType', 'exclusive')}
                         disabled={!data.maximum}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&lt; exclusive</Typography>}
-                    sx={{ m: 0 }}
+                    label={<span className="text-xs">&lt; exclusive</span>}
                   />
-                </Box>
-              </Box>
-            </Box>
+                </div>
+              </div>
+            </div>
 
-            <TextField
-              label="Multiple Of"
+            <Input label="Multiple Of"
               type="number"
-              size={size}
-              fullWidth
+              size={size} className="w-full"
               value={data.multipleOf || ''}
               onChange={(e) => onChange('multipleOf', e.target.value)}
               helperText="Value must be divisible by this number"
@@ -1324,58 +1134,39 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 '& .MuiOutlinedInput-root': { borderRadius: 2 },
               }}
             />
-          </Box>
+          </div>
         )}
 
         {/* Array Constraints */}
         {isArray && (
-          <Box sx={{
-            p: 2.5,
-            bgcolor: isDark ? 'linear-gradient(135deg, #422006 0%, #713f12 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-            background: isDark ? 'linear-gradient(135deg, #422006 0%, #713f12 100%)' : 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-            borderRadius: 2.5,
-            border: '1px solid rgba(250, 204, 21, 0.4)',
-            mt: 2.5,
-            boxShadow: '0 2px 8px rgba(250, 204, 21, 0.1)',
-          }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#fcd34d' : '#854d0e', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box component="span" sx={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                bgcolor: '#eab308',
-              }} />
+          <div className={cn("flex flex-col")}>
+            <p className="text-sm">
+              <span />
               Array Constraints
-            </Typography>
+            </p>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2, mb: 2.5 }}>
-              <TextField
-                label="Min Items"
+            <div className={cn("flex flex-col")} sx_old={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2, mb: 2.5 }}>
+              <Input label="Min Items"
                 type="number"
-                size={size}
-                fullWidth
+                size={size} className="w-full"
                 value={data.minItems || ''}
                 onChange={(e) => onChange('minItems', e.target.value)}
-                inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#1e293b' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
-              <TextField
-                label="Max Items"
+              <Input label="Max Items"
                 type="number"
-                size={size}
-                fullWidth
+                size={size} className="w-full"
                 value={data.maxItems || ''}
                 onChange={(e) => onChange('maxItems', e.target.value)}
-                inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#1e293b' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
-              <Box sx={{
+              <div className={cn("flex flex-col")} sx_old={{
                 display: 'flex',
                 alignItems: 'center',
                 p: 1.5,
@@ -1393,35 +1184,25 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }}
               onClick={() => onChange('uniqueItems', !data.uniqueItems)}
               >
-                <FormControlLabel
-                  control={
+                <div className="flex items-center gap-2" control={
                     <Checkbox
                       checked={data.uniqueItems || false}
                       onChange={(e) => onChange('uniqueItems', e.target.checked)}
-                      size="small"
                       sx={{ '&.Mui-checked': { color: '#22c55e' } }}
                     />
                   }
-                  label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.uniqueItems ? '#16a34a' : (isDark ? '#94a3b8' : '#475569') }}>Unique Items</Typography>}
-                  sx={{ m: 0 }}
+                  label={<p className="text-sm">Unique Items</p>}
                 />
-              </Box>
-            </Box>
+              </div>
+            </div>
 
             {/* Contains Schema - collapsible advanced feature */}
-            <Box sx={{
-              p: 2,
-              bgcolor: isDark ? '#1e293b' : 'white',
-              borderRadius: 2,
-              border: isDark ? '2px dashed #475569' : '2px dashed #e2e8f0',
-            }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <CodeIcon sx={{ fontSize: 14 }} />
+            <div className={cn("flex flex-col")}>
+              <span className="text-xs">
+                <Code className="h-4 w-4" />
                 Contains Schema (OpenAPI 3.1)
-              </Typography>
-              <TextField
-                size={size}
-                fullWidth
+              </span>
+              <Input size={size} className="w-full"
                 multiline
                 rows={2}
                 value={data.contains || ''}
@@ -1440,42 +1221,29 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 }}
               />
 
-              <Collapse in={!!(data.contains && data.contains.trim())} timeout={300}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
-                  <TextField
-                    label="Min Contains"
+              <Collapsible open={!!(data.contains && data.contains.trim())}><CollapsibleContent timeout={300}>
+                <div className={cn("flex flex-col")}>
+                  <Input label="Min Contains"
                     type="number"
-                    size={size}
-                    fullWidth
+                    size={size} className="w-full"
                     value={data.minContains || ''}
                     onChange={(e) => onChange('minContains', e.target.value)}
-                    inputProps={{ min: 1 }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                   />
-                  <TextField
-                    label="Max Contains"
+                  <Input label="Max Contains"
                     type="number"
-                    size={size}
-                    fullWidth
+                    size={size} className="w-full"
                     value={data.maxContains || ''}
                     onChange={(e) => onChange('maxContains', e.target.value)}
-                    inputProps={{ min: 1 }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                   />
-                </Box>
-              </Collapse>
-            </Box>
+                </div>
+              </CollapsibleContent></Collapsible>
+            </div>
 
             {/* Tuple Mode - OpenAPI 3.1 prefixItems */}
-            <Box sx={{
-              mt: 2.5,
-              p: 2,
-              bgcolor: isDark ? '#1e293b' : 'white',
-              borderRadius: 2,
-              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-            }}>
-              <FormControlLabel
-                control={
+            <div className={cn("flex flex-col")}>
+              <div className="flex items-center gap-2" control={
                   <Checkbox
                     checked={data.tupleMode || false}
                     onChange={(e) => {
@@ -1486,37 +1254,34 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         onChange('prefixItems', []);
                       }
                     }}
-                    size="small"
                     sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                   />
                 }
                 label={
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
+                  <div>
+                    <p className="text-sm">
                       Tuple Mode (prefixItems)
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    </p>
+                    <span className="text-xs">
                       Define ordered schemas for specific array positions
-                    </Typography>
-                  </Box>
+                    </span>
+                  </div>
                 }
-                sx={{ m: 0 }}
               />
 
-              <Collapse in={data.tupleMode} timeout={300}>
-                <Box sx={{ mt: 2 }}>
+              <Collapsible open={data.tupleMode}><CollapsibleContent timeout={300}>
+                <div className={cn("flex flex-col")}>
                   <PrefixItemsEditor
                     value={data.prefixItems || []}
                     onChange={(items) => onChange('prefixItems', items)}
                   />
 
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <CodeIcon sx={{ fontSize: 14 }} />
+                  <div className={cn("flex flex-col")}>
+                    <span className="text-xs">
+                      <Code className="h-4 w-4" />
                       Items Schema (beyond prefix positions)
-                    </Typography>
-                    <TextField
-                      fullWidth
+                    </span>
+                    <Input className="w-full"
                       multiline
                       rows={3}
                       size={size}
@@ -1529,92 +1294,82 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         '& .MuiOutlinedInput-root': { borderRadius: 1.5 },
                       }}
                     />
-                  </Box>
-                </Box>
-              </Collapse>
-            </Box>
+                  </div>
+                </div>
+              </CollapsibleContent></Collapsible>
+            </div>
 
             {/* Unevaluated Items - OpenAPI 3.1/JSON Schema 2020-12 advanced feature */}
-            <Box sx={{
-              mt: 2.5,
-              p: 2,
-              bgcolor: isDark ? '#1e293b' : 'white',
-              borderRadius: 2,
-              border: isDark ? '2px dashed #475569' : '2px dashed #e2e8f0',
-            }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <TuneIcon sx={{ fontSize: 14 }} />
+            <div className={cn("flex flex-col")}>
+              <span className="text-xs">
+                <Sliders className="h-4 w-4" />
                 Unevaluated Items (OpenAPI 3.1)
-                <Tooltip title="Controls array items not matched by prefixItems, items, or contains. This is an advanced validation feature from JSON Schema 2020-12.">
-                  <InfoOutlinedIcon sx={{ fontSize: 14, ml: 0.5, color: isDark ? '#64748b' : '#94a3b8', cursor: 'help' }} />
-                </Tooltip>
-              </Typography>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="inline-flex">
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Controls array items not matched by prefixItems, items, or contains. This is an advanced validation feature from JSON Schema 2020-12.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </span>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <FormControlLabel
-                    control={
+              <div className={cn("flex flex-col")}>
+                <div className={cn("flex flex-col")}>
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={!data.unevaluatedItems || data.unevaluatedItems === 'default'}
                         onChange={() => {
                           onChange('unevaluatedItems', 'default');
                           onChange('unevaluatedItemsSchema', undefined);
                         }}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Default (not set)</Typography>}
-                    sx={{ m: 0 }}
+                    label={<p className="text-sm">Default (not set)</p>}
                   />
-                  <FormControlLabel
-                    control={
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.unevaluatedItems === 'allow'}
                         onChange={() => {
                           onChange('unevaluatedItems', 'allow');
                           onChange('unevaluatedItemsSchema', undefined);
                         }}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#22c55e' } }}
                       />
                     }
-                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Allow any</Typography>}
-                    sx={{ m: 0 }}
+                    label={<p className="text-sm">Allow any</p>}
                   />
-                  <FormControlLabel
-                    control={
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.unevaluatedItems === 'disallow'}
                         onChange={() => {
                           onChange('unevaluatedItems', 'disallow');
                           onChange('unevaluatedItemsSchema', undefined);
                         }}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#ef4444' } }}
                       />
                     }
-                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Disallow</Typography>}
-                    sx={{ m: 0 }}
+                    label={<p className="text-sm">Disallow</p>}
                   />
-                  <FormControlLabel
-                    control={
+                  <div className="flex items-center gap-2" control={
                       <Radio
                         checked={data.unevaluatedItems === 'schema'}
                         onChange={() => onChange('unevaluatedItems', 'schema')}
-                        size="small"
                         sx={{ '&.Mui-checked': { color: '#f59e0b' } }}
                       />
                     }
-                    label={<Typography variant="body2" sx={{ color: isDark ? '#cbd5e1' : '#475569' }}>Specify schema</Typography>}
-                    sx={{ m: 0 }}
+                    label={<p className="text-sm">Specify schema</p>}
                   />
-                </Box>
+                </div>
 
-                <Collapse in={data.unevaluatedItems === 'schema'} timeout={300}>
-                  <Box sx={{ mt: 1.5 }}>
-                    <TextField
-                      fullWidth
+                <Collapsible open={data.unevaluatedItems === 'schema'}><CollapsibleContent timeout={300}>
+                  <div className={cn("flex flex-col")}>
+                    <Input className="w-full"
                       multiline
                       rows={3}
                       size={size}
@@ -1627,172 +1382,102 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         '& .MuiOutlinedInput-root': { borderRadius: 1.5 },
                       }}
                     />
-                  </Box>
-                </Collapse>
-              </Box>
-            </Box>
-          </Box>
+                  </div>
+                </CollapsibleContent></Collapsible>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Object Constraints */}
         {baseType === 'object' && (
-          <Box sx={{
-            p: 2.5,
-            bgcolor: isDark ? 'linear-gradient(135deg, #14532d 0%, #166534 100%)' : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            background: isDark ? 'linear-gradient(135deg, #14532d 0%, #166534 100%)' : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            borderRadius: 2.5,
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            boxShadow: '0 2px 8px rgba(34, 197, 94, 0.1)',
-          }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 2, color: isDark ? '#86efac' : '#166534', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box component="span" sx={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                bgcolor: '#22c55e',
-              }} />
+          <div className={cn("flex flex-col")}>
+            <p className="text-sm">
+              <span />
               Object Constraints
-            </Typography>
+            </p>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-              <TextField
-                label="Min Properties"
+            <div className={cn("flex flex-col")} sx_old={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+              <Input label="Min Properties"
                 type="number"
-                size={size}
-                fullWidth
+                size={size} className="w-full"
                 value={data.minProperties || ''}
                 onChange={(e) => onChange('minProperties', e.target.value)}
-                inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#0f172a' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
-              <TextField
-                label="Max Properties"
+              <Input label="Max Properties"
                 type="number"
-                size={size}
-                fullWidth
+                size={size} className="w-full"
                 value={data.maxProperties || ''}
                 onChange={(e) => onChange('maxProperties', e.target.value)}
-                inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#0f172a' : 'white',
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
                 }}
               />
-            </Box>
+            </div>
 
-            <Box sx={{
-              p: 2,
-              bgcolor: isDark ? '#0f172a' : 'white',
-              borderRadius: 2,
-              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-            }}>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 1.5 }}>
+            <div className={cn("flex flex-col")}>
+              <span className="text-xs">
                 Additional Properties
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <FormControlLabel
-                  control={<Radio checked={data.additionalProperties === 'default'} onChange={() => onChange('additionalProperties', 'default')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Default (allows additional)</Typography>}
-                  sx={{ m: 0 }}
+              </span>
+              <div className={cn("flex flex-col")}>
+                <div className="flex items-center gap-2" control={<Radio checked={data.additionalProperties === 'default'} onChange={() => onChange('additionalProperties', 'default')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Default (allows additional)</p>}
                 />
-                <FormControlLabel
-                  control={<Radio checked={data.additionalProperties === 'true'} onChange={() => onChange('additionalProperties', 'true')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Allow additional properties</Typography>}
-                  sx={{ m: 0 }}
+                <div className="flex items-center gap-2" control={<Radio checked={data.additionalProperties === 'true'} onChange={() => onChange('additionalProperties', 'true')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Allow additional properties</p>}
                 />
-                <FormControlLabel
-                  control={<Radio checked={data.additionalProperties === 'false'} onChange={() => onChange('additionalProperties', 'false')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Strict (no extra properties)</Typography>}
-                  sx={{ m: 0 }}
+                <div className="flex items-center gap-2" control={<Radio checked={data.additionalProperties === 'false'} onChange={() => onChange('additionalProperties', 'false')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Strict (no extra properties)</p>}
                 />
-              </Box>
-            </Box>
+              </div>
+            </div>
 
             {/* Unevaluated Properties (OpenAPI 3.1 / JSON Schema 2020-12) */}
-            <Box sx={{
-              mt: 2.5,
-              p: 2.5,
-              bgcolor: isDark ? '#0f172a' : 'white',
-              borderRadius: 2.5,
-              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                mb: 2,
-                pb: 1.5,
-                borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
-              }}>
-                <Box sx={{
-                  p: 0.75,
-                  borderRadius: 1.5,
-                  bgcolor: 'rgba(99, 102, 241, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <SettingsIcon sx={{ color: '#6366f1', fontSize: 16 }} />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+            <div className={cn("flex flex-col")}>
+              <div className={cn("flex flex-col")}>
+                <div className={cn("flex flex-col")}>
+                  <Settings className="h-4 w-4" />
+                </div>
+                <div className={cn("flex flex-col")}>
+                  <p className="text-sm">
                     Unevaluated Properties
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                  </p>
+                  <span className="text-xs">
                     Advanced control for inheritance scenarios
-                  </Typography>
-                </Box>
-                <Typography variant="caption" sx={{
-                  px: 1,
-                  py: 0.25,
-                  bgcolor: 'rgba(99, 102, 241, 0.1)',
-                  color: '#4f46e5',
-                  borderRadius: 1,
-                  fontWeight: 600,
-                  fontSize: '0.65rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}>
+                  </span>
+                </div>
+                <span className="text-xs">
                   OpenAPI 3.1
-                </Typography>
-              </Box>
+                </span>
+              </div>
 
-              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+              <span className="text-xs">
                 Controls properties not matched by <code style={{ background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>properties</code>, <code style={{ background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>patternProperties</code>, or inherited schemas via <code style={{ background: isDark ? '#1e293b' : '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>allOf</code>.
-              </Typography>
+              </span>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: data.unevaluatedProperties === 'schema' ? 2 : 0 }}>
-                <FormControlLabel
-                  control={<Radio checked={!data.unevaluatedProperties || data.unevaluatedProperties === 'default'} onChange={() => onChange('unevaluatedProperties', 'default')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Not specified (default)</Typography>}
-                  sx={{ m: 0 }}
+              <div className={cn("flex flex-col")}>
+                <div className="flex items-center gap-2" control={<Radio checked={!data.unevaluatedProperties || data.unevaluatedProperties === 'default'} onChange={() => onChange('unevaluatedProperties', 'default')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Not specified (default)</p>}
                 />
-                <FormControlLabel
-                  control={<Radio checked={data.unevaluatedProperties === 'allow'} onChange={() => onChange('unevaluatedProperties', 'allow')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Allow unevaluated properties</Typography>}
-                  sx={{ m: 0 }}
+                <div className="flex items-center gap-2" control={<Radio checked={data.unevaluatedProperties === 'allow'} onChange={() => onChange('unevaluatedProperties', 'allow')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Allow unevaluated properties</p>}
                 />
-                <FormControlLabel
-                  control={<Radio checked={data.unevaluatedProperties === 'disallow'} onChange={() => onChange('unevaluatedProperties', 'disallow')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Disallow unevaluated properties</Typography>}
-                  sx={{ m: 0 }}
+                <div className="flex items-center gap-2" control={<Radio checked={data.unevaluatedProperties === 'disallow'} onChange={() => onChange('unevaluatedProperties', 'disallow')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Disallow unevaluated properties</p>}
                 />
-                <FormControlLabel
-                  control={<Radio checked={data.unevaluatedProperties === 'schema'} onChange={() => onChange('unevaluatedProperties', 'schema')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Must match schema</Typography>}
-                  sx={{ m: 0 }}
+                <div className="flex items-center gap-2" control={<Radio checked={data.unevaluatedProperties === 'schema'} onChange={() => onChange('unevaluatedProperties', 'schema')} sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<p className="text-sm">Must match schema</p>}
                 />
-              </Box>
+              </div>
 
               {data.unevaluatedProperties === 'schema' && (
-                <TextField
-                  label="Schema for Unevaluated Properties"
-                  size={size}
-                  fullWidth
+                <Input label="Schema for Unevaluated Properties"
+                  size={size} className="w-full"
                   multiline
                   rows={3}
                   value={data.unevaluatedPropertiesSchema ?? ''}
@@ -1808,83 +1493,43 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               )}
 
               {data.unevaluatedProperties && data.unevaluatedProperties !== 'default' && (
-                <Box sx={{
-                  mt: 2,
-                  p: 1.5,
-                  bgcolor: 'rgba(99, 102, 241, 0.06)',
-                  borderRadius: 1.5,
-                  border: '1px solid rgba(99, 102, 241, 0.2)',
-                }}>
-                  <Typography variant="caption" sx={{ color: '#4f46e5', display: 'block' }}>
+                <div className={cn("flex flex-col")}>
+                  <span className="text-xs">
                     <strong>Tip:</strong> Use <code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>unevaluatedProperties</code> when using schema composition (<code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>allOf</code>) to control properties from all composed schemas. Unlike <code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>additionalProperties</code>, it considers properties from inherited schemas.
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
               )}
-            </Box>
+            </div>
 
             {/* Property Name Constraints */}
-            <Box sx={{
-              mt: 2.5,
-              p: 2.5,
-              bgcolor: isDark ? '#0f172a' : 'white',
-              borderRadius: 2.5,
-              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                mb: 2,
-                pb: 1.5,
-                borderBottom: '1px solid rgba(139, 92, 246, 0.15)',
-              }}>
-                <Box sx={{
-                  p: 0.75,
-                  borderRadius: 1.5,
-                  bgcolor: 'rgba(139, 92, 246, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <SortByAlphaIcon sx={{ color: '#8b5cf6', fontSize: 16 }} />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+            <div className={cn("flex flex-col")}>
+              <div className={cn("flex flex-col")}>
+                <div className={cn("flex flex-col")}>
+                  <SortAsc className="h-4 w-4" />
+                </div>
+                <div className={cn("flex flex-col")}>
+                  <p className="text-sm">
                     Property Name Constraints
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                  </p>
+                  <span className="text-xs">
                     Validate the names of properties, not their values
-                  </Typography>
-                </Box>
-                <Typography variant="caption" sx={{
-                  px: 1,
-                  py: 0.25,
-                  bgcolor: 'rgba(139, 92, 246, 0.1)',
-                  color: '#7c3aed',
-                  borderRadius: 1,
-                  fontWeight: 600,
-                  fontSize: '0.65rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                }}>
+                  </span>
+                </div>
+                <span className="text-xs">
                   OpenAPI 3.1
-                </Typography>
-              </Box>
+                </span>
+              </div>
 
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 2 }}>
+              <span className="text-xs">
                 Define constraints for property names (keys) in this object. Useful for objects with dynamic keys like dictionaries or maps.
-              </Typography>
+              </span>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-                <TextField
-                  label="Min Length"
+              <div className={cn("flex flex-col")}>
+                <Input label="Min Length"
                   type="number"
-                  size={size}
-                  fullWidth
+                  size={size} className="w-full"
                   value={data.propertyNamesMinLength ?? ''}
                   onChange={(e) => onChange('propertyNamesMinLength', e.target.value)}
-                  inputProps={{ min: 0 }}
                   placeholder="e.g., 1"
                   helperText="Minimum name length"
                   sx={{
@@ -1893,14 +1538,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
                   }}
                 />
-                <TextField
-                  label="Max Length"
+                <Input label="Max Length"
                   type="number"
-                  size={size}
-                  fullWidth
+                  size={size} className="w-full"
                   value={data.propertyNamesMaxLength ?? ''}
                   onChange={(e) => onChange('propertyNamesMaxLength', e.target.value)}
-                  inputProps={{ min: 0 }}
                   placeholder="e.g., 50"
                   helperText="Maximum name length"
                   sx={{
@@ -1909,28 +1551,14 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
                   }}
                 />
-              </Box>
+              </div>
 
-              <TextField
-                label="Pattern (Regex)"
-                size={size}
-                fullWidth
+              <Input label="Pattern (Regex)"
+                size={size} className="w-full"
                 value={data.propertyNamesPattern ?? ''}
                 onChange={(e) => onChange('propertyNamesPattern', e.target.value)}
                 placeholder="e.g., ^[a-z][a-zA-Z0-9]*$"
                 helperText="Regular expression that all property names must match"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Typography sx={{ fontFamily: 'monospace', color: '#94a3b8', fontSize: '0.875rem' }}>/</Typography>
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Typography sx={{ fontFamily: 'monospace', color: '#94a3b8', fontSize: '0.875rem' }}>/</Typography>
-                    </InputAdornment>
-                  ),
-                }}
                 sx={{
                   '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace' },
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
@@ -1939,87 +1567,50 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               />
 
               {(data.propertyNamesPattern ?? data.propertyNamesMinLength ?? data.propertyNamesMaxLength) && (
-                <Box sx={{
-                  mt: 2,
-                  p: 2,
-                  bgcolor: 'rgba(139, 92, 246, 0.06)',
-                  borderRadius: 2,
-                  border: '1px solid rgba(139, 92, 246, 0.2)',
-                }}>
-                  <Typography variant="caption" sx={{ color: '#6d28d9', display: 'block', fontWeight: 600, mb: 1 }}>
+                <div className={cn("flex flex-col")}>
+                  <span className="text-xs">
                     Property Name Rules:
-                  </Typography>
-                  <Box component="ul" sx={{ m: 0, pl: 2, '& li': { fontSize: '0.75rem', color: '#7c3aed', mb: 0.5 } }}>
+                  </span>
+                  <ul className="m-0 pl-4 space-y-1">
                     {data.propertyNamesMinLength && (
-                      <li>Names must be at least <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMinLength}</code> characters</li>
+                      <li className="text-xs text-purple-700">Names must be at least <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMinLength}</code> characters</li>
                     )}
                     {data.propertyNamesMaxLength && (
-                      <li>Names must be at most <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMaxLength}</code> characters</li>
+                      <li className="text-xs text-purple-700">Names must be at most <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMaxLength}</code> characters</li>
                     )}
                     {data.propertyNamesPattern && (
-                      <li>Names must match: <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>/{data.propertyNamesPattern}/</code></li>
+                      <li className="text-xs text-purple-700">Names must match: <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>/{data.propertyNamesPattern}/</code></li>
                     )}
-                  </Box>
-                </Box>
+                  </ul>
+                </div>
               )}
-            </Box>
+            </div>
 
             {/* Nested Properties Display */}
             {nestedProperties && nestedProperties.length > 0 && (
-              <Box sx={{
-                mt: 2.5,
-                p: 2.5,
-                bgcolor: isDark ? '#0f172a' : 'white',
-                borderRadius: 2.5,
-                border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              }}>
-                <Box sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  mb: 2,
-                  pb: 1.5,
-                  borderBottom: '1px solid rgba(34, 197, 94, 0.15)',
-                }}>
-                  <Box sx={{
-                    p: 0.75,
-                    borderRadius: 1.5,
-                    bgcolor: 'rgba(34, 197, 94, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <CodeIcon sx={{ color: '#22c55e', fontSize: 16 }} />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+              <div className={cn("flex flex-col")}>
+                <div className={cn("flex flex-col")}>
+                  <div className={cn("flex flex-col")}>
+                    <Code className="h-4 w-4" />
+                  </div>
+                  <div className={cn("flex flex-col")}>
+                    <p className="text-sm">
                       Nested Properties
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    </p>
+                    <span className="text-xs">
                       {nestedProperties.length} propert{nestedProperties.length === 1 ? 'y' : 'ies'} defined within this object
-                    </Typography>
-                  </Box>
-                  <Typography variant="caption" sx={{
-                    px: 1,
-                    py: 0.25,
-                    bgcolor: 'rgba(34, 197, 94, 0.1)',
-                    color: '#16a34a',
-                    borderRadius: 1,
-                    fontWeight: 600,
-                    fontSize: '0.65rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}>
+                    </span>
+                  </div>
+                  <span className="text-xs">
                     Read-Only
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
 
-                <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+                <span className="text-xs">
                   These are the nested properties contained within this object. To edit them, close this dialog and expand the object property in the class node.
-                </Typography>
+                </span>
 
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <div className={cn("flex flex-col")}>
                   {nestedProperties.map((prop) => {
                     const propData = typeof prop.data === 'string' ? JSON.parse(prop.data) : (prop.data || {});
 
@@ -2052,150 +1643,85 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     }
 
                     return (
-                      <Box
+                      <div
                         key={prop.id}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          p: 1.5,
-                          bgcolor: isDark ? '#1e293b' : '#f8fafc',
-                          borderRadius: 1.5,
-                          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                          opacity: isDeprecated ? 0.6 : 1,
-                        }}
                       >
                         {/* Property Name */}
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                            fontWeight: 600,
-                            color: isDark ? '#e2e8f0' : '#1e293b',
-                            textDecoration: isDeprecated ? 'line-through' : 'none',
-                            minWidth: 120,
-                          }}
+                        <p className="text-sm"
                         >
                           {prop.name}
-                        </Typography>
+                        </p>
 
                         {/* Type Chip */}
-                        <Box
-                          sx={{
-                            px: 1,
-                            py: 0.25,
-                            bgcolor: hasRef
-                              ? 'rgba(139, 92, 246, 0.1)'
-                              : propType === 'array'
-                                ? 'rgba(59, 130, 246, 0.1)'
-                                : 'rgba(100, 116, 139, 0.1)',
-                            color: hasRef
-                              ? '#8b5cf6'
-                              : propType === 'array'
-                                ? '#3b82f6'
-                                : isDark ? '#94a3b8' : '#64748b',
-                            borderRadius: 1,
-                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                            fontSize: '0.7rem',
-                            fontWeight: 500,
-                          }}
+                        <div className={cn("flex flex-col")}
                         >
                           {typeDisplay}
-                        </Box>
+                        </div>
 
                         {/* Required Badge */}
                         {isRequired && (
-                          <Box
-                            sx={{
-                              px: 0.75,
-                              py: 0.25,
-                              bgcolor: 'rgba(239, 68, 68, 0.1)',
-                              color: '#ef4444',
-                              borderRadius: 1,
-                              fontSize: '0.6rem',
-                              fontWeight: 600,
-                              textTransform: 'uppercase',
-                            }}
+                          <div className={cn("flex flex-col")}
                           >
                             Required
-                          </Box>
+                          </div>
                         )}
 
                         {/* Deprecated Badge */}
                         {isDeprecated && (
-                          <Box
-                            sx={{
-                              px: 0.75,
-                              py: 0.25,
-                              bgcolor: 'rgba(245, 158, 11, 0.1)',
-                              color: '#f59e0b',
-                              borderRadius: 1,
-                              fontSize: '0.6rem',
-                              fontWeight: 600,
-                              textTransform: 'uppercase',
-                            }}
+                          <div className={cn("flex flex-col")}
                           >
                             Deprecated
-                          </Box>
+                          </div>
                         )}
 
                         {/* Description (if available) */}
                         {prop.description && (
-                          <Tooltip title={prop.description} placement="top">
-                            <InfoOutlinedIcon sx={{ fontSize: 14, color: isDark ? '#64748b' : '#94a3b8', ml: 'auto', cursor: 'help' }} />
-                          </Tooltip>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button type="button" className="inline-flex">
+                                  <Info className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{prop.description}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
-                      </Box>
+                      </div>
                     );
                   })}
-                </Box>
-              </Box>
+                </div>
+              </div>
             )}
-          </Box>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 4: Values (Const & Enum)
           ═══════════════════════════════════════════════════════════════════════════ */}
       {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'boolean') && (
-        <Box sx={{
-          p: 3,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        }}>
+        <div className={cn("flex flex-col")}>
           <SectionHeader
-            icon={<CodeIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
+            icon={<Code className="h-4 w-4" />}
             title="Allowed Values"
             subtitle="Restrict to specific values"
           />
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+          <div className={cn("flex flex-col")} sx_old={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
             {/* Constant Value */}
-            <Box sx={{
-              p: 2.5,
-              bgcolor: isDark ? '#0f172a' : 'white',
-              borderRadius: 2.5,
-              border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box component="span" sx={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  bgcolor: '#3b82f6',
-                }} />
+            <div className={cn("flex flex-col")}>
+              <p className="text-sm">
+                <span />
                 Constant Value
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 2 }}>
+              </p>
+              <span className="text-xs">
                 Use when property must have exactly one specific value
-              </Typography>
-              <TextField
-                label="Const"
-                size={size}
-                fullWidth
+              </span>
+              <Input label="Const"
+                size={size} className="w-full"
                 type={baseType === 'string' || baseType === 'boolean' ? 'text' : 'number'}
                 value={data.const || ''}
                 onChange={(e) => {
@@ -2216,88 +1742,75 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 }}
               />
               {data.const && (
-                <Box sx={{
-                  mt: 2,
-                  p: 2,
-                  bgcolor: 'rgba(59, 130, 246, 0.06)',
-                  borderRadius: 2,
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
-                }}>
-                  <Typography variant="caption" sx={{ color: '#1e40af', display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box component="span" sx={{ color: '#22c55e' }}>✓</Box>
+                <div className={cn("flex flex-col")}>
+                  <span className="text-xs">
+                    <span>✓</span>
                     Only accepts: <code style={{ fontWeight: 600, background: 'rgba(59, 130, 246, 0.1)', padding: '2px 6px', borderRadius: 4 }}>{data.const}</code>
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
               )}
-            </Box>
+            </div>
 
             {/* Enum Values */}
             {baseType !== 'boolean' && (
-              <Box sx={{
-                p: 2.5,
-                bgcolor: isDark ? '#0f172a' : 'white',
-                borderRadius: 2.5,
-                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155', display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box component="span" sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        bgcolor: '#a855f7',
-                      }} />
+              <div className={cn("flex flex-col")}>
+                <div className={cn("flex flex-col")}>
+                  <div>
+                    <p className="text-sm">
+                      <span />
                       Enum Values
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                    </p>
+                    <span className="text-xs">
                       List of allowed values
-                    </Typography>
-                  </Box>
+                    </span>
+                  </div>
                   {data.enum && data.enum.length > 1 && (
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="Sort A-Z" arrow>
-                        <IconButton
-                          onClick={handleSortEnumAZ}
-                          size="small"
-                          disabled={!!data.const}
-                          sx={{
-                            transition: 'all 0.2s',
-                            '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
-                          }}
-                        >
-                          <SortByAlphaIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Sort Z-A" arrow>
-                        <IconButton
-                          onClick={handleSortEnumZA}
-                          size="small"
-                          disabled={!!data.const}
-                          sx={{
-                            transform: 'scaleY(-1)',
-                            transition: 'all 0.2s',
-                            '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
-                          }}
-                        >
-                          <SortByAlphaIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
+                    <div className="flex gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={handleSortEnumAZ}
+                              disabled={!!data.const}
+                              className="p-2 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <SortAsc className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Sort A-Z</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={handleSortEnumZA}
+                              disabled={!!data.const}
+                              className="p-2 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <SortAsc className="h-4 w-4 rotate-180" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Sort Z-A</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   )}
-                </Box>
+                </div>
 
                 {data.const && (
-                  <Typography variant="caption" sx={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-                    <Box component="span">⚠️</Box> Disabled when const is set
-                  </Typography>
+                  <span className="text-xs">
+                    <span>⚠️</span> Disabled when const is set
+                  </span>
                 )}
 
-                <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
-                  <TextField
-                    size={size}
-                    fullWidth
+                <div className={cn("flex flex-col")}>
+                  <Input size={size} className="w-full"
                     type={baseType === 'string' ? 'text' : 'number'}
                     value={enumInput}
                     onChange={(e) => { setEnumInput(e.target.value); setEnumError(''); }}
@@ -2308,8 +1821,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     disabled={!!data.const}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                   />
-                  <IconButton
-                    onClick={handleAddEnum}
+                  <button onClick={handleAddEnum}
                     color="primary"
                     disabled={!enumInput.trim() || !!data.const}
                     sx={{
@@ -2319,68 +1831,48 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.2)', transform: 'scale(1.05)' },
                     }}
                   >
-                    <AddIcon />
-                  </IconButton>
-                </Box>
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
 
                 {data.enum && data.enum.length > 0 && (
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleEnumDragEnd}>
-                    <List dense sx={{
-                      bgcolor: isDark ? '#1e293b' : '#f8fafc',
-                      borderRadius: 2,
-                      maxHeight: 150,
-                      overflow: 'auto',
-                      border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-                    }}>
+                    <div dense>
                       <SortableContext items={data.enum} strategy={verticalListSortingStrategy}>
                         {data.enum.map((value) => (
                           <SortableEnumItem key={value} id={value} value={value} onDelete={handleRemoveEnum} />
                         ))}
                       </SortableContext>
-                    </List>
+                    </div>
                   </DndContext>
                 )}
-              </Box>
+              </div>
             )}
-          </Box>
-        </Box>
+          </div>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 5: Advanced (NOT Composition, External Docs, Extensions)
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{ p: 3, bgcolor: isDark ? '#1e293b' : 'white' }}>
+      <div className={cn("flex flex-col")}>
         <SectionHeader
-          icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
+          icon={<Settings className="h-4 w-4" />}
           title="Advanced"
           subtitle="Extended schema options"
         />
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
+        <div className={cn("flex flex-col")} sx_old={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
           {/* NOT Composition */}
-          <Box sx={{
-            p: 2.5,
-            bgcolor: isDark ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-            background: isDark ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-            borderRadius: 2.5,
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.08)',
-          }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: isDark ? '#fecaca' : '#991b1b', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box component="span" sx={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                bgcolor: '#ef4444',
-              }} />
+          <div className={cn("flex flex-col")}>
+            <p className="text-sm">
+              <span />
               NOT Schema
-            </Typography>
-            <Typography variant="caption" sx={{ color: isDark ? '#fca5a5' : '#7f1d1d', display: 'block', mb: 2 }}>
+            </p>
+            <span className="text-xs">
               Data must NOT match this schema (exclusion rule)
-            </Typography>
-            <TextField
-              size={size}
-              fullWidth
+            </span>
+            <Input size={size} className="w-full"
               multiline
               rows={3}
               value={data.not || ''}
@@ -2393,111 +1885,61 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }}
             />
             {data.not && data.not.trim() && (
-              <Box sx={{
-                mt: 2,
-                p: 2,
-                bgcolor: isDark ? '#1e293b' : 'white',
-                borderRadius: 2,
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-              }}>
-                <Typography variant="caption" sx={{ color: isDark ? '#fca5a5' : '#991b1b', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box component="span" sx={{ color: '#ef4444' }}>✗</Box>
+              <div className={cn("flex flex-col")}>
+                <span className="text-xs">
+                  <span>✗</span>
                   Values matching this schema will be rejected
-                </Typography>
-              </Box>
+                </span>
+              </div>
             )}
-          </Box>
+          </div>
 
           {/* External Documentation */}
-          <Box sx={{
-            p: 2.5,
-            bgcolor: isDark ? '#0f172a' : 'white',
-            borderRadius: 2.5,
-            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <Box sx={{
-                p: 0.75,
-                borderRadius: 1.5,
-                bgcolor: 'rgba(99, 102, 241, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <OpenInNewIcon sx={{ color: '#6366f1', fontSize: 16 }} />
-              </Box>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
+          {/* External Documentation */}
+          <div className="p-5 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-xl bg-indigo-600/10">
+                <ExternalLink className="h-4 w-4 text-indigo-600" />
+              </div>
+              <p className="text-sm font-semibold">
                 External Documentation
-              </Typography>
-            </Box>
+              </p>
+            </div>
 
-            <TextField
-              label="URL"
-              size={size}
-              fullWidth
-              type="url"
-              value={data.externalDocsUrl || ''}
-              onChange={(e) => onChange('externalDocsUrl', e.target.value)}
-              placeholder="https://docs.example.com/..."
-              sx={{
-                mb: 2,
-                '& .MuiOutlinedInput-root': { borderRadius: 2 },
-              }}
-              InputProps={{
-                endAdornment: data.externalDocsUrl?.trim() && (
-                  <InputAdornment position="end">
-                    <Tooltip title="Open in new tab" arrow>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          const url = data.externalDocsUrl?.trim();
-                          if (url) window.open(url, '_blank', 'noopener,noreferrer');
-                        }}
-                        sx={{
-                          transition: 'all 0.2s',
-                          '&:hover': { color: '#6366f1' },
-                        }}
-                      >
-                        <OpenInNewIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </InputAdornment>
-                ),
-              }}
-            />
+            <div className="space-y-4">
+              <FormField label="URL">
+                <Input
+                  type="url"
+                  value={data.externalDocsUrl || ''}
+                  onChange={(e) => onChange('externalDocsUrl', e.target.value)}
+                  placeholder="https://docs.example.com/..."
+                  className="w-full"
+                />
+              </FormField>
 
-            <TextField
-              label="Description"
-              size={size}
-              fullWidth
-              multiline
-              rows={2}
-              value={data.externalDocsDescription || ''}
-              onChange={(e) => onChange('externalDocsDescription', e.target.value)}
-              placeholder="Brief description..."
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-            />
-          </Box>
-        </Box>
+              <FormField label="Description">
+                <Textarea
+                  rows={2}
+                  value={data.externalDocsDescription || ''}
+                  onChange={(e) => onChange('externalDocsDescription', e.target.value)}
+                  placeholder="Brief description..."
+                  className="w-full"
+                />
+              </FormField>
+            </div>
+          </div>
+        </div>
 
         {/* Extensions */}
-        <Box sx={{
-          mt: 3,
-          p: 2.5,
-          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderRadius: 2.5,
-          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        }}>
+        <div className="mt-6">
           <ExtensionsEditor
             value={data.extensions || {}}
             onChange={(extensions) => onChange('extensions', extensions)}
             size={size}
           />
-        </Box>
-      </Box>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 };
 
