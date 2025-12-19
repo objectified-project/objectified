@@ -76,12 +76,12 @@ interface PropertyDialogProps {
 }
 
 export const PropertyDialog: React.FC<PropertyDialogProps> = ({
-  open,
-  onClose,
-  mode,
-  property,
-  onSubmit,
-}) => {
+                                                                open,
+                                                                onClose,
+                                                                mode,
+                                                                property,
+                                                                onSubmit,
+                                                              }) => {
   const { mode: colorMode, systemMode } = useColorScheme();
   const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
 
@@ -216,7 +216,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         // unevaluatedItems (OpenAPI 3.1/JSON Schema 2020-12)
         unevaluatedItems: (property as any).unevaluatedItems === true ? 'allow' :
           (property as any).unevaluatedItems === false ? 'disallow' :
-          (typeof (property as any).unevaluatedItems === 'object' ? 'schema' : 'default'),
+            (typeof (property as any).unevaluatedItems === 'object' ? 'schema' : 'default'),
         unevaluatedItemsSchema: typeof (property as any).unevaluatedItems === 'object' ?
           JSON.stringify((property as any).unevaluatedItems, null, 2) : '',
         // Enum and default come from items for array types
@@ -621,77 +621,77 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             ...originalItems, // Preserve ALL original item fields
             type: propertyType
           };
-        if (formData.format) itemsSchema.format = formData.format;
-        else delete itemsSchema.format;
-        if (formData.pattern) itemsSchema.pattern = formData.pattern;
-        else delete itemsSchema.pattern;
-        if (formData.minLength) itemsSchema.minLength = parseInt(formData.minLength);
-        else delete itemsSchema.minLength;
-        if (formData.maxLength) itemsSchema.maxLength = parseInt(formData.maxLength);
-        else delete itemsSchema.maxLength;
+          if (formData.format) itemsSchema.format = formData.format;
+          else delete itemsSchema.format;
+          if (formData.pattern) itemsSchema.pattern = formData.pattern;
+          else delete itemsSchema.pattern;
+          if (formData.minLength) itemsSchema.minLength = parseInt(formData.minLength);
+          else delete itemsSchema.minLength;
+          if (formData.maxLength) itemsSchema.maxLength = parseInt(formData.maxLength);
+          else delete itemsSchema.maxLength;
 
-        // Handle minimum/maximum with exclusive support
-        if (formData.minimum && formData.minimum.trim()) {
-          const minValue = parseFloat(formData.minimum);
-          if (!isNaN(minValue)) {
-            if (formData.minimumType === 'exclusive') {
-              itemsSchema.exclusiveMinimum = minValue;
-              delete itemsSchema.minimum;
-            } else {
-              itemsSchema.minimum = minValue;
-              delete itemsSchema.exclusiveMinimum;
+          // Handle minimum/maximum with exclusive support
+          if (formData.minimum && formData.minimum.trim()) {
+            const minValue = parseFloat(formData.minimum);
+            if (!isNaN(minValue)) {
+              if (formData.minimumType === 'exclusive') {
+                itemsSchema.exclusiveMinimum = minValue;
+                delete itemsSchema.minimum;
+              } else {
+                itemsSchema.minimum = minValue;
+                delete itemsSchema.exclusiveMinimum;
+              }
             }
-          }
-        } else {
-          delete itemsSchema.minimum;
-          delete itemsSchema.exclusiveMinimum;
-        }
-
-        if (formData.maximum && formData.maximum.trim()) {
-          const maxValue = parseFloat(formData.maximum);
-          if (!isNaN(maxValue)) {
-            if (formData.maximumType === 'exclusive') {
-              itemsSchema.exclusiveMaximum = maxValue;
-              delete itemsSchema.maximum;
-            } else {
-              itemsSchema.maximum = maxValue;
-              delete itemsSchema.exclusiveMaximum;
-            }
-          }
-        } else {
-          delete itemsSchema.maximum;
-          delete itemsSchema.exclusiveMaximum;
-        }
-
-        if (formData.multipleOf && formData.multipleOf.trim()) {
-          const multipleOfValue = parseFloat(formData.multipleOf);
-          if (!isNaN(multipleOfValue) && multipleOfValue > 0) {
-            itemsSchema.multipleOf = multipleOfValue;
-          }
-        } else {
-          delete itemsSchema.multipleOf;
-        }
-
-        // Handle const (mutually exclusive with enum)
-        if (formData.const && formData.const.trim()) {
-          try {
-            itemsSchema.const = JSON.parse(formData.const);
-          } catch (e) {
-            // If not valid JSON, use as string
-            itemsSchema.const = formData.const;
-          }
-          delete itemsSchema.enum;
-        } else {
-          delete itemsSchema.const;
-          if (formData.enum && formData.enum.length > 0) {
-            itemsSchema.enum = formData.enum;
           } else {
-            delete itemsSchema.enum;
+            delete itemsSchema.minimum;
+            delete itemsSchema.exclusiveMinimum;
           }
-        }
 
-        if (formData.default) itemsSchema.default = formData.default;
-        else delete itemsSchema.default;
+          if (formData.maximum && formData.maximum.trim()) {
+            const maxValue = parseFloat(formData.maximum);
+            if (!isNaN(maxValue)) {
+              if (formData.maximumType === 'exclusive') {
+                itemsSchema.exclusiveMaximum = maxValue;
+                delete itemsSchema.maximum;
+              } else {
+                itemsSchema.maximum = maxValue;
+                delete itemsSchema.exclusiveMaximum;
+              }
+            }
+          } else {
+            delete itemsSchema.maximum;
+            delete itemsSchema.exclusiveMaximum;
+          }
+
+          if (formData.multipleOf && formData.multipleOf.trim()) {
+            const multipleOfValue = parseFloat(formData.multipleOf);
+            if (!isNaN(multipleOfValue) && multipleOfValue > 0) {
+              itemsSchema.multipleOf = multipleOfValue;
+            }
+          } else {
+            delete itemsSchema.multipleOf;
+          }
+
+          // Handle const (mutually exclusive with enum)
+          if (formData.const && formData.const.trim()) {
+            try {
+              itemsSchema.const = JSON.parse(formData.const);
+            } catch (e) {
+              // If not valid JSON, use as string
+              itemsSchema.const = formData.const;
+            }
+            delete itemsSchema.enum;
+          } else {
+            delete itemsSchema.const;
+            if (formData.enum && formData.enum.length > 0) {
+              itemsSchema.enum = formData.enum;
+            } else {
+              delete itemsSchema.enum;
+            }
+          }
+
+          if (formData.default) itemsSchema.default = formData.default;
+          else delete itemsSchema.default;
 
           // Handle additionalProperties for array items that are objects
           if (propertyType === 'object') {
@@ -1094,4 +1094,3 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
 };
 
 export default PropertyDialog;
-
