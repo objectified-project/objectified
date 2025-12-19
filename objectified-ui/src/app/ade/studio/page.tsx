@@ -1890,7 +1890,7 @@ const StudioContent = () => {
                   <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[1002]">
                     <div className="py-1">
                       <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Export as Image
+                        Export Canvas
                       </div>
                       <button
                         onClick={() => {
