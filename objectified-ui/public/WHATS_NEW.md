@@ -75,6 +75,10 @@ We continue to improve the platform based on your feedback with improvements and
 - Additional Canvas Updates:
   - Added the ability to tag classes
   - Class nodes now display tag names alongside the class name for better visual organization
+  - Added an export button in the upper right-hand corner of the canvas header
+    - Export canvas as PNG image
+    - Export canvas as JPEG image
+    - Export canvas as SVG image
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

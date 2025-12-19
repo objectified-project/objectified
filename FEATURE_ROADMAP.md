@@ -302,6 +302,11 @@
 - Save custom groups as reusable templates
 - Share group templates across projects/tenants
 
+**Export Canvas** 📋 PLANNED
+- 📋 Export as PNG
+- 📋 Export as SVG
+- 📋 Export as PDF
+
 | Ticket | Feature Description                                                                                     |
 |--------|---------------------------------------------------------------------------------------------------------|
 | [#152] | Create visual containers to group related classes together                                              |
@@ -314,6 +319,10 @@
 | [#159] | Pre-defined group templates for common patterns                                                         |
 | [#160] | Save and share custom group templates                                                                   |
 | [#161] | Share group templates across projects/tenants                                                           |
+| [#190] | Create an export button to the canvas header                                                            |
+| [#191] | Export as PNG                                                                                           |
+| [#192] | Export as SVG                                                                                           |
+| [#193] | Export as PDF                                                                                           |
 
 ### Canvas Layout Management
 
@@ -4272,7 +4281,7 @@ These have been implemented:
 - ✅ Canvas zoom to fit button
 - ✅ Node alignment tools (align left, right, center)
 - ✅ Grid snapping toggle
-- ✅ Export canvas as PNG with current view
+- ✅ Export Mermaid canvas as PNG with current view
 - ✅ Search box for classes on canvas
 - ✅ "Last modified" timestamp display
 - ✅ Duplicate class button
