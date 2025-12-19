@@ -3,10 +3,10 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-import { useColorScheme } from '@mui/material/styles';
 import { useStudio } from './StudioContext';
 import { Copy, Download, Check, Eye, Code } from 'lucide-react';
-import Switch from '@mui/material/Switch';
+import * as Switch from '@radix-ui/react-switch';
+import * as Select from '@radix-ui/react-select';
 import YAML from 'yaml';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
@@ -75,8 +75,29 @@ type ViewMode = 'canvas' | 'code' | 'mermaid';
 
 const StudioContent = () => {
   const { data: session } = useSession();
-  const { mode: colorMode, systemMode } = useColorScheme();
-  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+
+  // Custom dark mode detection
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const checkDarkMode = () => {
+      const isDarkMode = document.documentElement.classList.contains('dark') ||
+                         window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setIsDark(isDarkMode);
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', checkDarkMode);
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', checkDarkMode);
+    };
+  }, []);
+
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const {
     setSelectedProjectId: setContextProjectId,
@@ -2121,19 +2142,13 @@ const StudioContent = () => {
                       Auto Layout
                     </span>
                   </div>
-                  <Switch
+                  <Switch.Root
                     checked={autoLayoutEnabled}
-                    onChange={(e) => setAutoLayoutEnabled(e.target.checked)}
-                    size="small"
-                    sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': {
-                        color: '#6366f1',
-                      },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                        backgroundColor: '#6366f1',
-                      },
-                    }}
-                  />
+                    onCheckedChange={setAutoLayoutEnabled}
+                    className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors cursor-pointer"
+                  >
+                    <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
+                  </Switch.Root>
                 </div>
 
                 {/* Algorithm Selector */}
@@ -2172,7 +2187,7 @@ const StudioContent = () => {
         ) : viewMode === 'code' ? (
           // Monaco Editor Code View - OpenAPI 3.1.0 Specification
           <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/80 dark:border-gray-700/80 px-6 py-4">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                   <div className="flex items-center gap-3">
@@ -2197,21 +2212,52 @@ const StudioContent = () => {
 
                   {/* Display Format Selector */}
                   <div className="flex items-center gap-3 pl-5 border-l border-gray-200 dark:border-gray-700">
-                    <select
-                      value={codeDisplayFormat}
-                      onChange={(e) => setCodeDisplayFormat(e.target.value as 'openapi' | 'arazzo' | 'jsonschema')}
-                      className="px-3 py-2 text-sm font-medium border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                    >
-                      <option value="openapi">OpenAPI Specification</option>
-                      <option value="arazzo">Arazzo Specification</option>
-                      <option value="jsonschema">JSON Schema</option>
-                    </select>
+                    <Select.Root value={codeDisplayFormat} onValueChange={(value) => setCodeDisplayFormat(value as 'openapi' | 'arazzo' | 'jsonschema')}>
+                      <Select.Trigger className="inline-flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-w-[200px]">
+                        <Select.Value />
+                        <Select.Icon>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </Select.Icon>
+                      </Select.Trigger>
+                      <Select.Portal>
+                        <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]">
+                          <Select.Viewport className="p-1">
+                            <Select.Item value="openapi" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30">
+                              <Select.ItemText>OpenAPI Specification</Select.ItemText>
+                              <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                                <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </Select.ItemIndicator>
+                            </Select.Item>
+                            <Select.Item value="arazzo" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30">
+                              <Select.ItemText>Arazzo Specification</Select.ItemText>
+                              <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                                <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </Select.ItemIndicator>
+                            </Select.Item>
+                            <Select.Item value="jsonschema" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30">
+                              <Select.ItemText>JSON Schema</Select.ItemText>
+                              <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                                <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </Select.ItemIndicator>
+                            </Select.Item>
+                          </Select.Viewport>
+                        </Select.Content>
+                      </Select.Portal>
+                    </Select.Root>
 
                     {/* Format Toggle (JSON/YAML) */}
                     <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
                       <button
                         onClick={() => setCodeFormat('json')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
+                        className={`px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 ${
                           codeFormat === 'json'
                             ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -2221,7 +2267,7 @@ const StudioContent = () => {
                       </button>
                       <button
                         onClick={() => setCodeFormat('yaml')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
+                        className={`px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 ${
                           codeFormat === 'yaml'
                             ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
