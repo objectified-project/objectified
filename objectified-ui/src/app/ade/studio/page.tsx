@@ -7,6 +7,8 @@ import { useStudio } from './StudioContext';
 import { Copy, Download, Check, Eye, Code } from 'lucide-react';
 import * as Switch from '@radix-ui/react-switch';
 import * as Select from '@radix-ui/react-select';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import YAML from 'yaml';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
@@ -1728,25 +1730,26 @@ const StudioContent = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <style jsx>{`
-        @keyframes slide {
-          0% {
-            transform: translateX(-100%);
+    <Tooltip.Provider>
+      <div className="flex flex-col h-full">
+        <style jsx>{`
+          @keyframes slide {
+            0% {
+              transform: translateX(-100%);
+            }
+            100% {
+              transform: translateX(400%);
+            }
           }
-          100% {
-            transform: translateX(400%);
+          @keyframes shimmer {
+            0% {
+              background-position: 200% 0;
+            }
+            100% {
+              background-position: -200% 0;
+            }
           }
-        }
-        @keyframes shimmer {
-          0% {
-            background-position: 200% 0;
-          }
-          100% {
-            background-position: -200% 0;
-          }
-        }
-      `}</style>
+        `}</style>
 
       {/* Header with Project and Version Selectors - spans full width including over sidebar */}
       <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
@@ -2254,104 +2257,128 @@ const StudioContent = () => {
                     </Select.Root>
 
                     {/* Format Toggle (JSON/YAML) */}
-                    <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
-                      <button
-                        onClick={() => setCodeFormat('json')}
-                        className={`px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 ${
-                          codeFormat === 'json'
-                            ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                        }`}
+                    <ToggleGroup.Root
+                      type="single"
+                      value={codeFormat}
+                      onValueChange={(value) => {
+                        if (value) setCodeFormat(value as 'json' | 'yaml');
+                      }}
+                      className="inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1"
+                    >
+                      <ToggleGroup.Item
+                        value="json"
+                        className="px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                       >
                         JSON
-                      </button>
-                      <button
-                        onClick={() => setCodeFormat('yaml')}
-                        className={`px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 ${
-                          codeFormat === 'yaml'
-                            ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                        }`}
+                      </ToggleGroup.Item>
+                      <ToggleGroup.Item
+                        value="yaml"
+                        className="px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                       >
                         YAML
-                      </button>
-                    </div>
+                      </ToggleGroup.Item>
+                    </ToggleGroup.Root>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   <>
-                    <button
-                      onClick={() => {
-                        const specContent = codeDisplayFormat === 'openapi'
-                          ? openApiSpec
-                          : codeDisplayFormat === 'arazzo'
-                          ? arazzoSpec
-                          : jsonSchemaSpec;
-                        const content = codeFormat === 'json'
-                          ? specContent
-                          : YAML.stringify(JSON.parse(specContent));
-                        navigator.clipboard.writeText(content);
-                        setCodeCopied(true);
-                        setTimeout(() => setCodeCopied(false), 2000);
-                      }}
-                      disabled={codeCopied}
-                      className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                        codeCopied
-                          ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      }`}
-                      title="Copy to clipboard"
-                    >
-                      {codeCopied ? <Check size={16} /> : <Copy size={16} />}
-                      {codeCopied ? 'Copied!' : 'Copy'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Get content in selected format
-                        const specContent = codeDisplayFormat === 'openapi'
-                          ? openApiSpec
-                          : codeDisplayFormat === 'arazzo'
-                          ? arazzoSpec
-                          : jsonSchemaSpec;
-                        const content = codeFormat === 'json'
-                          ? specContent
-                          : YAML.stringify(JSON.parse(specContent));
-                        const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
-                        const extension = codeFormat === 'json' ? 'json' : 'yaml';
+                    <Tooltip.Root>
+                      <Tooltip.Trigger asChild>
+                        <button
+                          onClick={() => {
+                            const specContent = codeDisplayFormat === 'openapi'
+                              ? openApiSpec
+                              : codeDisplayFormat === 'arazzo'
+                              ? arazzoSpec
+                              : jsonSchemaSpec;
+                            const content = codeFormat === 'json'
+                              ? specContent
+                              : YAML.stringify(JSON.parse(specContent));
+                            navigator.clipboard.writeText(content);
+                            setCodeCopied(true);
+                            setTimeout(() => setCodeCopied(false), 2000);
+                          }}
+                          disabled={codeCopied}
+                          className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            codeCopied
+                              ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {codeCopied ? <Check size={16} /> : <Copy size={16} />}
+                          {codeCopied ? 'Copied!' : 'Copy'}
+                        </button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content
+                          className="bg-gray-900 dark:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg z-[10000]"
+                          sideOffset={5}
+                        >
+                          {codeCopied ? 'Copied to clipboard!' : 'Copy to clipboard'}
+                          <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
 
-                        // Create a blob from the spec
-                        const blob = new Blob([content], { type: mimeType });
-                        const url = URL.createObjectURL(blob);
+                    <Tooltip.Root>
+                      <Tooltip.Trigger asChild>
+                        <button
+                          onClick={() => {
+                            // Get content in selected format
+                            const specContent = codeDisplayFormat === 'openapi'
+                              ? openApiSpec
+                              : codeDisplayFormat === 'arazzo'
+                              ? arazzoSpec
+                              : jsonSchemaSpec;
+                            const content = codeFormat === 'json'
+                              ? specContent
+                              : YAML.stringify(JSON.parse(specContent));
+                            const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
+                            const extension = codeFormat === 'json' ? 'json' : 'yaml';
 
-                        // Create a temporary download link
-                        const link = document.createElement('a');
-                        link.href = url;
+                            // Create a blob from the spec
+                            const blob = new Blob([content], { type: mimeType });
+                            const url = URL.createObjectURL(blob);
 
-                        // Generate filename from project and version
-                        const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
-                        const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-                        const specType = codeDisplayFormat === 'openapi'
-                          ? 'openapi'
-                          : codeDisplayFormat === 'arazzo'
-                          ? 'arazzo'
-                          : 'jsonschema';
-                        link.download = `${projectSlug}-${versionSlug}-${specType}.${extension}`;
+                            // Create a temporary download link
+                            const link = document.createElement('a');
+                            link.href = url;
 
-                        // Trigger download
-                        document.body.appendChild(link);
-                        link.click();
+                            // Generate filename from project and version
+                            const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
+                            const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+                            const specType = codeDisplayFormat === 'openapi'
+                              ? 'openapi'
+                              : codeDisplayFormat === 'arazzo'
+                              ? 'arazzo'
+                              : 'jsonschema';
+                            link.download = `${projectSlug}-${versionSlug}-${specType}.${extension}`;
 
-                        // Cleanup
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                      }}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
-                      title={`Download as ${codeFormat.toUpperCase()} file`}
-                    >
-                      <Download size={16} />
-                      Export
-                    </button>
+                            // Trigger download
+                            document.body.appendChild(link);
+                            link.click();
+
+                            // Cleanup
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
+                        >
+                          <Download size={16} />
+                          Export
+                        </button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Content
+                          className="bg-gray-900 dark:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg z-[10000]"
+                          sideOffset={5}
+                        >
+                          Download as {codeFormat.toUpperCase()} file
+                          <Tooltip.Arrow className="fill-gray-900 dark:fill-gray-700" />
+                        </Tooltip.Content>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
                   </>
                 </div>
               </div>
@@ -2645,7 +2672,8 @@ const StudioContent = () => {
           }
         }}
       />
-    </div>
+      </div>
+    </Tooltip.Provider>
   );
 };
 
