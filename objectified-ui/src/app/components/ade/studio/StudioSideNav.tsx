@@ -151,11 +151,21 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   );
 
   // Filter properties based on search query
-  const filteredProperties = properties.filter(prop =>
-    prop.name.toLowerCase().includes(propertiesSearchQuery.toLowerCase()) ||
-    (prop.type?.toLowerCase().includes(propertiesSearchQuery.toLowerCase()) ?? false) ||
-    (prop.description?.toLowerCase().includes(propertiesSearchQuery.toLowerCase()) ?? false)
-  );
+  const filteredProperties = properties.filter(prop => {
+    const searchLower = propertiesSearchQuery.toLowerCase();
+    const nameMatch = prop.name.toLowerCase().includes(searchLower);
+
+    // Handle type which could be string, array, or undefined
+    let typeMatch = false;
+    if (prop.type) {
+      const typeStr = typeof prop.type === 'string' ? prop.type : JSON.stringify(prop.type);
+      typeMatch = typeStr.toLowerCase().includes(searchLower);
+    }
+
+    const descMatch = prop.description?.toLowerCase().includes(searchLower) ?? false;
+
+    return nameMatch || typeMatch || descMatch;
+  });
 
   const handleClassSelect = (classItem: ClassItem) => {
     setSelectedClassId(classItem.id);
@@ -176,8 +186,8 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
         '& .MuiDrawer-paper': {
           width: 280,
           boxSizing: 'border-box',
-          top: 48, // Offset for top header
-          height: 'calc(100vh - 48px)',
+          top: 102, // TopHeader (48px) + Studio Header (~48px with py-2)
+          height: 'calc(100vh - 102px)',
           borderRight: 'none',
           background: isDark
             ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'

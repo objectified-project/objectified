@@ -231,15 +231,18 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   }, [classes]);
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 48px)" }}>
-      {currentTenantId && selectedProjectId && selectedVersionId && (
-        <StudioSideNav classes={classes} properties={properties} callbacks={callbacks} refreshKey={refreshKey}
-                       selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly} />
-      )}
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)" }}>
+      {/* Sidebar and main content area */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {currentTenantId && selectedProjectId && selectedVersionId && (
+          <StudioSideNav classes={classes} properties={properties} callbacks={callbacks} refreshKey={refreshKey}
+                         selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly} />
+        )}
 
-      <main style={{ flex: 1, overflow: "auto", position: "relative", zIndex: 100 }}>
-        {children}
-      </main>
+        <main style={{ flex: 1, overflow: "hidden", position: "relative", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          {children}
+        </main>
+      </div>
 
       {/* Class Dialog */}
       <ClassEditDialog

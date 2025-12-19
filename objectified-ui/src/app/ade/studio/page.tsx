@@ -1730,9 +1730,9 @@ const StudioContent = () => {
         }
       `}</style>
 
-      {/* Header with Project and Version Selectors */}
-      <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-5 py-3 shadow-sm" style={{ position: 'relative', zIndex: 1000 }}>
-        <div className="flex items-center gap-4">
+      {/* Header with Project and Version Selectors - spans full width including over sidebar */}
+      <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
+        <div className="flex flex-wrap items-center gap-4 w-full">
           {/* Project Selector */}
           <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
             <div className="flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md">
@@ -1757,9 +1757,6 @@ const StudioContent = () => {
               </select>
             </div>
           </div>
-
-          {/* Separator */}
-          <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
 
           {/* Version Selector */}
           <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
@@ -1854,9 +1851,12 @@ const StudioContent = () => {
             </>
           )}
 
+          {/* Spacer to push tenant name to the right */}
+          <div className="flex-grow"></div>
+
           {/* Context Display - Tenant Name */}
           {currentTenantName && (
-            <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/50">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800/50">
               <div className="w-2 h-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-pulse" />
               <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{currentTenantName}</span>
             </div>
@@ -1864,8 +1864,8 @@ const StudioContent = () => {
         </div>
       </div>
 
-      {/* Canvas/Code Area */}
-      <div className="flex-1 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 overflow-hidden relative">
+      {/* Canvas/Code Area - with top padding for fixed header */}
+      <div className="flex-1 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 overflow-hidden relative" style={{ paddingTop: '48px' }}>
         {!selectedProjectId || !selectedVersionId ? (
           // Empty state when no project/version selected
           <div className="h-full flex items-center justify-center">
