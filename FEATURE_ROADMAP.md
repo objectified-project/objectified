@@ -743,14 +743,9 @@
 - Bookmark thumbnails
 - Organize bookmarks in folders
 
-**Canvas Improvements** 📋 PLANNED
-- 📋 Layout should include export button in the view
-- 📋 Move layout adjustment button into the view as well
-
-| Ticket | Feature Description                                |
-|--------|----------------------------------------------------|
-| [#204] | Improve canvas navigation panel                    |
-| [#205] | Move layout button into navigation panel of canvas |
+**Canvas Improvements** ✅ COMPLETED
+- ✅ Layout should include export button in the view
+- ✅ Move layout adjustment button into the view as well
 
 **Canvas Layers**
 - Separate visual layers for different content:
