@@ -3,6 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
+import { toPng } from 'html-to-image';
 import { useStudio } from './StudioContext';
 import { Copy, Download, Check, Eye, Code } from 'lucide-react';
 import * as Switch from '@radix-ui/react-switch';
@@ -694,6 +695,76 @@ const StudioContent = () => {
 
   // Keep ref updated
   handleClassDeleteRef.current = handleClassDelete;
+
+  // Handle PNG export
+  const handleExportPng = useCallback(async () => {
+    try {
+      // Get the ReactFlow viewport element
+      const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
+
+      if (!viewportElement) {
+        await alertDialog({
+          message: 'Canvas not found. Please try again.',
+          variant: 'error',
+        });
+        return;
+      }
+
+      // Get project and version info for filename
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
+      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.png`;
+
+      // Show loading state
+      setLoadingMessage('Exporting canvas as PNG...');
+      setIsLoadingCanvas(true);
+
+      // Use html-to-image to convert the canvas to PNG
+      const dataUrl = await toPng(viewportElement, {
+        backgroundColor: isDark ? '#111827' : '#ffffff',
+        quality: 1.0,
+        pixelRatio: 2, // Higher quality export (2x resolution)
+        filter: (node) => {
+          // Exclude controls, minimap, and other UI elements
+          if (node.classList) {
+            return !node.classList.contains('react-flow__controls') &&
+                   !node.classList.contains('react-flow__minimap') &&
+                   !node.classList.contains('react-flow__attribution') &&
+                   !node.classList.contains('react-flow__panel');
+          }
+          return true;
+        },
+      });
+
+      // Create a download link and trigger download
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+
+      // Hide loading state
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+
+      // Close the export dropdown
+      setExportDropdownOpen(false);
+
+      // Show success message briefly
+      await alertDialog({
+        message: `Canvas exported as ${filename}`,
+        variant: 'success',
+      });
+    } catch (error) {
+      console.error('Error exporting PNG:', error);
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+
+      await alertDialog({
+        message: 'Failed to export canvas as PNG. Please try again.',
+        variant: 'error',
+      });
+    }
+  }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
 
   // Define custom node types
   const nodeTypes = {
@@ -2334,11 +2405,7 @@ const StudioContent = () => {
                         Export Canvas
                       </div>
                       <button
-                        onClick={() => {
-                          // PNG export functionality will be added here
-                          console.log('Export as PNG');
-                          setExportDropdownOpen(false);
-                        }}
+                        onClick={handleExportPng}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

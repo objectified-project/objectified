@@ -46,6 +46,7 @@
     "dagre": "^0.8.5",
     "diff": "^8.0.2",
     "handlebars": "^4.7.8",
+    "html-to-image": "^1.11.13",
     "json-schema-faker": "^0.5.9",
     "lucide-react": "^0.548.0",
     "mermaid": "^11.12.2",

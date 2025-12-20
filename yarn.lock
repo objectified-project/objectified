@@ -5390,6 +5390,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"html-to-image@npm:^1.11.13":
+  version: 1.11.13
+  resolution: "html-to-image@npm:1.11.13"
+  checksum: 10c0/03bd7192d87b99499e37ff12a8e2b41ddce4cf8e33a93dfadff18df0f213434c7f1ba8328db2158f4805da07b7aec3c90aec3152908281153217e86784218b10
+  languageName: node
+  linkType: hard
+
 "html-url-attributes@npm:^3.0.0":
   version: 3.0.1
   resolution: "html-url-attributes@npm:3.0.1"
@@ -7376,6 +7383,7 @@ __metadata:
     eslint: "npm:^9"
     eslint-config-next: "npm:16.0.0"
     handlebars: "npm:^4.7.8"
+    html-to-image: "npm:^1.11.13"
     json-schema-faker: "npm:^0.5.9"
     lucide-react: "npm:^0.548.0"
     mermaid: "npm:^11.12.2"

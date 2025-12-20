@@ -14,6 +14,7 @@
 | Schema Validation Score    | 2 weeks | 🔴 Critical | Real-time quality scoring & insights   |
 | Template Marketplace       | 3 weeks | 🔴 Critical | Community schema & property templates  |
 | Schema Showcase            | 1 week  | 🟠 High     | Monthly showcase of top-rated schemas  |
+| CRUD Stubs & Swagger Testing | 2 weeks | 🟠 High   | Auto-generate CRUD ops with testing    |
 | Undo/Redo                  | 2 weeks | 🔴 Critical | Canvas action history                  |
 | Node Grouping              | 3 weeks | 🔴 Critical | Visual containers for classes          |
 | Rate Limiting              | 1 week  | 🔴 Critical | API throttling                         |
@@ -156,7 +157,337 @@
 
 ---
 
+## 🎨 UI/UX Look & Feel - Consolidated for Next Iteration
+
+> **Purpose**: All visual design, user experience, and interface improvements consolidated in one place for focused development.
+> 
+> **Priority**: 🔴 High - Critical for user adoption and satisfaction
+> **Timeline**: Q1 2026 - Next coding iteration
+> **Status**: Mix of ✅ Implemented, 🚧 Partial, 📋 Planned
+
+---
+
+### 1. Canvas Visual Enhancements
+
+#### Layout & Organization ✅ PARTIALLY COMPLETE
+- ✅ **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
+- ✅ **Layout Controls**: Compact button with dropdown menu
+- 📋 **Save & Load Layouts**: Named layouts ("Development", "Presentation", "Logical", "Dependency")
+- 📋 **Layout Snapshots**: Quick snapshots with thumbnails, compare side-by-side
+- 📋 **Auto-save layouts**: Every 30 seconds (configurable)
+- 📋 **Layout sharing**: Share with team, pin as default, version control
+- 📋 **Export/Import layouts**: JSON format for portability
+
+#### Navigation & Controls ✅ PARTIALLY COMPLETE
+- ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
+- ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)
+- ✅ **Pan & Drag**: Middle-click or space+drag, smooth panning
+- 📋 **Global Search** (Cmd+F): Find classes with highlighting
+- 📋 **Search Focus Mode**: Dim everything except search results
+- 📋 **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
+- 📋 **Canvas Layers**: Background, Node, Edge, Annotation, UI layers with toggle/lock
+- 📋 **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
+- 📋 **Focus Mode**: Isolate selected classes and relationships, blur non-focused
+
+#### Visual Customization 📋 PLANNED
+**Node Styling:**
+- 📋 Custom colors (per-class, by group, by stereotype, gradients)
+- 📋 Node icons (1000+ built-in, custom upload, Font Awesome, Material Icons)
+- 📋 Node sizing (auto-size, fixed, compact mode, size by property count)
+- 📋 Node shapes (rectangle, rounded, circle, hexagon, diamond, custom SVG)
+- 📋 Node borders (thickness, style, shadow effects)
+- 📋 Node labels (font size/family, bold/italic, positioning, multi-line)
+
+**Edge Styling:**
+- 📋 Line styles (solid, dashed, dotted, double for bidirectional)
+- 📋 Edge colors and thickness (1-5px)
+- 📋 Edge routing (straight, curved Bezier, orthogonal, smart routing)
+- 📋 Arrow styles (standard, diamond, circle, open, custom)
+- 📋 Animated edges (flowing dots for data flow)
+- 📋 Edge hover effects (highlight and tooltip)
+
+**Grid & Alignment:**
+- 📋 Grid snapping (adjustable size: 10px, 20px, 50px)
+- 📋 Grid style (dots, lines, crosses)
+- 📋 Alignment tools (left/right/top/bottom edges, centers, distribute)
+- 📋 Smart guides on drag
+- 📋 Horizontal/vertical rulers
+- 📋 Equal spacing tools
+
+**Canvas Background:**
+- 📋 Background options (solid color, grid pattern, custom image, gradient, textures)
+- 📋 Background opacity and blur
+- 📋 Infinite canvas scrolling
+
+---
+
+### 2. Theme System ✅ PARTIALLY COMPLETE
+
+#### Current Implementation ✅
+- ✅ **Dark Mode**: Full support (admin and studio)
+- ✅ **Auto-switch**: Based on system preference
+- ✅ **Canvas dark mode**: Separate from UI dark mode
+- ✅ **Radix UI**: Modern accessible components
+
+#### Planned Enhancements 📋
+- 📋 **Pre-built Canvas Themes**:
+  - Light mode (default) ✅
+  - Dark mode ✅
+  - High contrast
+  - Blueprint (blue grid on dark)
+  - Whiteboard (minimal)
+  - Solarized
+  - Nord
+  - Darcula
+- 📋 **Custom Theme Creator**:
+  - Canvas background color
+  - Grid color and opacity
+  - Node default colors
+  - Edge default colors
+  - Text/selection/hover colors
+- 📋 **Theme Management**:
+  - Save and share custom themes
+  - Import themes from files
+  - Theme marketplace
+  - Custom theme scheduling (dark at night)
+
+---
+
+### 3. Modern UX Features
+
+#### Command & Control 🔴 HIGH PRIORITY
+- 📋 **Command Palette** (Cmd+K): Quick actions, search everything
+- 📋 **Global Search** (Cmd+F): Search schemas, paths, properties with highlighting
+- 📋 **Inline Editing**: Double-click to edit in place
+- 📋 **Smart Autocomplete**: Context-aware suggestions
+- 📋 **Real-Time Validation**: Validate as you type with error indicators
+
+#### Keyboard Shortcuts 📋 PLANNED
+- 📋 **Comprehensive Shortcuts**:
+  - `Cmd/Ctrl + N` - New class
+  - `Cmd/Ctrl + D` - Duplicate selected
+  - `Cmd/Ctrl + F` - Search canvas
+  - `Cmd/Ctrl + /` or `Cmd/Ctrl + K` - Command palette
+  - `Cmd/Ctrl + S` - Save
+  - `Cmd/Ctrl + Z` - Undo
+  - `Cmd/Ctrl + Y` - Redo
+  - `Cmd/Ctrl + A` - Select all
+  - `Delete/Backspace` - Delete selected
+  - `Arrow keys` - Move selected nodes
+  - `Shift + Arrow` - Expand selection
+- 📋 **Customizable shortcuts**: User-defined key bindings
+- 📋 **Shortcut reference**: Help panel (press `?`)
+
+#### Workspace & Layout 📋 PLANNED
+- 📋 **Split Views**: Side-by-side schema comparison
+- 📋 **Multi-Panel Layout**: Draggable panels, custom arrangements
+- 📋 **Customizable toolbar**: Rearrange buttons and panels
+- 📋 **Save workspace layouts**: Per-user or per-team
+- 📋 **Breadcrumb Navigation**: Easy navigation through schema hierarchy
+
+---
+
+### 4. Drag & Drop Interactions
+
+#### File Import 📋 PLANNED
+- 📋 **Drag & Drop Import**: Drop OpenAPI/JSON files to import
+- 📋 **Visual feedback**: Dropzone highlighting
+- 📋 **Format detection**: Auto-detect file type
+- 📋 **Error handling**: Clear error messages on invalid files
+
+#### Canvas Interactions ✅ PARTIALLY COMPLETE
+- ✅ **Node dragging**: Smooth drag with snap-to-grid option
+- 📋 **Multi-select drag**: Drag multiple nodes together
+- 📋 **Connection dragging**: Drag to create relationships
+- 📋 **Property dragging**: Drag properties between classes
+- 📋 **Group dragging**: Drag to add nodes to groups
+
+---
+
+### 5. Responsive & Accessibility
+
+#### Responsive Design 📋 PLANNED
+- 📋 **Tablet optimized**: iPad Pro, Surface support
+- 📋 **Mobile view**: Read-only, optimized for viewing
+- 📋 **Adaptive layouts**: Based on screen size
+- 📋 **Touch-friendly controls**: Larger hit areas
+- 📋 **Gesture support**: Pinch to zoom, swipe navigation
+
+#### Accessibility (a11y) 📋 PLANNED
+- 📋 **Keyboard navigation**: Full app control without mouse
+- 📋 **Screen reader support**: ARIA labels, semantic HTML
+- 📋 **Focus indicators**: Clear visual focus states
+- 📋 **High contrast mode**: For visual impairments
+- 📋 **Text scaling**: Support browser text size settings
+- 📋 **Color blind friendly**: Patterns in addition to colors
+- 📋 **Skip navigation**: Jump to main content
+- 📋 **Reduced motion**: Respect prefers-reduced-motion
+
+---
+
+### 6. Animations & Feedback
+
+#### Visual Feedback ✅ PARTIALLY COMPLETE
+- ✅ **Loading states**: Progress bars, skeleton loaders
+- ✅ **Toast notifications**: Success, error, warning, info
+- ✅ **Smooth animations**: 60fps canvas animations
+- 📋 **Micro-interactions**: Button hover, click feedback
+- 📋 **Transition effects**: Smooth page/modal transitions
+- 📋 **Skeleton screens**: Content placeholders during load
+
+#### Progress Indicators ✅ PARTIALLY COMPLETE
+- ✅ **Canvas loading**: Animated progress bar
+- ✅ **Operation progress**: Real-time status updates
+- 📋 **Upload progress**: File upload with percentage
+- 📋 **Export progress**: Large export operations
+- 📋 **Background tasks**: Persistent progress notifications
+
+---
+
+### 7. Interactive Elements
+
+#### Tooltips & Help 📋 PLANNED
+- 📋 **Rich tooltips**: Contextual help with examples
+- 📋 **Keyboard shortcut hints**: Show shortcuts in tooltips
+- 📋 **Interactive tutorials**: First-run product tour
+- 📋 **Contextual help**: Help button in each section
+- 📋 **Video tutorials**: Embedded walkthrough videos
+- 📋 **What's New**: Highlights for new features
+
+#### Modals & Dialogs ✅ PARTIALLY COMPLETE
+- ✅ **Radix UI modals**: Accessible, keyboard-friendly
+- 📋 **Modal animations**: Smooth open/close
+- 📋 **Modal sizes**: Small, medium, large, fullscreen
+- 📋 **Stackable modals**: Multiple modals if needed
+- 📋 **Confirmation dialogs**: Clear yes/no choices
+- 📋 **Smart defaults**: Pre-selected common choices
+
+---
+
+### 8. Data Visualization
+
+#### Canvas Elements ✅ PARTIALLY COMPLETE
+- ✅ **Level of Detail (LOD)**: Dynamic detail based on zoom
+- ✅ **Edge cardinality**: Visual relationship indicators (1:1, 1:N, N:N)
+- ✅ **Class tags**: Color-coded tag badges on nodes
+- ✅ **Mermaid diagrams**: Export with preview/code toggle
+- 📋 **Property counts**: Badge showing property count
+- 📋 **Relationship counts**: Badge showing connection count
+- 📋 **Deprecation indicators**: Visual warning for deprecated items
+
+#### Charts & Metrics 📋 PLANNED
+- 📋 **Quality score gauge**: Visual score indicator (0-100)
+- 📋 **Complexity charts**: Schema complexity visualization
+- 📋 **Relationship graphs**: Visual dependency maps
+- 📋 **Timeline views**: Schema evolution over time
+- 📋 **Comparison views**: Before/after schema changes
+
+---
+
+### 9. Sidebar & Panels
+
+#### Current Sidebars ✅ IMPLEMENTED
+- ✅ **Classes sidebar**: List of all classes with search
+- ✅ **Properties panel**: Edit class properties
+- 📋 **Annotations drawer**: Right-side notes (Lucidchart style)
+- 📋 **History panel**: Undo/redo history with preview
+- 📋 **Layers panel**: Toggle visibility of canvas layers
+- 📋 **Bookmarks panel**: Quick navigation to saved views
+
+#### Panel Behaviors 📋 PLANNED
+- 📋 **Resizable panels**: Drag to resize
+- 📋 **Collapsible panels**: Minimize to edge
+- 📋 **Pinned panels**: Keep panel always visible
+- 📋 **Floating panels**: Detach to separate window
+- 📋 **Panel tabs**: Stack multiple panels with tabs
+- 📋 **Panel positions**: Left, right, top, bottom
+
+---
+
+### 10. Export & Sharing
+
+#### Current Export ✅ PARTIALLY COMPLETE
+- ✅ **Export button**: Icon-only button in canvas area (upper right)
+- 📋 **Export dropdown**: PNG, JPEG, SVG options
+- 📋 **Export settings**: Resolution, quality, transparent background
+- 📋 **PDF export**: Multi-page with table of contents
+- 📋 **Mermaid export** ✅: Already implemented
+
+#### Sharing Features 📋 PLANNED
+- 📋 **Share link**: Generate shareable view-only link
+- 📋 **Embed code**: Embed canvas in external sites
+- 📋 **Social sharing**: Share to Twitter, LinkedIn with preview
+- 📋 **QR code**: Generate QR for quick mobile access
+
+---
+
+### 🎯 Priority Order for Next Iteration
+
+#### Week 1-2: Core UX Improvements
+1. ✅ **Layout dropdown** - COMPLETED (button with menu)
+2. ✅ **Export button** - COMPLETED (moved to canvas)
+3. 📋 **Command Palette** (Cmd+K) - HIGH PRIORITY
+4. 📋 **Global Search** (Cmd+F) - HIGH PRIORITY
+5. 📋 **Keyboard shortcuts** - HIGH PRIORITY
+6. 📋 **Inline editing** - HIGH PRIORITY
+
+#### Week 3-4: Visual Polish
+7. 📋 **Canvas themes** (Light, Dark, Blueprint, High Contrast)
+8. 📋 **Node customization** (colors, icons, shapes)
+9. 📋 **Edge styling** (routing, arrows, animations)
+10. 📋 **Grid & alignment tools**
+
+#### Week 5-6: Advanced Features
+11. 📋 **Save/Load layouts**
+12. 📋 **Canvas bookmarks**
+13. 📋 **Focus mode**
+14. 📋 **Split views**
+15. 📋 **Annotations drawer** (right-side notes)
+
+#### Week 7-8: Polish & Accessibility
+16. 📋 **Tooltips & help**
+17. 📋 **Accessibility improvements**
+18. 📋 **Responsive design**
+19. 📋 **Interactive tutorials**
+20. 📋 **Micro-interactions**
+
+---
+
+### 📊 Implementation Tickets Summary
+
+| Category | Completed | Planned | Total |
+|----------|-----------|---------|-------|
+| Layout & Navigation | 12 | 20 | 32 |
+| Visual Customization | 0 | 25 | 25 |
+| Theme System | 4 | 10 | 14 |
+| UX Features | 2 | 15 | 17 |
+| Keyboard & Commands | 0 | 10 | 10 |
+| Responsive & a11y | 0 | 12 | 12 |
+| Animations | 6 | 8 | 14 |
+| Panels & Sidebars | 2 | 10 | 12 |
+| Export & Sharing | 2 | 8 | 10 |
+| **TOTAL** | **28** | **118** | **146** |
+
+**Current Progress**: 19% Complete (28 of 146 items)
+
+---
+
+### 💡 Key Design Principles
+
+1. **Consistency**: Follow Radix UI design system throughout
+2. **Accessibility**: WCAG 2.1 AA compliance minimum
+3. **Performance**: 60fps animations, responsive interactions
+4. **Feedback**: Clear visual feedback for all actions
+5. **Forgiveness**: Easy undo/redo, confirmation dialogs
+6. **Discoverability**: Tooltips, help, keyboard hints
+7. **Efficiency**: Keyboard shortcuts for power users
+8. **Beauty**: Polished, professional appearance
+
+---
+
 ## Implementation Status Legend
+
+...existing code...
 
 | Status  | Meaning                             |
 |---------|-------------------------------------|
@@ -168,6 +499,7 @@
 ---
 
 ## Table of Contents
+- [🎨 UI/UX Look & Feel - Consolidated for Next Iteration](#-uiux-look--feel---consolidated-for-next-iteration) 🔥 **NEXT ITERATION**
 - [Schema Validation & Quality Scoring](#schema-validation--quality-scoring-new) ⭐ NEW
 - [Template Marketplace](#template-marketplace-new) ⭐ NEW
 - [Schema Showcase](#schema-showcase-new) ⭐ NEW
@@ -850,6 +1182,8 @@
 | [#191] | Export as PNG                                                                                           |
 | [#192] | Export as SVG                                                                                           |
 | [#193] | Export as PDF                                                                                           |
+| [#284] | Dragging and dropping a node to a group will add it                                                     |
+| [#285] | Ungrouping nodes from a group by deleting it                                                            |
 
 ### Canvas Layout Management
 
@@ -1369,7 +1703,7 @@
 
 **Canvas Export Options**
 - **Export Formats**: 
-  - 📋 PNG (raster image)
+  - ✅ PNG (raster image)
   - 📋 JPG (photo quality)
   - 📋 SVG (vector, scalable)
   - 📋 PDF (document format)
@@ -1677,6 +2011,291 @@
   - Response serialization
   - Error handling patterns
   - OpenAPI validation middleware
+- **Stubbing CRUD operations**:
+  - Auto-generate CRUD stubs from schemas
+  - RESTful endpoint patterns
+  - Request/response type safety
+  - Mock data generation
+
+### CRUD Operation Stubs (NEW)
+
+**Automatic CRUD Generation** 📋 PLANNED
+- **One-Click CRUD Creation**:
+  - Select schema/class and generate full CRUD operations
+  - Generate all 5 operations: Create, Read, Update, Delete, List
+  - RESTful URL patterns following best practices
+  - Proper HTTP methods and status codes
+  - Request/response schemas automatically configured
+
+- **CRUD Operation Templates**:
+  - **Create (POST /resources)**:
+    - Request body: Full schema
+    - Response: 201 Created with created resource
+    - Validation: Required fields, constraints
+    - Error responses: 400 (validation), 409 (conflict)
+  
+  - **Read/Get Single (GET /resources/{id})**:
+    - Path parameter: Resource ID
+    - Response: 200 OK with resource
+    - Error responses: 404 (not found), 403 (forbidden)
+  
+  - **List/Get All (GET /resources)**:
+    - Query parameters: pagination (page, limit, offset)
+    - Query parameters: filtering, sorting
+    - Response: 200 OK with array of resources
+    - Pagination metadata in response
+  
+  - **Update (PUT /resources/{id})**:
+    - Path parameter: Resource ID
+    - Request body: Full schema (replace entire resource)
+    - Response: 200 OK with updated resource
+    - Error responses: 404 (not found), 400 (validation), 409 (conflict)
+  
+  - **Partial Update (PATCH /resources/{id})**:
+    - Path parameter: Resource ID
+    - Request body: Partial schema (only changed fields)
+    - Response: 200 OK with updated resource
+    - Error responses: 404 (not found), 400 (validation)
+  
+  - **Delete (DELETE /resources/{id})**:
+    - Path parameter: Resource ID
+    - Response: 204 No Content or 200 OK with deleted resource
+    - Error responses: 404 (not found), 409 (conflict if dependencies)
+
+- **Bulk Operations** (Optional):
+  - **Bulk Create (POST /resources/bulk)**
+  - **Bulk Update (PUT /resources/bulk)**
+  - **Bulk Delete (DELETE /resources/bulk)**
+
+**CRUD Customization** 📋 PLANNED
+- **URL Pattern Customization**:
+  - Choose ID parameter name (id, userId, resourceId, etc.)
+  - Choose ID type (integer, UUID, string)
+  - Custom path segments (/api/v1/resources, /resources)
+  - Singular vs plural resource names
+  - Nested resources (/users/{userId}/posts)
+
+- **Operation Selection**:
+  - Enable/disable specific operations
+  - Read-only APIs (GET operations only)
+  - Write-only APIs (POST operations only)
+  - Custom operation combinations
+
+- **Response Customization**:
+  - Choose response wrapper format
+  - Include/exclude metadata
+  - Custom pagination format
+  - Custom error response schema
+  - HATEOAS links (include navigation links)
+
+- **Request Validation**:
+  - Auto-generate validation rules from schema
+  - Custom validation messages
+  - Field-level validation
+  - Business rule validation hooks
+  - Async validation support
+
+**Mock Data Generation** 📋 PLANNED
+- **Stub Response Data**:
+  - Generate realistic mock data based on schema
+  - Faker.js integration for common fields
+  - Respect constraints (min/max, patterns, enums)
+  - Multiple example variations
+  - Configurable data set size
+
+- **Mock Data Strategies**:
+  - Static examples from schema
+  - Dynamic random generation
+  - Incremental IDs
+  - Timestamp generation
+  - Related data consistency (foreign keys)
+
+**Server Stub Implementation** 📋 PLANNED
+- **Framework-Specific Stubs**:
+  - **Express.js (Node.js)**:
+    ```javascript
+    // GET /users/:id
+    router.get('/users/:id', async (req, res) => {
+      const { id } = req.params;
+      // TODO: Implement database query
+      const user = mockData.users.find(u => u.id === id);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json(user);
+    });
+    ```
+  
+  - **FastAPI (Python)**:
+    ```python
+    @app.get("/users/{user_id}", response_model=User)
+    async def get_user(user_id: int):
+        # TODO: Implement database query
+        user = mock_data.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+    ```
+  
+  - **Spring Boot (Java)**:
+    ```java
+    @GetMapping("/users/{id}")
+    public ResponseEntity<User> getUser(@PathVariable Long id) {
+        // TODO: Implement database query
+        Optional<User> user = mockData.getUserById(id);
+        return user.map(ResponseEntity::ok)
+                   .orElse(ResponseEntity.notFound().build());
+    }
+    ```
+
+- **Stub Features**:
+  - TODO comments for implementation
+  - Mock data pre-populated
+  - Request validation enabled
+  - Response serialization configured
+  - Error handling implemented
+  - Logging statements included
+  - OpenAPI middleware integrated
+
+### Swagger/OpenAPI Testing Integration (NEW)
+
+**Interactive API Testing** 📋 PLANNED
+- **Swagger UI Integration**:
+  - Embedded Swagger UI in Studio (already implemented ✅)
+  - Live preview of generated OpenAPI spec
+  - "Try it out" functionality for all operations
+  - Real-time request/response testing
+  - Request builder with autocomplete
+  - Response visualization with syntax highlighting
+
+- **Enhanced Testing Features**:
+  - **Test from Studio**:
+    - "Test API" button on each operation
+    - Pre-filled request body from examples
+    - Parameter auto-completion
+    - Authentication token management
+    - Save test requests as collections
+  
+  - **Mock Server Integration**:
+    - One-click mock server startup
+    - Serve mock responses based on examples
+    - Configurable mock behavior
+    - Request logging and inspection
+    - Hot-reload on spec changes
+
+**CRUD Operation Testing** 📋 PLANNED
+- **Visual CRUD Testing Panel**:
+  - Dedicated CRUD testing interface
+  - Test all operations in sequence
+  - Visual flow: Create → Read → Update → Delete
+  - Automatic ID propagation between operations
+  - Test data persistence within session
+
+- **Test Scenarios**:
+  - **Happy Path Testing**:
+    - Create resource with valid data
+    - Read created resource
+    - Update resource
+    - Delete resource
+    - Verify 404 after deletion
+  
+  - **Error Path Testing**:
+    - Invalid data validation (400)
+    - Resource not found (404)
+    - Duplicate resource (409)
+    - Unauthorized access (401)
+    - Forbidden operation (403)
+  
+  - **Edge Case Testing**:
+    - Empty list response
+    - Pagination with no results
+    - Large data sets
+    - Special characters in data
+    - Boundary value testing
+
+**Request Collections** 📋 PLANNED
+- **Test Collection Management**:
+  - Save requests as named collections
+  - Organize by feature/endpoint
+  - Share collections with team
+  - Import/export Postman collections
+  - Version control for collections
+
+- **Collection Runner**:
+  - Execute entire collection sequentially
+  - Variable substitution between requests
+  - Assertions and test validation
+  - Response time tracking
+  - Success/failure reporting
+
+**Mock Server Features** 📋 PLANNED
+- **Local Development Server**:
+  - Generate runnable mock server code
+  - Docker container with mock server
+  - In-memory data store for CRUD
+  - Persistent mode with SQLite
+  - Configurable response delays
+  - Error injection for testing
+
+- **Mock Server Controls**:
+  - Start/stop server from Studio
+  - View server logs in real-time
+  - Monitor request/response traffic
+  - Modify mock data on the fly
+  - Reset data to initial state
+  - Export mock data as JSON
+
+**API Testing Playground** 📋 PLANNED
+- **Interactive Playground**:
+  - Side-by-side request/response view
+  - Syntax highlighting for JSON/XML
+  - Request history with replay
+  - Response timing and size metrics
+  - Headers and cookies inspection
+  - WebSocket testing support
+
+- **Advanced Testing Features**:
+  - Environment variables for different endpoints
+  - Pre-request scripts (JavaScript)
+  - Post-response assertions
+  - Chain requests with data flow
+  - Performance testing (load simulation)
+  - Response schema validation
+
+**Swagger UI Customization** 📋 PLANNED
+- **UI Configuration**:
+  - Custom branding and colors
+  - API information display
+  - Default expanded/collapsed state
+  - Filter operations by tag
+  - Sort operations
+  - Show/hide model schemas
+
+- **Try-It-Out Enhancements**:
+  - Example selector dropdown
+  - Generate random data button
+  - Clear form button
+  - Copy as cURL command
+  - Copy as code snippet (multiple languages)
+  - Download response as file
+
+**Documentation Integration** 📋 PLANNED
+- **Rich API Documentation**:
+  - Markdown support in descriptions
+  - Code examples per operation
+  - Multiple language examples
+  - Video/image embedding
+  - Interactive diagrams
+  - Version-specific documentation
+
+- **Testing Guides**:
+  - Auto-generated testing guide
+  - Authentication setup instructions
+  - Common error scenarios
+  - Best practices documentation
+  - Rate limiting information
+  - Troubleshooting tips
+
+| Ticket | Feature Description                                      |
+|--------|----------------------------------------------------------|
 
 ---
 
@@ -5615,7 +6234,44 @@ Focus on shipping high-impact features that users will love, rather than buildin
 
 ## 📈 Changelog
 
+### December 20, 2025 - Version 3.2 (UI/UX Consolidation for Next Iteration)
+- **Added UI/UX Look & Feel Consolidated Section** 🔥 **NEXT ITERATION FOCUS**
+  - Consolidated all visual design and UX improvements into single section
+  - 10 major categories: Canvas Visual, Themes, Modern UX, Drag & Drop, Responsive, Accessibility, Animations, Interactive, Data Viz, Panels
+  - **Progress Tracking**: 28 items completed (19%), 118 planned (81%), 146 total items
+  - **Priority roadmap**: 8-week implementation plan with weekly milestones
+  - Week 1-2: Core UX (Command Palette, Global Search, Keyboard Shortcuts, Inline Editing)
+  - Week 3-4: Visual Polish (Canvas Themes, Node Customization, Edge Styling)
+  - Week 5-6: Advanced Features (Layouts, Bookmarks, Focus Mode, Split Views)
+  - Week 7-8: Polish & Accessibility (Tooltips, a11y, Responsive, Tutorials)
+  - **Design Principles**: Consistency, Accessibility, Performance, Feedback, Forgiveness
+  - **Key Features Consolidated**:
+    - Canvas: 32 features (12 done, 20 planned)
+    - Visual Customization: 25 features (0 done, 25 planned)
+    - Theme System: 14 features (4 done, 10 planned)
+    - UX Features: 17 features (2 done, 15 planned)
+    - Keyboard & Commands: 10 features (0 done, 10 planned)
+    - Responsive & a11y: 12 features (0 done, 12 planned)
+  - Positioned at top of Table of Contents for visibility
+  - Provides clear blueprint for next development sprint
+
 ### December 19, 2025 - Version 3.1 (Schema Showcase, Completed Features & Enterprise Enhancement)
+- **Added CRUD Operation Stubs & Swagger Testing Section** (🟠 High Priority, Q1 2026)
+  - One-click CRUD operation generation from schemas (Create, Read, Update, Delete, List)
+  - RESTful URL pattern templates with customization options
+  - Bulk operation templates (Bulk Create, Update, Delete)
+  - Mock data generation with Faker.js integration
+  - Framework-specific server stubs (Express, FastAPI, Spring Boot, Go, Rust)
+  - Enhanced Swagger UI with "Test from Studio" button
+  - Visual CRUD testing panel with operation flow
+  - Mock server with one-click startup and real-time logs
+  - Request collection management with Postman import/export
+  - Collection runner with sequential execution and assertions
+  - API testing playground with request history and variables
+  - Environment management and pre-request scripts
+  - Copy as cURL and multi-language code snippets
+  - Auto-generated testing guides and documentation
+  - 21 new tickets added (#253-#273)
 - **Added Tenant Industry Tagging Section** (Q1 2026)
   - Industry classification taxonomy with 15+ standard categories
   - Multi-industry tagging support for tenants (primary + secondary)
