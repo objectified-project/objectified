@@ -1161,8 +1161,8 @@
 
 **Export Canvas** 📋 PLANNED
 - ✅ Export button
-- 📋 Export as PNG
-- 📋 Export as SVG
+- ✅ Export as PNG
+- ✅ Export as SVG
 - 📋 Export as PDF
 
 | Ticket | Feature Description                                                                                     |
@@ -6233,6 +6233,35 @@ Focus on shipping high-impact features that users will love, rather than buildin
 ---
 
 ## 📈 Changelog
+
+### December 20, 2025 - Version 3.2.1 (Canvas Export Implementation)
+- **Implemented Canvas Export as PNG** ✅ COMPLETED
+  - Installed html-to-image library for canvas export functionality
+  - Created handleExportPng function with high-quality export (2x pixel ratio)
+  - Smart background color based on dark/light theme (#111827 for dark, #ffffff for light)
+  - Filters out UI controls (minimap, controls, attribution, panels) for clean export
+  - Smart filename generation: `{project-name}-v{version}.png`
+  - Loading state with "Exporting canvas as PNG..." message
+  - Success feedback with alert dialog showing filename
+  - Comprehensive error handling
+- **Implemented Canvas Export as SVG** ✅ COMPLETED
+  - Added toSvg import from html-to-image library
+  - Created handleExportSvg function for vector export
+  - Same filtering and quality controls as PNG export
+  - Vector format preserves scalability and editability
+  - Smart filename generation: `{project-name}-v{version}.svg`
+  - Loading state with "Exporting canvas as SVG..." message
+  - Success and error handling consistent with PNG export
+- **Updated Export Dropdown UI**
+  - Connected PNG Image button to handleExportPng function
+  - Connected SVG Image button to handleExportSvg function
+  - Export button remains positioned in canvas upper right corner
+  - JPEG export button remains as placeholder for future implementation
+- **Export Features Summary**:
+  - ✅ PNG Export: High-resolution raster images (2x pixel ratio)
+  - ✅ SVG Export: Scalable vector graphics
+  - 📋 JPEG Export: Placeholder for future implementation
+  - 📋 PDF Export: Planned for future release
 
 ### December 20, 2025 - Version 3.2 (UI/UX Consolidation for Next Iteration)
 - **Added UI/UX Look & Feel Consolidated Section** 🔥 **NEXT ITERATION FOCUS**
