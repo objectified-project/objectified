@@ -616,6 +616,7 @@
   - External documentation links
 - Schema must be public or organization must opt-in
 - Active maintenance (updated within last 90 days)
+- "Submit" option for tenants to submit their schemas to the Showcase
 
 **Showcase Categories**
 - **Industry Leaders**:
@@ -1906,27 +1907,24 @@
 **Rich Property Editing** ✅ MOSTLY IMPLEMENTED
 - **Inline Editing**: ✅ Edit properties directly on canvas (quick mode)
 - **Full Editor Panel**: ✅ Detailed editor with all options
-- **Bulk Edit**: 📋 Edit multiple properties at once
-- **Property Templates**: 📋 Reusable property configurations
-- **Property Presets**: 📋 Common property types (email, phone, address)
 - **Validation Rules**: ✅ IMPLEMENTED
   - ✅ Min/max length
   - ✅ Pattern (regex) with live tester
   - ✅ Enum values with sorting and reordering
   - ✅ Format (date, email, uuid, etc.)
   - 📋 Custom validators
-- **OpenAPI 3.1 Array Features** ✅ IMPLEMENTED:
-  - **Tuple Mode (prefixItems)**: Define ordered schemas for specific array positions
-    - Enable/disable tuple mode with checkbox toggle
-    - Add, remove, and reorder prefix items with drag-and-drop
-    - Each position has its own JSON schema definition
-    - Visual editor with type selection and JSON editing
-    - Items beyond prefix use the regular items schema
-    - Example: `[string, number, boolean]` for heterogeneous arrays
-  - **Contains Schema**: Specify that at least one array item must match a schema
-  - **minContains/maxContains**: Control how many items must match the contains schema
-  - **Exclusive Min/Max**: Radio buttons for inclusive (≥) vs exclusive (>) boundaries
-  - **multipleOf**: Numeric constraint for values that must be multiples
+- ✅ **OpenAPI 3.1 Array Features** ✅ IMPLEMENTED:
+  - ✅ **Tuple Mode (prefixItems)**: Define ordered schemas for specific array positions
+    - ✅ Enable/disable tuple mode with checkbox toggle
+    - ✅ Add, remove, and reorder prefix items with drag-and-drop
+    - ✅ Each position has its own JSON schema definition
+    - ✅ Visual editor with type selection and JSON editing
+    - ✅ Items beyond prefix use the regular items schema
+    - ✅ Example: `[string, number, boolean]` for heterogeneous arrays
+  - ✅ **Contains Schema**: Specify that at least one array item must match a schema
+  - ✅ **minContains/maxContains**: Control how many items must match the contains schema
+  - ✅ **Exclusive Min/Max**: Radio buttons for inclusive (≥) vs exclusive (>) boundaries
+  - ✅ **multipleOf**: Numeric constraint for values that must be multiples
 - **Documentation**: ✅ IMPLEMENTED
   - ✅ Rich text descriptions
   - ✅ Examples with auto-generation
@@ -1941,6 +1939,10 @@
   - ✅ Custom x- prefixed properties at class level
   - ✅ Custom x- prefixed properties at property level
   - ✅ JSON editor for extension values
+
+| Ticket | Feature Description                 |
+|--------|-------------------------------------|
+| [#280] | Adds owner metadata to the property |
 
 **Property Library** 📋 PLANNED
 - Shared property definitions across classes
@@ -2021,11 +2023,11 @@
 
 **Conditional Schemas** ✅ FULLY IMPLEMENTED
 - ✅ `if`/`then`/`else`: Conditional schema application (OpenAPI 3.1)
-  - Visual conditional rule builder
-  - Multiple operators: equals, enum, type, required, pattern, minimum, maximum
-  - THEN schema with required properties and constraints
-  - Optional ELSE schema for when condition is false
-  - Support for complex nested conditions
+  - ✅ Visual conditional rule builder
+  - ✅ Multiple operators: equals, enum, type, required, pattern, minimum, maximum
+  - ✅ THEN schema with required properties and constraints
+  - ✅ Optional ELSE schema for when condition is false
+  - ✅ Support for complex nested conditions
 
 **Metadata & Documentation** ✅ FULLY IMPLEMENTED
 - ✅ `title`: Display title for schemas
@@ -2229,6 +2231,10 @@
 - ✅ Canvas dark mode (separate from UI dark mode)
 - 📋 High contrast mode for accessibility
 - ✅ Beta mode with special backgrounds
+
+| Ticket | Feature Description                 |
+|--------|-------------------------------------|
+| [#281] | Adds a settings button              |
 
 **Customization**
 - Customizable toolbar layout
@@ -2468,25 +2474,25 @@
   - 📋 **TypeScript**: Interfaces, types with full composition support
   - 📋 **Python - Pydantic**: Models with validation and constraints
   - 📋 **Python - Dataclasses**: Native Python dataclasses with type hints
-    - Standard library dataclasses (Python 3.7+)
-    - Optional field defaults and factories
-    - JSON serialization/deserialization support
-    - Immutable (frozen) option
-    - Post-init validation hooks
-    - Inheritance and composition support
+    - 📋 Standard library dataclasses (Python 3.7+)
+    - 📋 Optional field defaults and factories
+    - 📋 JSON serialization/deserialization support
+    - 📋 Immutable (frozen) option
+    - 📋 Post-init validation hooks
+    - 📋 Inheritance and composition support
   - 📋 **Python - SQLAlchemy**: ORM models for database mapping
-    - SQLAlchemy 2.0+ declarative models
-    - Automatic table name generation
-    - Primary key and foreign key constraints
-    - Relationship mappings (one-to-many, many-to-many)
-    - Column types from OpenAPI formats
-    - Indexes and unique constraints
-    - Alembic migration generation support
-    - Optional type hints for mypy compatibility
+    - 📋 SQLAlchemy 2.0+ declarative models
+    - 📋 Automatic table name generation
+    - 📋 Primary key and foreign key constraints
+    - 📋 Relationship mappings (one-to-many, many-to-many)
+    - 📋 Column types from OpenAPI formats
+    - 📋 Indexes and unique constraints
+    - 📋 Alembic migration generation support
+    - 📋 Optional type hints for mypy compatibility
   - 📋 **Python - Mixed**: Combine multiple approaches
-    - Pydantic + SQLAlchemy hybrid models
-    - Dataclasses with validation decorators
-    - Choose per-class basis
+    - 📋 Pydantic + SQLAlchemy hybrid models
+    - 📋 Dataclasses with validation decorators
+    - 📋 Choose per-class basis
   - 📋 **TypeScript (Extended)**: Zod validators, runtime type checking
   - 📋 **Java**: POJOs, Records, JPA entities
   - 📋 **C#**: Classes, records, EF Core models
