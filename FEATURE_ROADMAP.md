@@ -3,7 +3,7 @@
 > Comprehensive list of features and improvements to make Objectified a world-class enterprise schema development platform
 > 
 > **Last Updated**: December 19, 2025
-> **Version**: 3.1 - Marketplace, Validation & Enterprise Enhancement
+> **Version**: 3.1 - Schema Showcase, Marketplace, Validation & Enterprise Enhancement
 
 ---
 
@@ -13,6 +13,7 @@
 |----------------------------|---------|-------------|----------------------------------------|
 | Schema Validation Score    | 2 weeks | 🔴 Critical | Real-time quality scoring & insights   |
 | Template Marketplace       | 3 weeks | 🔴 Critical | Community schema & property templates  |
+| Schema Showcase            | 1 week  | 🟠 High     | Monthly showcase of top-rated schemas  |
 | Undo/Redo                  | 2 weeks | 🔴 Critical | Canvas action history                  |
 | Node Grouping              | 3 weeks | 🔴 Critical | Visual containers for classes          |
 | Rate Limiting              | 1 week  | 🔴 Critical | API throttling                         |
@@ -30,6 +31,8 @@
 | **Permissions**   | Custom Roles & Permissions             | Q1 2026   |
 | **Permissions**   | Team Management                        | Q2 2026   |
 | **Permissions**   | Resource-Level Permissions             | Q2 2026   |
+| **Tenants**       | Industry Tagging & Classification      | Q1 2026   |
+| **Tenants**       | Industry-Based Recommendations         | Q1 2026   |
 | **Paths**         | Path Editor & Designer                 | Q1 2026   |
 | **Paths**         | Operation Builder (CRUD)               | Q1 2026   |
 | **Paths**         | Request/Response Body Editor           | Q1 2026   |
@@ -167,6 +170,7 @@
 ## Table of Contents
 - [Schema Validation & Quality Scoring](#schema-validation--quality-scoring-new) ⭐ NEW
 - [Template Marketplace](#template-marketplace-new) ⭐ NEW
+- [Schema Showcase](#schema-showcase-new) ⭐ NEW
 - [Canvas & Visual Editor](#canvas--visual-editor-enhancements)
 - [API Paths & Operations](#api-paths--operations-new) ⭐ NEW
 - [Developer Experience](#developer-experience-improvements)
@@ -198,27 +202,42 @@
 
 ### Real-Time Schema Quality Score
 
-**Quality Score Dashboard**
-- Overall schema quality score (0-100) displayed prominently in Studio header
-- Real-time score updates as schema is modified
-- Historical score tracking with trend chart
-- Score breakdown by category:
-  - **Design Quality** (30 points): Naming conventions, consistency, reusability
-  - **Documentation** (20 points): Descriptions, examples, external docs
-  - **API Best Practices** (25 points): RESTful patterns, proper HTTP methods, status codes
-  - **Security** (15 points): Authentication, authorization, input validation
-  - **Performance** (10 points): Pagination, filtering, caching headers
+**Quality Score Dashboard** 📋 PLANNED
+- 📋 Overall schema quality score (0-100) displayed prominently in Studio header
+- 📋 Real-time score updates as schema is modified
+- 📋 Historical score tracking with trend chart
+- 📋 Score breakdown by category:
+  - 📋 **Design Quality** (30 points): Naming conventions, consistency, reusability
+  - 📋 **Documentation** (20 points): Descriptions, examples, external docs
+  - 📋 **API Best Practices** (25 points): RESTful patterns, proper HTTP methods, status codes
+  - 📋 **Security** (15 points): Authentication, authorization, input validation
+  - 📋 **Performance** (10 points): Pagination, filtering, caching headers
 
-**Score Visualization**
-- Color-coded score indicator:
-  - 🟢 Green (90-100): Excellent - Production ready
-  - 🟡 Yellow (70-89): Good - Minor improvements needed
-  - 🟠 Orange (50-69): Fair - Significant improvements recommended
-  - 🔴 Red (0-49): Poor - Major issues must be addressed
-- Animated score gauge with smooth transitions
-- Score comparison across versions
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+| [#244] | Realtime score calculation as schema is modified |
+| [#245] | Overall schema quality score (0-100)             |
+| [#246] | Historical score tracking with trend chart       |
+| [#247] | Score breakdown by category                      |
+
+**Score Visualization** 📋 PLANNED
+- 📋 Color-coded score indicator:
+  - 📋 🟢 Green (90-100): Excellent - Production ready
+  - 📋 🟡 Yellow (70-89): Good - Minor improvements needed
+  - 📋 🟠 Orange (50-69): Fair - Significant improvements recommended
+  - 📋 🔴 Red (0-49): Poor - Major issues must be addressed
+- 📋 Animated score gauge with smooth transitions
+- 📋 Score comparison across versions
 - Team average score for benchmarking
 - Export score reports as PDF
+
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| [#248] | Add color-coded score indicators             |
+| [#249] | Add gauge for schemas                        |
+| [#250] | Add project version schema scoring breakdown |
+| [#251] | Add scoring comparison across versions       |
+| [#252] | Score report export as PDF                   |
 
 **Validation Rules Engine**
 - **Naming Convention Rules**:
@@ -326,15 +345,22 @@
   - Compare with industry benchmarks
   - Version-to-version improvements
 
-**Actionable Recommendations**
-- AI-powered suggestions for improvement:
-  - "Add descriptions to 12 classes to improve docs score"
-  - "Rename 5 properties to follow camelCase convention"
-  - "Split 'User' class - it has 28 properties (recommended max: 15)"
-  - "Add pagination to 'GET /users' endpoint"
-- Prioritized action items (quick wins first)
-- Estimated score impact for each fix
-- Bulk apply recommendations
+**Actionable Recommendations** 📋 PLANNED
+- 📋 AI-powered suggestions for improvement:
+  - 📋 "Add descriptions to 12 classes to improve docs score"
+  - 📋 "Rename 5 properties to follow camelCase convention"
+  - 📋 "Split 'User' class - it has 28 properties (recommended max: 15)"
+  - 📋 "Add pagination to 'GET /users' endpoint"
+- 📋 Prioritized action items (quick wins first)
+- 📋 Estimated score impact for each fix
+- 📋 Bulk apply recommendations
+
+| Ticket | Feature Description                    |
+|--------|----------------------------------------|
+| [#253] | AI powered suggestions for improvement |
+| [#254] | Prioritized action items               |
+| [#255] | Estimated score impact for each fix    |
+| [#256] | Add bulk apply recommendations         |
 
 **Schema Complexity Analysis**
 - Cognitive complexity score per class
@@ -384,19 +410,6 @@
 
 | Ticket | Feature Description                                         |
 |--------|-------------------------------------------------------------|
-| [#210] | Real-time schema quality score (0-100) with visual gauge    |
-| [#211] | Score breakdown by category (design, docs, security, etc.)  |
-| [#212] | Color-coded score indicator (green/yellow/orange/red)       |
-| [#213] | Validation rules engine with 50+ built-in rules             |
-| [#214] | Custom validation rules builder                             |
-| [#215] | Real-time violation alerts on canvas                        |
-| [#216] | Violations panel with filtering and grouping                |
-| [#217] | Auto-fix capabilities for common violations                 |
-| [#218] | Violation suppression with justification                    |
-| [#219] | Schema health dashboard with trends                         |
-| [#220] | AI-powered improvement recommendations                      |
-| [#221] | Automated compliance checking (GDPR, HIPAA, PCI, SOC 2)     |
-| [#222] | CI/CD integration with validation gates                     |
 
 ---
 
@@ -406,15 +419,15 @@
 
 ### Community Template Library
 
-**Template Categories**
-- **Industry Patterns**:
-  - E-commerce (Product, Cart, Order, Payment, Shipping)
-  - Healthcare (Patient, Appointment, Medication, Insurance)
-  - Finance (Account, Transaction, Investment, Loan)
-  - SaaS (Tenant, User, Subscription, Usage)
-  - Education (Course, Student, Assignment, Grade)
-  - Real Estate (Property, Listing, Agent, Transaction)
-  - Logistics (Shipment, Route, Warehouse, Delivery)
+**Template Categories** 📋 PLANNED
+- 📋 **Industry Patterns**:
+  - 📋 E-commerce (Product, Cart, Order, Payment, Shipping)
+  - 📋 Healthcare (Patient, Appointment, Medication, Insurance)
+  - 📋 Finance (Account, Transaction, Investment, Loan)
+  - 📋 SaaS (Tenant, User, Subscription, Usage)
+  - 📋 Education (Course, Student, Assignment, Grade)
+  - 📋 Real Estate (Property, Listing, Agent, Transaction)
+  - 📋 Logistics (Shipment, Route, Warehouse, Delivery)
 - **Authentication & Authorization**:
   - OAuth 2.0 flow models
   - JWT token structures
@@ -435,12 +448,17 @@
   - Bulk operations
   - Batch processing
   - Webhook payload structures
-- **Domain-Specific**:
-  - IoT device schemas
-  - Social media entities
-  - Gaming (Player, Match, Leaderboard)
-  - Travel & hospitality
-  - Media & entertainment
+- 📋 **Domain-Specific**:
+  - 📋 IoT device schemas
+  - 📋 Social media entities
+  - 📋 Gaming (Player, Match, Leaderboard)
+  - 📋 Travel & hospitality
+  - 📋 Media & entertainment
+
+| Ticket | Feature Description                                         |
+|--------|-------------------------------------------------------------|
+| [#242] | Add industry-specific schema categories                     |
+| [#243] | Add domain specific schema categories                        |
 
 **Template Structure**
 - Each template includes:
@@ -484,17 +502,21 @@
 
 ### Template Import & Customization
 
-**One-Click Import**
+**One-Click Import** 📋 PLANNED
 - "Use Template" button from marketplace
-- Template wizard guides through import:
-  1. Select destination project/version
-  2. Choose classes to import (select all or subset)
-  3. Preview on canvas before committing
-  4. Resolve naming conflicts
-  5. Customize class names and namespaces
-  6. Import with one click
+- 📋 Template wizard guides through import:
+  1. 📋 Select destination project/version
+  2. 📋 Choose classes to import (select all or subset)
+  3. 📋 Preview on canvas before committing
+  4. 📋 Resolve naming conflicts
+  5. 📋 Customize class names and namespaces
+  6. 📋 Import with one click
 - Bulk import multiple templates
 - Template dependencies (auto-import related templates)
+
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| [#220] | Improve import using a wizard with guides  |
 
 **Template Customization**
 - Customize before import:
@@ -520,54 +542,244 @@
 
 ### Property Templates
 
-**Reusable Property Patterns**
+**Reusable Property Patterns** 📋 PLANNED
 - Pre-built property templates for common fields:
-  - **Identifiers**: UUID, ULID, nanoid, auto-increment
-  - **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
-  - **Audit Fields**: createdBy, updatedBy, version
-  - **Status Fields**: status enum, isActive boolean, state machine
-  - **Address Fields**: street, city, state, zip, country
-  - **Contact Fields**: email, phone, mobile, fax
-  - **Money Fields**: amount, currency (ISO 4217)
-  - **Geolocation**: latitude, longitude, geohash
-  - **Internationalization**: locale, timezone, language
-  - **Pagination**: page, limit, offset, cursor
-  - **Search**: query, filters, sort, fields
-- Property templates include:
-  - Data type and format
-  - Validation rules (regex, min/max, enum)
-  - Default values
-  - Examples
-  - Documentation
-- Drag-and-drop property templates onto classes
-- Bulk add property templates to multiple classes
+  - 📋 **Identifiers**: UUID, ULID, nanoid, auto-increment
+  - 📋 **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
+  - 📋 **Audit Fields**: createdBy, updatedBy, version
+  - 📋 **Status Fields**: status enum, isActive boolean, state machine
+  - 📋 **Address Fields**: street, city, state, zip, country
+  - 📋 **Contact Fields**: email, phone, mobile, fax
+  - 📋 **Money Fields**: amount, currency (ISO 4217)
+  - 📋 **Geolocation**: latitude, longitude, geohash
+  - 📋 **Internationalization**: locale, timezone, language
+  - 📋 **Pagination**: page, limit, offset, cursor
+  - 📋 **Search**: query, filters, sort, fields
+- 📋 Property templates include:
+  - 📋 Data type and format
+  - 📋 Validation rules (regex, min/max, enum)
+  - 📋 Default values
+  - 📋 Examples
+  - 📋 Documentation
+- 📋 Drag-and-drop property templates onto classes
 
-**Property Template Library**
-- Browse property templates by category
-- Search property templates
+**Property Template Library** 📋 PLANNED
+- 📋 Browse property templates by category
+- 📋 Search property templates
 - Preview property configuration
 - "Add to Class" quick action
 - Customize property before adding
 - Create custom property templates
 - Share property templates with team
 
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| [#206] | Property templates for identifiers           |
+| [#207] | Property templates for timestamps            |
+| [#208] | Property templates for audit fields          |
+| [#209] | Property templates for status fields         |
+| [#210] | Property templates for addresses             |
+| [#211] | Property templates for money                 |
+| [#212] | Property templates for geolocation           |
+| [#213] | Property templates for internationalization  |
+| [#214] | Property templates for pagination            |
+| [#215] | Property templates for search                |
+| [#216] | Properties templates store definitions       |
+| [#217] | Add property templates into sidebar          |
+| [#218] | Browse property template library by category |
+| [#219] | Add ability to search property templates     |
+
+---
+
+## 🏆 Schema Showcase (NEW)
+
+> **Priority**: 🟠 High | **Timeline**: Q1 2026 | **Effort**: 1 week
+
+### Browse Site Showcase Feature
+
+**Monthly Schema Showcase**
+- Curated gallery on browse.objectified.dev
+- Featured schemas with top quality scores (90-100)
+- Rotating monthly showcase highlighting best-in-class schemas
+- Company branding and recognition for featured schemas
+- Direct links to schema details and documentation
+
+**Showcase Eligibility**
+- Quality score threshold:
+  - Minimum score: 90/100
+  - Must maintain score for 30+ days
+  - No critical violations
+- Documentation requirements:
+  - Complete class descriptions
+  - Complete property descriptions
+  - Example values provided
+  - External documentation links
+- Schema must be public or organization must opt-in
+- Active maintenance (updated within last 90 days)
+
+**Showcase Categories**
+- **Industry Leaders**:
+  - Financial Services schemas
+  - Healthcare schemas
+  - E-commerce schemas
+  - SaaS/B2B schemas
+- **Best Practices**:
+  - Most comprehensive documentation
+  - Best use of composition
+  - Cleanest architecture
+  - Most reusable patterns
+- **Innovation Awards**:
+  - Novel API design patterns
+  - Complex domain modeling
+  - Advanced OpenAPI features
+- **Community Choice**:
+  - Most cloned/forked schemas
+  - Highest community ratings
+  - Most helpful templates derived
+
+**Showcase Display**
+- **Showcase Gallery Page**:
+  - Hero section with "Schema of the Month"
+  - Grid layout with category sections
+  - Schema cards showing:
+    - Company logo and name
+    - Schema title and description
+    - Quality score badge
+    - Category tags
+    - View/Clone counts
+    - Preview thumbnail of canvas
+  - Filter by industry/category
+  - Search showcase archives
+  
+- **Schema Detail View**:
+  - Full schema visualization
+  - Company spotlight section
+  - Quality score breakdown
+  - Key metrics (classes, properties, relationships)
+  - "Why This Schema Stands Out" section
+  - Interactive preview
+  - "Use This Template" button
+  - Link to company profile
+
+**Company Benefits**
+- **Recognition**:
+  - Featured on browse.objectified.dev homepage
+  - Social media promotion by Objectified
+  - "Featured Schema" badge on company profile
+  - Press release opportunity
+  - Newsletter feature
+- **Marketing Assets**:
+  - "Featured Schema" logo badge for website
+  - Showcase certificate (digital/PDF)
+  - Case study collaboration
+  - Quote/testimonial opportunity
+- **Analytics**:
+  - Showcase page views
+  - Schema template usage
+  - Clone/fork statistics
+  - Traffic referral data
+
+**Nomination & Selection**
+- **Automatic Consideration**:
+  - Schemas with 90+ quality score automatically entered
+  - System scans weekly for eligible schemas
+  - Notification to schema owners about eligibility
+- **Manual Nomination**:
+  - Companies can nominate their own schemas
+  - Community can nominate public schemas
+  - Objectified team can spotlight schemas
+- **Selection Process**:
+  - Automated quality checks
+  - Editorial review for best practices
+  - Diversity across industries and sizes
+  - Innovation and educational value
+  - Monthly selection committee review
+- **Opt-Out**:
+  - Companies can opt-out of showcase
+  - Maintain quality score benefits
+  - Privacy-focused organizations
+
+**Showcase Management**
+- **Admin Dashboard**:
+  - Review nominated schemas
+  - Schedule future showcases
+  - Manage showcase categories
+  - Edit showcase descriptions
+  - Approve/reject nominations
+  - Configure quality score thresholds
+- **Company Dashboard**:
+  - View showcase status
+  - Opt-in/opt-out controls
+  - Download marketing assets
+  - View showcase analytics
+  - Schedule social media posts
+  - Manage company bio
+
+**Showcase Archive**
+- Browse past months' showcases
+- Filter by date, industry, category
+- Search archived schemas
+- "Hall of Fame" for multi-time features
+- Trending schemas over time
+- Historical quality score data
+
+**Integration with Quality Score**
+- Real-time quality monitoring for featured schemas
+- Alert if featured schema drops below threshold
+- Automatic removal if score falls below 85
+- Grace period for fixing issues
+- Re-showcase opportunity after improvements
+
+**Social & Marketing**
+- **Social Sharing**:
+  - Auto-generated social cards
+  - LinkedIn, Twitter, Facebook ready graphics
+  - Custom hashtags (#ObjectifiedShowcase)
+  - Scheduled social media posts
+  - Company tagging and mentions
+- **Email Campaigns**:
+  - Monthly showcase newsletter
+  - Subscriber highlights
+  - Featured schema announcements
+  - "Apply for showcase" CTAs
+- **Blog Integration**:
+  - Monthly showcase blog post
+  - Schema deep-dive articles
+  - Company interviews
+  - Best practices guides
+
+**Gamification**
+- **Achievement Badges**:
+  - "Featured Schema" badge
+  - "Schema of the Month" badge
+  - "Category Leader" badge
+  - "Hall of Fame" badge (3+ features)
+  - "Quality Pioneer" badge (first in industry)
+- **Leaderboards**:
+  - Top schemas by quality score
+  - Most featured companies
+  - Rising stars (new high-quality schemas)
+  - Community favorites
+- **Rewards**:
+  - Extended trial periods for featured companies
+  - Premium features access
+  - Exclusive beta access
+  - Speaking opportunities at events
+
+**Technical Implementation**
+- Showcase database schema
+- Automated quality score monitoring
+- Nomination workflow system
+- Admin approval interface
+- Public showcase gallery
+- Analytics tracking
+- Marketing asset generator
+- Email notification system
+- Social media integration
+- Archive and search functionality
+
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
-| [#223] | Template marketplace UI (browse, search, filter)         |
-| [#224] | Template categories and metadata structure               |
-| [#225] | Template preview (canvas, code, OpenAPI)                 |
-| [#226] | One-click template import wizard                         |
-| [#227] | Smart merging with conflict resolution                   |
-| [#228] | Template customization before import                     |
-| [#229] | Property template library (50+ common properties)        |
-| [#230] | Drag-and-drop property templates                         |
-| [#231] | Create and publish custom templates                      |
-| [#232] | Template versioning and changelog                        |
-| [#233] | Template ratings and reviews                             |
-| [#234] | Fork and customize existing templates                    |
-| [#235] | Template dependencies (auto-import related)              |
-
-### Template Creation & Publishing
 
 ---
 
@@ -652,6 +864,9 @@
 - Default layout setting per user or per team
 - Export layout as JSON for sharing
 - Import layouts from other versions/projects
+
+| Ticket | Feature Description                                  |
+|--------|------------------------------------------------------|
 
 **Layout Snapshots**
 - Take quick snapshots of current layout
@@ -742,10 +957,6 @@
 - Share bookmarks with team
 - Bookmark thumbnails
 - Organize bookmarks in folders
-
-**Canvas Improvements** ✅ COMPLETED
-- ✅ Layout should include export button in the view
-- ✅ Move layout adjustment button into the view as well
 
 **Canvas Layers**
 - Separate visual layers for different content:
@@ -847,16 +1058,16 @@
 - Animated edges (flowing dots for data flow)
 - Edge hover effects (highlight and tooltip)
 
-**Canvas Themes**
-- Pre-built themes:
-  - Light mode (default)
-  - Dark mode
-  - High contrast
-  - Blueprint (blue grid on dark)
-  - Whiteboard (minimal)
-  - Solarized
-  - Nord
-  - Darcula
+**Canvas Themes** 📋 PLANNED
+- 📋 Pre-built themes:
+  - 📋 Light mode (default)
+  - 📋 Dark mode
+  - 📋 High contrast
+  - 📋 Blueprint (blue grid on dark)
+  - 📋 Whiteboard (minimal)
+  - 📋 Solarized
+  - 📋 Nord
+  - 📋 Darcula
 - Custom theme creator:
   - Canvas background color
   - Grid color and opacity
@@ -1255,6 +1466,10 @@
   - Reference parameters across operations
   - Parameter inheritance from path to operations
 
+| Ticket | Feature Description |
+|--------|---------------------|
+| [#279] | Adds path editor button to the Studio |
+
 ### Operations (HTTP Methods)
 
 **Operation Builder** 📋 PLANNED
@@ -1469,48 +1684,6 @@
 > **Section Status**: Needs redesigning due to recent changes in code generation approach
 
 ### Code Generation
-
-**Schema-to-Code** 
-- Generate code from schemas in multiple languages:
-  - **TypeScript**: Interfaces, types with full composition support
-  - **Python - Pydantic**: Models with validation and constraints
-  - **Python - Dataclasses**: Native Python dataclasses with type hints
-    - Standard library dataclasses (Python 3.7+)
-    - Optional field defaults and factories
-    - JSON serialization/deserialization support
-    - Immutable (frozen) option
-    - Post-init validation hooks
-    - Inheritance and composition support
-  - **Python - SQLAlchemy**: ORM models for database mapping
-    - SQLAlchemy 2.0+ declarative models
-    - Automatic table name generation
-    - Primary key and foreign key constraints
-    - Relationship mappings (one-to-many, many-to-many)
-    - Column types from OpenAPI formats
-    - Indexes and unique constraints
-    - Alembic migration generation support
-    - Optional type hints for mypy compatibility
-  - **Python - Mixed**: Combine multiple approaches
-    - Pydantic + SQLAlchemy hybrid models
-    - Dataclasses with validation decorators
-    - Choose per-class basis
-  - **TypeScript (Extended)**: Zod validators, runtime type checking
-  - **Java**: POJOs, Records, JPA entities
-  - **C#**: Classes, records, EF Core models
-  - **Go**: Structs with JSON tags
-  - **Rust**: Structs with Serde
-  - **Scala**: Case classes with play-json support
-  - **GraphQL**: SDL schema definitions
-  - **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
-- Customizable generation templates
-- Code generation settings per language:
-  - Naming conventions (camelCase, snake_case, PascalCase)
-  - Nullable vs Optional handling
-  - Validation annotations
-  - Documentation comments
-- Preview generated code before download
-- Download as single file or project structure
-- Generate with tests/mocks included
 
 **Python Code Generation Options**
 
@@ -2247,35 +2420,104 @@
 
 ### Schema Import/Export
 
-**Import From**
-- OpenAPI 2.0 (Swagger)
-- OpenAPI 3.0/3.1
-- JSON Schema
+**Import From** 📋 PLANNED
+- 📋 OpenAPI 2.0 (Swagger)
+- 📋 OpenAPI 3.0/3.1
+- 📋 JSON Schema
 - Postman Collections
-- GraphQL SDL
-- AsyncAPI
-- RAML
+- 📋 GraphQL SDL
+- 📋 AsyncAPI
+- 📋 RAML
 - API Blueprint
-- Protobuf
-- Avro
-- Thrift
+- 📋 Protobuf
+- 📋 Avro
+- 📋 Thrift
 - Excel/CSV (data definitions)
 - Database (reverse engineer from DB)
 
-**Export To**
-- OpenAPI 3.1.0 (default)
-- JSON Schema
-- GraphQL SDL
-- AsyncAPI
-- TypeScript types
-- Python models (Pydantic, Dataclasses, SQLAlchemy)
-- Java classes
-- C# classes
-- Go structs
-- SQL DDL
-- Markdown documentation
-- Excel (for non-technical stakeholders)
-- PDF documentation
+| Ticket | Feature Description     |
+|--------|-------------------------|
+| [#232] | Import from OpenAPI 2.0 |
+| [#233] | Import from OpenAPI 3.0/3.1 |
+| [#234] | Import from JSON Schema |
+| [#235] | Import from GraphQL SDL |
+| [#236] | Import from AsyncAPI |
+| [#237] | Import from RAML |
+| [#238] | Import from Protobuf |
+| [#239] | Import from Avro |
+| [#240] | Import from Thrift |
+
+**Export To** 📋 PLANNED
+- ✅ OpenAPI 3.1.0 (default)
+- ✅ JSON Schema
+- ✅ Arazzo
+- 📋 GraphQL SDL
+- 📋 AsyncAPI
+- 📋 TypeScript types
+- 📋 Python models (Pydantic, Dataclasses, SQLAlchemy)
+- 📋 Java classes
+- 📋 C# classes
+- 📋 Go structs
+- 📋 SQL DDL
+- 📋 Markdown documentation
+- 📋 Excel (for non-technical stakeholders)
+- 📋 PDF documentation
+
+**Schema-to-Code**
+- Generate code from schemas in multiple languages:
+  - 📋 **TypeScript**: Interfaces, types with full composition support
+  - 📋 **Python - Pydantic**: Models with validation and constraints
+  - 📋 **Python - Dataclasses**: Native Python dataclasses with type hints
+    - Standard library dataclasses (Python 3.7+)
+    - Optional field defaults and factories
+    - JSON serialization/deserialization support
+    - Immutable (frozen) option
+    - Post-init validation hooks
+    - Inheritance and composition support
+  - 📋 **Python - SQLAlchemy**: ORM models for database mapping
+    - SQLAlchemy 2.0+ declarative models
+    - Automatic table name generation
+    - Primary key and foreign key constraints
+    - Relationship mappings (one-to-many, many-to-many)
+    - Column types from OpenAPI formats
+    - Indexes and unique constraints
+    - Alembic migration generation support
+    - Optional type hints for mypy compatibility
+  - 📋 **Python - Mixed**: Combine multiple approaches
+    - Pydantic + SQLAlchemy hybrid models
+    - Dataclasses with validation decorators
+    - Choose per-class basis
+  - 📋 **TypeScript (Extended)**: Zod validators, runtime type checking
+  - 📋 **Java**: POJOs, Records, JPA entities
+  - 📋 **C#**: Classes, records, EF Core models
+  - 📋 **Go**: Structs with JSON tags
+  - 📋 **Rust**: Structs with Serde
+  - 📋 **Scala**: Case classes with play-json support
+  - 📋 **GraphQL**: SDL schema definitions
+  - 📋 **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
+- Customizable generation templates
+- Code generation settings per language:
+  - Naming conventions (camelCase, snake_case, PascalCase)
+  - Nullable vs Optional handling
+  - Validation annotations
+  - Documentation comments
+- Preview generated code before download
+- Download as single file or project structure
+- Generate with tests/mocks included
+
+| Ticket | Feature Description     |
+|--------|-------------------------|
+| [#221] | Export to GraphQL SDL   |
+| [#222] | Export to AsyncAPI      |
+| [#223] | Export to TypeScript    |
+| [#224] | Export to Python models |
+| [#225] | Export to Java          |
+| [#226] | Export to C#            |
+| [#227] | Export to Golang        |
+| [#228] | Export to SQL           |
+| [#229] | Export to Markdown      |
+| [#230] | Export to Excel         |
+| [#231] | Export to PDF           |
 
 **Import Wizard**
 - Step-by-step import process
@@ -2379,6 +2621,12 @@
 - 📋 SOC 2 compliance
 - 📋 GDPR compliance tools
 - 📋 Penetration testing reports
+
+| Ticket | Feature Description |
+|--------|---------------------|
+| [#68]  | SSO with AWS        |
+| [#69]  | SSO with Azure AD   |
+| [#241] | SSO with Okta       |
 
 ### User Permissions & Access Control 📋 PLANNED
 
@@ -2794,11 +3042,156 @@
 **Advanced Tenant Management** ✅ PARTIALLY IMPLEMENTED
 - ✅ Tenant CRUD operations
 - ✅ Tenant slug management with validation
+- 📋 Tenant industry tagging
+  - Industry classification tags (Financial Services, Healthcare, E-commerce, SaaS, etc.)
+  - Multi-industry support (select multiple industries)
+  - Industry-specific compliance recommendations
+  - Industry-based schema showcase filtering
+  - Industry benchmarking and analytics
+  - Custom industry categories for enterprise
 - 📋 Tenant resource quotas
 - 📋 Tenant billing and usage tracking
 - 📋 Tenant data isolation verification
 - 📋 Cross-tenant schema sharing (controlled)
 - ✅ Super Admin portal for tenant oversight
+
+### Tenant Industry Tagging (NEW)
+
+**Industry Classification** 📋 PLANNED
+- **Standard Industry Categories**:
+  - Financial Services (Banking, FinTech, Insurance, Investments)
+  - Healthcare (Hospitals, Pharma, Medical Devices, Health Tech)
+  - E-commerce (Retail, Marketplace, B2C, D2C)
+  - SaaS/B2B (Enterprise Software, DevTools, Productivity)
+  - Government & Public Sector (Federal, State, Local, Defense)
+  - Education (EdTech, Universities, K-12, Training)
+  - Manufacturing (Industrial, Automotive, Consumer Goods)
+  - Technology (Hardware, Software, Telecommunications)
+  - Real Estate (PropTech, Commercial, Residential)
+  - Logistics & Transportation (Supply Chain, Shipping, Travel)
+  - Media & Entertainment (Streaming, Gaming, Publishing)
+  - Energy & Utilities (Oil & Gas, Renewable Energy, Water)
+  - Professional Services (Consulting, Legal, Accounting)
+  - Non-Profit & NGO (Charity, Advocacy, Social Impact)
+  - Other/Multi-Industry
+
+- **Multi-Industry Support**:
+  - Select multiple industry tags per tenant
+  - Primary industry designation
+  - Industry weight/relevance scoring
+  - Industry history tracking (industry changes over time)
+
+- **Custom Industry Categories**:
+  - Enterprise customers can define custom industries
+  - Industry hierarchies (parent-child relationships)
+  - Industry-specific metadata fields
+  - Localized industry names (internationalization)
+
+**Industry-Specific Features** 📋 PLANNED
+- **Compliance Recommendations**:
+  - Auto-suggest compliance frameworks based on industry
+  - Healthcare → HIPAA, FHIR compliance
+  - Financial → PCI DSS, SOX, Open Banking
+  - Government → FedRAMP, NIST 800-53
+  - Display relevant regulations in dashboard
+  - Compliance checklist per industry
+
+- **Template Marketplace Integration**:
+  - Filter templates by industry
+  - "Recommended for your industry" section
+  - Industry-specific property templates
+  - Common patterns for specific industries
+  - Showcase schemas from same industry
+
+- **Schema Showcase Integration**:
+  - Filter showcase by industry
+  - "Schemas from [Industry]" collections
+  - Industry leaderboards
+  - Cross-industry inspiration section
+  - Industry-specific awards/recognition
+
+- **Benchmarking & Analytics**:
+  - Compare quality scores within industry
+  - Industry average metrics (classes, properties, complexity)
+  - Time-to-production by industry
+  - API complexity trends per industry
+  - Industry best practices reports
+
+- **Industry-Specific Validation Rules**:
+  - Healthcare: PHI field validation
+  - Financial: PCI compliance field checks
+  - E-commerce: Product schema standards
+  - Configurable rule sets per industry
+  - Industry working groups for standards
+
+**Tenant Profile Enhancement** 📋 PLANNED
+- **Public Profile**:
+  - Display industry tags on tenant profile
+  - Industry badges/icons
+  - "Serving [Industry]" section
+  - Industry expertise indicators
+  - Cross-reference with showcase
+
+- **Private Dashboard**:
+  - Industry-specific tips and guidance
+  - Regulatory updates for industry
+  - Industry news and trends
+  - Peer comparisons within industry
+  - Industry events and webinars
+
+**Search & Discovery** 📋 PLANNED
+- **Global Search**:
+  - Filter schemas by industry
+  - "Find schemas in [Industry]"
+  - Industry-based recommendations
+  - Cross-industry pattern matching
+
+- **Browse Page**:
+  - Industry facets in sidebar
+  - Industry tag cloud
+  - Popular industries this month
+  - Emerging industries
+
+**Admin Features** 📋 PLANNED
+- **Super Admin Dashboard**:
+  - View all tenants by industry
+  - Industry distribution analytics
+  - Growth trends by industry
+  - Industry engagement metrics
+  - Manage industry taxonomy
+
+- **Industry Management**:
+  - Add/edit/archive industries
+  - Merge industry categories
+  - Set industry aliases
+  - Define compliance mappings
+  - Industry hierarchy editor
+
+**Reporting & Analytics** 📋 PLANNED
+- **Industry Reports**:
+  - Schemas per industry breakdown
+  - Quality score by industry
+  - Active users by industry
+  - API complexity by industry
+  - Adoption trends by industry
+  - Industry market share
+
+- **Business Intelligence**:
+  - Industry segmentation for marketing
+  - Cross-sell opportunities by industry
+  - Churn analysis by industry
+  - Feature adoption by industry
+  - Support ticket trends by industry
+
+**API Integration** 📋 PLANNED
+- Tenant industry tags in REST API
+- GraphQL industry filtering
+- Webhook events for industry changes
+- Industry-based API quotas
+- Industry-specific rate limits
+
+| Ticket | Feature Description                                      |
+|--------|----------------------------------------------------------|
 
 ### Compliance & Governance
 
@@ -3119,39 +3512,57 @@
 ### Studio AI Chatbot
 
 **Chatbot Panel** 📋 PLANNED
-- **Panel Location**:
-  - Slide-out panel from right side of Studio
-  - Floating chat bubble option
-  - Full-screen chat mode for complex conversations
-  - Keyboard shortcut to toggle (`Cmd+Shift+A`)
-- **Chat Interface**:
-  - Modern chat UI with message bubbles
-  - User messages vs AI responses clearly distinguished
-  - Typing indicators while AI processes
-  - Markdown rendering in responses
-  - Code blocks with syntax highlighting
-  - Copy button for code snippets
-  - Regenerate response button
-  - Thumbs up/down for feedback
+- 📋 **Panel Location**:
+  - 📋 Slide-out panel from right side of Studio
+  - 📋 Floating chat bubble option
+  - 📋 Full-screen chat mode for complex conversations
+  - 📋 Keyboard shortcut to toggle (`Cmd+Shift+A`)
+  - 📋 Bottom right-hand corner of the canvas opens the AI Chatbot
+- 📋 **Chat Interface**:
+  - 📋 Modern chat UI with message bubbles
+  - 📋 User messages vs AI responses clearly distinguished
+  - 📋 Typing indicators while AI processes
+  - 📋 Markdown rendering in responses
+  - 📋 Code blocks with syntax highlighting
+  - 📋 Copy button for code snippets
+  - 📋 Regenerate response button
+  - 📋 Thumbs up/down for feedback
+  - 📋 OpenAPI Specifications are parsed using ```json``` markers, click button to view/accept import
+
+| Ticket | Feature Description              |
+|--------|----------------------------------|
+| [#257] | AI Chatbot Placement             |
+| [#258] | AI Chatbot Guidelines for design |
 
 **Conversation Features** 📋 PLANNED
-- **Conversation History**:
-  - Persist conversations per project/version
-  - Browse past conversations
-  - Search conversation history
-  - Export conversations as markdown
-  - Clear conversation option
-- **Context Awareness**:
-  - AI knows current project, version, classes
-  - AI can reference existing schemas in responses
-  - AI understands selected items on canvas
-  - AI can see property definitions
-  - Automatic context injection into prompts
-- **Multi-Turn Conversations**:
-  - Follow-up questions with context
-  - Clarification requests
-  - Iterative refinement of schemas
-  - "Make it more like X" type instructions
+- 📋 **Conversation History**:
+  - 📋 Persist conversations per project/version
+  - 📋 Browse past conversations
+  - 📋 Search conversation history
+  - 📋 Export conversations as markdown
+  - 📋 Clear conversation option
+- 📋 **Context Awareness**:
+  - 📋 AI knows current project, version, classes
+  - 📋 AI can reference existing schemas in responses
+  - 📋 AI understands selected items on canvas
+  - 📋 AI can see property definitions
+  - 📋 Automatic context injection into prompts
+- 📋 **Multi-Turn Conversations**:
+  - 📋 Follow-up questions with context
+  - 📋 Clarification requests
+  - 📋 Iterative refinement of schemas
+  - 📋 "Make it more like X" type instructions
+- Add guardrails to prevent sensitive data exposure
+- Add guardrails to prevent malicious code generation
+
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| [#259] | AI Chat Context Awareness                          |
+| [#260] | AI Multi-Turn Conversation with History            |
+| [#261] | AI Conversation history actions                    |
+| [#262] | Install guardrails.ai server                       |
+| [#263] | Add guardrails to prevent sensitive data exposure  |
+| [#264] | Add guardrails to prevent further sensitive issues |
 
 **Quick Actions from Chat** 📋 PLANNED
 - AI responses include action buttons:
@@ -3172,21 +3583,26 @@
   - Health check and failover
   - Connection timeout settings
   - Retry policies
-- **Model Selection**:
-  - Choose from available models:
-    - Qwen 2.5 (7B, 14B, 32B, 72B)
-    - Llama 3.2 (1B, 3B, 11B, 90B)
-    - CodeLlama for code-specific tasks
-    - Custom fine-tuned models
+- 📋 **Model Selection**:
+  - 📋 Choose from available models:
+    - 📋 Qwen 2.5
+    - 📋 Llama 3.2
+    - 📋 CodeLlama for code-specific tasks
+    - 📋 Custom fine-tuned models
   - Model switching per task type
   - Model performance comparison
-  - Default model per tenant/project
+  - 📋 Default model per tenant/project
 - **Resource Management**:
   - GPU memory monitoring
   - Request queuing for high load
   - Priority queues for different users
   - Rate limiting per user/tenant
   - Usage tracking and quotas
+
+| Ticket | Feature Description                     |
+|--------|-----------------------------------------|
+| [#265] | Ollama model selection                  |
+| [#266] | Ollama default model per tenant/project |
 
 **Ollama API Integration** 📋 PLANNED
 - **API Endpoints**:
@@ -3208,16 +3624,16 @@
 ### Natural Language to Schema
 
 **Schema Generation from Description** 📋 PLANNED
-- **Input Methods**:
-  - Free-form text description
-  - Structured prompts with templates
-  - Voice input (speech-to-text)
-  - Paste requirements document
-- **Example Prompts**:
-  - "Create a User class with email, password hash, created date, and roles array"
-  - "I need an e-commerce order with line items, shipping address, and payment info"
-  - "Generate a blog post schema with author reference, tags, and comments"
-  - "Create a REST API for managing a todo list application"
+- 📋 **Input Methods**:
+  - 📋 Free-form text description
+  - 📋 Structured prompts with templates
+  - 📋 Voice input (speech-to-text)
+  - 📋 Paste requirements document
+- 📋 **Example Prompts**:
+  - 📋 "Create a User class with email, password hash, created date, and roles array"
+  - 📋 "I need an e-commerce order with line items, shipping address, and payment info"
+  - 📋 "Generate a blog post schema with author reference, tags, and comments"
+  - 📋 "Create a REST API for managing a todo list application"
 - **Generation Output**:
   - Preview generated schema before creation
   - JSON Schema format display
@@ -3229,6 +3645,12 @@
   - "Make email required"
   - "Add validation for password length"
   - "Include timestamps for audit"
+
+| Ticket | Feature Description                     |
+|--------|-----------------------------------------|
+| [#267] | Adds the ability to generate a schema from a description |
+| [#268] | Adds example prompts |
+
 
 **Scenario-Based API Generation** 📋 PLANNED
 - **User Story Input**:
@@ -3251,35 +3673,51 @@
 ### AI-Powered Property Suggestions
 
 **Smart Property Recommendations** 📋 PLANNED
-- **Trigger Conditions**:
-  - When creating a new class
-  - When class name is entered
-  - On-demand via chat or button
-  - After adding first few properties
-- **Suggestion Types**:
-  - Common properties for class type (e.g., "User" → email, password, name)
-  - Missing standard properties (e.g., id, createdAt, updatedAt)
-  - Related properties based on existing ones
-  - Industry-standard properties (FHIR for healthcare, etc.)
-- **Suggestion UI**:
-  - Property suggestion dropdown
-  - Bulk accept/reject
-  - Customize before adding
-  - "Add all suggested" button
-  - Explanation for each suggestion
+- 📋 **Trigger Conditions**:
+  - 📋 When creating a new class
+  - 📋 When class name is entered
+  - 📋 On-demand via chat or button
+  - 📋 After adding first few properties
+- 📋 **Suggestion Types**:
+  - 📋 Common properties for class type (e.g., "User" → email, password, name)
+  - 📋 Missing standard properties (e.g., id, createdAt, updatedAt)
+  - 📋 Related properties based on existing ones
+  - 📋 Industry-standard properties (FHIR for healthcare, etc.)
+- 📋 **Suggestion UI**:
+  - 📋 Property suggestion dropdown
+  - 📋 Bulk accept/reject
+  - 📋 Customize before adding
+  - 📋 "Add all suggested" button
+  - 📋 Explanation for each suggestion
+
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| [#269] | Adds the ability to suggest properties based on AI |
+| [#270] | Adds a property suggestion dropdown                |
+| [#271] | Adds bulk accept/reject for property suggestions   |
+| [#272] | Adds customization before adding                   |
+| [#273] | Adds explanations for each suggestion              |
+| [#274] | Adds "Add all suggested" button                    |
+| [#275] | Adds trigger conditions for the Suggestion UI      |
+| [#276] | Adds analyze button for properties analysis        |
 
 **Type and Constraint Inference** 📋 PLANNED
-- Suggest type based on property name:
-  - `email` → string with email format
-  - `createdAt` → string with date-time format
-  - `age` → integer with minimum 0
-  - `price` → number with minimum 0
-  - `isActive` → boolean
-- Suggest constraints:
-  - String length limits
-  - Numeric ranges
-  - Pattern validation
-  - Required vs optional
+- 📋 Suggest type based on property name:
+  - 📋 `email` → string with email format
+  - 📋 `createdAt` → string with date-time format
+  - 📋 `age` → integer with minimum 0
+  - 📋 `price` → number with minimum 0
+  - 📋 `isActive` → boolean
+- 📋 Suggest constraints:
+  - 📋 String length limits
+  - 📋 Numeric ranges
+  - 📋 Pattern validation
+  - 📋 Required vs optional
+
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| [#277] | Adds type inference based on property name |
+| [#278] | Adds constraint suggestions for properties |
 
 ### AI Schema Review & Improvement
 
@@ -3585,7 +4023,7 @@
 
 **Multi-Language SDK Generation** 📋 PLANNED
 - **Supported Languages**:
-  - TypeScript/JavaScript (npm packages)
+  - TypeScript/JavaScript (npm or yarn packages)
   - Python (PyPI packages)
   - Java (Maven Central artifacts)
   - Kotlin (Maven Central artifacts)
@@ -5109,68 +5547,96 @@ Focus on shipping high-impact features that users will love, rather than buildin
 
 ### ✅ Completed Features (53 items) - See [Detailed Completion List](#completed-features-detailed) at end of document
 
-| Category     | Feature                           | Description                                        |
-|--------------|-----------------------------------|----------------------------------------------------|
-| **Canvas**   | ~~Auto Layout~~                       | ~~8 algorithms (hierarchical, force, circular, grid)~~ |
-| **Canvas**   | ~~Level of Detail~~                   | ~~Dynamic detail based on zoom level~~                 |
-| **Canvas**   | ~~Progress Bar~~                      | ~~Visual loading feedback~~                            |
-| **Canvas**   | ~~Edge Cardinality~~                  | ~~Visual relationship types~~                          |
-| **Canvas**   | ~~Class Tags~~                        | ~~Tags displayed on nodes~~                            |
-| **Canvas**   | ~~Mermaid Export~~                    | ~~Preview/code modes, PNG/SVG export~~                 |
-| **Canvas**   | Export Button                     | Icon-only button in canvas header             |
-| **Code Gen** | ~~TypeScript~~                        | ~~Interfaces with composition~~                        |
-| **Code Gen** | ~~Python - Pydantic~~                 | ~~Models with validation~~                             |
-| **Code Gen** | ~~Python - Dataclasses~~              | ~~Standard library classes~~                           |
-| **Code Gen** | ~~Python - SQLAlchemy~~               | ~~ORM models~~                                         |
-| **Code Gen** | ~~Java~~                              | ~~POJOs, Records, JPA entities~~                       |
-| **Code Gen** | ~~Scala~~                             | ~~Case classes with play-json~~                        |
-| **Code Gen** | ~~GraphQL SDL~~                       | ~~Schema definitions~~                                 |
-| **Code Gen** | ~~SQL DDL~~                           | ~~PostgreSQL, MySQL, SQLite, SQL Server, Oracle~~      |
-| **OpenAPI**  | ~~Composition (allOf/anyOf/oneOf)~~   | ~~Full schema composition support~~                    |
-| **OpenAPI**  | ~~Discriminator~~                     | ~~Property + mapping with auto/manual modes~~          |
-| **OpenAPI**  | ~~Type Arrays (nullable)~~            | ~~`['string', 'null']` for nullable types~~            |
-| **OpenAPI**  | ~~Exclusive Min/Max~~                 | ~~`exclusiveMinimum`, `exclusiveMaximum`~~             |
-| **OpenAPI**  | ~~const Keyword~~                     | ~~Single constant value constraint~~                   |
-| **OpenAPI**  | ~~prefixItems (Tuple Mode)~~          | ~~Ordered array schemas with position-specific types~~ |
-| **OpenAPI**  | ~~contains/minContains/maxContains~~  | ~~Array item matching constraints~~                    |
-| **OpenAPI**  | ~~unevaluatedItems~~                  | ~~Control for unmatched array items~~                  |
-| **OpenAPI**  | ~~unevaluatedProperties~~             | ~~Control for unmatched object properties~~            |
-| **OpenAPI**  | ~~not Keyword~~                       | ~~Negation schemas~~                                   |
-| **OpenAPI**  | ~~if/then/else~~                      | ~~Conditional schema application~~                     |
-| **OpenAPI**  | ~~patternProperties~~                 | ~~Regex-based property schemas~~                       |
-| **OpenAPI**  | ~~dependentSchemas~~                  | ~~Property-triggered schema constraints~~              |
-| **OpenAPI**  | ~~dependentRequired~~                 | ~~Property-triggered required fields~~                 |
-| **OpenAPI**  | ~~propertyNames~~                     | ~~Property name validation (pattern, min/max length)~~ |
-| **OpenAPI**  | ~~deprecated~~                        | ~~With custom deprecation messages~~                   |
-| **OpenAPI**  | ~~examples Array~~                    | ~~Multiple example values~~                            |
-| **OpenAPI**  | ~~readOnly/writeOnly~~                | ~~Access control flags~~                               |
-| **OpenAPI**  | ~~Extension Properties (x-)~~         | ~~Custom vendor extensions~~                           |
-| **OpenAPI**  | ~~External Documentation~~            | ~~externalDocs with URL and description~~              |
-| **OpenAPI**  | ~~String Constraints~~                | ~~minLength, maxLength, pattern, format~~              |
-| **OpenAPI**  | ~~Numeric Constraints~~               | ~~minimum, maximum, multipleOf~~                       |
-| **OpenAPI**  | ~~Array Constraints~~                 | ~~minItems, maxItems, uniqueItems~~                    |
-| **OpenAPI**  | ~~Object Constraints~~                | ~~minProperties, maxProperties, additionalProperties~~ |
-| **OpenAPI**  | ~~Enum Values~~                       | ~~With drag-and-drop reordering~~                      |
-| **OpenAPI**  | ~~Default Values~~                    | ~~Property defaults~~                                  |
-| **Auth**     | ~~API Keys~~                          | ~~Full CRUD, expiration, usage tracking~~              |
-| **Auth**     | ~~GitHub OAuth~~                      | ~~SSO + account linking~~                              |
-| **Auth**     | ~~GitLab OAuth~~                      | ~~SSO + account linking~~                              |
-| **Auth**     | ~~External Providers~~                | ~~Linked accounts management~~                         |
-| **Auth**     | ~~Super Admin~~                       | ~~Password-protected portal~~                          |
-| **DevEx**    | ~~Swagger UI~~                        | ~~Integrated in Studio~~                               |
-| **DevEx**    | ~~Git Browser~~                       | ~~GitHub/GitLab via SSO~~                              |
-| **DevEx**    | ~~PAT Support~~                       | ~~Personal Access Tokens~~                             |
-| **DevEx**    | ~~Version Copy~~                      | ~~Copy classes between versions~~                      |
-| **DevEx**    | ~~Spec Viewer (Browse)~~              | ~~JSON/YAML toggle, theme selector~~                   |
-| **Infra**    | ~~Docker~~                            | ~~Multi-stage production builds~~                      |
-| **UI**       | ~~Dark Mode~~                         | ~~System preference detection~~                        |
-| **UI**       | ~~Radix UI Migration~~                | ~~Modern component library (Studio & Dashboard)~~      |
+| Category     | Feature                              | Description                                            |
+|--------------|--------------------------------------|--------------------------------------------------------|
+| **Canvas**   | ~~Auto Layout~~                      | ~~8 algorithms (hierarchical, force, circular, grid)~~ |
+| **Canvas**   | ~~Level of Detail~~                  | ~~Dynamic detail based on zoom level~~                 |
+| **Canvas**   | ~~Progress Bar~~                     | ~~Visual loading feedback~~                            |
+| **Canvas**   | ~~Edge Cardinality~~                 | ~~Visual relationship types~~                          |
+| **Canvas**   | ~~Class Tags~~                       | ~~Tags displayed on nodes~~                            |
+| **Canvas**   | ~~Mermaid Export~~                   | ~~Preview/code modes, PNG/SVG export~~                 |
+| **Canvas**   | ~~Export Button~~                    | ~~Icon-only button in canvas header~~                  |
+| **Canvas**   | ~~Layout Adjustment Button~~         | ~~Moved into canvas header for easier access~~         |
+| **Code Gen** | ~~TypeScript~~                       | ~~Interfaces with composition~~                        |
+| **Code Gen** | ~~Python - Pydantic~~                | ~~Models with validation~~                             |
+| **Code Gen** | ~~Python - Dataclasses~~             | ~~Standard library classes~~                           |
+| **Code Gen** | ~~Python - SQLAlchemy~~              | ~~ORM models~~                                         |
+| **Code Gen** | ~~Java~~                             | ~~POJOs, Records, JPA entities~~                       |
+| **Code Gen** | ~~Scala~~                            | ~~Case classes with play-json~~                        |
+| **Code Gen** | ~~GraphQL SDL~~                      | ~~Schema definitions~~                                 |
+| **Code Gen** | ~~SQL DDL~~                          | ~~PostgreSQL, MySQL, SQLite, SQL Server, Oracle~~      |
+| **OpenAPI**  | ~~Composition (allOf/anyOf/oneOf)~~  | ~~Full schema composition support~~                    |
+| **OpenAPI**  | ~~Discriminator~~                    | ~~Property + mapping with auto/manual modes~~          |
+| **OpenAPI**  | ~~Type Arrays (nullable)~~           | ~~`['string', 'null']` for nullable types~~            |
+| **OpenAPI**  | ~~Exclusive Min/Max~~                | ~~`exclusiveMinimum`, `exclusiveMaximum`~~             |
+| **OpenAPI**  | ~~const Keyword~~                    | ~~Single constant value constraint~~                   |
+| **OpenAPI**  | ~~prefixItems (Tuple Mode)~~         | ~~Ordered array schemas with position-specific types~~ |
+| **OpenAPI**  | ~~contains/minContains/maxContains~~ | ~~Array item matching constraints~~                    |
+| **OpenAPI**  | ~~unevaluatedItems~~                 | ~~Control for unmatched array items~~                  |
+| **OpenAPI**  | ~~unevaluatedProperties~~            | ~~Control for unmatched object properties~~            |
+| **OpenAPI**  | ~~not Keyword~~                      | ~~Negation schemas~~                                   |
+| **OpenAPI**  | ~~if/then/else~~                     | ~~Conditional schema application~~                     |
+| **OpenAPI**  | ~~patternProperties~~                | ~~Regex-based property schemas~~                       |
+| **OpenAPI**  | ~~dependentSchemas~~                 | ~~Property-triggered schema constraints~~              |
+| **OpenAPI**  | ~~dependentRequired~~                | ~~Property-triggered required fields~~                 |
+| **OpenAPI**  | ~~propertyNames~~                    | ~~Property name validation (pattern, min/max length)~~ |
+| **OpenAPI**  | ~~deprecated~~                       | ~~With custom deprecation messages~~                   |
+| **OpenAPI**  | ~~examples Array~~                   | ~~Multiple example values~~                            |
+| **OpenAPI**  | ~~readOnly/writeOnly~~               | ~~Access control flags~~                               |
+| **OpenAPI**  | ~~Extension Properties (x-)~~        | ~~Custom vendor extensions~~                           |
+| **OpenAPI**  | ~~External Documentation~~           | ~~externalDocs with URL and description~~              |
+| **OpenAPI**  | ~~String Constraints~~               | ~~minLength, maxLength, pattern, format~~              |
+| **OpenAPI**  | ~~Numeric Constraints~~              | ~~minimum, maximum, multipleOf~~                       |
+| **OpenAPI**  | ~~Array Constraints~~                | ~~minItems, maxItems, uniqueItems~~                    |
+| **OpenAPI**  | ~~Object Constraints~~               | ~~minProperties, maxProperties, additionalProperties~~ |
+| **OpenAPI**  | ~~Enum Values~~                      | ~~With drag-and-drop reordering~~                      |
+| **OpenAPI**  | ~~Default Values~~                   | ~~Property defaults~~                                  |
+| **Auth**     | ~~API Keys~~                         | ~~Full CRUD, expiration, usage tracking~~              |
+| **Auth**     | ~~GitHub OAuth~~                     | ~~SSO + account linking~~                              |
+| **Auth**     | ~~GitLab OAuth~~                     | ~~SSO + account linking~~                              |
+| **Auth**     | ~~External Providers~~               | ~~Linked accounts management~~                         |
+| **Auth**     | ~~Super Admin~~                      | ~~Password-protected portal~~                          |
+| **DevEx**    | ~~Swagger UI~~                       | ~~Integrated in Studio~~                               |
+| **DevEx**    | ~~Git Browser~~                      | ~~GitHub/GitLab via SSO~~                              |
+| **DevEx**    | ~~PAT Support~~                      | ~~Personal Access Tokens~~                             |
+| **DevEx**    | ~~Version Copy~~                     | ~~Copy classes between versions~~                      |
+| **DevEx**    | ~~Spec Viewer (Browse)~~             | ~~JSON/YAML toggle, theme selector~~                   |
+| **Infra**    | ~~Docker~~                           | ~~Multi-stage production builds~~                      |
+| **UI**       | ~~Dark Mode~~                        | ~~System preference detection~~                        |
+| **UI**       | ~~Radix UI Migration~~               | ~~Modern component library (Studio & Dashboard)~~      |
 
 ---
 
 ## 📈 Changelog
 
-### December 19, 2025 - Version 3.1 (Completed Features Summary & Enterprise Enhancement)
+### December 19, 2025 - Version 3.1 (Schema Showcase, Completed Features & Enterprise Enhancement)
+- **Added Tenant Industry Tagging Section** (Q1 2026)
+  - Industry classification taxonomy with 15+ standard categories
+  - Multi-industry tagging support for tenants (primary + secondary)
+  - Industry-specific compliance recommendations (HIPAA for Healthcare, PCI DSS for Financial, etc.)
+  - Template marketplace filtering by industry
+  - Schema showcase industry collections and leaderboards
+  - Industry benchmarking and analytics (quality scores, complexity, time-to-production)
+  - Industry-specific validation rule sets
+  - Tenant public profile with industry badges
+  - Industry-based search and discovery
+  - Super admin industry management dashboard
+  - Industry reports and business intelligence
+  - Custom industry categories for enterprise customers
+  - 14 new tickets added (#239-#252)
+- **Added Schema Showcase Section** (🟠 High Priority, Q1 2026)
+  - Monthly showcase gallery on browse.objectified.dev
+  - Features schemas with top quality scores (90-100)
+  - Company branding and recognition for featured schemas
+  - Showcase categories: Industry Leaders, Best Practices, Innovation Awards, Community Choice
+  - Automatic eligibility detection and nomination system
+  - Company benefits: homepage feature, social media promotion, marketing assets, analytics
+  - "Featured Schema" badges and certificates
+  - Showcase archive with search and filtering
+  - Achievement badges and gamification system
+  - Integration with quality score monitoring
+  - Social sharing cards and email campaigns
+  - 19 new tickets added (#220-#238)
 - **Added Completed Features Detailed Section**
   - Comprehensive list of all 53+ completed features organized by category
   - Strikethrough formatting for all completed items
