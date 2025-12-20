@@ -173,7 +173,9 @@ const StudioContent = () => {
 
   // Export dropdown state
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
+  const layoutDropdownRef = useRef<HTMLDivElement>(null);
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -1426,16 +1428,19 @@ const StudioContent = () => {
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as HTMLElement)) {
         setExportDropdownOpen(false);
       }
+      if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target as HTMLElement)) {
+        setLayoutDropdownOpen(false);
+      }
     };
 
-    if (exportDropdownOpen) {
+    if (exportDropdownOpen || layoutDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [exportDropdownOpen]);
+  }, [exportDropdownOpen, layoutDropdownOpen]);
 
   // Load versions when project is selected
   useEffect(() => {
@@ -2064,59 +2069,244 @@ const StudioContent = () => {
               ) : null;
             })()}
 
-            {/* Layout Control Panel */}
-            <Panel position="top-right" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg p-4 border border-gray-200/80 dark:border-gray-700/80 min-w-[300px]" style={{ marginRight: '60px' }}>
-              <div className="flex flex-col gap-4">
-                {/* Auto Layout Toggle */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-                      <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                      </svg>
-                    </div>
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      Auto Layout
-                    </span>
-                  </div>
-                  <Switch.Root
-                    checked={autoLayoutEnabled}
-                    onCheckedChange={setAutoLayoutEnabled}
-                    className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors cursor-pointer"
-                  >
-                    <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
-                  </Switch.Root>
-                </div>
+            {/* Layout Control Button */}
+            <Panel position="top-right" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80" style={{ marginRight: '60px' }}>
+              <div className="relative" ref={layoutDropdownRef}>
+                <button
+                  onClick={() => setLayoutDropdownOpen(!layoutDropdownOpen)}
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2"
+                  title="Layout options"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                </button>
 
-                {/* Algorithm Selector */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Algorithm
-                  </label>
-                  <select
-                    value={layoutAlgorithm}
-                    onChange={(e) => onLayoutAlgorithm(e.target.value as LayoutAlgorithm)}
-                    disabled={!autoLayoutEnabled}
-                    className={`text-sm px-3 py-2 rounded-lg border transition-all duration-200 ${
-                      autoLayoutEnabled
-                        ? 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:border-indigo-300 dark:hover:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
-                        : 'bg-gray-50 dark:bg-gray-700/50 border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    <optgroup label="Hierarchical">
-                      <option value="hierarchical-tb">↓ Top to Bottom</option>
-                      <option value="hierarchical-lr">→ Left to Right</option>
-                      <option value="hierarchical-bt">↑ Bottom to Top</option>
-                      <option value="hierarchical-rl">← Right to Left</option>
-                    </optgroup>
-                    <optgroup label="Other">
-                      <option value="force-directed">🔄 Force-Directed</option>
-                      <option value="circular">⭕ Circular</option>
-                      <option value="grid">⊞ Grid</option>
-                      <option value="layered">📚 Layered</option>
-                    </optgroup>
-                  </select>
-                </div>
+                {/* Dropdown Menu */}
+                {layoutDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[1002]">
+                    <div className="py-1">
+                      {/* Auto Layout Toggle */}
+                      <div className="px-4 py-3 mb-1 border-b border-gray-100 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                            </svg>
+                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              Auto Layout
+                            </span>
+                          </div>
+                          <Switch.Root
+                            checked={autoLayoutEnabled}
+                            onCheckedChange={setAutoLayoutEnabled}
+                            className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors cursor-pointer"
+                          >
+                            <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
+                          </Switch.Root>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                          Automatically arrange nodes when adding or removing classes
+                        </p>
+                      </div>
+
+                      {/* Layout Algorithms Header */}
+                      <div className="px-4 pt-2 pb-1">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Layout Algorithms
+                        </h4>
+                      </div>
+
+                      {/* Hierarchical Layouts */}
+                      <div className="px-3 py-1">
+                        <div className="px-2 py-1.5">
+                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Hierarchical</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('hierarchical-tb');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'hierarchical-tb' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">↓</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Top to Bottom</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Parent nodes at top, children flow downward
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('hierarchical-lr');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'hierarchical-lr' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">→</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Left to Right</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Root nodes on left, branches extend rightward
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('hierarchical-bt');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'hierarchical-bt' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">↑</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Bottom to Top</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Children at bottom, parents above
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('hierarchical-rl');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'hierarchical-rl' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">←</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Right to Left</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Root nodes on right, branches extend leftward
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Other Layouts */}
+                        <div className="px-2 py-1.5 mt-2">
+                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Other</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('force-directed');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'force-directed' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">🔄</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Force-Directed</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Physics-based layout with natural node spacing
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('circular');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'circular' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">⭕</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Circular</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Arrange nodes in a circular pattern
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('grid');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'grid' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">⊞</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Grid</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Uniform grid layout with equal spacing
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            onLayoutAlgorithm('layered');
+                            setLayoutDropdownOpen(false);
+                          }}
+                          disabled={!autoLayoutEnabled}
+                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
+                            autoLayoutEnabled
+                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          } ${layoutAlgorithm === 'layered' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0 w-6 text-center">📚</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">Layered</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                Minimize edge crossings with layered approach
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Panel>
 
