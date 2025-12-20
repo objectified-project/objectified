@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-import { toPng, toSvg } from 'html-to-image';
+import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useStudio } from './StudioContext';
 import { Copy, Download, Check, Eye, Code } from 'lucide-react';
@@ -955,6 +955,76 @@ const StudioContent = () => {
 
       await alertDialog({
         message: 'Failed to export canvas as PDF. Please try again.',
+        variant: 'error',
+      });
+    }
+  }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
+
+  // Handle JPEG export
+  const handleExportJpeg = useCallback(async () => {
+    try {
+      // Get the ReactFlow viewport element
+      const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
+
+      if (!viewportElement) {
+        await alertDialog({
+          message: 'Canvas not found. Please try again.',
+          variant: 'error',
+        });
+        return;
+      }
+
+      // Get project and version info for filename
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
+      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.jpg`;
+
+      // Show loading state
+      setLoadingMessage('Exporting canvas as JPEG...');
+      setIsLoadingCanvas(true);
+
+      // Use html-to-image to convert the canvas to JPEG
+      const dataUrl = await toJpeg(viewportElement, {
+        backgroundColor: isDark ? '#111827' : '#ffffff',
+        quality: 0.95, // High quality JPEG (0.0 to 1.0)
+        pixelRatio: 2, // Higher quality export (2x resolution)
+        filter: (node) => {
+          // Exclude controls, minimap, and other UI elements
+          if (node.classList) {
+            return !node.classList.contains('react-flow__controls') &&
+                   !node.classList.contains('react-flow__minimap') &&
+                   !node.classList.contains('react-flow__attribution') &&
+                   !node.classList.contains('react-flow__panel');
+          }
+          return true;
+        },
+      });
+
+      // Create a download link and trigger download
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+
+      // Hide loading state
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+
+      // Close the export dropdown
+      setExportDropdownOpen(false);
+
+      // Show success message briefly
+      await alertDialog({
+        message: `Canvas exported as ${filename}`,
+        variant: 'success',
+      });
+    } catch (error) {
+      console.error('Error exporting JPEG:', error);
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+
+      await alertDialog({
+        message: 'Failed to export canvas as JPEG. Please try again.',
         variant: 'error',
       });
     }
@@ -2608,11 +2678,7 @@ const StudioContent = () => {
                         <span>PNG Image</span>
                       </button>
                       <button
-                        onClick={() => {
-                          // JPEG export functionality will be added here
-                          console.log('Export as JPEG');
-                          setExportDropdownOpen(false);
-                        }}
+                        onClick={handleExportJpeg}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

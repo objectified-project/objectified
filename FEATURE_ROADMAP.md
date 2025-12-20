@@ -1179,9 +1179,6 @@
 | [#161] | Share group templates across projects/tenants                                                           |
 | [#197] | Group classes by dragging group into canvas group                                                       |
 | [#190] | Create an export button to the canvas header                                                            |
-| [#191] | Export as PNG                                                                                           |
-| [#192] | Export as SVG                                                                                           |
-| [#193] | Export as PDF                                                                                           |
 | [#284] | Dragging and dropping a node to a group will add it                                                     |
 | [#285] | Ungrouping nodes from a group by deleting it                                                            |
 
@@ -1704,9 +1701,9 @@
 **Canvas Export Options**
 - **Export Formats**: 
   - ✅ PNG (raster image)
-  - 📋 JPG (photo quality)
-  - 📋 SVG (vector, scalable)
-  - 📋 PDF (document format)
+  - ✅ JPG (photo quality)
+  - ✅ SVG (vector, scalable)
+  - ✅ PDF (document format)
   - ✅ Mermaid diagram code
   - 📋 PlantUML code
   - 📋 GraphML (for yEd, Gephi)
@@ -1741,9 +1738,6 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| [#191] | Export as PNG       |
-| [#192] | Export as SVG       |
-| [#193] | Export as PDF       |
 | [#198] | Export as JPG       |
 | [#200] | Export as PlantUML  |
 | [#201] | Export as GraphML   |
@@ -6266,17 +6260,29 @@ Focus on shipping high-impact features that users will love, rather than buildin
   - Smart filename generation: `{project-name}-v{version}.pdf`
   - Loading state with "Exporting canvas as PDF..." message
   - Comprehensive error handling with user feedback
+- **Implemented Canvas Export as JPEG** ✅ COMPLETED
+  - Added toJpeg import from html-to-image library
+  - Created handleExportJpeg function for compressed raster export
+  - High quality JPEG encoding (quality: 0.95 on 0.0-1.0 scale)
+  - 2x pixel ratio for high-resolution output
+  - Smaller file sizes compared to PNG (ideal for sharing)
+  - Same filtering as other formats (excludes UI controls)
+  - Smart filename generation: `{project-name}-v{version}.jpg`
+  - Loading state with "Exporting canvas as JPEG..." message
+  - Theme-aware backgrounds (dark/light)
+  - Complete error handling with user feedback
 - **Updated Export Dropdown UI**
   - Connected PNG Image button to handleExportPng function
+  - Connected JPEG Image button to handleExportJpeg function
   - Connected SVG Image button to handleExportSvg function
   - Connected PDF Document button to handleExportPdf function
   - Export button remains positioned in canvas upper right corner
-  - JPEG export button remains as placeholder for future implementation
-- **Export Features Summary**:
+  - All 4 export formats now fully functional
+- **Export Features Summary** - ALL FORMATS COMPLETE:
   - ✅ PNG Export: High-resolution raster images (2x pixel ratio)
+  - ✅ JPEG Export: Compressed raster with smaller file sizes (quality 0.95)
   - ✅ SVG Export: Scalable vector graphics
   - ✅ PDF Export: Professional documents with metadata and layout
-  - 📋 JPEG Export: Placeholder for future implementation
 
 ### December 20, 2025 - Version 3.2 (UI/UX Consolidation for Next Iteration)
 - **Added UI/UX Look & Feel Consolidated Section** 🔥 **NEXT ITERATION FOCUS**
