@@ -26,7 +26,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, clickToFocusEnabled } = useStudio();
 
   // State
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -212,7 +212,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     onClassAdd: handleClassAdd, onClassEdit: handleClassEdit, onClassDelete: handleClassDelete,
     onClassSelect: (classItem) => {
       console.log('Class selected:', classItem);
-      if (zoomToClassFn) {
+      // Only zoom if click-to-focus mode is enabled
+      if (clickToFocusEnabled && zoomToClassFn) {
         zoomToClassFn(classItem.id);
       }
     },

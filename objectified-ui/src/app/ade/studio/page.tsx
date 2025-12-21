@@ -127,8 +127,19 @@ const StudioContent = () => {
     triggerSidebarRefresh,
     isReadOnly,
     setIsReadOnly,
-    setZoomToClassFn
+    setZoomToClassFn,
+    setClickToFocusEnabled: setContextClickToFocusEnabled
   } = useStudio();
+
+  // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
+  const toggleClickToFocus = useCallback(() => {
+    setClickToFocusEnabled((prev) => {
+      const newValue = !prev;
+      localStorage.setItem('clickToFocusEnabled', JSON.stringify(newValue));
+      setContextClickToFocusEnabled(newValue);
+      return newValue;
+    });
+  }, [setContextClickToFocusEnabled]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -196,6 +207,15 @@ const StudioContent = () => {
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click-to-focus mode state
+  const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('clickToFocusEnabled');
+      return saved ? JSON.parse(saved) : true; // Default to enabled
+    }
+    return true;
+  });
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -292,6 +312,11 @@ const StudioContent = () => {
     setZoomToClassFn(() => zoomToClass);
     return () => setZoomToClassFn(null);
   }, [zoomToClass, setZoomToClassFn]);
+
+  // Sync clickToFocusEnabled with context
+  useEffect(() => {
+    setContextClickToFocusEnabled(clickToFocusEnabled);
+  }, [clickToFocusEnabled, setContextClickToFocusEnabled]);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async (applyLayout = false) => {
@@ -2451,7 +2476,12 @@ const StudioContent = () => {
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
     console.log('Clicked node:', node);
-  }, []);
+
+    // If click-to-focus is enabled, zoom to the clicked node
+    if (clickToFocusEnabled) {
+      zoomToClass(node.id);
+    }
+  }, [clickToFocusEnabled, zoomToClass]);
 
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
     console.log('Clicked edge:', edge);
@@ -2733,6 +2763,23 @@ const StudioContent = () => {
                             <span>Dark Mode</span>
                           </>
                         )}
+                      </DropdownMenu.Item>
+
+                      <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+
+                      {/* Click-to-Focus Toggle */}
+                      <DropdownMenu.Item
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                        onSelect={() => toggleClickToFocus()}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        <span className="flex-1">Click-to-Focus</span>
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                          {clickToFocusEnabled ? 'ON' : 'OFF'}
+                        </span>
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>

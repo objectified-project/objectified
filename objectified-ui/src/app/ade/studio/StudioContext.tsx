@@ -15,6 +15,8 @@ interface StudioContextType {
   setIsReadOnly: (value: boolean) => void;
   zoomToClassFn: ((classId: string) => void) | null;
   setZoomToClassFn: (fn: ((classId: string) => void) | null) => void;
+  clickToFocusEnabled: boolean;
+  setClickToFocusEnabled: (value: boolean) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -26,6 +28,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState<number>(0);
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [zoomToClassFn, setZoomToClassFn] = useState<((classId: string) => void) | null>(null);
+  const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(true);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -48,7 +51,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       isReadOnly,
       setIsReadOnly,
       zoomToClassFn,
-      setZoomToClassFn
+      setZoomToClassFn,
+      clickToFocusEnabled,
+      setClickToFocusEnabled
     }}>
       {children}
     </StudioContext.Provider>

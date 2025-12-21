@@ -8,7 +8,11 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Even more look and feel improvements
   - Converting from Material UI to Radix UI
-  - Click-to-focus classes
+  - Click-to-focus mode - toggle in Settings menu to enable/disable automatic zoom-to-node behavior
+    - When enabled: clicking a class node on the canvas or selecting a class in the sidebar automatically zooms and focuses on that class
+    - When disabled: clicking nodes and selecting classes in the sidebar does not trigger automatic zooming
+    - Preference is saved to localStorage and persists across sessions
+    - Defaults to enabled for the best user experience
 - Numerous bug fixes and performance enhancements
 - Improved canvas performance for large schemas
 - Properties form and editor have an improved layout
