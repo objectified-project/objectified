@@ -1203,11 +1203,11 @@ const StudioContent = () => {
 
           // Add node attributes
           if (node.data.name) {
-            graphMlContent += `      <data key="d0">${escapeXml(node.data.name)}</data>\n`;
+            graphMlContent += `      <data key="d0">${escapeXml(String(node.data.name))}</data>\n`;
           }
 
           if (node.data.description) {
-            graphMlContent += `      <data key="d1">${escapeXml(node.data.description)}</data>\n`;
+            graphMlContent += `      <data key="d1">${escapeXml(String(node.data.description))}</data>\n`;
           }
 
           // Add properties as JSON string
@@ -1248,7 +1248,7 @@ const StudioContent = () => {
         // Add edge type
         if (edge.data) {
           const edgeType = edge.data.type || 'reference';
-          graphMlContent += `      <data key="e1">${escapeXml(edgeType)}</data>\n`;
+          graphMlContent += `      <data key="e1">${escapeXml(String(edgeType))}</data>\n`;
 
           // Add cardinality if available
           if (edge.data.cardinality) {
