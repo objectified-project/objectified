@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: Unevaluated Items Example
+  version: 1.0.0
+  description: Demonstrates unevaluatedItems for array validation
+
+components:
+  schemas:
+    StrictTuple:
+      type: object
+      description: Object with strict tuple validation
+      properties:
+        coordinates:
+          type: array
+          description: 2D coordinates [x, y] with no additional items
+          prefixItems:
+            - type: number
+              description: X coordinate
+            - type: number
+              description: Y coordinate
+          unevaluatedItems: false
+          examples:
+            - [10.5, 20.3]
+            - [-5.0, 15.7]
+
+    FlexibleTuple:
+      type: object
+      description: Object with flexible tuple validation
+      properties:
+        data:
+          type: array
+          description: First three items are structured, rest must be strings
+          prefixItems:
+            - type: string
+              description: Name
+            - type: integer
+              description: Age
+            - type: boolean
+              description: Active status
+          unevaluatedItems:
+            type: string
+            description: Additional items must be strings
+          examples:
+            - ["Alice", 30, true, "tag1", "tag2"]
+            - ["Bob", 25, false]
+
+    MixedArray:
+      type: object
+      description: Object with mixed array validation
+      properties:
+        values:
+          type: array
+          description: Array with known items and constrained additional items
+          prefixItems:
+            - type: string
+              const: "header"
+          items:
+            type: number
+          unevaluatedItems: false
+          examples:
+            - ["header", 1, 2, 3, 4, 5]
+

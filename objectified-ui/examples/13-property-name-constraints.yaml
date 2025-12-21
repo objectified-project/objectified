@@ -1,0 +1,71 @@
+openapi: 3.1.0
+info:
+  title: Property Name Constraints Example
+  version: 1.0.0
+  description: Demonstrates property name constraints with format, length, and pattern
+
+components:
+  schemas:
+    StrictObject:
+      type: object
+      description: Object with strict property name constraints
+      properties:
+        data:
+          type: object
+          description: Object where property names must follow specific rules
+          propertyNames:
+            type: string
+            pattern: "^[a-z][a-z0-9_]*$"
+            minLength: 3
+            maxLength: 20
+            description: Property names must be lowercase, start with letter, contain only letters/numbers/underscore
+          additionalProperties:
+            type: string
+          examples:
+            - user_name: "john_doe"
+              user_email: "john@example.com"
+              user_id: "12345"
+
+    EmailKeyedObject:
+      type: object
+      description: Object where property names must be valid email addresses
+      properties:
+        users:
+          type: object
+          description: User data keyed by email addresses
+          propertyNames:
+            type: string
+            format: email
+            minLength: 5
+            maxLength: 100
+          additionalProperties:
+            type: object
+            properties:
+              name:
+                type: string
+              role:
+                type: string
+          examples:
+            - user@example.com:
+                name: "John Doe"
+                role: "admin"
+              admin@company.org:
+                name: "Jane Smith"
+                role: "superadmin"
+
+    UUIDKeyedData:
+      type: object
+      description: Object where property names must be UUIDs
+      properties:
+        records:
+          type: object
+          description: Records keyed by UUID
+          propertyNames:
+            type: string
+            format: uuid
+          additionalProperties:
+            type: object
+          examples:
+            - "550e8400-e29b-41d4-a716-446655440000":
+                status: "active"
+

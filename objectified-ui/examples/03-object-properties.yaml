@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: Object Properties Constraints Example
+  version: 1.0.0
+  description: Demonstrates minProperties, maxProperties, and patternProperties
+
+components:
+  schemas:
+    Configuration:
+      type: object
+      description: Configuration object with property count constraints
+      properties:
+        name:
+          type: string
+          examples:
+            - "Production Config"
+        settings:
+          type: object
+          description: Settings object with min/max properties and pattern properties
+          minProperties: 2
+          maxProperties: 10
+          properties:
+            timeout:
+              type: integer
+              examples:
+                - 30
+            retries:
+              type: integer
+              examples:
+                - 3
+          patternProperties:
+            "^env_":
+              type: string
+              description: Environment variables starting with env_
+              examples:
+                - "production"
+            "^flag_":
+              type: boolean
+              description: Feature flags starting with flag_
+              examples:
+                - true
+          examples:
+            - timeout: 30
+              retries: 3
+              env_mode: "production"
+              flag_debug: false
+      required:
+        - name
+        - settings
+

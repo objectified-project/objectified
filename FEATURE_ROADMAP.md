@@ -3044,17 +3044,17 @@
 - Excel/CSV (data definitions)
 - Database (reverse engineer from DB)
 
-| Ticket | Feature Description     |
-|--------|-------------------------|
-| [#232] | Import from OpenAPI 2.0 |
+| Ticket | Feature Description         |
+|--------|-----------------------------|
+| [#232] | Import from OpenAPI 2.0     |
 | [#233] | Import from OpenAPI 3.0/3.1 |
-| [#234] | Import from JSON Schema |
-| [#235] | Import from GraphQL SDL |
-| [#236] | Import from AsyncAPI |
-| [#237] | Import from RAML |
-| [#238] | Import from Protobuf |
-| [#239] | Import from Avro |
-| [#240] | Import from Thrift |
+| [#234] | Import from JSON Schema     |
+| [#235] | Import from GraphQL SDL     |
+| [#236] | Import from AsyncAPI        |
+| [#237] | Import from RAML            |
+| [#238] | Import from Protobuf        |
+| [#239] | Import from Avro            |
+| [#240] | Import from Thrift          |
 
 **Export To** 📋 PLANNED
 - ✅ OpenAPI 3.1.0 (default)

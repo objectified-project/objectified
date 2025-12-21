@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: Constant and Not Constraints Example
+  version: 1.0.0
+  description: Demonstrates constant values and not constraints
+
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      description: API response with constant version and not constraints
+      properties:
+        version:
+          type: string
+          const: "v1.0"
+          description: API version (must be exactly v1.0)
+          examples:
+            - "v1.0"
+        status:
+          type: string
+          description: Response status (cannot be 'pending')
+          not:
+            const: "pending"
+          examples:
+            - "success"
+            - "error"
+        errorCode:
+          type: integer
+          description: Error code (cannot be in 400-499 range)
+          not:
+            type: integer
+            minimum: 400
+            maximum: 499
+          examples:
+            - 200
+            - 500
+        data:
+          type: object
+          description: Response data (cannot be empty object)
+          not:
+            type: object
+            maxProperties: 0
+          examples:
+            - result: "success"
+              count: 42
+      required:
+        - version
+        - status
+

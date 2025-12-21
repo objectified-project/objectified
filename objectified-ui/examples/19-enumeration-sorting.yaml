@@ -1,0 +1,99 @@
+openapi: 3.1.0
+info:
+  title: Enumeration Sorting Example
+  version: 1.0.0
+  description: Demonstrates property enumerations with various orderings
+
+components:
+  schemas:
+    SortedEnums:
+      type: object
+      description: Object with various enumeration orderings
+      properties:
+        priority:
+          type: string
+          description: Priority levels in ascending order
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+          examples:
+            - "high"
+        status:
+          type: string
+          description: Status values in logical order
+          enum:
+            - draft
+            - pending
+            - approved
+            - published
+            - archived
+          examples:
+            - "approved"
+        size:
+          type: string
+          description: Size values in ascending order
+          enum:
+            - xs
+            - s
+            - m
+            - l
+            - xl
+            - xxl
+          examples:
+            - "m"
+        month:
+          type: string
+          description: Months in calendar order
+          enum:
+            - january
+            - february
+            - march
+            - april
+            - may
+            - june
+            - july
+            - august
+            - september
+            - october
+            - november
+            - december
+          examples:
+            - "december"
+        numericEnum:
+          type: integer
+          description: Numeric enum in ascending order
+          enum:
+            - 1
+            - 2
+            - 5
+            - 10
+            - 25
+            - 50
+            - 100
+          examples:
+            - 25
+        alphabeticalEnum:
+          type: string
+          description: Alphabetically sorted enum
+          enum:
+            - alpha
+            - beta
+            - delta
+            - gamma
+            - omega
+          examples:
+            - "alpha"
+        reverseEnum:
+          type: string
+          description: Reverse alphabetically sorted enum
+          enum:
+            - zebra
+            - yankee
+            - xray
+            - whiskey
+            - victor
+          examples:
+            - "xray"
+

@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: Prefix Items (Tuples) Example
+  version: 1.0.0
+  description: Demonstrates prefixItems for ordered array schemas (tuples)
+
+components:
+  schemas:
+    Coordinates2D:
+      type: object
+      description: 2D coordinate system
+      properties:
+        point:
+          type: array
+          description: 2D point as [x, y]
+          prefixItems:
+            - type: number
+              description: X coordinate
+              examples:
+                - 10.5
+            - type: number
+              description: Y coordinate
+              examples:
+                - 20.3
+          minItems: 2
+          maxItems: 2
+          examples:
+            - [10.5, 20.3]
+            - [-5.0, 15.7]
+
+    Coordinates3D:
+      type: object
+      description: 3D coordinate system
+      properties:
+        point:
+          type: array
+          description: 3D point as [x, y, z]
+          prefixItems:
+            - type: number
+              description: X coordinate
+            - type: number
+              description: Y coordinate
+            - type: number
+              description: Z coordinate
+          minItems: 3
+          maxItems: 3
+          examples:
+            - [10.5, 20.3, 5.0]
+
+    CSVRow:
+      type: object
+      description: CSV row with typed columns
+      properties:
+        row:
+          type: array
+          description: CSV row with [string, number, boolean, date]
+          prefixItems:
+            - type: string
+              description: Name column
+              examples:
+                - "John Doe"
+            - type: integer
+              description: Age column
+              minimum: 0
+              examples:
+                - 30
+            - type: boolean
+              description: Active status column
+              examples:
+                - true
+            - type: string
+              format: date
+              description: Registration date column
+              examples:
+                - "2025-12-21"
+          items:
+            type: string
+            description: Additional string columns
+          examples:
+            - ["John Doe", 30, true, "2025-12-21", "tag1", "tag2"]
+            - ["Jane Smith", 25, false, "2025-11-15"]
+
+    FunctionArguments:
+      type: object
+      description: Function call with typed arguments
+      properties:
+        functionName:
+          type: string
+          examples:
+            - "processUser"
+        args:
+          type: array
+          description: Function arguments [userId, action, options]
+          prefixItems:
+            - type: string
+              format: uuid
+              description: User ID
+              examples:
+                - "550e8400-e29b-41d4-a716-446655440000"
+            - type: string
+              enum:
+                - create
+                - update
+                - delete
+              description: Action type
+              examples:
+                - "update"
+            - type: object
+              description: Options object
+              properties:
+                force:
+                  type: boolean
+                notify:
+                  type: boolean
+              examples:
+                - force: true
+                  notify: false
+          minItems: 3
+          maxItems: 3
+          examples:
+            - ["550e8400-e29b-41d4-a716-446655440000", "update", {"force": true, "notify": false}]
+
+    DatabaseRow:
+      type: object
+      description: Database row with strict column types
+      properties:
+        id:
+          type: string
+          examples:
+            - "row-123"
+        data:
+          type: array
+          description: Row data [id, name, age, email, created_at]
+          prefixItems:
+            - type: integer
+              description: ID column (primary key)
+              examples:
+                - 1
+            - type: string
+              description: Name column
+              minLength: 1
+              maxLength: 100
+              examples:
+                - "Alice Johnson"
+            - type:
+                - integer
+                - "null"
+              description: Age column (nullable)
+              minimum: 0
+              maximum: 150
+              examples:
+                - 28
+                - null
+            - type: string
+              format: email
+              description: Email column
+              examples:
+                - "alice@example.com"
+            - type: string
+              format: date-time
+              description: Created timestamp
+              examples:
+                - "2025-12-21T10:00:00Z"
+          minItems: 5
+          maxItems: 5
+          examples:
+            - [1, "Alice Johnson", 28, "alice@example.com", "2025-12-21T10:00:00Z"]
+            - [2, "Bob Smith", null, "bob@example.com", "2025-12-20T15:30:00Z"]
+

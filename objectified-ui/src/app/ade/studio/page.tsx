@@ -6,11 +6,12 @@ import dynamic from 'next/dynamic';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useStudio } from './StudioContext';
-import { Copy, Download, Check, Eye, Code } from 'lucide-react';
+import { Copy, Download, Check, Eye, Code, Settings } from 'lucide-react';
 import * as Switch from '@radix-ui/react-switch';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import YAML from 'yaml';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
@@ -100,6 +101,22 @@ const StudioContent = () => {
       observer.disconnect();
       mediaQuery.removeEventListener('change', checkDarkMode);
     };
+  }, []);
+
+  // Toggle theme function
+  const toggleTheme = useCallback(() => {
+    const html = document.documentElement;
+    const isDarkMode = html.classList.contains('dark');
+
+    if (isDarkMode) {
+      html.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+      setIsDark(false);
+    } else {
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDark(true);
+    }
   }, []);
 
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
@@ -2370,33 +2387,6 @@ const StudioContent = () => {
     }
   };
 
-  const handleProjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const projectId = e.target.value;
-    setSelectedProjectId(projectId);
-    setSelectedVersionId(''); // Reset version when project changes
-    setIsReadOnly(false); // Reset read-only flag when version is cleared
-    setViewMode('canvas'); // Reset view to canvas when project changes
-
-    // Load tags for the new project
-    if (projectId) {
-      loadProjectTags(projectId);
-    } else {
-      setProjectTags([]);
-    }
-  };
-
-  const handleVersionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const versionId = e.target.value;
-    setSelectedVersionId(versionId);
-
-    // Update read-only status based on whether version is published
-    const version = versions.find(v => v.id === versionId);
-    setIsReadOnly(version?.published || false);
-
-    // Reset view to canvas when version changes
-    setViewMode('canvas');
-  };
-
   const onConnect = useCallback(
     async (params: Connection) => {
       // If sourceHandle is a property handle (prop-<class_property_id>) and target is a class node,
@@ -2514,109 +2504,154 @@ const StudioContent = () => {
       {/* Header with Project and Version Selectors - spans full width including over sidebar */}
       <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
         <div className="flex flex-wrap items-center gap-4 w-full">
-          {/* Project Selector */}
+          {/* Project Selector - Radix UI Select */}
           <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-            <div className="flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md">
-              <div className="pl-3 text-gray-400 dark:text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <Select.Root
+              value={selectedProjectId}
+              onValueChange={(value) => {
+                setSelectedProjectId(value);
+                setContextProjectId(value);
+                setSelectedVersionId('');
+                setContextVersionId('');
+                setIsReadOnly(false);
+                setViewMode('canvas');
+                if (value) {
+                  loadProjectTags(value);
+                } else {
+                  setProjectTags([]);
+                }
+              }}
+              disabled={isLoadingProjects || !currentTenantId}
+            >
+              <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
-              </div>
-              <select
-                value={selectedProjectId}
-                onChange={handleProjectChange}
-                disabled={isLoadingProjects || !currentTenantId}
-                className="pl-1 pr-8 py-2 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none min-w-[200px] cursor-pointer appearance-none"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 8px center', backgroundRepeat: 'no-repeat', backgroundSize: '16px' }}
-              >
-                <option value="">Select project...</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <Select.Value placeholder="Select project..." />
+                <Select.Icon className="ml-auto">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]" position="popper" sideOffset={5}>
+                  <Select.Viewport className="p-1">
+                    {projects.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No projects available</div>
+                    ) : (
+                      projects.map((project) => (
+                        <Select.Item
+                          key={project.id}
+                          value={project.id}
+                          className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
+                        >
+                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          </Select.ItemIndicator>
+                          <Select.ItemText>{project.name}</Select.ItemText>
+                        </Select.Item>
+                      ))
+                    )}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
           </div>
 
-          {/* Version Selector */}
+          {/* Version Selector - Radix UI Select */}
           <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-            <div className="flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md">
-              <div className="pl-3 text-gray-400 dark:text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <Select.Root
+              value={selectedVersionId}
+              onValueChange={(value) => {
+                setSelectedVersionId(value);
+                setContextVersionId(value);
+                const version = versions.find(v => v.id === value);
+                setIsReadOnly(version?.published ?? false);
+                setViewMode('canvas');
+              }}
+              disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
+            >
+              <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-              </div>
-              <select
-                value={selectedVersionId}
-                onChange={handleVersionChange}
-                disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
-                className="pl-1 pr-8 py-2 text-sm bg-transparent text-gray-900 dark:text-white focus:outline-none min-w-[200px] cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 8px center', backgroundRepeat: 'no-repeat', backgroundSize: '16px' }}
-              >
-                <option value="">Select version...</option>
-                {versions.map((version) => (
-                  <option key={version.id} value={version.id}>
-                    {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <Select.Value placeholder="Select version..." />
+                <Select.Icon className="ml-auto">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]" position="popper" sideOffset={5}>
+                  <Select.Viewport className="p-1">
+                    {versions.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No versions available</div>
+                    ) : (
+                      versions.map((version) => (
+                        <Select.Item
+                          key={version.id}
+                          value={version.id}
+                          className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[state=checked]:bg-indigo-50 dark:data-[state=checked]:bg-indigo-900/30"
+                        >
+                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          </Select.ItemIndicator>
+                          <Select.ItemText>
+                            {version.published ? '🔒 ' : ''}{version.version_id} - {version.description}
+                          </Select.ItemText>
+                        </Select.Item>
+                      ))
+                    )}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
           </div>
 
-          {/* View Switcher */}
+          {/* View Switcher - Radix UI ToggleGroup */}
           {selectedProjectId && selectedVersionId && (
             <>
               {/* Separator */}
               <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
 
-              <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner">
-                <button
-                  onClick={() => setViewMode('canvas')}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                    viewMode === 'canvas'
-                      ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+              <ToggleGroup.Root
+                type="single"
+                value={viewMode}
+                onValueChange={(value) => {
+                  if (value) setViewMode(value as ViewMode);
+                }}
+                className="inline-flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1 shadow-inner"
+              >
+                <ToggleGroup.Item
+                  value="canvas"
+                  className="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                    </svg>
-                    Canvas
-                  </span>
-                </button>
-                <button
-                  onClick={() => setViewMode('code')}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                    viewMode === 'code'
-                      ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                  Canvas
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="code"
+                  className="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                    Code
-                  </span>
-                </button>
-                <button
-                  onClick={() => setViewMode('mermaid')}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                    viewMode === 'mermaid'
-                      ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                  }`}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  Code
+                </ToggleGroup.Item>
+                <ToggleGroup.Item
+                  value="mermaid"
+                  className="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    Diagram
-                  </span>
-                </button>
-              </div>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  Diagram
+                </ToggleGroup.Item>
+              </ToggleGroup.Root>
 
               {/* Manage Tags Button */}
               <button
@@ -2629,6 +2664,51 @@ const StudioContent = () => {
                 </svg>
                 <span>Tags</span>
               </button>
+
+              {/* Settings Dropdown - Radix UI DropdownMenu */}
+              <div className="ml-auto">
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
+                      title="Settings"
+                      aria-label="Settings"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  </DropdownMenu.Trigger>
+
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      className="min-w-[180px] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[9999]"
+                      sideOffset={5}
+                      align="end"
+                    >
+                      {/* Theme Toggle */}
+                      <DropdownMenu.Item
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                        onSelect={() => toggleTheme()}
+                      >
+                        {isDark ? (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                            <span>Light Mode</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </svg>
+                            <span>Dark Mode</span>
+                          </>
+                        )}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              </div>
             </>
           )}
         </div>

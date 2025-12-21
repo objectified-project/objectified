@@ -1,0 +1,56 @@
+openapi: 3.1.0
+info:
+  title: Dependent Required Example
+  version: 1.0.0
+  description: Demonstrates dependentRequired constraints
+
+components:
+  schemas:
+    ShippingAddress:
+      type: object
+      description: Shipping address with dependent required fields
+      properties:
+        name:
+          type: string
+          examples:
+            - "John Doe"
+        street:
+          type: string
+          examples:
+            - "123 Main St"
+        city:
+          type: string
+          examples:
+            - "San Francisco"
+        state:
+          type: string
+          examples:
+            - "CA"
+        zipCode:
+          type: string
+          pattern: "^[0-9]{5}(-[0-9]{4})?$"
+          examples:
+            - "94102"
+        billingAddress:
+          type: string
+          examples:
+            - "456 Oak Ave"
+        billingCity:
+          type: string
+          examples:
+            - "Los Angeles"
+        billingZip:
+          type: string
+          pattern: "^[0-9]{5}(-[0-9]{4})?$"
+          examples:
+            - "90001"
+      required:
+        - name
+        - street
+        - city
+        - zipCode
+      dependentRequired:
+        billingAddress:
+          - billingCity
+          - billingZip
+

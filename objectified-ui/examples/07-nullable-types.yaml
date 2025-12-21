@@ -1,0 +1,61 @@
+openapi: 3.1.0
+info:
+  title: Nullable Types Example
+  version: 1.0.0
+  description: Demonstrates OpenAPI 3.1 nullable types using type arrays
+
+components:
+  schemas:
+    UserProfile:
+      type: object
+      description: User profile with nullable fields
+      properties:
+        id:
+          type: string
+          examples:
+            - "user-123"
+        username:
+          type: string
+          examples:
+            - "johndoe"
+        email:
+          type:
+            - string
+            - "null"
+          format: email
+          description: Email address (nullable)
+          examples:
+            - "john@example.com"
+            - null
+        phoneNumber:
+          type:
+            - string
+            - "null"
+          pattern: "^\\+?[1-9]\\d{1,14}$"
+          description: Phone number (nullable)
+          examples:
+            - "+14155551234"
+            - null
+        age:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          maximum: 150
+          description: Age in years (nullable)
+          examples:
+            - 25
+            - null
+        lastLoginAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Last login timestamp (nullable)
+          examples:
+            - "2025-12-21T10:30:00Z"
+            - null
+      required:
+        - id
+        - username
+

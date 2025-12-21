@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: Custom Extensions Example
+  version: 1.0.0
+  description: Demonstrates custom x- tags and values on classes and properties
+
+components:
+  schemas:
+    CustomProduct:
+      type: object
+      description: Product with custom extension attributes
+      x-internal-id: "PROD-2025"
+      x-version: "2.0"
+      x-deprecated-date: "2026-12-31"
+      x-team-owner: "Platform Team"
+      x-documentation-url: "https://docs.example.com/products"
+      x-audit-enabled: true
+      properties:
+        id:
+          type: string
+          x-database-column: "product_id"
+          x-indexed: true
+          x-searchable: true
+          examples:
+            - "prod-123"
+        name:
+          type: string
+          x-translatable: true
+          x-max-display-length: 50
+          x-sanitize: true
+          examples:
+            - "Premium Widget"
+        price:
+          type: number
+          minimum: 0
+          x-currency: "USD"
+          x-decimal-places: 2
+          x-tax-category: "standard"
+          examples:
+            - 99.99
+        category:
+          type: string
+          x-enum-values:
+            electronics: "Electronic Items"
+            furniture: "Furniture & Decor"
+            clothing: "Apparel & Fashion"
+          x-display-order: 1
+          examples:
+            - "electronics"
+        metadata:
+          type: object
+          x-storage-type: "json"
+          x-compression-enabled: true
+          additionalProperties:
+            type: string
+          examples:
+            - manufacturer: "ACME Corp"
+              warranty: "2 years"
+      required:
+        - id
+        - name
+        - price
+

@@ -1,0 +1,47 @@
+openapi: 3.1.0
+info:
+  title: Array Constraints Example
+  version: 1.0.0
+  description: Demonstrates array constraints including contains, minContains, and maxContains
+
+components:
+  schemas:
+    ProductTags:
+      type: object
+      description: Product with tagged categories
+      properties:
+        name:
+          type: string
+          examples:
+            - "Wireless Mouse"
+        tags:
+          type: array
+          description: Product tags with contains validation
+          items:
+            type: string
+          contains:
+            type: string
+            enum:
+              - electronics
+              - gadgets
+              - accessories
+          minContains: 1
+          maxContains: 2
+          minItems: 1
+          maxItems: 10
+          examples:
+            - ["electronics", "wireless", "computer"]
+            - ["gadgets", "portable"]
+        colors:
+          type: array
+          description: Available colors
+          items:
+            type: string
+          minItems: 1
+          uniqueItems: true
+          examples:
+            - ["black", "white", "silver"]
+      required:
+        - name
+        - tags
+

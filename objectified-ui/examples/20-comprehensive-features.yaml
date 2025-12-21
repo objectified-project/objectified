@@ -1,0 +1,268 @@
+openapi: 3.1.0
+info:
+  title: Comprehensive Features Example
+  version: 1.0.0
+  description: Comprehensive example combining multiple OpenAPI 3.1 features
+
+components:
+  schemas:
+    AdvancedOrder:
+      type: object
+      description: Advanced order schema with comprehensive constraints
+      deprecated: false
+      externalDocs:
+        description: Order Processing Guide
+        url: https://docs.example.com/orders
+      x-business-entity: "Order"
+      x-version: "3.0"
+      x-audit-log: true
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: Unique order identifier
+          x-database-index: true
+          examples:
+            - "550e8400-e29b-41d4-a716-446655440000"
+        orderNumber:
+          type: string
+          pattern: "^ORD-[0-9]{8}$"
+          description: Human-readable order number
+          x-display-format: "ORD-########"
+          examples:
+            - "ORD-20251221"
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - processing
+            - shipped
+            - delivered
+            - cancelled
+          description: Current order status
+          x-state-machine: true
+          examples:
+            - "confirmed"
+        customer:
+          type: object
+          description: Customer information
+          properties:
+            customerId:
+              type: string
+              examples:
+                - "CUST-12345"
+            email:
+              type:
+                - string
+                - "null"
+              format: email
+              examples:
+                - "customer@example.com"
+                - null
+            phoneNumber:
+              type:
+                - string
+                - "null"
+              pattern: "^\\+?[1-9]\\d{1,14}$"
+              examples:
+                - "+14155551234"
+                - null
+          required:
+            - customerId
+          dependentRequired:
+            email:
+              - phoneNumber
+        items:
+          type: array
+          description: Order line items
+          items:
+            type: object
+            properties:
+              sku:
+                type: string
+                pattern: "^[A-Z]{3}-[0-9]{4}$"
+                examples:
+                  - "PRD-1001"
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 999
+                examples:
+                  - 2
+              price:
+                type: number
+                minimum: 0
+                exclusiveMinimum: 0
+                multipleOf: 0.01
+                x-currency: "USD"
+                examples:
+                  - 29.99
+            required:
+              - sku
+              - quantity
+              - price
+          minItems: 1
+          maxItems: 100
+          contains:
+            type: object
+            properties:
+              quantity:
+                minimum: 1
+          minContains: 1
+          examples:
+            - - sku: "PRD-1001"
+                quantity: 2
+                price: 29.99
+              - sku: "PRD-2002"
+                quantity: 1
+                price: 49.99
+        totals:
+          type: object
+          description: Order totals
+          properties:
+            subtotal:
+              type: number
+              minimum: 0
+              multipleOf: 0.01
+              examples:
+                - 109.97
+            tax:
+              type: number
+              minimum: 0
+              multipleOf: 0.01
+              examples:
+                - 9.90
+            shipping:
+              type: number
+              minimum: 0
+              multipleOf: 0.01
+              examples:
+                - 10.00
+            total:
+              type: number
+              minimum: 0
+              multipleOf: 0.01
+              const: 129.87
+              examples:
+                - 129.87
+          required:
+            - subtotal
+            - tax
+            - shipping
+            - total
+          minProperties: 4
+          maxProperties: 10
+        paymentMethod:
+          type: string
+          enum:
+            - credit_card
+            - paypal
+            - bank_transfer
+          examples:
+            - "credit_card"
+        shippingAddress:
+          type: object
+          properties:
+            street:
+              type: string
+              minLength: 1
+              maxLength: 100
+              examples:
+                - "123 Main St"
+            city:
+              type: string
+              examples:
+                - "San Francisco"
+            state:
+              type: string
+              pattern: "^[A-Z]{2}$"
+              examples:
+                - "CA"
+            zipCode:
+              type: string
+              pattern: "^[0-9]{5}(-[0-9]{4})?$"
+              examples:
+                - "94102"
+            country:
+              type: string
+              const: "US"
+              examples:
+                - "US"
+          required:
+            - street
+            - city
+            - state
+            - zipCode
+            - country
+          unevaluatedProperties: false
+        metadata:
+          type: object
+          description: Additional metadata
+          propertyNames:
+            type: string
+            pattern: "^[a-z][a-z0-9_]*$"
+            minLength: 3
+            maxLength: 30
+          additionalProperties:
+            type: string
+          x-storage-type: "json"
+          examples:
+            - source_channel: "web"
+              campaign_id: "summer_sale_2025"
+        timestamps:
+          type: array
+          description: Order event timestamps
+          prefixItems:
+            - type: string
+              format: date-time
+              description: Created at
+            - type: string
+              format: date-time
+              description: Updated at
+            - type: string
+              format: date-time
+              description: Shipped at
+          unevaluatedItems:
+            type: string
+            format: date-time
+          examples:
+            - - "2025-12-21T10:00:00Z"
+              - "2025-12-21T10:30:00Z"
+              - "2025-12-21T14:00:00Z"
+      required:
+        - orderId
+        - orderNumber
+        - status
+        - customer
+        - items
+        - totals
+        - shippingAddress
+      dependentSchemas:
+        paymentMethod:
+          if:
+            properties:
+              paymentMethod:
+                const: "credit_card"
+          then:
+            properties:
+              cardLast4:
+                type: string
+                pattern: "^[0-9]{4}$"
+            required:
+              - cardLast4
+      if:
+        properties:
+          status:
+            enum:
+              - shipped
+              - delivered
+      then:
+        properties:
+          trackingNumber:
+            type: string
+            pattern: "^[A-Z0-9]{10,20}$"
+        required:
+          - trackingNumber
+          - timestamps
+

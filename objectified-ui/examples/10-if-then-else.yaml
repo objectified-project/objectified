@@ -1,0 +1,73 @@
+openapi: 3.1.0
+info:
+  title: If-Then-Else Composition Example
+  version: 1.0.0
+  description: Demonstrates if/then/else conditional schemas
+
+components:
+  schemas:
+    Vehicle:
+      type: object
+      description: Vehicle with conditional validation based on type
+      properties:
+        vehicleType:
+          type: string
+          enum:
+            - car
+            - motorcycle
+            - truck
+          examples:
+            - "car"
+        wheels:
+          type: integer
+          minimum: 2
+          maximum: 18
+          examples:
+            - 4
+        engine:
+          type: string
+          examples:
+            - "V6"
+        cargoCapacity:
+          type: number
+          description: Cargo capacity in cubic feet
+          examples:
+            - 50.5
+        passengerSeats:
+          type: integer
+          minimum: 1
+          maximum: 60
+          examples:
+            - 5
+      required:
+        - vehicleType
+        - wheels
+      if:
+        properties:
+          vehicleType:
+            const: "car"
+      then:
+        properties:
+          wheels:
+            const: 4
+          passengerSeats:
+            minimum: 2
+            maximum: 8
+        required:
+          - passengerSeats
+      else:
+        if:
+          properties:
+            vehicleType:
+              const: "motorcycle"
+        then:
+          properties:
+            wheels:
+              enum: [2, 3]
+        else:
+          properties:
+            wheels:
+              minimum: 4
+          required:
+            - cargoCapacity
+

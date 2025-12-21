@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: Additional Properties with References Example
+  version: 1.0.0
+  description: Demonstrates additionalProperties matching schemas by reference
+
+components:
+  schemas:
+    Metadata:
+      type: object
+      description: Metadata value object
+      properties:
+        value:
+          type: string
+          examples:
+            - "production"
+        updatedAt:
+          type: string
+          format: date-time
+          examples:
+            - "2025-12-21T10:00:00Z"
+      required:
+        - value
+
+    Resource:
+      type: object
+      description: Resource with metadata using schema reference
+      properties:
+        id:
+          type: string
+          examples:
+            - "resource-123"
+        name:
+          type: string
+          examples:
+            - "My Resource"
+        metadata:
+          type: object
+          description: Metadata object where all properties must match Metadata schema
+          additionalProperties:
+            $ref: "#/components/schemas/Metadata"
+          examples:
+            - environment:
+                value: "production"
+                updatedAt: "2025-12-21T10:00:00Z"
+              region:
+                value: "us-west-2"
+                updatedAt: "2025-12-21T10:00:00Z"
+      required:
+        - id
+        - name
+
+    StringDictionary:
+      type: object
+      description: Dictionary where all additional properties are strings
+      properties:
+        type:
+          type: string
+          const: "dictionary"
+          examples:
+            - "dictionary"
+      additionalProperties:
+        type: string
+      examples:
+        - type: "dictionary"
+          key1: "value1"
+          key2: "value2"
+          key3: "value3"
+

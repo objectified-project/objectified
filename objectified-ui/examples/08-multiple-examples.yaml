@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: Multiple Examples Example
+  version: 1.0.0
+  description: Demonstrates multiple examples per property
+
+components:
+  schemas:
+    Product:
+      type: object
+      description: Product with multiple example values
+      properties:
+        name:
+          type: string
+          examples:
+            - "Laptop Pro 15"
+            - "Desktop Ultra"
+            - "Tablet Mini"
+            - "Smartphone X"
+        price:
+          type: number
+          minimum: 0
+          examples:
+            - 999.99
+            - 1499.99
+            - 299.99
+            - 799.99
+        category:
+          type: string
+          enum:
+            - electronics
+            - computers
+            - mobile
+            - accessories
+          examples:
+            - "electronics"
+            - "computers"
+            - "mobile"
+        sku:
+          type: string
+          pattern: "^[A-Z]{3}-[0-9]{4}$"
+          examples:
+            - "LAP-1001"
+            - "DSK-2002"
+            - "TAB-3003"
+            - "PHN-4004"
+        inStock:
+          type: boolean
+          examples:
+            - true
+            - false
+        tags:
+          type: array
+          items:
+            type: string
+          examples:
+            - ["new", "featured", "bestseller"]
+            - ["sale", "clearance"]
+            - ["premium", "warranty"]
+      required:
+        - name
+        - price
+        - category
+

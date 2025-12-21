@@ -1,0 +1,82 @@
+openapi: 3.1.0
+info:
+  title: Dependent Schemas Example
+  version: 1.0.0
+  description: Demonstrates dependentSchemas composition
+
+components:
+  schemas:
+    Payment:
+      type: object
+      description: Payment information with dependent schemas
+      properties:
+        amount:
+          type: number
+          minimum: 0
+          examples:
+            - 99.99
+        paymentMethod:
+          type: string
+          enum:
+            - credit_card
+            - paypal
+            - bank_transfer
+          examples:
+            - "credit_card"
+        cardNumber:
+          type: string
+          pattern: "^[0-9]{16}$"
+          examples:
+            - "4111111111111111"
+        cardExpiry:
+          type: string
+          pattern: "^(0[1-9]|1[0-2])/[0-9]{2}$"
+          examples:
+            - "12/25"
+        cardCvv:
+          type: string
+          pattern: "^[0-9]{3,4}$"
+          examples:
+            - "123"
+        paypalEmail:
+          type: string
+          format: email
+          examples:
+            - "user@example.com"
+        bankAccount:
+          type: string
+          pattern: "^[0-9]{10,12}$"
+          examples:
+            - "1234567890"
+        routingNumber:
+          type: string
+          pattern: "^[0-9]{9}$"
+          examples:
+            - "021000021"
+      required:
+        - amount
+        - paymentMethod
+      dependentSchemas:
+        paymentMethod:
+          if:
+            properties:
+              paymentMethod:
+                const: "credit_card"
+          then:
+            required:
+              - cardNumber
+              - cardExpiry
+              - cardCvv
+          else:
+            if:
+              properties:
+                paymentMethod:
+                  const: "paypal"
+            then:
+              required:
+                - paypalEmail
+            else:
+              required:
+                - bankAccount
+                - routingNumber
+

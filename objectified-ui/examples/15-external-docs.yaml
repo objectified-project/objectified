@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: External Documentation Example
+  version: 1.0.0
+  description: Demonstrates external documentation at class and property levels
+
+components:
+  schemas:
+    DocumentedAPI:
+      type: object
+      description: API object with extensive external documentation
+      externalDocs:
+        description: API Documentation Portal
+        url: https://docs.example.com/api/v1
+      properties:
+        endpoint:
+          type: string
+          description: API endpoint path
+          externalDocs:
+            description: Endpoint Configuration Guide
+            url: https://docs.example.com/api/v1/endpoints
+          examples:
+            - "/api/v1/users"
+        method:
+          type: string
+          enum:
+            - GET
+            - POST
+            - PUT
+            - DELETE
+            - PATCH
+          description: HTTP method
+          externalDocs:
+            description: HTTP Methods Reference
+            url: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
+          examples:
+            - "GET"
+        authentication:
+          type: object
+          description: Authentication configuration
+          externalDocs:
+            description: Authentication Guide
+            url: https://docs.example.com/api/v1/auth
+          properties:
+            type:
+              type: string
+              enum:
+                - bearer
+                - api_key
+                - oauth2
+              externalDocs:
+                description: Supported Authentication Types
+                url: https://docs.example.com/api/v1/auth/types
+              examples:
+                - "bearer"
+            scopes:
+              type: array
+              items:
+                type: string
+              externalDocs:
+                description: OAuth2 Scopes Reference
+                url: https://docs.example.com/api/v1/auth/scopes
+              examples:
+                - ["read", "write", "admin"]
+      required:
+        - endpoint
+        - method
+

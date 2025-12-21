@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: Numeric Constraints Example
+  version: 1.0.0
+  description: Demonstrates OpenAPI 3.1 numeric constraints with inclusive/exclusive ranges and multipleOf
+
+components:
+  schemas:
+    Temperature:
+      type: object
+      description: Temperature measurement with various numeric constraints
+      properties:
+        celsius:
+          type: number
+          description: Temperature in Celsius with inclusive range
+          minimum: -273.15  # Inclusive (≥)
+          maximum: 1000     # Inclusive (≤)
+          examples:
+            - 20.5
+            - -10.0
+            - 100.0
+        fahrenheit:
+          type: number
+          description: Temperature in Fahrenheit with exclusive range
+          exclusiveMinimum: -459.67  # Exclusive (>)
+          exclusiveMaximum: 1832     # Exclusive (<)
+          examples:
+            - 68.0
+            - 32.0
+        kelvin:
+          type: number
+          description: Temperature in Kelvin (always positive, multiple of 0.01)
+          minimum: 0
+          multipleOf: 0.01
+          examples:
+            - 273.15
+            - 293.15
+        rating:
+          type: integer
+          description: Integer rating from 1 to 5
+          minimum: 1
+          maximum: 5
+          multipleOf: 1
+          examples:
+            - 5
+            - 3
+            - 1
+      required:
+        - celsius
+

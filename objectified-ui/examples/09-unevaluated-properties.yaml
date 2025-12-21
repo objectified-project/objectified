@@ -1,0 +1,62 @@
+openapi: 3.1.0
+info:
+  title: Unevaluated Properties Example
+  version: 1.0.0
+  description: Demonstrates unevaluatedProperties for inheritance scenarios
+
+components:
+  schemas:
+    BaseEntity:
+      type: object
+      description: Base entity with common properties
+      properties:
+        id:
+          type: string
+          examples:
+            - "entity-123"
+        createdAt:
+          type: string
+          format: date-time
+          examples:
+            - "2025-12-21T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          examples:
+            - "2025-12-21T11:00:00Z"
+      required:
+        - id
+        - createdAt
+
+    ExtendedEntity:
+      allOf:
+        - $ref: "#/components/schemas/BaseEntity"
+        - type: object
+          properties:
+            name:
+              type: string
+              examples:
+                - "Sample Entity"
+            description:
+              type: string
+              examples:
+                - "This is a sample entity"
+          required:
+            - name
+      unevaluatedProperties: false
+      description: Extended entity that inherits from BaseEntity and disallows additional properties
+
+    FlexibleEntity:
+      allOf:
+        - $ref: "#/components/schemas/BaseEntity"
+        - type: object
+          properties:
+            category:
+              type: string
+              examples:
+                - "general"
+      unevaluatedProperties:
+        type: string
+        description: Additional properties must be strings
+      description: Flexible entity that allows string-type additional properties
+

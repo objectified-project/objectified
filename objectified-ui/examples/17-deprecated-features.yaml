@@ -1,0 +1,80 @@
+openapi: 3.1.0
+info:
+  title: Deprecated Features Example
+  version: 1.0.0
+  description: Demonstrates deprecation marking for properties and classes
+
+components:
+  schemas:
+    LegacyUser:
+      type: object
+      description: Legacy user schema (deprecated in favor of UserV2)
+      deprecated: true
+      x-deprecated-since: "2024-01-01"
+      x-sunset-date: "2026-01-01"
+      x-migration-guide: "https://docs.example.com/migration/user-v2"
+      properties:
+        id:
+          type: string
+          examples:
+            - "user-123"
+        username:
+          type: string
+          deprecated: true
+          x-deprecated-since: "2023-06-01"
+          x-replaced-by: "email"
+          examples:
+            - "johndoe"
+        email:
+          type: string
+          format: email
+          examples:
+            - "john@example.com"
+        legacyField:
+          type: string
+          deprecated: true
+          description: This field is no longer used
+          x-deprecated-since: "2023-01-01"
+          x-removal-date: "2025-01-01"
+          examples:
+            - "legacy_value"
+      required:
+        - id
+        - email
+
+    UserV2:
+      type: object
+      description: Current user schema
+      properties:
+        id:
+          type: string
+          examples:
+            - "user-456"
+        email:
+          type: string
+          format: email
+          examples:
+            - "jane@example.com"
+        profile:
+          type: object
+          properties:
+            displayName:
+              type: string
+              examples:
+                - "Jane Smith"
+            avatarUrl:
+              type: string
+              format: uri
+              examples:
+                - "https://example.com/avatars/jane.jpg"
+            oldAvatar:
+              type: string
+              deprecated: true
+              description: Use avatarUrl instead
+              x-deprecated-since: "2024-06-01"
+              examples:
+                - "/old/path/avatar.jpg"
+      required:
+        - id
+        - email
+
