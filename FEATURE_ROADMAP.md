@@ -1701,7 +1701,7 @@
   - ✅ Mermaid diagram code
   - ✅ PlantUML code
   - ✅ GraphML (for yEd, Gephi)
-  - 📋 DOT (Graphviz)
+  - ✅ DOT (Graphviz)
   - 📋 JSON (raw data)
 - **High-Resolution Export**: 
   - 1x (default), 2x, 4x, 8x resolution
@@ -1732,7 +1732,6 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| [#202] | Export as DOT       |
 | [#203] | Export as JSON      |
 
 ---
@@ -6218,6 +6217,60 @@ Focus on shipping high-impact features that users will love, rather than buildin
 ---
 
 ## 📈 Changelog
+
+### December 20, 2025 - Version 3.2.4 (DOT/GraphViz Export Implementation)
+- **Implemented Canvas Export as DOT (GraphViz)** ✅ COMPLETED
+  - Created handleExportDot function for GraphViz DOT language export
+  - Generates DOT format for graph visualization with GraphViz tools
+  - No external libraries required - pure text generation
+  - Full DOT language syntax with styling:
+    - Digraph declaration (directed graph)
+    - Graph attributes (rankdir, nodesep, ranksep, bgcolor)
+    - Node styling (shape=record, filled backgrounds, fonts)
+    - Edge styling (colors, fonts, arrow types)
+  - Node representation:
+    - Record shape with class name and properties
+    - Property visibility indicators (+ for required, - for optional)
+    - Type information with array notation (type[])
+    - Escaped special characters for DOT compliance
+  - Edge styling based on relationship types:
+    - `arrowhead=empty` for inheritance (allOf)
+    - `arrowhead=vee` for associations (anyOf, oneOf, references)
+    - `style=solid` for inheritance
+    - `style=dashed` for polymorphic relationships
+    - Labels for relationship types and cardinality
+  - Smart attribute handling:
+    - Automatic label generation
+    - Cardinality display (headlabel or label)
+    - Edge type detection (inheritance vs association)
+  - Tool compatibility:
+    - GraphViz CLI (dot, neato, fdp, circo, twopi)
+    - Online viewers (GraphvizOnline, viz-js.com)
+    - IDE plugins (VS Code GraphViz extension)
+    - Documentation tools (Sphinx, Doxygen)
+  - Layout algorithms supported:
+    - dot: Hierarchical layouts
+    - neato: Spring model layouts
+    - fdp: Force-directed layouts
+    - circo: Circular layouts
+    - twopi: Radial layouts
+  - Smart filename generation: `{project-name}-v{version}.dot`
+  - Loading state with "Exporting canvas as DOT..." message
+  - Success message guides users to GraphViz tools and online renderers
+  - Comprehensive error handling
+  - Text file download (text/plain MIME type)
+- **Updated Export Dropdown UI**
+  - Added DOT (GraphViz) button with lightning icon
+  - Connected to handleExportDot function
+  - Positioned after GraphML (text format grouping)
+- **Export Features Summary** - ALL 7 FORMATS COMPLETE:
+  - ✅ PNG Export: High-resolution raster images (2x pixel ratio)
+  - ✅ JPEG Export: Compressed raster with smaller file sizes (quality 0.95)
+  - ✅ SVG Export: Scalable vector graphics
+  - ✅ PDF Export: Professional documents with metadata and layout
+  - ✅ PlantUML Export: UML diagram text for tools and renderers
+  - ✅ GraphML Export: Graph XML for analysis and visualization tools
+  - ✅ DOT Export: GraphViz language for graph visualization and layouts
 
 ### December 20, 2025 - Version 3.2.3 (GraphML Export Implementation)
 - **Implemented Canvas Export as GraphML** ✅ COMPLETED

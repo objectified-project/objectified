@@ -82,6 +82,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Export canvas as PDF document
     - Export canvas as PlantUML document
     - Export canvas as GraphML document
+    - Export canvas as DOT document
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
