@@ -1159,12 +1159,6 @@
 - Save custom groups as reusable templates
 - Share group templates across projects/tenants
 
-**Export Canvas** 📋 PLANNED
-- ✅ Export button
-- ✅ Export as PNG
-- ✅ Export as SVG
-- ✅ Export as PDF
-
 | Ticket | Feature Description                                                                                     |
 |--------|---------------------------------------------------------------------------------------------------------|
 | [#152] | Create visual containers to group related classes together                                              |
@@ -1705,7 +1699,7 @@
   - ✅ SVG (vector, scalable)
   - ✅ PDF (document format)
   - ✅ Mermaid diagram code
-  - 📋 PlantUML code
+  - ✅ PlantUML code
   - 📋 GraphML (for yEd, Gephi)
   - 📋 DOT (Graphviz)
   - 📋 JSON (raw data)
@@ -1738,7 +1732,6 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| [#198] | Export as JPG       |
 | [#200] | Export as PlantUML  |
 | [#201] | Export as GraphML   |
 | [#202] | Export as DOT       |
@@ -6227,6 +6220,41 @@ Focus on shipping high-impact features that users will love, rather than buildin
 ---
 
 ## 📈 Changelog
+
+### December 20, 2025 - Version 3.2.2 (PlantUML Export Implementation)
+- **Implemented Canvas Export as PlantUML** ✅ COMPLETED
+  - Created handleExportPlantUml function for UML diagram text export
+  - Generates PlantUML class diagrams from canvas nodes and edges
+  - No external libraries required - pure text generation
+  - Comprehensive PlantUML syntax with styling:
+    - Custom skin parameters (colors, borders, backgrounds)
+    - Class definitions with properties
+    - Property visibility indicators (+ for required, - for optional)
+    - Type information with array notation (e.g., string[])
+    - Relationship mapping (inheritance, anyOf, oneOf, references)
+    - Cardinality labels on relationships
+  - Smart relationship detection:
+    - `--|>` for inheritance (allOf)
+    - `-->` for associations (anyOf, oneOf, references)
+    - Labels for relationship types and cardinality
+  - Header comments with project name, version, and generation date
+  - Clean, readable .puml format
+  - Smart filename generation: `{project-name}-v{version}.puml`
+  - Loading state with "Exporting canvas as PlantUML..." message
+  - Success message guides users to PlantUML tools/online renderers
+  - Comprehensive error handling
+  - Text file download (no image generation)
+- **Updated Export Dropdown UI**
+  - Added visual separator (divider line) before PlantUML option
+  - Added PlantUML Diagram button with UML diagram icon
+  - Connected to handleExportPlantUml function
+  - PlantUML positioned after image formats (logical grouping)
+- **Export Features Summary** - ALL 5 FORMATS COMPLETE:
+  - ✅ PNG Export: High-resolution raster images (2x pixel ratio)
+  - ✅ JPEG Export: Compressed raster with smaller file sizes (quality 0.95)
+  - ✅ SVG Export: Scalable vector graphics
+  - ✅ PDF Export: Professional documents with metadata and layout
+  - ✅ PlantUML Export: UML diagram text for tools and renderers
 
 ### December 20, 2025 - Version 3.2.1 (Canvas Export Implementation)
 - **Implemented Canvas Export as PNG** ✅ COMPLETED
