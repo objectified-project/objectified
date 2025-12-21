@@ -287,24 +287,319 @@
 
 ---
 
-### 4. Drag & Drop Interactions
+### 4. Import System (Enterprise-Grade)
 
-#### File Import 📋 PLANNED
-- 📋 **Drag & Drop Import**: Drop OpenAPI/JSON files to import
-- 📋 **Visual feedback**: Dropzone highlighting
-- 📋 **Format detection**: Auto-detect file type
-- 📋 **Error handling**: Clear error messages on invalid files
+The import system provides comprehensive, enterprise-level capabilities for importing OpenAPI specifications and related formats. It supports multiple input methods, validation layers, conflict resolution, and seamless integration with existing projects.
 
-#### Canvas Interactions ✅ PARTIALLY COMPLETE
+#### 4.1 Import Methods 📋 PLANNED
+
+##### File Upload
+- 📋 **Single File Upload**: Standard file picker for individual files
+- 📋 **Multi-File Upload**: Batch import multiple specification files
+- 📋 **Drag & Drop Zone**: Visual dropzone with file type indicators
+- 📋 **Folder Upload**: Import entire specification directories
+- 📋 **Archive Support**: Import from ZIP, TAR.GZ containing specs
+- 📋 **Large File Handling**: Chunked upload for files > 10MB
+- 📋 **Upload Resume**: Resume interrupted uploads
+
+##### URL Import
+- 📋 **Direct URL Import**: Fetch spec from public URL
+- 📋 **Authenticated URL**: Support for Bearer, API Key, Basic Auth
+- 📋 **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket
+- 📋 **Branch/Tag Selection**: Import specific versions from git
+- 📋 **Private Repository Support**: OAuth integration for private repos
+- 📋 **Swagger Hub Integration**: Direct import from SwaggerHub
+- 📋 **Postman Collection Import**: Import from Postman workspace URL
+
+##### Clipboard Import
+- 📋 **Paste JSON/YAML**: Direct paste into import dialog
+- 📋 **Syntax Highlighting**: Live preview of pasted content
+- 📋 **Format Auto-Detection**: Automatically detect JSON vs YAML
+- 📋 **Quick Import Button**: One-click import from clipboard
+
+##### Integration Import
+- 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong
+- 📋 **CI/CD Pipeline Integration**: Import from build artifacts
+- 📋 **Registry Import**: Import from schema registries
+- 📋 **Webhook Import**: Automated import via webhook triggers
+
+#### 4.2 Supported Formats 📋 PLANNED
+
+##### OpenAPI Specifications
+- 📋 **OpenAPI 3.1.x**: Full JSON Schema Draft 2020-12 support
+- 📋 **OpenAPI 3.0.x**: Backward compatible import with upgrade path
+- 📋 **OpenAPI 2.0 (Swagger)**: Legacy support with automatic conversion
+- 📋 **Multi-File Specs**: Support for $ref across multiple files
+- 📋 **External References**: Resolve external $ref URLs
+
+##### JSON Schema
+- 📋 **JSON Schema Draft 2020-12**: Latest specification
+- 📋 **JSON Schema Draft 07**: Common enterprise format
+- 📋 **JSON Schema Draft 04**: Legacy support
+- 📋 **Bundled Schemas**: Multi-schema documents
+
+##### Related Formats
+- 📋 **Arazzo Specification**: Workflow orchestration import
+- 📋 **AsyncAPI 2.x/3.x**: Event-driven API specifications
+- 📋 **GraphQL Schema**: SDL format import
+- 📋 **Protobuf Definitions**: gRPC service definitions
+- 📋 **RAML 1.0**: RESTful API Modeling Language
+- 📋 **API Blueprint**: Markdown-based API format
+- 📋 **Postman Collections**: v2.0 and v2.1 formats
+- 📋 **Insomnia Export**: Import from Insomnia workspaces
+- 📋 **HAR Files**: HTTP Archive format for API discovery
+
+##### Data Formats
+- 📋 **YAML**: Full YAML 1.2 support with anchors/aliases
+- 📋 **JSON**: Standard JSON with comments support (JSONC)
+- 📋 **JSON5**: Extended JSON format support
+
+#### 4.3 Pre-Import Analysis 📋 PLANNED
+
+##### Format Detection & Validation
+- 📋 **Auto-Detection**: Automatically identify specification format
+- 📋 **Version Detection**: Detect OpenAPI/JSON Schema version
+- 📋 **Syntax Validation**: Real-time YAML/JSON syntax checking
+- 📋 **Schema Validation**: Validate against official meta-schemas
+- 📋 **Custom Validation Rules**: Enterprise-specific validation
+
+##### Specification Analysis
+- 📋 **Schema Count**: Number of schemas to be imported
+- 📋 **Property Count**: Total properties across all schemas
+- 📋 **Reference Analysis**: Count and map all $ref relationships
+- 📋 **Circular Reference Detection**: Identify circular dependencies
+- 📋 **External Reference Inventory**: List all external URLs
+
+##### Compatibility Check
+- 📋 **Feature Compatibility**: Identify unsupported features
+- 📋 **Extension Detection**: List all x- custom extensions
+- 📋 **Deprecated Feature Warning**: Flag deprecated constructs
+- 📋 **Security Scheme Analysis**: Identify auth requirements
+- 📋 **Breaking Change Detection**: Compare with existing version
+
+##### Quality Score
+- 📋 **Completeness Score**: Descriptions, examples, documentation
+- 📋 **Consistency Score**: Naming conventions, patterns
+- 📋 **Best Practices Score**: Industry standard compliance
+- 📋 **Security Score**: Security scheme coverage
+- 📋 **Overall Quality Rating**: A-F grade with breakdown
+
+#### 4.4 Import Preview & Mapping 📋 PLANNED
+
+##### Visual Preview
+- 📋 **Schema Tree View**: Hierarchical view of all schemas
+- 📋 **Property Listing**: Expandable property details
+- 📋 **Relationship Diagram**: Preview of schema relationships
+- 📋 **Side-by-Side Comparison**: Compare with existing schemas
+- 📋 **Diff Highlighting**: Visual diff for updates
+
+##### Schema Selection
+- 📋 **Select All / None**: Bulk selection controls
+- 📋 **Individual Selection**: Cherry-pick specific schemas
+- 📋 **Dependency Resolution**: Auto-select required dependencies
+- 📋 **Search & Filter**: Find schemas by name, type, tags
+- 📋 **Category Grouping**: Group by tag, path, or custom criteria
+
+##### Name Mapping
+- 📋 **Auto-Generated Names**: Smart naming from schema context
+- 📋 **Custom Name Override**: Manual name assignment
+- 📋 **Naming Convention Enforcement**: camelCase, PascalCase, etc.
+- 📋 **Prefix/Suffix Rules**: Apply consistent naming patterns
+- 📋 **Reserved Name Detection**: Prevent conflicts with keywords
+
+##### Property Mapping
+- 📋 **Type Mapping**: Map external types to internal types
+- 📋 **Default Value Assignment**: Set defaults during import
+- 📋 **Required Field Override**: Modify required status
+- 📋 **Description Enhancement**: Add/modify descriptions
+- 📋 **Example Generation**: Auto-generate missing examples
+
+#### 4.5 Conflict Resolution 📋 PLANNED
+
+##### Conflict Detection
+- 📋 **Duplicate Schema Detection**: Same name, different definition
+- 📋 **Property Conflicts**: Incompatible property definitions
+- 📋 **Reference Conflicts**: Broken or ambiguous references
+- 📋 **Type Mismatches**: Incompatible type assignments
+- 📋 **Semantic Conflicts**: Logically incompatible constraints
+
+##### Resolution Strategies
+- 📋 **Keep Existing**: Preserve current schema, skip import
+- 📋 **Replace**: Overwrite existing with imported schema
+- 📋 **Merge**: Intelligently merge properties and constraints
+- 📋 **Rename**: Import with modified name to avoid conflict
+- 📋 **Create Version**: Import as new version of existing schema
+
+##### Merge Options
+- 📋 **Additive Merge**: Add new properties, keep existing
+- 📋 **Override Merge**: Imported values take precedence
+- 📋 **Selective Merge**: Choose per-property merge strategy
+- 📋 **Deep Merge**: Recursively merge nested objects
+- 📋 **Array Merge Strategies**: Append, replace, or deduplicate
+
+##### Conflict Report
+- 📋 **Conflict Summary**: Overview of all detected conflicts
+- 📋 **Impact Analysis**: What will change if resolved
+- 📋 **Resolution Recommendations**: AI-suggested resolutions
+- 📋 **Batch Resolution**: Apply same strategy to similar conflicts
+- 📋 **Conflict Export**: Export conflict report for review
+
+#### 4.6 Import Execution 📋 PLANNED
+
+##### Progress Tracking
+- 📋 **Step-by-Step Progress**: Current phase indicator
+- 📋 **Percentage Complete**: Overall progress bar
+- 📋 **Schema Counter**: X of Y schemas imported
+- 📋 **Time Estimate**: Estimated completion time
+- 📋 **Speed Metrics**: Schemas per second
+
+##### Execution Options
+- 📋 **Dry Run Mode**: Preview changes without committing
+- 📋 **Transaction Mode**: All-or-nothing import
+- 📋 **Incremental Mode**: Import available, skip failures
+- 📋 **Background Import**: Continue working during import
+- 📋 **Scheduled Import**: Queue import for later execution
+
+##### Real-Time Feedback
+- 📋 **Live Log**: Streaming import log
+- 📋 **Success Indicators**: Green checkmarks for completed
+- 📋 **Warning Indicators**: Yellow for non-critical issues
+- 📋 **Error Indicators**: Red for failures with details
+- 📋 **Skip Indicators**: Gray for intentionally skipped items
+
+##### Error Handling
+- 📋 **Graceful Degradation**: Continue on non-critical errors
+- 📋 **Error Recovery**: Retry failed operations
+- 📋 **Rollback Support**: Undo partial imports
+- 📋 **Error Export**: Download detailed error report
+- 📋 **Support Ticket Creation**: One-click issue reporting
+
+#### 4.7 Post-Import Actions 📋 PLANNED
+
+##### Import Summary
+- 📋 **Success Count**: Schemas successfully imported
+- 📋 **Warning Count**: Items with warnings
+- 📋 **Error Count**: Failed imports
+- 📋 **Skip Count**: Intentionally skipped items
+- 📋 **Time Taken**: Total import duration
+
+##### Automatic Actions
+- 📋 **Auto-Layout**: Arrange imported schemas on canvas
+- 📋 **Auto-Connect**: Create relationships from $ref
+- 📋 **Auto-Tag**: Apply tags based on source/category
+- 📋 **Auto-Document**: Generate descriptions from context
+- 📋 **Auto-Validate**: Run validation on imported schemas
+
+##### Review & Verification
+- 📋 **Import Review Mode**: Highlight newly imported items
+- 📋 **Comparison Report**: Before/after summary
+- 📋 **Validation Report**: Full validation results
+- 📋 **Quality Assessment**: Post-import quality score
+- 📋 **Relationship Verification**: Confirm all refs resolved
+
+##### Follow-Up Actions
+- 📋 **Open in Canvas**: Navigate to imported schemas
+- 📋 **Generate Documentation**: Create docs from import
+- 📋 **Share Import Report**: Send summary to team
+- 📋 **Schedule Re-Import**: Set up recurring import
+- 📋 **Export Transformed**: Export in different format
+
+#### 4.8 Import History & Audit 📋 PLANNED
+
+##### Import History
+- 📋 **Import Log**: Complete history of all imports
+- 📋 **Source Tracking**: Where each schema originated
+- 📋 **Timestamp Recording**: When imports occurred
+- 📋 **User Attribution**: Who performed the import
+- 📋 **Version Tracking**: Import version history
+
+##### Audit Trail
+- 📋 **Change Log**: Detailed record of all changes
+- 📋 **Before/After Snapshots**: State comparison
+- 📋 **Rollback Points**: Restore to pre-import state
+- 📋 **Compliance Reporting**: Audit-ready reports
+- 📋 **Retention Policies**: Configurable history retention
+
+##### Re-Import Capabilities
+- 📋 **Saved Import Configs**: Reuse import settings
+- 📋 **Scheduled Re-Imports**: Periodic sync from source
+- 📋 **Incremental Updates**: Only import changes
+- 📋 **Change Detection**: Notify when source changes
+- 📋 **Sync Status**: Dashboard of import freshness
+
+#### 4.9 Import Templates & Presets 📋 PLANNED
+
+##### Built-In Templates
+- 📋 **Standard OpenAPI**: Default settings for OpenAPI import
+- 📋 **Minimal Import**: Only essential schemas
+- 📋 **Full Import**: All schemas with all metadata
+- 📋 **Migration Mode**: Optimized for legacy conversion
+- 📋 **Strict Mode**: Fail on any validation error
+
+##### Custom Presets
+- 📋 **Save Current Settings**: Create preset from current config
+- 📋 **Preset Library**: Organization-wide preset sharing
+- 📋 **Preset Parameters**: Variables in preset templates
+- 📋 **Preset Versioning**: Track preset changes over time
+- 📋 **Preset Import/Export**: Share presets across instances
+
+##### Transformation Rules
+- 📋 **Property Transformations**: Rename, restructure properties
+- 📋 **Type Coercion Rules**: Convert between types
+- 📋 **Constraint Adjustments**: Modify min/max, patterns
+- 📋 **Metadata Injection**: Add standard metadata
+- 📋 **Sanitization Rules**: Clean up imported data
+
+#### 4.10 Enterprise Features 📋 PLANNED
+
+##### Access Control
+- 📋 **Import Permissions**: Role-based import access
+- 📋 **Approval Workflow**: Require approval for imports
+- 📋 **Quarantine Mode**: Review imports before activation
+- 📋 **Import Quotas**: Limit import volume per user/org
+- 📋 **Source Restrictions**: Whitelist allowed import sources
+
+##### Integration & Automation
+- 📋 **REST API**: Programmatic import via API
+- 📋 **CLI Tool**: Command-line import utility
+- 📋 **SDK Support**: Language-specific import libraries
+- 📋 **Webhook Notifications**: Import event webhooks
+- 📋 **CI/CD Integration**: GitHub Actions, GitLab CI, Jenkins
+
+##### Compliance & Governance
+- 📋 **Policy Enforcement**: Automatic policy validation
+- 📋 **Naming Standards**: Enforce organization conventions
+- 📋 **Required Fields**: Mandate specific metadata
+- 📋 **Prohibited Patterns**: Block disallowed constructs
+- 📋 **Compliance Certification**: Mark imports as certified
+
+##### Performance & Scale
+- 📋 **Parallel Processing**: Multi-threaded import
+- 📋 **Queue Management**: Handle import backlog
+- 📋 **Rate Limiting**: Prevent system overload
+- 📋 **Caching**: Cache resolved external references
+- 📋 **Optimization**: Memory-efficient large imports
+
+---
+
+### 5. Canvas Interactions
+
+#### Drag & Drop Interactions ✅ PARTIALLY COMPLETE
 - ✅ **Node dragging**: Smooth drag with snap-to-grid option
 - 📋 **Multi-select drag**: Drag multiple nodes together
 - 📋 **Connection dragging**: Drag to create relationships
 - 📋 **Property dragging**: Drag properties between classes
 - 📋 **Group dragging**: Drag to add nodes to groups
 
+#### Visual Feedback
+- 📋 **Dropzone highlighting**: Visual cues for valid drop targets
+- 📋 **Ghost preview**: Show preview while dragging
+- 📋 **Invalid drop indicator**: Clear feedback for invalid drops
+- 📋 **Snap indicators**: Show snap points during drag
+
 ---
 
-### 5. Responsive & Accessibility
+### 6. Responsive & Accessibility
 
 #### Responsive Design 📋 PLANNED
 - 📋 **Tablet optimized**: iPad Pro, Surface support
@@ -384,7 +679,7 @@
 
 ---
 
-### 9. Sidebar & Panels
+### 10. Sidebar & Panels
 
 #### Current Sidebars ✅ IMPLEMENTED
 - ✅ **Classes sidebar**: List of all classes with search
@@ -404,7 +699,7 @@
 
 ---
 
-### 10. Export & Sharing
+### 11. Export & Sharing
 
 #### Current Export ✅ PARTIALLY COMPLETE
 - ✅ **Export button**: Icon-only button in canvas area (upper right)
