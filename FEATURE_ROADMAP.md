@@ -1700,7 +1700,7 @@
   - ✅ PDF (document format)
   - ✅ Mermaid diagram code
   - ✅ PlantUML code
-  - 📋 GraphML (for yEd, Gephi)
+  - ✅ GraphML (for yEd, Gephi)
   - 📋 DOT (Graphviz)
   - 📋 JSON (raw data)
 - **High-Resolution Export**: 
@@ -1732,7 +1732,6 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| [#201] | Export as GraphML   |
 | [#202] | Export as DOT       |
 | [#203] | Export as JSON      |
 
@@ -6219,6 +6218,51 @@ Focus on shipping high-impact features that users will love, rather than buildin
 ---
 
 ## 📈 Changelog
+
+### December 20, 2025 - Version 3.2.3 (GraphML Export Implementation)
+- **Implemented Canvas Export as GraphML** ✅ COMPLETED
+  - Created handleExportGraphMl function for graph XML export
+  - Generates GraphML format for graph analysis and visualization tools
+  - No external libraries required - pure XML text generation
+  - Full GraphML specification compliance:
+    - XML declaration and GraphML namespace
+    - Key definitions for node attributes (name, description, properties, position, type)
+    - Key definitions for edge attributes (label, type, cardinality)
+    - Directed graph with metadata comments
+    - Node definitions with all class data
+    - Edge definitions with relationship information
+  - Node data export:
+    - Class names and descriptions
+    - Properties as JSON (name, type, required, is_array, description)
+    - Canvas position (x, y coordinates)
+    - Node type classification
+  - Edge data export:
+    - Relationship labels (inheritance, associations, references)
+    - Edge types (allOf, anyOf, oneOf, reference)
+    - Cardinality information (1..*, 0..1, etc.)
+  - XML escaping for special characters (&, <, >, ", ')
+  - Tool compatibility:
+    - yEd Editor (desktop graph visualization)
+    - Gephi (network analysis and visualization)
+    - Cytoscape (network analysis platform)
+    - Neo4j (graph database import)
+    - NetworkX (Python graph library)
+  - Smart filename generation: `{project-name}-v{version}.graphml`
+  - Loading state with "Exporting canvas as GraphML..." message
+  - Success message guides users to compatible graph tools
+  - Comprehensive error handling
+  - XML file download (application/xml MIME type)
+- **Updated Export Dropdown UI**
+  - Added GraphML Graph button with graph/network icon
+  - Connected to handleExportGraphMl function
+  - Positioned after PlantUML (text format grouping)
+- **Export Features Summary** - ALL 6 FORMATS COMPLETE:
+  - ✅ PNG Export: High-resolution raster images (2x pixel ratio)
+  - ✅ JPEG Export: Compressed raster with smaller file sizes (quality 0.95)
+  - ✅ SVG Export: Scalable vector graphics
+  - ✅ PDF Export: Professional documents with metadata and layout
+  - ✅ PlantUML Export: UML diagram text for tools and renderers
+  - ✅ GraphML Export: Graph XML for analysis and visualization tools
 
 ### December 20, 2025 - Version 3.2.2 (PlantUML Export Implementation)
 - **Implemented Canvas Export as PlantUML** ✅ COMPLETED
