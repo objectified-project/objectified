@@ -1732,7 +1732,6 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| [#200] | Export as PlantUML  |
 | [#201] | Export as GraphML   |
 | [#202] | Export as DOT       |
 | [#203] | Export as JSON      |
@@ -1788,8 +1787,8 @@
   - Reference parameters across operations
   - Parameter inheritance from path to operations
 
-| Ticket | Feature Description |
-|--------|---------------------|
+| Ticket | Feature Description                   |
+|--------|---------------------------------------|
 | [#279] | Adds path editor button to the Studio |
 
 ### Operations (HTTP Methods)

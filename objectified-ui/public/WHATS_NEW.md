@@ -78,7 +78,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Added an export button in the upper right-hand corner of the canvas header
     - Export canvas as PNG image
     - Export canvas as SVG image
+    - Export canvas as JPG image
     - Export canvas as PDF document
+    - Export canvas as PlantUML document
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
