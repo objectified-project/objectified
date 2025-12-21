@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Even more look and feel improvements
   - Converting from Material UI to Radix UI
+  - Click-to-focus classes
 - Numerous bug fixes and performance enhancements
 - Improved canvas performance for large schemas
 - Properties form and editor have an improved layout

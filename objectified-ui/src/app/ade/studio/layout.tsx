@@ -26,7 +26,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn } = useStudio();
 
   // State
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -210,7 +210,12 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
 
   const callbacks: StudioSideNavCallbacks = {
     onClassAdd: handleClassAdd, onClassEdit: handleClassEdit, onClassDelete: handleClassDelete,
-    onClassSelect: (classItem) => console.log('Class selected:', classItem),
+    onClassSelect: (classItem) => {
+      console.log('Class selected:', classItem);
+      if (zoomToClassFn) {
+        zoomToClassFn(classItem.id);
+      }
+    },
     onPropertyAdd: handlePropertyAdd, onPropertyEdit: handlePropertyEdit, onPropertyDelete: handlePropertyDelete,
     onPropertySelect: (propertyItem) => console.log('Property selected:', propertyItem),
   };

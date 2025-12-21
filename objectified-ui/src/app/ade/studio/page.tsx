@@ -126,7 +126,8 @@ const StudioContent = () => {
     canvasRefreshKey,
     triggerSidebarRefresh,
     isReadOnly,
-    setIsReadOnly
+    setIsReadOnly,
+    setZoomToClassFn
   } = useStudio();
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -156,7 +157,7 @@ const StudioContent = () => {
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('hierarchical-tb');
   const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(true);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
-  const { fitView } = useReactFlow();
+  const { fitView, setCenter, getViewport } = useReactFlow();
 
   // Zoom level state for level-of-detail rendering
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -263,6 +264,34 @@ const StudioContent = () => {
     // Also reflect immediately into node data
     setNodes((prev) => prev.map((n) => ({ ...n, data: { ...(n.data as any), expandedProperties: empty } })));
   }, [setNodes]);
+
+  // Handle zoom to class when selected in sidebar
+  const zoomToClass = useCallback((classId: string) => {
+    const node = nodes.find(n => n.id === classId);
+    if (!node) return;
+
+    // Highlight the node by adding a temporary selected state
+    setNodes((prev) => prev.map((n) => ({
+      ...n,
+      selected: n.id === classId,
+    })));
+
+    // Center the view on the node with smooth animation
+    const x = node.position.x + (node.width || 200) / 2;
+    const y = node.position.y + (node.height || 150) / 2;
+    const currentZoom = getViewport().zoom;
+
+    // Zoom to 1.5x if currently zoomed out, otherwise keep current zoom
+    const targetZoom = currentZoom < 1 ? 1.5 : currentZoom;
+
+    setCenter(x, y, { zoom: targetZoom, duration: 800 });
+  }, [nodes, setNodes, setCenter, getViewport]);
+
+  // Register zoomToClass function in context on mount
+  useEffect(() => {
+    setZoomToClassFn(() => zoomToClass);
+    return () => setZoomToClassFn(null);
+  }, [zoomToClass, setZoomToClassFn]);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async (applyLayout = false) => {
