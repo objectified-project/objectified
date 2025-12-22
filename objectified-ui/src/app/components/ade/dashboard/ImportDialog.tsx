@@ -53,7 +53,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" showCloseButton={false}>
         <DialogHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -68,47 +68,48 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto py-6 px-6">
-          {/* Step Indicator */}
-          <div className="mb-8">
-            <div className="flex items-center justify-center gap-2 text-sm">
-              <div className="flex items-center">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white font-semibold">
-                  1
-                </div>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">Source</span>
+        {/* Step Indicator - Fixed */}
+        <div className="border-b border-gray-200 dark:border-gray-700 py-4 px-6">
+          <div className="flex items-center justify-center gap-2 text-sm">
+            <div className="flex items-center">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 text-white font-semibold">
+                1
               </div>
-              <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
-                  2
-                </div>
-                <span className="ml-2 text-gray-500 dark:text-gray-400">Analyze</span>
+              <span className="ml-2 font-medium text-gray-900 dark:text-white">Source</span>
+            </div>
+            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className="flex items-center">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
+                2
               </div>
-              <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
-                  3
-                </div>
-                <span className="ml-2 text-gray-500 dark:text-gray-400">Preview</span>
+              <span className="ml-2 text-gray-500 dark:text-gray-400">Analyze</span>
+            </div>
+            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className="flex items-center">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
+                3
               </div>
-              <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
-                  4
-                </div>
-                <span className="ml-2 text-gray-500 dark:text-gray-400">Import</span>
+              <span className="ml-2 text-gray-500 dark:text-gray-400">Preview</span>
+            </div>
+            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className="flex items-center">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
+                4
               </div>
-              <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
-                  5
-                </div>
-                <span className="ml-2 text-gray-500 dark:text-gray-400">Done</span>
+              <span className="ml-2 text-gray-500 dark:text-gray-400">Import</span>
+            </div>
+            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className="flex items-center">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
+                5
               </div>
+              <span className="ml-2 text-gray-500 dark:text-gray-400">Done</span>
             </div>
           </div>
+        </div>
 
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto py-6 px-6 min-h-[500px]">
           {/* Choose Import Source */}
           <div className="mb-8">
             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 p-6">
