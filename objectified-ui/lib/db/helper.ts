@@ -325,10 +325,10 @@ const bumpPatchVersion = (version: string) => {
 
 export async function copyClassesFromVersion(sourceVersionId: string, targetVersionId: string) {
   try {
-    // Copy all classes from source version to target version
+    // Copy all classes from source version to target version (including canvas_metadata for layout preservation)
     const result = await connectionPool.query(
-      `INSERT INTO odb.classes (version_id, name, description, schema, enabled)
-       SELECT $1, name, description, schema, enabled
+      `INSERT INTO odb.classes (version_id, name, description, schema, enabled, canvas_metadata)
+       SELECT $1, name, description, schema, enabled, canvas_metadata
        FROM odb.classes
        WHERE version_id = $2 AND deleted_at IS NULL
        RETURNING id, name`,
@@ -744,7 +744,7 @@ export async function getClassesWithPropertiesAndTags(versionId: string) {
   try {
     // Query 1: Get all classes for the version
     const classesResult = await connectionPool.query(
-      `SELECT id, version_id, name, description, schema, enabled, created_at, updated_at
+      `SELECT id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at
        FROM odb.classes
        WHERE version_id = $1 AND deleted_at IS NULL
        ORDER BY name ASC`,
@@ -819,7 +819,7 @@ export async function getClassesWithPropertiesAndTags(versionId: string) {
 export async function getClassesForVersion(versionId: string) {
   try {
     const result = await connectionPool.query(
-      `SELECT id, version_id, name, description, schema, enabled, created_at, updated_at
+      `SELECT id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at
        FROM odb.classes
        WHERE version_id = $1 AND deleted_at IS NULL
        ORDER BY name ASC`,
@@ -846,7 +846,7 @@ export async function createClass(versionId: string, name: string, description: 
     const result = await connectionPool.query(
       `INSERT INTO odb.classes (version_id, name, description, schema)
        VALUES ($1, $2, $3, $4)
-       RETURNING id, version_id, name, description, schema, enabled, created_at, updated_at`,
+       RETURNING id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at`,
       [versionId, name.trim(), description, JSON.stringify(schema)]
     );
 
@@ -892,7 +892,7 @@ export async function updateClass(classId: string, name: string, description: st
       `UPDATE odb.classes
        SET name = $1, description = $2, schema = $3, updated_at = CURRENT_TIMESTAMP
        WHERE id = $4 AND deleted_at IS NULL
-       RETURNING id, version_id, name, description, schema, enabled, created_at, updated_at`,
+       RETURNING id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at`,
       [newClassName, description, JSON.stringify(schema), classId]
     );
 
@@ -979,6 +979,96 @@ export async function deleteClass(classId: string) {
     return JSON.stringify({ success: true });
   } catch (error: any) {
     console.error('Error deleting class:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Update canvas metadata for a class (position, dimensions, styling).
+ * This is UI-only data and does not affect the class schema for code generation or exports.
+ *
+ * @param classId - The ID of the class to update
+ * @param canvasMetadata - Canvas metadata object containing position, dimensions, and style
+ * @returns JSON response with success status
+ */
+export async function updateClassCanvasMetadata(classId: string, canvasMetadata: {
+  position?: { x: number; y: number };
+  dimensions?: { width?: number; height?: number };
+  style?: {
+    backgroundColor?: string;
+    borderColor?: string;
+    collapsed?: boolean;
+    zIndex?: number;
+  };
+  group?: string | null;
+} | null) {
+  try {
+    const result = await connectionPool.query(
+      `UPDATE odb.classes
+       SET canvas_metadata = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND deleted_at IS NULL
+       RETURNING id, canvas_metadata`,
+      [canvasMetadata ? JSON.stringify(canvasMetadata) : null, classId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    return JSON.stringify({ success: true, canvas_metadata: result.rows[0].canvas_metadata });
+  } catch (error: any) {
+    console.error('Error updating class canvas metadata:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Batch update canvas metadata for multiple classes.
+ * Useful for saving entire canvas layouts at once.
+ *
+ * @param updates - Array of { classId, canvasMetadata } objects
+ * @returns JSON response with success status and count of updated classes
+ */
+export async function batchUpdateClassCanvasMetadata(updates: Array<{
+  classId: string;
+  canvasMetadata: {
+    position?: { x: number; y: number };
+    dimensions?: { width?: number; height?: number };
+    style?: {
+      backgroundColor?: string;
+      borderColor?: string;
+      collapsed?: boolean;
+      zIndex?: number;
+    };
+    group?: string | null;
+  } | null;
+}>) {
+  try {
+    if (!updates || updates.length === 0) {
+      return JSON.stringify({ success: true, updatedCount: 0 });
+    }
+
+    let updatedCount = 0;
+
+    // Use a transaction for batch updates
+    await connectionPool.query('BEGIN');
+
+    for (const update of updates) {
+      const result = await connectionPool.query(
+        `UPDATE odb.classes
+         SET canvas_metadata = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2 AND deleted_at IS NULL`,
+        [update.canvasMetadata ? JSON.stringify(update.canvasMetadata) : null, update.classId]
+      );
+      updatedCount += result.rowCount;
+    }
+
+    await connectionPool.query('COMMIT');
+
+    return JSON.stringify({ success: true, updatedCount });
+  } catch (error: any) {
+    await connectionPool.query('ROLLBACK');
+    console.error('Error batch updating class canvas metadata:', error);
     return JSON.stringify({ success: false, error: error.message });
   }
 }

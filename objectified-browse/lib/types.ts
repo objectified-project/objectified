@@ -52,3 +52,46 @@ export interface SearchResult {
   version_count: number;
 }
 
+/**
+ * Canvas metadata for class positioning and styling.
+ * This is UI-only data and does not affect schema generation or exports.
+ */
+export interface CanvasMetadata {
+  /** Position on the canvas in pixels */
+  position?: {
+    x: number;
+    y: number;
+  };
+  /** Dimensions of the class node */
+  dimensions?: {
+    width?: number;
+    height?: number;
+  };
+  /** Visual styling options */
+  style?: {
+    backgroundColor?: string;
+    borderColor?: string;
+    collapsed?: boolean;
+    zIndex?: number;
+  };
+  /** Group ID if this class belongs to a visual group */
+  group?: string | null;
+}
+
+/**
+ * Class definition representing a schema object.
+ */
+export interface Class {
+  id: string;
+  version_id: string;
+  name: string;
+  description: string | null;
+  /** JSON Schema definition for the class */
+  schema: Record<string, unknown>;
+  enabled: boolean;
+  /** UI-only canvas positioning and styling - excluded from exports */
+  canvas_metadata?: CanvasMetadata | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
