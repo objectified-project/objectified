@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -566,40 +566,60 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     return schema;
   };
 
-  // Generate OpenAPI doc asynchronously
+  // Create a stable stringified version of formData for dependency tracking
+  const formDataString = useMemo(() => JSON.stringify(formData), [formData]);
+
+  // Memoize the built schema to prevent unnecessary recalculations
+  const builtSchema = useMemo(() => {
+    if (editingClassData) {
+      return typeof editingClassData.schema === 'string'
+        ? JSON.parse(editingClassData.schema)
+        : editingClassData.schema || {};
+    }
+    return buildSchemaFromFormData();
+  }, [editingClassData, formDataString]);
+
+  // Memoize all classes array to prevent reference changes
+  const allClasses = useMemo(() => {
+    return nodes.map(node => node.data).filter(data => data && data.name);
+  }, [nodes]);
+
+  // Generate OpenAPI doc asynchronously with debouncing
   useEffect(() => {
-    const generateOpenApiDocAsync = async () => {
-      if (!open) return;
+    if (!open) return;
 
-      setLoadingOpenApiDoc(true);
-      try {
-        const allClasses = nodes.map(node => node.data).filter(data => data && data.name);
+    // Debounce the generation to prevent rapid successive calls
+    const timeoutId = setTimeout(() => {
+      const generateOpenApiDocAsync = async () => {
+        setLoadingOpenApiDoc(true);
+        try {
+          const previewClassData = editingClassData || {
+            name: formData.name || 'NewClass',
+            description: formData.description,
+            schema: builtSchema
+          };
 
-        const previewClassData = editingClassData || {
-          name: formData.name || 'NewClass',
-          description: formData.description,
-          schema: buildSchemaFromFormData()
-        };
+          const doc = await generateClassOpenApiSpec(previewClassData, allClasses, {
+            title: `${previewClassData.name} Schema`,
+            version: '1.0.0',
+            description: 'OpenAPI 3.1.0 schema definition',
+            metadata: projectMetadata
+          });
 
-        const doc = await generateClassOpenApiSpec(previewClassData, allClasses, {
-          title: `${previewClassData.name} Schema`,
-          version: '1.0.0',
-          description: 'OpenAPI 3.1.0 schema definition',
-          metadata: projectMetadata
-        });
+          setOpenApiDoc(doc);
+        } catch (error) {
+          console.error('Failed to generate OpenAPI doc:', error);
+          setOpenApiDoc(null);
+        } finally {
+          setLoadingOpenApiDoc(false);
+        }
+      };
 
-        setOpenApiDoc(doc);
-      } catch (error) {
-        console.error('Failed to generate OpenAPI doc:', error);
-        setOpenApiDoc(null);
-      } finally {
-        setLoadingOpenApiDoc(false);
-      }
-    };
+      generateOpenApiDocAsync();
+    }, 300); // 300ms debounce
 
-    generateOpenApiDocAsync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingClassData, formData.name, formData.description, formData.allOf, formData.anyOf, formData.oneOf, formData.discriminatorProperty, formData.discriminatorUseAuto, formData.additionalProperties, nodes]);
+    return () => clearTimeout(timeoutId);
+  }, [open, builtSchema, allClasses, editingClassData, projectMetadata]);
 
   // Get all available class names for composition selectors (excluding current class)
   const availableClasses = nodes
@@ -712,7 +732,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   };
 
   // Get the class schema from the generated OpenAPI doc (with null check)
-  const classSchema = openApiDoc?.components?.schemas?.[previewClassData.name];
+  const openApiClassSchema = openApiDoc?.components?.schemas?.[previewClassData.name];
 
   // Helper function to resolve $ref references in a schema
   const resolveRefs = (schema: any, schemas: any, visited: Set<string> = new Set(), path: string = ''): any => {
@@ -869,10 +889,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     // Example view - regenerate when exampleRefreshKey changes
     try {
       // Resolve all $ref references for json-schema-faker
-      const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+      const resolvedSchema = resolveRefs(openApiClassSchema, openApiDoc.components.schemas);
 
       // Debug: Log the resolved schema to verify allOf merging
-      console.log('Original schema:', classSchema);
+      console.log('Original schema:', openApiClassSchema);
       console.log('Resolved schema for example generation:', resolvedSchema);
       console.log('Resolved schema properties:', resolvedSchema.properties);
 
@@ -902,7 +922,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     let content: string;
     if (activeTab === 'example') {
       try {
-        const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+        const resolvedSchema = resolveRefs(openApiClassSchema, openApiDoc.components.schemas);
         const fakeData = jsf.generate(resolvedSchema);
         content = JSON.stringify(fakeData, null, 2);
       } catch (error) {
@@ -930,7 +950,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
     if (activeTab === 'example') {
       try {
-        const resolvedSchema = resolveRefs(classSchema, openApiDoc.components.schemas);
+        const resolvedSchema = resolveRefs(openApiClassSchema, openApiDoc.components.schemas);
         const fakeData = jsf.generate(resolvedSchema);
         content = JSON.stringify(fakeData, null, 2);
       } catch (error) {
