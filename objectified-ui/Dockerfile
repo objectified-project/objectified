@@ -8,12 +8,12 @@ WORKDIR /app
 # Install dependencies for native modules (bcrypt, pg)
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Copy package files only
+COPY package.json ./
 
 # Install ALL dependencies (including dev deps) for build
-# TypeScript is needed to transpile next.config.ts
-#RUN npm install
+# Using npm to avoid yarn workspace complications
+RUN npm install
 
 
 # Stage 2: Builder
@@ -62,6 +62,6 @@ EXPOSE 3000
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
-# Start the application
-CMD ["yarn", "start"]
+# Start the application (standalone uses server.js)
+CMD ["node", "server.js"]
 
