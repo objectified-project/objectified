@@ -17,11 +17,6 @@ interface ImportDialogProps {
   userId: string;
 }
 
-interface RecentImport {
-  filename: string;
-  date: string;
-}
-
 const ImportDialog: React.FC<ImportDialogProps> = ({
   open,
   onClose,
@@ -29,11 +24,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   userId    // Will be used in future steps for tracking import activity
 }) => {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
-  const [recentImports] = useState<RecentImport[]>([
-    { filename: 'petstore.yaml', date: '3 days ago' },
-    { filename: 'user-service.json', date: '1 week ago' },
-    { filename: 'payment-api.yaml', date: '2 weeks ago' },
-  ]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -41,14 +33,62 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     console.log('Selected source:', source);
   };
 
-  const handleReImport = (filename: string) => {
-    console.log('Re-importing:', filename);
-    // TODO: Implement re-import functionality
+  const handleBack = () => {
+    setSelectedSource(null);
+    setSelectedFile(null);
   };
 
   const handleClose = () => {
     setSelectedSource(null);
+    setSelectedFile(null);
     onClose();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  };
+
+  const handleFileSelect = (file: File) => {
+    const validExtensions = ['.yaml', '.yml', '.json', '.zip'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (validExtensions.includes(fileExtension)) {
+      setSelectedFile(file);
+      console.log('File selected:', file.name);
+    } else {
+      console.error('Invalid file type');
+      // TODO: Show error message
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelect(e.target.files[0]);
+    }
   };
 
   return (
@@ -109,15 +149,17 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto py-6 px-6 min-h-[500px]">
-          {/* Choose Import Source */}
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">
-                Choose Import Source
-              </h2>
+        <div className="overflow-y-auto py-6 px-6 h-[60vh]">
+          {!selectedSource ? (
+            <>
+              {/* Choose Import Source */}
+              <div className="mb-8">
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 p-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">
+                    Choose Import Source
+                  </h2>
 
-              {/* Source Options Grid */}
+                  {/* Source Options Grid */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 {/* File Upload */}
                 <button
@@ -289,59 +331,177 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               </div>
             </div>
           </div>
+            </>
+          ) : selectedSource === 'file' ? (
+            <>
+              {/* Step 1a: File Upload View */}
 
-          {/* Recent Imports */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Recent Imports
-            </h3>
-            <div className="space-y-2">
-              {recentImports.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileCode className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {item.filename}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {item.date}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleReImport(item.filename)}
+              {/* Source Tabs */}
+              <div className="mb-6">
+                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+                  <button
+                    className="px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400"
                   >
-                    Re-import
-                  </Button>
+                    📁 File
+                  </button>
+                  <button
+                    onClick={() => handleSourceClick('url')}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    🔗 URL
+                  </button>
+                  <button
+                    onClick={() => handleSourceClick('clipboard')}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    📋 Clipboard
+                  </button>
+                  <button
+                    onClick={() => handleSourceClick('git')}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    🐙 Git
+                  </button>
+                  <button
+                    onClick={() => handleSourceClick('swaggerhub')}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    ☁️ SwaggerHub
+                  </button>
+                  <button
+                    onClick={() => handleSourceClick('registry')}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    📦 Registry
+                  </button>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+
+              {/* Drop Zone */}
+              <div className="mb-6">
+                <div
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
+                    isDragging
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-600'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+                      isDragging
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
+                    }`}>
+                      <Upload className="h-8 w-8" />
+                    </div>
+
+                    {selectedFile ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                          <FileCode className="h-5 w-5" />
+                          <span className="font-medium">{selectedFile.name}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {(selectedFile.size / 1024).toFixed(2)} KB
+                        </p>
+                        <button
+                          onClick={() => setSelectedFile(null)}
+                          className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                        >
+                          Remove file
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <p className="text-lg font-medium text-gray-900 dark:text-white">
+                            Drop files here
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            or
+                          </p>
+                        </div>
+
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".yaml,.yml,.json,.zip"
+                            onChange={handleFileInputChange}
+                          />
+                          <span className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-sm">
+                            <Upload className="h-5 w-5" />
+                            Browse Files
+                          </span>
+                        </label>
+
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Supports: .yaml, .yml, .json, .zip
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Placeholder for other source views (URL, Clipboard, etc.) */}
+              <div className="text-center py-12">
+                <p className="text-gray-600 dark:text-gray-400">
+                  {selectedSource} import view - Coming soon
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => {
-              if (selectedSource) {
-                // TODO: Navigate to next step
-                console.log('Proceeding with:', selectedSource);
-              }
-            }}
-            disabled={!selectedSource}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-          >
-            Next →
-          </Button>
+          {selectedSource ? (
+            <>
+              <Button variant="outline" onClick={handleBack}>
+                ← Back
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    // TODO: Navigate to next step
+                    console.log('Proceeding with file:', selectedFile);
+                  }}
+                  disabled={selectedSource === 'file' && !selectedFile}
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                >
+                  Next →
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedSource) {
+                    // TODO: Navigate to next step
+                    console.log('Proceeding with:', selectedSource);
+                  }
+                }}
+                disabled={!selectedSource}
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+              >
+                Next →
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

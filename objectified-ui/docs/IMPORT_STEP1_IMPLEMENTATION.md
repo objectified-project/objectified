@@ -22,10 +22,11 @@ Created a new dedicated import dialog that implements Step 1 (Source Selection P
   - 🐙 **Git Repository**: Clone from GitHub/GitLab
   - ☁️ **SwaggerHub Integration**: Import from SwaggerHub
   - 📦 **Registry Import**: Import from schema registry
-- **Recent Imports**: List of previously imported files with re-import capability
 - **Interactive Selection**: Visual feedback when hovering and selecting source options
 - **Dark Mode Support**: Full theme adaptation for light/dark modes
 - **Responsive Design**: Clean, modern UI using Radix UI components and Tailwind CSS
+
+**Note**: Recent Imports feature has been removed as it's impractical for file-based imports across different browsers or sessions.
 
 ### 2. Projects Page Updates
 **File**: `/Users/kenji/Development/objectified/objectified-ui/src/app/ade/dashboard/projects/page.tsx`
@@ -63,15 +64,15 @@ The implementation closely follows the ASCII mockup from section 4.11 of the FEA
 │  ║  [File Upload]  [URL Import]  [Clipboard]                             ║  │
 │  ║  [Git Repo]     [SwaggerHub]  [Registry]                              ║  │
 │  ╚═══════════════════════════════════════════════════════════════════════╝  │
-│  Recent Imports: [petstore.yaml] [user-service.json] [payment-api.yaml]    │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Note**: Recent Imports section has been removed from the implementation.
 
 #### Implemented Elements:
 ✅ Step indicator with current step highlighted  
 ✅ 6 source options in grid layout  
 ✅ Visual distinction for selected source  
-✅ Recent imports section with re-import buttons  
 ✅ Cancel and Next buttons in footer  
 ✅ Close button in header  
 ✅ Gradient backgrounds for emphasis  
@@ -131,7 +132,6 @@ The following steps need to be implemented in future iterations:
 ### Future Integration Points
 - `tenantId` and `userId` props are prepared for use in subsequent steps
 - `selectedSource` state will drive navigation to source-specific sub-views
-- Recent imports list will be populated from database in future implementation
 
 ### Styling Decisions
 - Gradient backgrounds used to create visual hierarchy
@@ -151,7 +151,6 @@ The following steps need to be implemented in future iterations:
    - Click each source option and verify selection state
    - Test Cancel and Next buttons
    - Verify Close button closes dialog
-   - Test Recent Imports section (when populated)
 
 3. **Responsive Testing**:
    - Test on various screen sizes
