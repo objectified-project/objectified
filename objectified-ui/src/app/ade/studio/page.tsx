@@ -3033,187 +3033,151 @@ const StudioContent = () => {
                         <div className="px-2 py-1.5">
                           <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Hierarchical</span>
                         </div>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('hierarchical-tb');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'hierarchical-tb' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">↓</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Top to Bottom</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Parent nodes at top, children flow downward
-                              </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('hierarchical-tb');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'hierarchical-tb' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">↓</span>
+                              <div className="font-medium text-xs">Top to Bottom</div>
                             </div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('hierarchical-lr');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'hierarchical-lr' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">→</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Left to Right</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Root nodes on left, branches extend rightward
-                              </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('hierarchical-lr');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'hierarchical-lr' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">→</span>
+                              <div className="font-medium text-xs">Left to Right</div>
                             </div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('hierarchical-bt');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'hierarchical-bt' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">↑</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Bottom to Top</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Children at bottom, parents above
-                              </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('hierarchical-bt');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'hierarchical-bt' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">↑</span>
+                              <div className="font-medium text-xs">Bottom to Top</div>
                             </div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('hierarchical-rl');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'hierarchical-rl' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">←</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Right to Left</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Root nodes on right, branches extend leftward
-                              </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('hierarchical-rl');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'hierarchical-rl' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">←</span>
+                              <div className="font-medium text-xs">Right to Left</div>
                             </div>
-                          </div>
-                        </button>
+                          </button>
+                        </div>
 
                         {/* Other Layouts */}
                         <div className="px-2 py-1.5 mt-2">
                           <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Other</span>
                         </div>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('force-directed');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'force-directed' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">🔄</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Force-Directed</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Physics-based layout with natural node spacing
-                              </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('force-directed');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'force-directed' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">🔄</span>
+                              <div className="font-medium text-xs">Force-Directed</div>
                             </div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('circular');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'circular' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">⭕</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Circular</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Arrange nodes in a circular pattern
-                              </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('circular');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'circular' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">⭕</span>
+                              <div className="font-medium text-xs">Circular</div>
                             </div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('grid');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'grid' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">⊞</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Grid</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Uniform grid layout with equal spacing
-                              </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('grid');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'grid' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">⊞</span>
+                              <div className="font-medium text-xs">Grid</div>
                             </div>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            onLayoutAlgorithm('layered');
-                            setLayoutDropdownOpen(false);
-                          }}
-                          disabled={!autoLayoutEnabled}
-                          className={`w-full text-left px-3 py-3 rounded-lg transition-colors ${
-                            autoLayoutEnabled
-                              ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                              : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                          } ${layoutAlgorithm === 'layered' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0 w-6 text-center">📚</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">Layered</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
-                                Minimize edge crossings with layered approach
-                              </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onLayoutAlgorithm('layered');
+                              setLayoutDropdownOpen(false);
+                            }}
+                            disabled={!autoLayoutEnabled}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
+                              autoLayoutEnabled
+                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                            } ${layoutAlgorithm === 'layered' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                          >
+                            <div className="flex flex-col items-center text-center gap-2">
+                              <span className="text-2xl">📚</span>
+                              <div className="font-medium text-xs">Layered</div>
                             </div>
-                          </div>
-                        </button>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
