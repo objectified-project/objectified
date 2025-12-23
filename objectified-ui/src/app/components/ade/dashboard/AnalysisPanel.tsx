@@ -267,6 +267,30 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
               </span>
             </div>
           )}
+          {(analysis.metrics.compositionSchemas.allOf > 0 ||
+            analysis.metrics.compositionSchemas.oneOf > 0 ||
+            analysis.metrics.compositionSchemas.anyOf > 0) && (
+            <div className="flex items-center justify-between py-2">
+              <span className="text-gray-600 dark:text-gray-400">Schema Composition:</span>
+              <div className="flex items-center gap-3">
+                {analysis.metrics.compositionSchemas.allOf > 0 && (
+                  <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-medium">
+                    allOf: {analysis.metrics.compositionSchemas.allOf}
+                  </span>
+                )}
+                {analysis.metrics.compositionSchemas.oneOf > 0 && (
+                  <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded font-medium">
+                    oneOf: {analysis.metrics.compositionSchemas.oneOf}
+                  </span>
+                )}
+                {analysis.metrics.compositionSchemas.anyOf > 0 && (
+                  <span className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded font-medium">
+                    anyOf: {analysis.metrics.compositionSchemas.anyOf}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

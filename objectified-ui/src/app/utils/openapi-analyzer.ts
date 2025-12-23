@@ -22,6 +22,11 @@ export interface AnalysisResult {
     externalReferences: string[];
     circularReferences: string[];
     customExtensions: string[];
+    compositionSchemas: {
+      allOf: number;
+      oneOf: number;
+      anyOf: number;
+    };
   };
 
   // Quality Score
@@ -188,6 +193,24 @@ function detectCircularReferences(doc: any): string[] {
   });
 
   return [...new Set(circular)];
+}
+
+/**
+ * Detect schemas using composition keywords (allOf, oneOf, anyOf)
+ */
+function detectCompositionSchemas(doc: any): { allOf: number; oneOf: number; anyOf: number } {
+  const schemas = doc.components?.schemas || doc.definitions || {};
+  let allOfCount = 0;
+  let oneOfCount = 0;
+  let anyOfCount = 0;
+
+  Object.values(schemas).forEach((schema: any) => {
+    if (schema.allOf) allOfCount++;
+    if (schema.oneOf) oneOfCount++;
+    if (schema.anyOf) anyOfCount++;
+  });
+
+  return { allOf: allOfCount, oneOf: oneOfCount, anyOf: anyOfCount };
 }
 
 /**
@@ -429,7 +452,12 @@ export async function analyzeSpecification(fileContent: string, fileName: string
         pathCount: 0,
         externalReferences: [],
         circularReferences: [],
-        customExtensions: []
+        customExtensions: [],
+        compositionSchemas: {
+          allOf: 0,
+          oneOf: 0,
+          anyOf: 0
+        }
       },
       qualityScore: {
         overall: 0,
@@ -466,7 +494,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     pathCount: countPaths(doc),
     externalReferences: findExternalReferences(refs),
     circularReferences: detectCircularReferences(doc),
-    customExtensions: findCustomExtensions(doc)
+    customExtensions: findCustomExtensions(doc),
+    compositionSchemas: detectCompositionSchemas(doc)
   };
 
   // Calculate quality score
