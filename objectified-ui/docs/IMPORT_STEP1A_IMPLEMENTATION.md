@@ -34,16 +34,21 @@ Added state variables for file upload functionality:
 ###### Source Tab Navigation
 Horizontal tab bar showing all 6 source options:
 - 📁 File (active)
-- 🔗 URL
-- 📋 Clipboard
-- 🐙 Git
-- ☁️ SwaggerHub
-- 📦 Registry
+- 🔗 URL (disabled)
+- 📋 Clipboard (disabled)
+- 🐙 Git (disabled)
+- ☁️ SwaggerHub (disabled)
+- 📦 Registry (disabled)
 
 Active tab indicated with:
 - Blue bottom border
 - Blue text color
-- Other tabs are clickable and switch to their respective views
+
+**Note**: Other import source tabs (URL, Clipboard, Git, SwaggerHub, Registry) are currently disabled until file import functionality is completed. They are visible but not clickable, with:
+- Gray text color
+- Reduced opacity (50%)
+- `cursor-not-allowed` cursor style
+- "Coming soon" tooltip on hover
 
 ###### Drag-and-Drop Upload Zone
 Features:
@@ -98,6 +103,7 @@ The implementation matches the ASCII mockup from FEATURE_ROADMAP.md section 4.11
 
 ### Implemented Elements:
 ✅ Source tabs with active state indicator  
+✅ Disabled state for other import sources (URL, Clipboard, Git, SwaggerHub, Registry)  
 ✅ Drag-and-drop file upload zone  
 ✅ Visual feedback during drag operations  
 ✅ Browse files button  

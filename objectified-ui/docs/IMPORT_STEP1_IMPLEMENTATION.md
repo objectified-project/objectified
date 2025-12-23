@@ -16,17 +16,21 @@ Created a new dedicated import dialog that implements Step 1 (Source Selection P
 #### Features Implemented:
 - **Step Indicator**: Visual progress bar showing 5 steps (Source → Analyze → Preview → Import → Done)
 - **Source Selection Grid**: 6 source options arranged in a 3x2 grid:
-  - 📁 **File Upload**: Drop files or click to browse
-  - 🔗 **URL Import**: Fetch from URL or repository
-  - 📋 **Clipboard Paste**: Paste JSON or YAML content
-  - 🐙 **Git Repository**: Clone from GitHub/GitLab
-  - ☁️ **SwaggerHub Integration**: Import from SwaggerHub
-  - 📦 **Registry Import**: Import from schema registry
-- **Interactive Selection**: Visual feedback when hovering and selecting source options
+  - 📁 **File Upload**: Drop files or click to browse (ENABLED)
+  - 🔗 **URL Import**: Fetch from URL or repository (DISABLED - Coming soon)
+  - 📋 **Clipboard Paste**: Paste JSON or YAML content (DISABLED - Coming soon)
+  - 🐙 **Git Repository**: Clone from GitHub/GitLab (DISABLED - Coming soon)
+  - ☁️ **SwaggerHub Integration**: Import from SwaggerHub (DISABLED - Coming soon)
+  - 📦 **Registry Import**: Import from schema registry (DISABLED - Coming soon)
+- **Interactive Selection**: Visual feedback when hovering and selecting the enabled File Upload option
 - **Dark Mode Support**: Full theme adaptation for light/dark modes
 - **Responsive Design**: Clean, modern UI using Radix UI components and Tailwind CSS
 
-**Note**: Recent Imports feature has been removed as it's impractical for file-based imports across different browsers or sessions.
+**Note**: Only File Upload is currently enabled. Other import sources are disabled with:
+- Grayed out appearance (opacity: 60%)
+- `cursor-not-allowed` cursor style
+- "Coming soon" tooltip on hover
+- No click interaction
 
 ### 2. Projects Page Updates
 **File**: `/Users/kenji/Development/objectified/objectified-ui/src/app/ade/dashboard/projects/page.tsx`
@@ -72,7 +76,9 @@ The implementation closely follows the ASCII mockup from section 4.11 of the FEA
 #### Implemented Elements:
 ✅ Step indicator with current step highlighted  
 ✅ 6 source options in grid layout  
-✅ Visual distinction for selected source  
+✅ File Upload button enabled and functional  
+✅ Other source buttons disabled (URL, Clipboard, Git, SwaggerHub, Registry)  
+✅ Visual distinction for enabled vs disabled sources  
 ✅ Cancel and Next buttons in footer  
 ✅ Close button in header  
 ✅ Gradient backgrounds for emphasis  
