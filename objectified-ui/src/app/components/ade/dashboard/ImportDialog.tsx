@@ -10,6 +10,7 @@ import {
 } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
 import { AnalysisPanel } from './AnalysisPanel';
+import { PreviewPanel, ImportOptions } from './PreviewPanel';
 import { analyzeSpecification, AnalysisResult } from '../../../utils/openapi-analyzer';
 
 interface ImportDialogProps {
@@ -25,12 +26,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   tenantId, // Will be used in future steps for project creation
   userId    // Will be used in future steps for tracking import activity
 }) => {
-  const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis'>('source');
+  const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis' | 'preview'>('source');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [importOptions, setImportOptions] = useState<ImportOptions | null>(null);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -39,7 +41,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const handleBack = () => {
-    if (currentStep === 'analysis') {
+    if (currentStep === 'preview') {
+      setCurrentStep('analysis');
+    } else if (currentStep === 'analysis') {
       setCurrentStep('file-upload');
       setAnalysisResult(null);
     } else if (currentStep === 'file-upload') {
@@ -54,6 +58,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setSelectedSource(null);
     setSelectedFile(null);
     setAnalysisResult(null);
+    setImportOptions(null);
     onClose();
   };
 
@@ -147,20 +152,20 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           <div className="flex items-center justify-center gap-2 text-sm">
             <div className="flex items-center">
               <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
-                currentStep === 'source' || currentStep === 'file-upload' || currentStep === 'analysis'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-indigo-600 text-white'
+                currentStep === 'source' || currentStep === 'file-upload' 
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-green-600 text-white'
               }`}>
-                {currentStep === 'analysis' ? '✓' : '1'}
+                {currentStep === 'analysis' || currentStep === 'preview' ? '✓' : '1'}
               </div>
               <span className={`ml-2 font-medium ${
-                currentStep === 'source' || currentStep === 'file-upload' || currentStep === 'analysis'
+                currentStep === 'source' || currentStep === 'file-upload' || currentStep === 'analysis' || currentStep === 'preview'
                   ? 'text-gray-900 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400'
               }`}>Source</span>
             </div>
             <div className={`w-16 h-0.5 ${
-              currentStep === 'analysis'
+              currentStep === 'analysis' || currentStep === 'preview'
                 ? 'bg-green-500'
                 : 'bg-gray-300 dark:bg-gray-600'
             }`}></div>
@@ -168,22 +173,36 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
                 currentStep === 'analysis'
                   ? 'bg-indigo-600 text-white'
+                  : currentStep === 'preview'
+                  ? 'bg-green-600 text-white'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}>
-                2
+                {currentStep === 'preview' ? '✓' : '2'}
               </div>
               <span className={`ml-2 ${
-                currentStep === 'analysis'
+                currentStep === 'analysis' || currentStep === 'preview'
                   ? 'font-medium text-gray-900 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400'
               }`}>Analyze</span>
             </div>
-            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className={`w-16 h-0.5 ${
+              currentStep === 'preview'
+                ? 'bg-green-500'
+                : 'bg-gray-300 dark:bg-gray-600'
+            }`}></div>
             <div className="flex items-center">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
+                currentStep === 'preview'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              }`}>
                 3
               </div>
-              <span className="ml-2 text-gray-500 dark:text-gray-400">Preview</span>
+              <span className={`ml-2 ${
+                currentStep === 'preview'
+                  ? 'font-medium text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}>Preview</span>
             </div>
             <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
             <div className="flex items-center">
@@ -479,6 +498,17 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               <AnalysisPanel fileName={selectedFile?.name || ''} analysis={analysisResult} />
             </>
               );
+            } else if (currentStep === 'preview' && analysisResult) {
+              console.log('Rendering: Preview panel');
+              return (
+            <>
+              {/* Step 3: Preview Panel */}
+              <PreviewPanel
+                analysis={analysisResult}
+                onImportOptionsChange={setImportOptions}
+              />
+            </>
+              );
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
               return (
@@ -521,13 +551,24 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                 {currentStep === 'analysis' && (
                   <Button
                     onClick={() => {
-                      // TODO: Navigate to preview step
-                      console.log('Proceeding to preview');
+                      setCurrentStep('preview');
                     }}
                     disabled={!analysisResult?.isValid}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     Next →
+                  </Button>
+                )}
+                {currentStep === 'preview' && (
+                  <Button
+                    onClick={() => {
+                      // TODO: Start import process
+                      console.log('Starting import with options:', importOptions);
+                    }}
+                    disabled={!importOptions || importOptions.selectedSchemas.length === 0}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    Import →
                   </Button>
                 )}
               </div>
