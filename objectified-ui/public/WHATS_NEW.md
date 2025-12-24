@@ -9,6 +9,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Moved import to its own feature, completely rewrote the logic
 - Added support for missing patternProperties in the property editor
 - Fixed dependentProperties editing in the class editor, adds a logic builder
+- Fixed unevaluatedProperties in comprehension section of schemas
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

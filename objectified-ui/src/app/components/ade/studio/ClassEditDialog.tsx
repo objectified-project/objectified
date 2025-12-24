@@ -188,6 +188,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     additionalProperties: null as boolean | null,
     additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema',
     additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
+    unevaluatedProperties: null as boolean | null,
+    unevaluatedPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema' | 'type',
+    unevaluatedPropertiesSchema: '', // Class name reference for "Must Match Schema" option
+    unevaluatedPropertiesInlineType: 'string' as 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array', // For inline type schema
     patternProperties: [] as Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }>,
     dependentSchemas: {} as Record<string, any>, // Full dependent schemas objects (if/then/else, not just refs)
     dependentRequired: [] as Array<{ triggerProperty: string; requiredProperties: string[] }>, // When triggerProperty is present, these properties become required
@@ -274,6 +278,28 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               }
             }
 
+            // Determine unevaluatedProperties type and schema
+            let unevaluatedPropsType: 'default' | 'allow' | 'disallow' | 'schema' | 'type' = 'default';
+            let unevaluatedPropsSchema = '';
+            let unevaluatedPropsInlineType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' = 'string';
+            if (schema.unevaluatedProperties !== undefined) {
+              if (schema.unevaluatedProperties === true) {
+                unevaluatedPropsType = 'allow';
+              } else if (schema.unevaluatedProperties === false) {
+                unevaluatedPropsType = 'disallow';
+              } else if (typeof schema.unevaluatedProperties === 'object' && schema.unevaluatedProperties.$ref) {
+                unevaluatedPropsType = 'schema';
+                unevaluatedPropsSchema = schema.unevaluatedProperties.$ref.split('/').pop() || '';
+              } else if (typeof schema.unevaluatedProperties === 'object' && schema.unevaluatedProperties.type) {
+                // Inline type schema like { type: 'string' }
+                unevaluatedPropsType = 'type';
+                unevaluatedPropsInlineType = schema.unevaluatedProperties.type;
+              } else if (typeof schema.unevaluatedProperties === 'object') {
+                // Other inline schema - default to 'type' with string
+                unevaluatedPropsType = 'type';
+              }
+            }
+
             // Extract patternProperties
             const patternPropsArray: Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }> = [];
             if (schema.patternProperties && typeof schema.patternProperties === 'object') {
@@ -318,6 +344,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
+              unevaluatedProperties: schema.unevaluatedProperties !== undefined ? schema.unevaluatedProperties : null,
+              unevaluatedPropertiesType: unevaluatedPropsType,
+              unevaluatedPropertiesSchema: unevaluatedPropsSchema,
+              unevaluatedPropertiesInlineType: unevaluatedPropsInlineType,
               patternProperties: patternPropsArray,
               dependentSchemas: dependentSchemasObj,
               dependentRequired: dependentRequiredArray,
@@ -343,6 +373,25 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.$ref) {
                 additionalPropsType = 'schema';
                 additionalPropsSchema = schema.additionalProperties.$ref.split('/').pop() || '';
+              }
+            }
+            // Determine unevaluatedProperties type and schema for error case
+            let unevaluatedPropsType: 'default' | 'allow' | 'disallow' | 'schema' | 'type' = 'default';
+            let unevaluatedPropsSchema = '';
+            let unevaluatedPropsInlineType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' = 'string';
+            if (schema.unevaluatedProperties !== undefined) {
+              if (schema.unevaluatedProperties === true) {
+                unevaluatedPropsType = 'allow';
+              } else if (schema.unevaluatedProperties === false) {
+                unevaluatedPropsType = 'disallow';
+              } else if (typeof schema.unevaluatedProperties === 'object' && schema.unevaluatedProperties.$ref) {
+                unevaluatedPropsType = 'schema';
+                unevaluatedPropsSchema = schema.unevaluatedProperties.$ref.split('/').pop() || '';
+              } else if (typeof schema.unevaluatedProperties === 'object' && schema.unevaluatedProperties.type) {
+                unevaluatedPropsType = 'type';
+                unevaluatedPropsInlineType = schema.unevaluatedProperties.type;
+              } else if (typeof schema.unevaluatedProperties === 'object') {
+                unevaluatedPropsType = 'type';
               }
             }
             // Extract patternProperties for error case
@@ -386,6 +435,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
+              unevaluatedProperties: schema.unevaluatedProperties !== undefined ? schema.unevaluatedProperties : null,
+              unevaluatedPropertiesType: unevaluatedPropsType,
+              unevaluatedPropertiesSchema: unevaluatedPropsSchema,
+              unevaluatedPropertiesInlineType: unevaluatedPropsInlineType,
               patternProperties: patternPropsArrayError,
               dependentSchemas: dependentSchemasObjError,
               dependentRequired: dependentRequiredArrayError,
@@ -416,6 +469,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           additionalProperties: null,
           additionalPropertiesType: 'default',
           additionalPropertiesSchema: '',
+          unevaluatedProperties: null,
+          unevaluatedPropertiesType: 'default',
+          unevaluatedPropertiesSchema: '',
+          unevaluatedPropertiesInlineType: 'string',
           patternProperties: [],
           dependentSchemas: {},
           dependentRequired: [],
@@ -468,6 +525,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       schema.additionalProperties = { $ref: `#/components/schemas/${formData.additionalPropertiesSchema}` };
     }
     // 'default' means no additionalProperties field is added
+
+    // Add unevaluatedProperties based on the selected type
+    if (formData.unevaluatedPropertiesType === 'allow') {
+      schema.unevaluatedProperties = true;
+    } else if (formData.unevaluatedPropertiesType === 'disallow') {
+      schema.unevaluatedProperties = false;
+    } else if (formData.unevaluatedPropertiesType === 'schema' && formData.unevaluatedPropertiesSchema) {
+      schema.unevaluatedProperties = { $ref: `#/components/schemas/${formData.unevaluatedPropertiesSchema}` };
+    } else if (formData.unevaluatedPropertiesType === 'type') {
+      schema.unevaluatedProperties = { type: formData.unevaluatedPropertiesInlineType };
+    }
+    // 'default' means no unevaluatedProperties field is added
 
     // Add patternProperties if defined
     if (formData.patternProperties.length > 0) {
@@ -1134,6 +1203,83 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                           <Select
                             value={formData.additionalPropertiesSchema || '__none__'}
                             onValueChange={(val) => setFormData(prev => ({ ...prev, additionalPropertiesSchema: val === '__none__' ? '' : val }))}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a class..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Select a class...</SelectItem>
+                              {availableClasses.map((cls) => (
+                                <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Unevaluated Properties */}
+                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-gray-100">Unevaluated Properties</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">For schema composition (allOf/oneOf/anyOf)</p>
+                    <div className="space-y-2">
+                      {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
+                        <label key={value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="unevaluatedPropertiesType"
+                            value={value}
+                            checked={formData.unevaluatedPropertiesType === value}
+                            onChange={(e) => {
+                              const val = e.target.value as typeof value;
+                              setFormData(prev => ({
+                                ...prev,
+                                unevaluatedPropertiesType: val,
+                                unevaluatedProperties: val === 'default' ? null : val === 'allow' ? true : val === 'disallow' ? false : null,
+                                unevaluatedPropertiesSchema: val === 'schema' ? prev.unevaluatedPropertiesSchema : '',
+                                unevaluatedPropertiesInlineType: val === 'type' ? prev.unevaluatedPropertiesInlineType : 'string'
+                              }));
+                            }}
+                            disabled={isReadOnly}
+                            className="w-4 h-4 text-indigo-600"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {value === 'default' && 'Not specified (default)'}
+                            {value === 'allow' && 'Allow Any (true)'}
+                            {value === 'disallow' && 'Disallow (false)'}
+                            {value === 'type' && 'Must Be Type'}
+                            {value === 'schema' && 'Must Match Schema'}
+                          </span>
+                        </label>
+                      ))}
+                      {formData.unevaluatedPropertiesType === 'type' && (
+                        <div className="mt-2 pl-6">
+                          <Select
+                            value={formData.unevaluatedPropertiesInlineType}
+                            onValueChange={(val) => setFormData(prev => ({ ...prev, unevaluatedPropertiesInlineType: val as any }))}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="string">string</SelectItem>
+                              <SelectItem value="number">number</SelectItem>
+                              <SelectItem value="integer">integer</SelectItem>
+                              <SelectItem value="boolean">boolean</SelectItem>
+                              <SelectItem value="object">object</SelectItem>
+                              <SelectItem value="array">array</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      {formData.unevaluatedPropertiesType === 'schema' && (
+                        <div className="mt-2 pl-6">
+                          <Select
+                            value={formData.unevaluatedPropertiesSchema || '__none__'}
+                            onValueChange={(val) => setFormData(prev => ({ ...prev, unevaluatedPropertiesSchema: val === '__none__' ? '' : val }))}
                             disabled={isReadOnly}
                           >
                             <SelectTrigger className="w-full">
