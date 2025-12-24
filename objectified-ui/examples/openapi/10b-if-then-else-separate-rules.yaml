@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: If-Then-Else Separate Rules Example
+  version: 1.0.0
+  description: |
+    Demonstrates if/then/else conditional schemas using separate rules.
+    Instead of nesting if/then/else blocks, each condition is a separate rule
+    composed using allOf. This makes it easier to manage in a UI.
+
+components:
+  schemas:
+    Vehicle:
+      type: object
+      description: Vehicle with conditional validation based on type
+      properties:
+        vehicleType:
+          type: string
+          enum:
+            - car
+            - motorcycle
+            - truck
+          examples:
+            - "car"
+        wheels:
+          type: integer
+          minimum: 2
+          maximum: 18
+          examples:
+            - 4
+        engine:
+          type: string
+          examples:
+            - "V6"
+        cargoCapacity:
+          type: number
+          description: Cargo capacity in cubic feet
+          examples:
+            - 50.5
+        passengerSeats:
+          type: integer
+          minimum: 1
+          maximum: 60
+          examples:
+            - 5
+      required:
+        - vehicleType
+        - wheels
+
+      # Separate conditional rules composed with allOf
+      # Each rule is independent and easier to manage
+      allOf:
+        # Rule 1: When vehicleType is "car"
+        - if:
+            properties:
+              vehicleType:
+                const: "car"
+          then:
+            properties:
+              wheels:
+                const: 4
+              passengerSeats:
+                minimum: 2
+                maximum: 8
+            required:
+              - passengerSeats
+
+        # Rule 2: When vehicleType is "motorcycle"
+        - if:
+            properties:
+              vehicleType:
+                const: "motorcycle"
+          then:
+            properties:
+              wheels:
+                enum: [2, 3]
+
+        # Rule 3: When vehicleType is "truck"
+        - if:
+            properties:
+              vehicleType:
+                const: "truck"
+          then:
+            properties:
+              wheels:
+                minimum: 4
+            required:
+              - cargoCapacity
+
+    # Alternative approach: Using oneOf for mutually exclusive variants
+    VehicleAlternative:
+      type: object
+      description: |
+        Alternative approach using oneOf with discriminator.
+        Each variant is a complete schema, making it very explicit.
+      discriminator:
+        propertyName: vehicleType
+        mapping:
+          car: '#/components/schemas/Car'
+          motorcycle: '#/components/schemas/Motorcycle'
+          truck: '#/components/schemas/Truck'
+      oneOf:
+        - $ref: '#/components/schemas/Car'
+        - $ref: '#/components/schemas/Motorcycle'
+        - $ref: '#/components/schemas/Truck'
+
+    # Base vehicle properties shared by all types
+    VehicleBase:
+      type: object
+      properties:
+        vehicleType:
+          type: string
+          enum:
+            - car
+            - motorcycle
+            - truck
+        engine:
+          type: string
+      required:
+        - vehicleType
+
+    Car:
+      allOf:
+        - $ref: '#/components/schemas/VehicleBase'
+        - type: object
+          properties:
+            vehicleType:
+              const: "car"
+            wheels:
+              type: integer
+              const: 4
+            passengerSeats:
+              type: integer
+              minimum: 2
+              maximum: 8
+          required:
+            - wheels
+            - passengerSeats
+
+    Motorcycle:
+      allOf:
+        - $ref: '#/components/schemas/VehicleBase'
+        - type: object
+          properties:
+            vehicleType:
+              const: "motorcycle"
+            wheels:
+              type: integer
+              enum: [2, 3]
+          required:
+            - wheels
+
+    Truck:
+      allOf:
+        - $ref: '#/components/schemas/VehicleBase'
+        - type: object
+          properties:
+            vehicleType:
+              const: "truck"
+            wheels:
+              type: integer
+              minimum: 4
+              maximum: 18
+            cargoCapacity:
+              type: number
+              description: Cargo capacity in cubic feet
+          required:
+            - wheels
+            - cargoCapacity
+
