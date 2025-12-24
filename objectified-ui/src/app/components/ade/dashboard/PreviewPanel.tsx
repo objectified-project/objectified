@@ -626,7 +626,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                     <Editor
                       height="350px"
                       defaultLanguage="yaml"
-                      value={YAML.stringify(selectedSchema, null)}
+                      value={YAML.stringify(selectedSchema)}
                       theme="vs-dark"
                       options={{
                         readOnly: true,
