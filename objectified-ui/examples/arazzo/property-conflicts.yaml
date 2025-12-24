@@ -1,0 +1,45 @@
+arazzo: 1.0.1
+            description: Shipment scheduled
+          - expression: ${response.status == 201}
+        assertions:
+              currency: "USD"         # same name, may share enum or differ
+              amount: "42.50"         # string conflicts with payment number
+              id: "SHP-000123"        # string pattern conflicts with payment
+            body:
+          parameters:
+          operationId: scheduleShipment
+          source: ShipmentAPI
+        request:
+        description: Shipment uses string id with pattern
+      - name: ScheduleShipment
+            path: $.id
+          - name: paymentId
+        outputs:
+              currency: "USD"         # string enum
+              amount: 42.50            # number
+              id: 123456789            # integer ID conflicts with shipment
+            body:
+          parameters:
+          operationId: createPayment
+          source: PaymentAPI
+        request:
+        description: Payment uses numeric id
+      - name: CreatePayment
+    steps:
+    description: Create payment then schedule shipment
+  - name: PayAndShip
+workflows:
+
+    url: https://example.com/openapi/shipment.json
+    type: openapi
+  - name: ShipmentAPI
+    url: https://example.com/openapi/payment.json
+    type: openapi
+  - name: PaymentAPI
+sourceDescriptions:
+
+  description: Same property names with different definitions across steps
+  version: 1.0.0
+  title: Property Conflicts Workflow
+info:
+

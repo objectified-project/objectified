@@ -1,0 +1,76 @@
+arazzo: 1.0.1
+info:
+  title: Mixed Scenarios Workflow
+  version: 1.0.0
+  description: Reuse and conflicts combined with branching and assertions
+
+sourceDescriptions:
+  - name: AuthAPI
+    type: openapi
+    url: https://example.com/openapi/auth.json
+  - name: ProfileAPI
+    type: openapi
+    url: https://example.com/openapi/profile.json
+  - name: NotifyAPI
+    type: openapi
+    url: https://example.com/openapi/notify.json
+
+workflows:
+  - name: SignupLoginProfile
+    description: User signs up, logs in, and creates profile; sends notification if verified
+    steps:
+      - name: Signup
+        request:
+          source: AuthAPI
+          operationId: signup
+          parameters:
+            body:
+              email: "user@example.com"      # reused in multiple steps
+              password: "example-Password1"
+        outputs:
+          - name: userId
+            path: $.id
+          - name: verified
+            path: $.verified
+      - name: Login
+        request:
+          source: AuthAPI
+          operationId: login
+          parameters:
+            body:
+              email: "user@example.com"      # reuse
+              password: "example-Password1"
+        outputs:
+          - name: token
+            path: $.token
+      - name: CreateProfile
+        when:
+          expression: ${token != null}
+        request:
+          source: ProfileAPI
+          operationId: createProfile
+          parameters:
+            headers:
+              Authorization: Bearer ${token}
+            body:
+              id: ${userId}                   # conflict potential if types differ
+              displayName: "Test User"
+              tags: ["alpha", "beta"]      # array reuse test
+        outputs:
+          - name: profileId
+            path: $.id
+      - name: Notify
+        when:
+          expression: ${verified == true}
+        request:
+          source: NotifyAPI
+          operationId: send
+          parameters:
+            body:
+              to: "user@example.com"         # reuse
+              subject: "Welcome"
+              content: "Your profile ${profileId} was created"
+        assertions:
+          - expression: ${response.status == 202}
+            description: Notification queued
+

@@ -1,0 +1,46 @@
+arazzo: 1.0.1
+info:
+  title: Property Reuse Workflow
+  version: 1.0.0
+  description: Arazzo workflow that reuses similar properties across steps
+
+sourceDescriptions:
+  - name: UserAPI
+    type: openapi
+    url: https://example.com/openapi/user.json
+  - name: EmailAPI
+    type: openapi
+    url: https://example.com/openapi/email.json
+
+workflows:
+  - name: RegisterAndNotify
+    description: Register a user and send a welcome email
+    steps:
+      - name: RegisterUser
+        description: Register a new user
+        request:
+          source: UserAPI
+          operationId: registerUser
+          parameters:
+            body:
+              id: "00000000-0000-0000-0000-000000000001" # uuid
+              name: "Alice Example"
+              email: "alice@example.com" # format: email
+        outputs:
+          - name: userId
+            path: $.id
+          - name: userEmail
+            path: $.email
+      - name: SendWelcome
+        description: Send a welcome email
+        request:
+          source: EmailAPI
+          operationId: sendEmail
+          parameters:
+            body:
+              to: ${userEmail}
+              subject: "Welcome, ${userId}!"
+              content: "Hello ${userId}, thanks for registering!"
+        assertions:
+          - expression: ${response.status == 202}
+            description: Email accepted for delivery

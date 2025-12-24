@@ -1,0 +1,51 @@
+arazzo: 1.0.1
+info:
+  title: Edge Cases Workflow
+  version: 1.0.0
+  description: Tests conditional steps, missing outputs, and array/object signatures
+
+sourceDescriptions:
+  - name: ContentAPI
+    type: openapi
+    url: https://example.com/openapi/content.json
+
+workflows:
+  - name: PublishContent
+    description: Create article, optionally add tags, then publish
+    steps:
+      - name: CreateArticle
+        request:
+          source: ContentAPI
+          operationId: createArticle
+          parameters:
+            body:
+              title: "Arazzo Testing"
+              content: "This is a test article"
+              author:
+                name: "Kenji"
+                email: "kenji@example.com"
+        outputs:
+          - name: articleId
+            path: $.id
+      - name: AddTags
+        when:
+          expression: ${articleId != null}
+        request:
+          source: ContentAPI
+          operationId: addTags
+          parameters:
+            path:
+              id: ${articleId}
+            body:
+              tags: ["testing", "arazzo", "import"]  # array of strings
+      - name: Publish
+        request:
+          source: ContentAPI
+          operationId: publish
+          parameters:
+            path:
+              id: ${articleId}
+        assertions:
+          - expression: ${response.status == 200}
+            description: Publish succeeded
+
