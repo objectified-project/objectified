@@ -236,6 +236,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         additionalProperties: additionalPropsValue,
         minProperties: minMaxSource.minProperties?.toString() || '',
         maxProperties: minMaxSource.maxProperties?.toString() || '',
+        patternProperties: minMaxSource.patternProperties || undefined,
         // Property Name Constraints (OpenAPI 3.1)
         propertyNamesPattern: minMaxSource.propertyNames?.pattern || '',
         propertyNamesMinLength: minMaxSource.propertyNames?.minLength?.toString() || '',
@@ -713,6 +714,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               delete itemsSchema.maxProperties;
             }
 
+            // Handle patternProperties
+            if (formData.patternProperties && Object.keys(formData.patternProperties).length > 0) {
+              itemsSchema.patternProperties = formData.patternProperties;
+            } else {
+              delete itemsSchema.patternProperties;
+            }
+
             // Handle propertyNames constraints for object items (OpenAPI 3.1)
             const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
             if (hasPropertyNamesConstraints) {
@@ -840,6 +848,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             dataObject.maxProperties = parseInt(formData.maxProperties);
           } else {
             delete dataObject.maxProperties;
+          }
+
+          // Handle patternProperties
+          if (formData.patternProperties && Object.keys(formData.patternProperties).length > 0) {
+            dataObject.patternProperties = formData.patternProperties;
+          } else {
+            delete dataObject.patternProperties;
           }
 
           // Handle propertyNames constraints (OpenAPI 3.1)

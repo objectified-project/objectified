@@ -101,6 +101,7 @@ export interface PropertyFormData {
   additionalProperties?: 'default' | 'true' | 'false';
   minProperties?: string;
   maxProperties?: string;
+  patternProperties?: Record<string, any>; // Map of regex patterns to schemas
   propertyNamesPattern?: string;
   propertyNamesMinLength?: string;
   propertyNamesMaxLength?: string;
@@ -265,6 +266,65 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, ba
         </Typography>
       )}
     </Box>
+  );
+};
+
+// Reusable component for editing pattern property schemas
+interface PatternPropertySchemaEditorProps {
+  schemaValue: any;
+  onChange: (newSchema: any) => void;
+  isDark: boolean;
+  rows?: number;
+  size?: 'small' | 'medium';
+}
+
+const PatternPropertySchemaEditor: React.FC<PatternPropertySchemaEditorProps> = ({
+  schemaValue,
+  onChange,
+  isDark,
+  rows = 5,
+  size = 'small',
+}) => {
+  // Use local state to manage the display value
+  const [localValue, setLocalValue] = React.useState(() => {
+    return typeof schemaValue === 'string' ? schemaValue : JSON.stringify(schemaValue, null, 2);
+  });
+
+  // Update local value when schemaValue prop changes
+  React.useEffect(() => {
+    const newValue = typeof schemaValue === 'string' ? schemaValue : JSON.stringify(schemaValue, null, 2);
+    setLocalValue(newValue);
+  }, [schemaValue]);
+
+  const textFieldSize = (size === 'medium' || size === 'small') ? size : 'small';
+
+  return (
+    <TextField
+      label="Schema (JSON)"
+      size={textFieldSize}
+      fullWidth
+      multiline
+      rows={rows}
+      value={localValue}
+      onChange={(e) => {
+        setLocalValue(e.target.value);
+        try {
+          const parsed = e.target.value ? JSON.parse(e.target.value) : { type: 'string' };
+          onChange(parsed);
+        } catch {
+          // Keep editing even if JSON is invalid
+          onChange(e.target.value);
+        }
+      }}
+      placeholder='{ "type": "string" }'
+      sx={{
+        '& .MuiInputBase-input': {
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: '0.75rem',
+        },
+        '& .MuiOutlinedInput-root': { borderRadius: 1 },
+      }}
+    />
   );
 };
 
@@ -1727,6 +1787,188 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   sx={{ m: 0 }}
                 />
               </Box>
+            </Box>
+
+            {/* Pattern Properties */}
+            <Box sx={{
+              mt: 2.5,
+              p: 2.5,
+              bgcolor: isDark ? '#0f172a' : 'white',
+              borderRadius: 2.5,
+              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                mb: 2,
+                pb: 1.5,
+                borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
+              }}>
+                <Box sx={{
+                  p: 0.75,
+                  borderRadius: 1.5,
+                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <CodeIcon sx={{ color: '#6366f1', fontSize: 16 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    Pattern Properties
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Validate properties matching regex patterns
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+                Define schemas for properties that match specific patterns. Each pattern is a regular expression.
+              </Typography>
+
+              {(() => {
+                const patterns = data.patternProperties || {};
+                const patternEntries = Object.entries(patterns);
+
+
+                return (
+                  <Box>
+                    {patternEntries.length > 0 && (
+                      <List sx={{ mb: 2, bgcolor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 2, p: 1 }}>
+                        {patternEntries.map(([pattern, schema], index) => (
+                          <ListItem
+                            key={index}
+                            sx={{
+                              borderBottom: index < patternEntries.length - 1 ? '1px solid' : 'none',
+                              borderColor: isDark ? '#334155' : '#e2e8f0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'stretch',
+                              gap: 1,
+                              py: 1.5,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                                  fontSize: '0.85rem',
+                                  color: '#6366f1',
+                                  flex: 1,
+                                  bgcolor: isDark ? '#0f172a' : 'white',
+                                  px: 1,
+                                  py: 0.5,
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: isDark ? '#475569' : '#e2e8f0',
+                                }}
+                              >
+                                {pattern}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const newPatterns = { ...patterns };
+                                  delete newPatterns[pattern];
+                                  onChange('patternProperties', Object.keys(newPatterns).length > 0 ? newPatterns : undefined);
+                                }}
+                                sx={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <PatternPropertySchemaEditor
+                              schemaValue={schema}
+                              onChange={(newSchema) => {
+                                const newPatterns = { ...patterns };
+                                newPatterns[pattern] = newSchema;
+                                onChange('patternProperties', newPatterns);
+                              }}
+                              isDark={isDark}
+                              rows={5}
+                              size="small"
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    )}
+
+                    {(() => {
+                      const [newPattern, setNewPattern] = React.useState('');
+                      const [newSchema, setNewSchema] = React.useState({ type: 'string' } as any);
+
+                      return (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <TextField
+                            label="Pattern (regex)"
+                            size={size}
+                            fullWidth
+                            value={newPattern}
+                            onChange={(e) => setNewPattern(e.target.value)}
+                            placeholder="^env_|^flag_"
+                            helperText="Regular expression to match property names"
+                            sx={{
+                              '& .MuiInputBase-input': {
+                                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                                fontSize: '0.85rem',
+                              },
+                              '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                              '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                            }}
+                          />
+                          <PatternPropertySchemaEditor
+                            schemaValue={newSchema}
+                            onChange={(newSchema) => setNewSchema(newSchema)}
+                            isDark={isDark}
+                            rows={5}
+                            size={(size === 'medium' || size === 'small') ? size : 'small'}
+                          />
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <IconButton
+                              size="small"
+                              disabled={!newPattern.trim()}
+                              onClick={() => {
+                                if (!newPattern.trim()) return;
+                                const schemaObj = typeof newSchema === 'string' ? JSON.parse(newSchema) : newSchema;
+                                const newPatterns = { ...(patterns || {}), [newPattern]: schemaObj };
+                                onChange('patternProperties', newPatterns);
+                                setNewPattern('');
+                                setNewSchema({ type: 'string' });
+                              }}
+                              sx={{
+                                bgcolor: '#6366f1',
+                                color: 'white',
+                                '&:hover': { bgcolor: '#4f46e5' },
+                                '&.Mui-disabled': { bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: isDark ? '#475569' : '#94a3b8' },
+                              }}
+                            >
+                              <AddIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      );
+                    })()}
+
+                    {patternEntries.length === 0 && (
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: 'rgba(99, 102, 241, 0.06)',
+                        borderRadius: 1.5,
+                        border: '1px dashed rgba(99, 102, 241, 0.3)',
+                      }}>
+                        <Typography variant="caption" sx={{ color: '#4f46e5' }}>
+                          <strong>Example:</strong> Pattern <code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>^env_</code> with schema <code style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{"{"}"type":"string"{"}"}</code> would validate any property starting with "env_" as a string.
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })()}
             </Box>
 
             {/* Unevaluated Properties (OpenAPI 3.1 / JSON Schema 2020-12) */}

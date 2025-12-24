@@ -144,6 +144,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
     // Get the actual schema (handle array types)
     const schema = actualType === 'array' ? (propData.items || {}) : propData;
 
+
     // Determine additionalProperties value
     let additionalPropsValue: 'default' | 'true' | 'false' = 'default';
     if (schema.hasOwnProperty('additionalProperties')) {
@@ -214,6 +215,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       additionalProperties: additionalPropsValue,
       minProperties: schema.minProperties?.toString() || '',
       maxProperties: schema.maxProperties?.toString() || '',
+      patternProperties: schema.patternProperties || undefined,
 
       // unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects
       unevaluatedProperties: schema.unevaluatedProperties === true ? 'allow' :
@@ -237,6 +239,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       externalDocsUrl: propData.externalDocs?.url || '',
       externalDocsDescription: propData.externalDocs?.description || '',
     });
+
 
     setEditPropertyError('');
   }, [editingClassProperty]);
@@ -353,6 +356,13 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         targetSchema.maxProperties = parseInt(formData.maxProperties);
       } else {
         delete targetSchema.maxProperties;
+      }
+
+      // Handle patternProperties
+      if (formData.patternProperties && Object.keys(formData.patternProperties).length > 0) {
+        targetSchema.patternProperties = formData.patternProperties;
+      } else {
+        delete targetSchema.patternProperties;
       }
 
       // Handle unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects
@@ -677,6 +687,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
             : (editingClassProperty.data || {});
           const schema = typeInfo.isArray ? (propData.items || {}) : propData;
           const baseType = schema.$ref ? 'reference' : (schema.type || 'object');
+
 
           // Only show constraints for non-reference types
           if (schema.$ref) return null;
