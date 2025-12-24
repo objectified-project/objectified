@@ -32,6 +32,49 @@ interface SchemaInfo {
 
 const MAX_ENUM_DISPLAY = 4;
 
+// Helper function to count properties including those from allOf/oneOf/anyOf
+function countSchemaProperties(schema: any): number {
+  let count = 0;
+
+  // Count direct properties
+  if (schema.properties) {
+    count += Object.keys(schema.properties).length;
+  }
+
+  // Count properties from allOf (inheritance - all schemas apply)
+  if (schema.allOf && Array.isArray(schema.allOf)) {
+    schema.allOf.forEach((item: any) => {
+      if (item.properties) {
+        count += Object.keys(item.properties).length;
+      }
+    });
+  }
+
+  // Count properties from oneOf (variants - show max from any variant)
+  if (schema.oneOf && Array.isArray(schema.oneOf)) {
+    let maxOneOf = 0;
+    schema.oneOf.forEach((item: any) => {
+      if (item.properties) {
+        maxOneOf = Math.max(maxOneOf, Object.keys(item.properties).length);
+      }
+    });
+    count += maxOneOf;
+  }
+
+  // Count properties from anyOf (flexible - show max from any option)
+  if (schema.anyOf && Array.isArray(schema.anyOf)) {
+    let maxAnyOf = 0;
+    schema.anyOf.forEach((item: any) => {
+      if (item.properties) {
+        maxAnyOf = Math.max(maxAnyOf, Object.keys(item.properties).length);
+      }
+    });
+    count += maxAnyOf;
+  }
+
+  return count;
+}
+
 export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelProps) {
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
@@ -41,7 +84,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
     return Object.keys(schemaObj).map(name => ({
       name,
-      properties: Object.keys(schemaObj[name]?.properties || {}).length,
+      properties: countSchemaProperties(schemaObj[name]),
       selected: true,
       required: false
     }));
@@ -139,7 +182,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       }
       return `array<${prop.items?.type || 'any'}>`;
     }
-    
+
     if (prop.enum) {
       const enumValues = prop.enum.slice(0, MAX_ENUM_DISPLAY).join(', ');
       const remaining = prop.enum.length - MAX_ENUM_DISPLAY;
@@ -413,7 +456,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                                   <div className="text-sm flex items-center gap-2">
                                     <span className="text-blue-600 dark:text-blue-400">+</span>
                                     <span className="text-gray-700 dark:text-gray-300 font-medium">
-                                      inline properties:
+                                      additional properties:
                                     </span>
                                   </div>
                                   <div className="ml-6 space-y-1 pl-3 border-l border-blue-100 dark:border-blue-800">
@@ -449,7 +492,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                         <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Variants (oneOf):
                         </h5>
-                        <div className="space-y-1 pl-4 border-l-2 border-purple-200 dark:border-purple-700">
+                        <div className="space-y-2 pl-4 border-l-2 border-purple-200 dark:border-purple-700">
                           {selectedSchema.oneOf.map((item: any, idx: number) => {
                             if (item.$ref) {
                               const refName = item.$ref.split('/').pop();
@@ -463,10 +506,37 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                                 </div>
                               );
                             }
+                            // Show inline schema details
+                            const hasRequired = item.required && item.required.length > 0;
+                            const hasProperties = item.properties && Object.keys(item.properties).length > 0;
                             return (
-                              <div key={idx} className="text-sm flex items-center gap-2">
-                                <span className="text-purple-600 dark:text-purple-400">◇</span>
-                                <span className="text-gray-700 dark:text-gray-300">inline schema</span>
+                              <div key={idx} className="space-y-1">
+                                <div className="text-sm flex items-center gap-2">
+                                  <span className="text-purple-600 dark:text-purple-400">◇</span>
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {hasRequired ? `requires: [${item.required.join(', ')}]` : 'inline schema'}
+                                  </span>
+                                </div>
+                                {hasProperties && (
+                                  <div className="ml-6 space-y-1 pl-3 border-l border-purple-100 dark:border-purple-800">
+                                    {Object.entries(item.properties).map(([propName, propValue]: [string, any]) => (
+                                      <div key={propName} className="text-sm">
+                                        <span className="font-mono text-purple-600 dark:text-purple-400">
+                                          {propName}
+                                        </span>
+                                        <span className="text-gray-500 dark:text-gray-400">: </span>
+                                        <span className="text-gray-700 dark:text-gray-300">
+                                          {getPropertyType(propValue)}
+                                        </span>
+                                        {item.required?.includes(propName) && (
+                                          <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                                            (required)
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -480,7 +550,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                         <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Options (anyOf):
                         </h5>
-                        <div className="space-y-1 pl-4 border-l-2 border-indigo-200 dark:border-indigo-700">
+                        <div className="space-y-2 pl-4 border-l-2 border-indigo-200 dark:border-indigo-700">
                           {selectedSchema.anyOf.map((item: any, idx: number) => {
                             if (item.$ref) {
                               const refName = item.$ref.split('/').pop();
@@ -494,10 +564,37 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                                 </div>
                               );
                             }
+                            // Show inline schema details
+                            const hasRequired = item.required && item.required.length > 0;
+                            const hasProperties = item.properties && Object.keys(item.properties).length > 0;
                             return (
-                              <div key={idx} className="text-sm flex items-center gap-2">
-                                <span className="text-indigo-600 dark:text-indigo-400">○</span>
-                                <span className="text-gray-700 dark:text-gray-300">inline schema</span>
+                              <div key={idx} className="space-y-1">
+                                <div className="text-sm flex items-center gap-2">
+                                  <span className="text-indigo-600 dark:text-indigo-400">○</span>
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {hasRequired ? `requires: [${item.required.join(', ')}]` : 'inline schema'}
+                                  </span>
+                                </div>
+                                {hasProperties && (
+                                  <div className="ml-6 space-y-1 pl-3 border-l border-indigo-100 dark:border-indigo-800">
+                                    {Object.entries(item.properties).map(([propName, propValue]: [string, any]) => (
+                                      <div key={propName} className="text-sm">
+                                        <span className="font-mono text-indigo-600 dark:text-indigo-400">
+                                          {propName}
+                                        </span>
+                                        <span className="text-gray-500 dark:text-gray-400">: </span>
+                                        <span className="text-gray-700 dark:text-gray-300">
+                                          {getPropertyType(propValue)}
+                                        </span>
+                                        {item.required?.includes(propName) && (
+                                          <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                                            (required)
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
