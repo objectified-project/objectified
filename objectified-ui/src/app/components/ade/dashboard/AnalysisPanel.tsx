@@ -47,25 +47,30 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
             Specification Information
           </h3>
           <div className="space-y-3">
-            {analysis.document.info.title && (
-              <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Title
-                </span>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                  {analysis.document.info.title}
-                </div>
-              </div>
-            )}
-
-            {analysis.document.info.version && (
-              <div>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Version
-                </span>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                  {analysis.document.info.version}
-                </div>
+            {(analysis.document.info.title || analysis.document.info.version) && (
+              <div className="flex items-start justify-between gap-4">
+                {analysis.document.info.title && (
+                  <div>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Title
+                    </span>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                      {analysis.document.info.title}
+                    </div>
+                  </div>
+                )}
+                {analysis.document.info.version && (
+                  <div className="text-right">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Version
+                    </span>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                      <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                        {analysis.document.info.version}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -140,49 +145,58 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Format Detection
         </h3>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Format:</span>
-            <div className="flex items-center gap-2">
+        <div className="grid grid-cols-3 gap-4">
+          {/* Format Card */}
+          <div className={`rounded-lg p-4 border ${analysis.isValid ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+            <div className="flex items-center gap-2 mb-2">
               {analysis.isValid ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
               ) : (
-                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               )}
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {analysis.format === 'openapi' && `OpenAPI ${analysis.version}`}
-                {analysis.format === 'swagger' && `Swagger ${analysis.version}`}
-                {analysis.format === 'jsonschema' && `JSON Schema`}
-                {analysis.format === 'unknown' && 'Unknown Format'}
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Format
               </span>
             </div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {analysis.format === 'openapi' && `OpenAPI ${analysis.version}`}
+              {analysis.format === 'swagger' && `Swagger ${analysis.version}`}
+              {analysis.format === 'jsonschema' && `JSON Schema`}
+              {analysis.format === 'unknown' && 'Unknown Format'}
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Syntax:</span>
-            <div className="flex items-center gap-2">
+
+          {/* Syntax Card */}
+          <div className={`rounded-lg p-4 border ${analysis.syntaxValid ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+            <div className="flex items-center gap-2 mb-2">
               {analysis.syntaxValid ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
               ) : (
-                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               )}
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Valid {analysis.syntax.toUpperCase()}
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Syntax
               </span>
             </div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              Valid {analysis.syntax.toUpperCase()}
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Schema:</span>
-            <div className="flex items-center gap-2">
+
+          {/* Schema Card */}
+          <div className={`rounded-lg p-4 border ${analysis.schemaValid ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+            <div className="flex items-center gap-2 mb-2">
               {analysis.schemaValid ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
               ) : (
-                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               )}
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {analysis.schemaValid
-                  ? `Valid against ${analysis.format.toUpperCase()} meta-schema`
-                  : 'Schema validation failed'}
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Schema
               </span>
+            </div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {analysis.schemaValid ? 'Valid' : 'Invalid'}
             </div>
           </div>
         </div>
@@ -317,20 +331,17 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold text-gray-900 dark:text-white">
-              {analysis.qualityScore.overall}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              / 100
+              {analysis.qualityScore.overall}%
             </div>
           </div>
         </div>
 
         {/* Quality Metrics */}
-        <div className="space-y-4">
+        <div className="grid grid-cols-4 gap-4">
           {/* Completeness */}
-          <div>
+          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Completeness
               </span>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
@@ -338,7 +349,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
               </span>
             </div>
             <Progress.Root
-              className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
               value={analysis.qualityScore.completeness}
             >
               <Progress.Indicator
@@ -346,15 +357,15 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 style={{ transform: `translateX(-${100 - analysis.qualityScore.completeness}%)` }}
               />
             </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Descriptions and documentation
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              Descriptions & docs
             </div>
           </div>
 
           {/* Consistency */}
-          <div>
+          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Consistency
               </span>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
@@ -362,7 +373,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
               </span>
             </div>
             <Progress.Root
-              className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
               value={analysis.qualityScore.consistency}
             >
               <Progress.Indicator
@@ -370,15 +381,15 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 style={{ transform: `translateX(-${100 - analysis.qualityScore.consistency}%)` }}
               />
             </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Naming conventions and patterns
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              Naming & patterns
             </div>
           </div>
 
           {/* Best Practices */}
-          <div>
+          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Best Practices
               </span>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
@@ -386,7 +397,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
               </span>
             </div>
             <Progress.Root
-              className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
               value={analysis.qualityScore.bestPractices}
             >
               <Progress.Indicator
@@ -394,15 +405,15 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 style={{ transform: `translateX(-${100 - analysis.qualityScore.bestPractices}%)` }}
               />
             </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Industry standards adherence
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              Industry standards
             </div>
           </div>
 
           {/* Security */}
-          <div>
+          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                 Security
               </span>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
@@ -410,7 +421,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
               </span>
             </div>
             <Progress.Root
-              className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
               value={analysis.qualityScore.security}
             >
               <Progress.Indicator
@@ -418,8 +429,8 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 style={{ transform: `translateX(-${100 - analysis.qualityScore.security}%)` }}
               />
             </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Authentication and authorization
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              Auth & authorization
             </div>
           </div>
         </div>
