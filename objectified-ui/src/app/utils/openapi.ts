@@ -57,11 +57,17 @@ function buildPropertySchema(prop: any, allProperties: any[]): any {
   // It will be extracted by the caller and moved to the parent's required array
   const selfRequired = propData.required;
 
-  // Clean up description handling
-  if (propData.description === null) {
-    delete propData.description;
+  // Use property description from database field (prop.description) if available
+  // This takes precedence over any description in the data JSON
+  if (prop.description) {
+    propData.description = prop.description;
+  } else if (propData.description === null || propData.description === undefined) {
+    // If no description in database field and no description in data, try title as fallback
     if (propData.title) {
       propData.description = propData.title;
+    } else {
+      // Remove undefined/null description
+      delete propData.description;
     }
   }
 

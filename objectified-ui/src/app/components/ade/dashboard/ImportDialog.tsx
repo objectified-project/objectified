@@ -12,6 +12,8 @@ import { Button } from '../../../components/ui/Button';
 import { AnalysisPanel } from './AnalysisPanel';
 import { PreviewPanel, ImportOptions } from './PreviewPanel';
 import { analyzeSpecification, AnalysisResult } from '../../../utils/openapi-analyzer';
+import ImportExecutionPanel from './ImportExecutionPanel';
+import { startImport } from '../../../../../lib/db/import-actions';
 
 interface ImportDialogProps {
   open: boolean;
@@ -26,13 +28,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   tenantId, // Will be used in future steps for project creation
   userId    // Will be used in future steps for tracking import activity
 }) => {
-  const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis' | 'preview'>('source');
+  const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis' | 'preview' | 'import' | 'done'>('source');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [importOptions, setImportOptions] = useState<ImportOptions | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -41,7 +44,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const handleBack = () => {
-    if (currentStep === 'preview') {
+    if (currentStep === 'done') {
+      setCurrentStep('preview');
+    } else if (currentStep === 'import') {
+      setCurrentStep('preview');
+      setJobId(null);
+    } else if (currentStep === 'preview') {
       setCurrentStep('analysis');
     } else if (currentStep === 'analysis') {
       setCurrentStep('file-upload');
@@ -59,6 +67,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setSelectedFile(null);
     setAnalysisResult(null);
     setImportOptions(null);
+    setJobId(null);
     onClose();
   };
 
@@ -130,6 +139,36 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     }
   };
 
+  const beginImport = async () => {
+    if (!analysisResult || !importOptions) return;
+
+    const document = analysisResult.document;
+    const job = await startImport({
+      tenantId,
+      userId,
+      sourceKind: 'openapi',
+      document,
+      project: {
+        name: importOptions.projectName || (document?.info?.title || 'New Project'),
+        slug: (document?.info?.title || 'new-project').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g,'-'),
+        description: document?.info?.description || null
+      },
+      version: {
+        versionId: importOptions.targetVersion || (document?.info?.version || '1.0.0'),
+        description: 'Imported from OpenAPI specification'
+      },
+      options: {
+        selectedSchemas: importOptions.selectedSchemas,
+        autoLayout: importOptions.autoLayout,
+        createRelationships: importOptions.createRelationships,
+        applyNamingConvention: importOptions.applyNamingConvention
+      }
+    });
+
+    setJobId(job.jobId);
+    setCurrentStep('import');
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col" showCloseButton={false}>
@@ -156,67 +195,75 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   ? 'bg-indigo-600 text-white'
                   : 'bg-green-600 text-white'
               }`}>
-                {currentStep === 'analysis' || currentStep === 'preview' ? '✓' : '1'}
+                {currentStep === 'analysis' || currentStep === 'preview' || currentStep === 'import' || currentStep === 'done' ? '✓' : '1'}
               </div>
               <span className={`ml-2 font-medium ${
-                currentStep === 'source' || currentStep === 'file-upload' || currentStep === 'analysis' || currentStep === 'preview'
-                  ? 'text-gray-900 dark:text-white'
-                  : 'text-gray-500 dark:text-gray-400'
+                currentStep !== 'source' ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'
               }`}>Source</span>
             </div>
             <div className={`w-16 h-0.5 ${
-              currentStep === 'analysis' || currentStep === 'preview'
-                ? 'bg-green-500'
-                : 'bg-gray-300 dark:bg-gray-600'
+              ['analysis','preview','import','done'].includes(currentStep) ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
             }`}></div>
             <div className="flex items-center">
               <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
                 currentStep === 'analysis'
                   ? 'bg-indigo-600 text-white'
-                  : currentStep === 'preview'
+                  : ['preview','import','done'].includes(currentStep)
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}>
-                {currentStep === 'preview' ? '✓' : '2'}
+                {['preview','import','done'].includes(currentStep) ? '✓' : '2'}
               </div>
               <span className={`ml-2 ${
-                currentStep === 'analysis' || currentStep === 'preview'
+                ['analysis','preview','import','done'].includes(currentStep)
                   ? 'font-medium text-gray-900 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400'
               }`}>Analyze</span>
             </div>
             <div className={`w-16 h-0.5 ${
-              currentStep === 'preview'
-                ? 'bg-green-500'
-                : 'bg-gray-300 dark:bg-gray-600'
+              ['preview','import','done'].includes(currentStep) ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
             }`}></div>
             <div className="flex items-center">
               <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
                 currentStep === 'preview'
                   ? 'bg-indigo-600 text-white'
+                  : ['import','done'].includes(currentStep)
+                  ? 'bg-green-600 text-white'
                   : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}>
-                3
+                {['import','done'].includes(currentStep) ? '✓' : '3'}
               </div>
               <span className={`ml-2 ${
-                currentStep === 'preview'
+                ['preview','import','done'].includes(currentStep)
                   ? 'font-medium text-gray-900 dark:text-white'
                   : 'text-gray-500 dark:text-gray-400'
               }`}>Preview</span>
             </div>
-            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className={`w-16 h-0.5 ${
+              ['import','done'].includes(currentStep) ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+            }`}></div>
             <div className="flex items-center">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
-                4
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold ${
+                currentStep === 'import'
+                  ? 'bg-indigo-600 text-white'
+                  : currentStep === 'done'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              }`}>
+                {currentStep === 'done' ? '✓' : '4'}
               </div>
-              <span className="ml-2 text-gray-500 dark:text-gray-400">Import</span>
+              <span className={`ml-2 ${
+                ['import','done'].includes(currentStep)
+                  ? 'font-medium text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}>Import</span>
             </div>
-            <div className="w-16 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
+            <div className={`w-16 h-0.5 ${ currentStep === 'done' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600' }`}></div>
             <div className="flex items-center">
-              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-semibold">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${ currentStep === 'done' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400' } font-semibold`}>
                 5
               </div>
-              <span className="ml-2 text-gray-500 dark:text-gray-400">Done</span>
+              <span className={`ml-2 ${ currentStep === 'done' ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400' }`}>Done</span>
             </div>
           </div>
         </div>
@@ -509,6 +556,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               />
             </>
               );
+            } else if (currentStep === 'import' && jobId) {
+              return (
+                <ImportExecutionPanel jobId={jobId} onDone={() => setCurrentStep('done')} />
+              );
+            } else if (currentStep === 'done') {
+              return jobId ? (
+                <ImportExecutionPanel jobId={jobId} />
+              ) : null;
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
               return (
@@ -530,7 +585,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
         {/* Footer */}
         <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-          {currentStep !== 'source' ? (
+          {currentStep === 'import' || currentStep === 'done' ? (
+            <>
+              <div />
+              <Button variant="outline" onClick={handleClose}>
+                Close
+              </Button>
+            </>
+          ) : currentStep !== 'source' ? (
             <>
               <Button variant="outline" onClick={handleBack}>
                 ← Back
@@ -561,10 +623,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                 )}
                 {currentStep === 'preview' && (
                   <Button
-                    onClick={() => {
-                      // TODO: Start import process
-                      console.log('Starting import with options:', importOptions);
-                    }}
+                    onClick={beginImport}
                     disabled={!importOptions || importOptions.selectedSchemas.length === 0}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
