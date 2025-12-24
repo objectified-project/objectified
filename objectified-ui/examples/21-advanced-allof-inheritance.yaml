@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: Advanced Composition - allOf Inheritance Example
+  version: 1.0.0
+  description: |
+    Demonstrates allOf for schema inheritance and composition.
+    This example shows how to extend base schemas with additional properties,
+    creating a type hierarchy similar to object-oriented inheritance.
+    
+    **Key Concepts:**
+    - allOf: Schema must match ALL of the listed schemas (AND logic)
+    - Common use case: Inheritance and extension patterns
+    - Combines multiple schemas into one
+    
+    **Pattern:** Base schema + Extensions = Complete schema
+
+components:
+  schemas:
+    # Base Entities - Common properties
+    BaseEntity:
+      type: object
+      required:
+        - id
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        version:
+          type: integer
+          description: Entity version for optimistic locking
+          minimum: 0
+
+    # Auditable Entity - Adds audit trail
+    AuditableEntity:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required:
+            - createdBy
+            - updatedBy
+          properties:
+            createdBy:
+              type: string
+              description: User who created this entity
+            updatedBy:
+              type: string
+              description: User who last updated this entity
+            metadata:
+              type: object
+              additionalProperties: true
+              description: Additional metadata
+
+    # Animal - Base animal type
+    Animal:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required:
+            - name
+            - species
+          properties:
+            name:
+              type: string
+              description: Animal's name
+              minLength: 1
+            species:
+              type: string
+              description: Species classification
+            age:
+              type: integer
+              minimum: 0
+              description: Age in years
+            weight:
+              type: number
+              minimum: 0
+              description: Weight in kilograms
+
+    # Pet - Extends Animal with pet-specific properties
+    Pet:
+      allOf:
+        - $ref: '#/components/schemas/Animal'
+        - type: object
+          required:
+            - ownerId
+            - microchipId
+          properties:
+            ownerId:
+              type: string
+              format: uuid
+              description: Reference to owner
+            microchipId:
+              type: string
+              pattern: '^[0-9]{15}$'
+              description: 15-digit microchip ID
+            vaccinations:
+              type: array
+              items:
+                $ref: '#/components/schemas/Vaccination'
+              description: Vaccination history
+            dietaryRestrictions:
+              type: array
+              items:
+                type: string
+              description: Known dietary restrictions
+
+    # Dog - Extends Pet with dog-specific properties
+    Dog:
+      allOf:
+        - $ref: '#/components/schemas/Pet'
+        - type: object
+          required:
+            - breed
+          properties:
+            breed:
+              type: string
+              description: Dog breed
+              examples:
+                - Labrador Retriever
+                - German Shepherd
+                - Golden Retriever
+            registrationNumber:
+              type: string
+              description: Kennel club registration
+            trainedCommands:
+              type: array
+              items:
+                type: string
+              description: Commands the dog knows
+
+    # Cat - Extends Pet with cat-specific properties
+    Cat:
+      allOf:
+        - $ref: '#/components/schemas/Pet'
+        - type: object
+          properties:
+            isIndoor:
+              type: boolean
+              description: Whether cat is kept indoors
+              default: true
+            declawed:
+              type: boolean
+              description: Whether cat has been declawed
+              default: false
+            catBreed:
+              type: string
+              description: Cat breed
+              examples:
+                - Persian
+                - Siamese
+                - Maine Coon
+
+    # Vaccination - Nested schema
+    Vaccination:
+      allOf:
+        - $ref: '#/components/schemas/AuditableEntity'
+        - type: object
+          required:
+            - vaccine
+            - dateAdministered
+            - veterinarianId
+          properties:
+            vaccine:
+              type: string
+              description: Vaccine name
+              examples:
+                - Rabies
+                - Distemper
+                - Parvovirus
+            dateAdministered:
+              type: string
+              format: date
+              description: Date vaccine was given
+            nextDueDate:
+              type: string
+              format: date
+              description: When next dose is due
+            veterinarianId:
+              type: string
+              format: uuid
+              description: Veterinarian who administered
+            batchNumber:
+              type: string
+              description: Vaccine batch number
+
+    # User - Owner of pets
+    User:
+      allOf:
+        - $ref: '#/components/schemas/AuditableEntity'
+        - type: object
+          required:
+            - email
+            - firstName
+            - lastName
+          properties:
+            email:
+              type: string
+              format: email
+              description: User's email address
+            firstName:
+              type: string
+              description: First name
+              minLength: 1
+            lastName:
+              type: string
+              description: Last name
+              minLength: 1
+            phoneNumber:
+              type: string
+              pattern: '^\+?[1-9]\d{1,14}$'
+              description: Phone number in E.164 format
+            address:
+              $ref: '#/components/schemas/Address'
+            emergencyContact:
+              $ref: '#/components/schemas/EmergencyContact'
+
+    # Address
+    Address:
+      type: object
+      required:
+        - street
+        - city
+        - country
+        - postalCode
+      properties:
+        street:
+          type: string
+          description: Street address
+        city:
+          type: string
+          description: City
+        state:
+          type: string
+          description: State or province
+        country:
+          type: string
+          description: Country code (ISO 3166-1 alpha-2)
+          pattern: '^[A-Z]{2}$'
+        postalCode:
+          type: string
+          description: Postal or ZIP code
+
+    # Emergency Contact
+    EmergencyContact:
+      type: object
+      required:
+        - name
+        - relationship
+        - phoneNumber
+      properties:
+        name:
+          type: string
+          description: Contact's name
+        relationship:
+          type: string
+          description: Relationship to user
+          examples:
+            - Spouse
+            - Parent
+            - Friend
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: Emergency contact phone
+
+    # Document - Complex allOf with multiple schemas
+    MedicalDocument:
+      allOf:
+        - $ref: '#/components/schemas/AuditableEntity'
+        - type: object
+          required:
+            - documentType
+            - petId
+            - filePath
+          properties:
+            documentType:
+              type: string
+              enum:
+                - vaccination_record
+                - medical_history
+                - test_results
+                - prescription
+                - invoice
+              description: Type of document
+            petId:
+              type: string
+              format: uuid
+              description: Pet this document belongs to
+            filePath:
+              type: string
+              format: uri
+              description: Location of document file
+            fileSize:
+              type: integer
+              minimum: 0
+              description: File size in bytes
+            mimeType:
+              type: string
+              description: MIME type of document
+              examples:
+                - application/pdf
+                - image/jpeg
+            notes:
+              type: string
+              description: Additional notes about document
+
+paths:
+  /pets:
+    get:
+      summary: List all pets
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
+
+  /dogs:
+    get:
+      summary: List all dogs
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dog'
+
+  /cats:
+    get:
+      summary: List all cats
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cat'
+

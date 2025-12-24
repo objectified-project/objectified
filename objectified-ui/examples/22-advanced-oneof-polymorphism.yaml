@@ -1,0 +1,583 @@
+openapi: 3.1.0
+info:
+  title: Advanced Composition - oneOf Polymorphism Example
+  version: 2.0.0
+  description: |
+    Demonstrates oneOf for polymorphism and exclusive choice patterns.
+    This example shows how to model scenarios where a value must be
+    exactly one of several possible types.
+    
+    **Key Concepts:**
+    - oneOf: Schema must match EXACTLY ONE of the listed schemas (XOR logic)
+    - Common use case: Polymorphism, variant types, discriminated unions
+    - Only one schema can be valid at a time
+    
+    **Pattern:** Payment methods, notification channels, document types
+
+components:
+  schemas:
+    # Payment Methods - Different payment types
+    Payment:
+      type: object
+      required:
+        - id
+        - amount
+        - currency
+        - timestamp
+        - method
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Payment transaction ID
+        amount:
+          type: number
+          minimum: 0.01
+          description: Payment amount
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 currency code
+          examples:
+            - USD
+            - EUR
+            - GBP
+        timestamp:
+          type: string
+          format: date-time
+          description: Payment timestamp
+        method:
+          oneOf:
+            - $ref: '#/components/schemas/CreditCardPayment'
+            - $ref: '#/components/schemas/BankTransferPayment'
+            - $ref: '#/components/schemas/PayPalPayment'
+            - $ref: '#/components/schemas/CryptocurrencyPayment'
+          discriminator:
+            propertyName: paymentType
+            mapping:
+              credit_card: '#/components/schemas/CreditCardPayment'
+              bank_transfer: '#/components/schemas/BankTransferPayment'
+              paypal: '#/components/schemas/PayPalPayment'
+              cryptocurrency: '#/components/schemas/CryptocurrencyPayment'
+
+    # Credit Card Payment
+    CreditCardPayment:
+      type: object
+      required:
+        - paymentType
+        - cardNumber
+        - expiryMonth
+        - expiryYear
+        - cvv
+        - cardholderName
+      properties:
+        paymentType:
+          type: string
+          const: credit_card
+          description: Payment type identifier
+        cardNumber:
+          type: string
+          pattern: '^[0-9]{13,19}$'
+          description: Credit card number
+        expiryMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Card expiry month
+        expiryYear:
+          type: integer
+          minimum: 2024
+          description: Card expiry year
+        cvv:
+          type: string
+          pattern: '^[0-9]{3,4}$'
+          description: Card security code
+        cardholderName:
+          type: string
+          description: Name on card
+        billingAddress:
+          $ref: '#/components/schemas/Address'
+        cardType:
+          type: string
+          enum:
+            - visa
+            - mastercard
+            - amex
+            - discover
+          description: Card brand
+
+    # Bank Transfer Payment
+    BankTransferPayment:
+      type: object
+      required:
+        - paymentType
+        - bankName
+        - accountNumber
+        - routingNumber
+        - accountHolderName
+      properties:
+        paymentType:
+          type: string
+          const: bank_transfer
+          description: Payment type identifier
+        bankName:
+          type: string
+          description: Name of bank
+        accountNumber:
+          type: string
+          pattern: '^[0-9]{8,17}$'
+          description: Bank account number
+        routingNumber:
+          type: string
+          pattern: '^[0-9]{9}$'
+          description: Bank routing number (ABA)
+        accountHolderName:
+          type: string
+          description: Name on bank account
+        accountType:
+          type: string
+          enum:
+            - checking
+            - savings
+          description: Type of account
+        swiftCode:
+          type: string
+          pattern: '^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$'
+          description: SWIFT/BIC code for international transfers
+
+    # PayPal Payment
+    PayPalPayment:
+      type: object
+      required:
+        - paymentType
+        - paypalEmail
+        - paypalTransactionId
+      properties:
+        paymentType:
+          type: string
+          const: paypal
+          description: Payment type identifier
+        paypalEmail:
+          type: string
+          format: email
+          description: PayPal account email
+        paypalTransactionId:
+          type: string
+          description: PayPal transaction identifier
+        payerName:
+          type: string
+          description: Name of PayPal payer
+
+    # Cryptocurrency Payment
+    CryptocurrencyPayment:
+      type: object
+      required:
+        - paymentType
+        - cryptocurrency
+        - walletAddress
+        - transactionHash
+      properties:
+        paymentType:
+          type: string
+          const: cryptocurrency
+          description: Payment type identifier
+        cryptocurrency:
+          type: string
+          enum:
+            - BTC
+            - ETH
+            - USDT
+            - USDC
+          description: Cryptocurrency type
+        walletAddress:
+          type: string
+          description: Cryptocurrency wallet address
+        transactionHash:
+          type: string
+          description: Blockchain transaction hash
+        confirmations:
+          type: integer
+          minimum: 0
+          description: Number of blockchain confirmations
+
+    # Notification Channels - Different delivery methods
+    Notification:
+      type: object
+      required:
+        - id
+        - subject
+        - timestamp
+        - priority
+        - channel
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Notification ID
+        subject:
+          type: string
+          description: Notification subject/title
+        timestamp:
+          type: string
+          format: date-time
+          description: When notification was created
+        priority:
+          type: string
+          enum:
+            - low
+            - normal
+            - high
+            - urgent
+          description: Notification priority
+        channel:
+          oneOf:
+            - $ref: '#/components/schemas/EmailNotification'
+            - $ref: '#/components/schemas/SMSNotification'
+            - $ref: '#/components/schemas/PushNotification'
+            - $ref: '#/components/schemas/WebhookNotification'
+          discriminator:
+            propertyName: channelType
+
+    # Email Notification
+    EmailNotification:
+      type: object
+      required:
+        - channelType
+        - to
+        - from
+        - body
+      properties:
+        channelType:
+          type: string
+          const: email
+        to:
+          type: array
+          items:
+            type: string
+            format: email
+          minItems: 1
+          description: Recipient email addresses
+        cc:
+          type: array
+          items:
+            type: string
+            format: email
+          description: CC recipients
+        bcc:
+          type: array
+          items:
+            type: string
+            format: email
+          description: BCC recipients
+        from:
+          type: string
+          format: email
+          description: Sender email address
+        replyTo:
+          type: string
+          format: email
+          description: Reply-to address
+        body:
+          type: string
+          description: Email body (HTML or plain text)
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+
+    # SMS Notification
+    SMSNotification:
+      type: object
+      required:
+        - channelType
+        - phoneNumber
+        - message
+      properties:
+        channelType:
+          type: string
+          const: sms
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: Phone number in E.164 format
+        message:
+          type: string
+          maxLength: 160
+          description: SMS message text
+        senderId:
+          type: string
+          maxLength: 11
+          description: Sender ID/name
+
+    # Push Notification
+    PushNotification:
+      type: object
+      required:
+        - channelType
+        - deviceToken
+        - title
+        - body
+      properties:
+        channelType:
+          type: string
+          const: push
+        deviceToken:
+          type: string
+          description: Device registration token
+        title:
+          type: string
+          description: Push notification title
+        body:
+          type: string
+          description: Push notification body
+        badge:
+          type: integer
+          minimum: 0
+          description: Badge count for iOS
+        sound:
+          type: string
+          description: Notification sound
+        data:
+          type: object
+          additionalProperties: true
+          description: Additional data payload
+
+    # Webhook Notification
+    WebhookNotification:
+      type: object
+      required:
+        - channelType
+        - url
+        - payload
+      properties:
+        channelType:
+          type: string
+          const: webhook
+        url:
+          type: string
+          format: uri
+          description: Webhook URL
+        method:
+          type: string
+          enum:
+            - POST
+            - PUT
+          default: POST
+          description: HTTP method
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom HTTP headers
+        payload:
+          type: object
+          description: Webhook payload
+        retryPolicy:
+          $ref: '#/components/schemas/RetryPolicy'
+
+    # Supporting Schemas
+    Address:
+      type: object
+      required:
+        - street
+        - city
+        - country
+        - postalCode
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        postalCode:
+          type: string
+
+    Attachment:
+      type: object
+      required:
+        - filename
+        - contentType
+        - url
+      properties:
+        filename:
+          type: string
+        contentType:
+          type: string
+        url:
+          type: string
+          format: uri
+        size:
+          type: integer
+          minimum: 0
+
+    RetryPolicy:
+      type: object
+      properties:
+        maxAttempts:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+        retryIntervalSeconds:
+          type: integer
+          minimum: 1
+          default: 60
+
+    # Document Type - oneOf for different document formats
+    Document:
+      type: object
+      required:
+        - id
+        - title
+        - createdAt
+        - content
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/TextDocument'
+            - $ref: '#/components/schemas/ImageDocument'
+            - $ref: '#/components/schemas/VideoDocument'
+            - $ref: '#/components/schemas/AudioDocument'
+          discriminator:
+            propertyName: documentType
+
+    TextDocument:
+      type: object
+      required:
+        - documentType
+        - text
+      properties:
+        documentType:
+          type: string
+          const: text
+        text:
+          type: string
+          description: Plain text content
+        format:
+          type: string
+          enum:
+            - plain
+            - markdown
+            - html
+          default: plain
+
+    ImageDocument:
+      type: object
+      required:
+        - documentType
+        - imageUrl
+        - width
+        - height
+      properties:
+        documentType:
+          type: string
+          const: image
+        imageUrl:
+          type: string
+          format: uri
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        format:
+          type: string
+          enum:
+            - jpeg
+            - png
+            - gif
+            - webp
+
+    VideoDocument:
+      type: object
+      required:
+        - documentType
+        - videoUrl
+        - durationSeconds
+      properties:
+        documentType:
+          type: string
+          const: video
+        videoUrl:
+          type: string
+          format: uri
+        durationSeconds:
+          type: integer
+          minimum: 1
+        thumbnailUrl:
+          type: string
+          format: uri
+        resolution:
+          type: string
+          enum:
+            - '720p'
+            - '1080p'
+            - '4K'
+
+    AudioDocument:
+      type: object
+      required:
+        - documentType
+        - audioUrl
+        - durationSeconds
+      properties:
+        documentType:
+          type: string
+          const: audio
+        audioUrl:
+          type: string
+          format: uri
+        durationSeconds:
+          type: integer
+          minimum: 1
+        bitrate:
+          type: integer
+          minimum: 64
+        format:
+          type: string
+          enum:
+            - mp3
+            - wav
+            - aac
+            - flac
+
+paths:
+  /payments:
+    post:
+      summary: Create a payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Payment'
+      responses:
+        '201':
+          description: Payment created
+
+  /notifications:
+    post:
+      summary: Send a notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      responses:
+        '201':
+          description: Notification sent
+

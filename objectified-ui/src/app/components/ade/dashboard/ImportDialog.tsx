@@ -132,7 +132,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" showCloseButton={false}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col" showCloseButton={false}>
         <DialogHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold text-gray-900 dark:text-white">

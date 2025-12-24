@@ -1,0 +1,651 @@
+openapi: 3.1.0
+info:
+  title: Advanced Composition - anyOf Flexible Matching Example
+  version: 3.0.0
+  description: |
+    Demonstrates anyOf for flexible schema matching and optional combinations.
+    This example shows how to model scenarios where a value can match
+    one or more of several possible schemas simultaneously.
+    
+    **Key Concepts:**
+    - anyOf: Schema must match AT LEAST ONE of the listed schemas (OR logic)
+    - Common use case: Optional fields, flexible validation, multi-format support
+    - Multiple schemas can be valid simultaneously
+    
+    **Pattern:** Contact information, search criteria, flexible APIs
+
+components:
+  schemas:
+    # Contact Information - Multiple ways to reach someone
+    ContactInfo:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Contact ID
+        name:
+          type: string
+          description: Contact name
+        contactMethods:
+          anyOf:
+            - $ref: '#/components/schemas/EmailContact'
+            - $ref: '#/components/schemas/PhoneContact'
+            - $ref: '#/components/schemas/AddressContact'
+            - $ref: '#/components/schemas/SocialMediaContact'
+          description: At least one contact method must be provided
+
+    EmailContact:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address
+        emailType:
+          type: string
+          enum:
+            - personal
+            - work
+            - other
+          default: personal
+        isPrimary:
+          type: boolean
+          description: Is this the primary email
+          default: false
+
+    PhoneContact:
+      type: object
+      required:
+        - phoneNumber
+      properties:
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+          description: Phone number in E.164 format
+        phoneType:
+          type: string
+          enum:
+            - mobile
+            - home
+            - work
+            - fax
+          default: mobile
+        isPrimary:
+          type: boolean
+          description: Is this the primary phone
+          default: false
+        canReceiveSMS:
+          type: boolean
+          description: Can receive SMS messages
+          default: true
+
+    AddressContact:
+      type: object
+      required:
+        - street
+        - city
+        - country
+      properties:
+        street:
+          type: string
+          description: Street address
+        apartment:
+          type: string
+          description: Apartment/unit number
+        city:
+          type: string
+          description: City
+        state:
+          type: string
+          description: State/province
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+          description: ISO country code
+        postalCode:
+          type: string
+          description: Postal code
+        addressType:
+          type: string
+          enum:
+            - home
+            - work
+            - billing
+            - shipping
+          default: home
+
+    SocialMediaContact:
+      type: object
+      properties:
+        twitter:
+          type: string
+          pattern: '^@[A-Za-z0-9_]{1,15}$'
+          description: Twitter handle
+        linkedin:
+          type: string
+          format: uri
+          description: LinkedIn profile URL
+        facebook:
+          type: string
+          description: Facebook username
+        instagram:
+          type: string
+          pattern: '^[A-Za-z0-9_.]{1,30}$'
+          description: Instagram username
+        github:
+          type: string
+          description: GitHub username
+
+    # Search Criteria - Flexible query parameters
+    SearchCriteria:
+      type: object
+      description: |
+        Flexible search criteria where user can search by multiple fields.
+        At least one search field must be provided.
+      anyOf:
+        - required: [keyword]
+        - required: [category]
+        - required: [tags]
+        - required: [dateRange]
+        - required: [priceRange]
+      properties:
+        keyword:
+          type: string
+          description: Search keyword
+          minLength: 1
+        category:
+          type: string
+          description: Product category
+        tags:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: Filter by tags
+        dateRange:
+          $ref: '#/components/schemas/DateRange'
+        priceRange:
+          $ref: '#/components/schemas/PriceRange'
+        location:
+          $ref: '#/components/schemas/LocationFilter'
+        status:
+          type: array
+          items:
+            type: string
+            enum:
+              - active
+              - pending
+              - completed
+              - cancelled
+          description: Filter by status
+
+    DateRange:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+          description: Range start date
+        endDate:
+          type: string
+          format: date
+          description: Range end date
+
+    PriceRange:
+      type: object
+      properties:
+        minPrice:
+          type: number
+          minimum: 0
+          description: Minimum price
+        maxPrice:
+          type: number
+          minimum: 0
+          description: Maximum price
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          default: USD
+
+    LocationFilter:
+      type: object
+      properties:
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        radius:
+          type: integer
+          minimum: 1
+          description: Search radius in kilometers
+
+    # Product - Flexible pricing and availability
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - pricing
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Product name
+        description:
+          type: string
+          description: Product description
+        pricing:
+          anyOf:
+            - $ref: '#/components/schemas/FixedPricing'
+            - $ref: '#/components/schemas/TieredPricing'
+            - $ref: '#/components/schemas/SubscriptionPricing'
+            - $ref: '#/components/schemas/AuctionPricing'
+          description: Product can have multiple pricing models
+
+    FixedPricing:
+      type: object
+      required:
+        - price
+        - currency
+      properties:
+        pricingType:
+          type: string
+          const: fixed
+        price:
+          type: number
+          minimum: 0
+          description: Fixed price
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        discount:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Discount percentage
+
+    TieredPricing:
+      type: object
+      required:
+        - tiers
+      properties:
+        pricingType:
+          type: string
+          const: tiered
+        tiers:
+          type: array
+          items:
+            type: object
+            required:
+              - minQuantity
+              - pricePerUnit
+            properties:
+              minQuantity:
+                type: integer
+                minimum: 1
+              pricePerUnit:
+                type: number
+                minimum: 0
+          minItems: 1
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+
+    SubscriptionPricing:
+      type: object
+      required:
+        - recurringPrice
+        - billingCycle
+      properties:
+        pricingType:
+          type: string
+          const: subscription
+        recurringPrice:
+          type: number
+          minimum: 0
+        billingCycle:
+          type: string
+          enum:
+            - daily
+            - weekly
+            - monthly
+            - quarterly
+            - yearly
+        setupFee:
+          type: number
+          minimum: 0
+        trialPeriodDays:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+
+    AuctionPricing:
+      type: object
+      required:
+        - startingBid
+        - currentBid
+        - auctionEndTime
+      properties:
+        pricingType:
+          type: string
+          const: auction
+        startingBid:
+          type: number
+          minimum: 0
+        currentBid:
+          type: number
+          minimum: 0
+        buyNowPrice:
+          type: number
+          minimum: 0
+        auctionEndTime:
+          type: string
+          format: date-time
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+
+    # Media Content - Multiple format support
+    MediaContent:
+      type: object
+      required:
+        - id
+        - title
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          description: Media title
+        formats:
+          anyOf:
+            - $ref: '#/components/schemas/ImageFormat'
+            - $ref: '#/components/schemas/VideoFormat'
+            - $ref: '#/components/schemas/AudioFormat'
+            - $ref: '#/components/schemas/DocumentFormat'
+          description: Content can be available in multiple formats
+
+    ImageFormat:
+      type: object
+      required:
+        - imageUrl
+      properties:
+        formatType:
+          type: string
+          const: image
+        imageUrl:
+          type: string
+          format: uri
+        thumbnailUrl:
+          type: string
+          format: uri
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        fileFormat:
+          type: string
+          enum:
+            - jpeg
+            - png
+            - gif
+            - webp
+            - svg
+
+    VideoFormat:
+      type: object
+      required:
+        - videoUrl
+      properties:
+        formatType:
+          type: string
+          const: video
+        videoUrl:
+          type: string
+          format: uri
+        durationSeconds:
+          type: integer
+          minimum: 1
+        resolution:
+          type: string
+          enum:
+            - '480p'
+            - '720p'
+            - '1080p'
+            - '4K'
+            - '8K'
+        fileFormat:
+          type: string
+          enum:
+            - mp4
+            - webm
+            - avi
+            - mov
+
+    AudioFormat:
+      type: object
+      required:
+        - audioUrl
+      properties:
+        formatType:
+          type: string
+          const: audio
+        audioUrl:
+          type: string
+          format: uri
+        durationSeconds:
+          type: integer
+          minimum: 1
+        bitrate:
+          type: integer
+          minimum: 64
+        fileFormat:
+          type: string
+          enum:
+            - mp3
+            - wav
+            - aac
+            - flac
+            - ogg
+
+    DocumentFormat:
+      type: object
+      required:
+        - documentUrl
+      properties:
+        formatType:
+          type: string
+          const: document
+        documentUrl:
+          type: string
+          format: uri
+        pageCount:
+          type: integer
+          minimum: 1
+        fileFormat:
+          type: string
+          enum:
+            - pdf
+            - docx
+            - txt
+            - rtf
+
+    # User Profile - Flexible identity verification
+    UserProfile:
+      type: object
+      required:
+        - userId
+        - username
+        - verification
+      properties:
+        userId:
+          type: string
+          format: uuid
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+        verification:
+          anyOf:
+            - $ref: '#/components/schemas/EmailVerification'
+            - $ref: '#/components/schemas/PhoneVerification'
+            - $ref: '#/components/schemas/DocumentVerification'
+            - $ref: '#/components/schemas/BiometricVerification'
+          description: User must have at least one verification method
+
+    EmailVerification:
+      type: object
+      required:
+        - email
+        - verified
+      properties:
+        verificationType:
+          type: string
+          const: email
+        email:
+          type: string
+          format: email
+        verified:
+          type: boolean
+        verifiedAt:
+          type: string
+          format: date-time
+
+    PhoneVerification:
+      type: object
+      required:
+        - phoneNumber
+        - verified
+      properties:
+        verificationType:
+          type: string
+          const: phone
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        verified:
+          type: boolean
+        verifiedAt:
+          type: string
+          format: date-time
+
+    DocumentVerification:
+      type: object
+      required:
+        - documentType
+        - documentNumber
+        - verified
+      properties:
+        verificationType:
+          type: string
+          const: document
+        documentType:
+          type: string
+          enum:
+            - passport
+            - drivers_license
+            - national_id
+        documentNumber:
+          type: string
+        issuingCountry:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        verified:
+          type: boolean
+        verifiedAt:
+          type: string
+          format: date-time
+
+    BiometricVerification:
+      type: object
+      required:
+        - biometricType
+        - verified
+      properties:
+        verificationType:
+          type: string
+          const: biometric
+        biometricType:
+          type: string
+          enum:
+            - fingerprint
+            - face_recognition
+            - iris_scan
+        verified:
+          type: boolean
+        verifiedAt:
+          type: string
+          format: date-time
+
+paths:
+  /contacts:
+    post:
+      summary: Create a contact
+      description: Must provide at least one contact method
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactInfo'
+      responses:
+        '201':
+          description: Contact created
+
+  /search:
+    post:
+      summary: Search with flexible criteria
+      description: Provide any combination of search parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchCriteria'
+      responses:
+        '200':
+          description: Search results
+
+  /products:
+    get:
+      summary: List products
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+  /media:
+    post:
+      summary: Upload media content
+      description: Content can be provided in multiple formats
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MediaContent'
+      responses:
+        '201':
+          description: Media uploaded
+

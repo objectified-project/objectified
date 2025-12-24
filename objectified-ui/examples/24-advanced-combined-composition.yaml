@@ -1,0 +1,692 @@
+openapi: 3.1.0
+info:
+  title: Advanced Composition - Combined Patterns Example
+  version: 4.0.0
+  description: |
+    Demonstrates combining allOf, oneOf, and anyOf in a single specification.
+    This example shows how these composition patterns work together in
+    real-world scenarios for complex data modeling.
+    
+    **Key Concepts:**
+    - allOf: Inheritance and extension (AND logic)
+    - oneOf: Exclusive choice/polymorphism (XOR logic)
+    - anyOf: Flexible matching (OR logic)
+    - Combined: Using multiple patterns together
+    
+    **Pattern:** E-commerce system with complex product hierarchies
+
+components:
+  schemas:
+    # Base Entity with allOf inheritance
+    BaseEntity:
+      type: object
+      required:
+        - id
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    # Product hierarchy using allOf
+    Product:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required:
+            - name
+            - category
+            - price
+            - availability
+          properties:
+            name:
+              type: string
+              description: Product name
+              minLength: 1
+            description:
+              type: string
+              description: Product description
+            category:
+              type: string
+              enum:
+                - electronics
+                - clothing
+                - food
+                - books
+                - toys
+              description: Product category
+            price:
+              type: number
+              minimum: 0
+              description: Base price
+            currency:
+              type: string
+              pattern: '^[A-Z]{3}$'
+              default: USD
+            availability:
+              $ref: '#/components/schemas/Availability'
+            images:
+              type: array
+              items:
+                type: string
+                format: uri
+              description: Product images
+            tags:
+              type: array
+              items:
+                type: string
+              description: Search tags
+
+    # Availability using anyOf - multiple availability patterns
+    Availability:
+      anyOf:
+        - $ref: '#/components/schemas/InStockAvailability'
+        - $ref: '#/components/schemas/PreOrderAvailability'
+        - $ref: '#/components/schemas/BackOrderAvailability'
+      description: Product can have multiple availability states
+
+    InStockAvailability:
+      type: object
+      required:
+        - inStock
+        - quantity
+      properties:
+        inStock:
+          type: boolean
+          const: true
+        quantity:
+          type: integer
+          minimum: 1
+          description: Available quantity
+        warehouse:
+          type: string
+          description: Warehouse location
+
+    PreOrderAvailability:
+      type: object
+      required:
+        - preOrder
+        - expectedDate
+      properties:
+        preOrder:
+          type: boolean
+          const: true
+        expectedDate:
+          type: string
+          format: date
+          description: Expected availability date
+        maxPreOrders:
+          type: integer
+          minimum: 1
+
+    BackOrderAvailability:
+      type: object
+      required:
+        - backOrder
+        - estimatedDays
+      properties:
+        backOrder:
+          type: boolean
+          const: true
+        estimatedDays:
+          type: integer
+          minimum: 1
+          description: Estimated days until available
+
+    # Electronics Product - extends Product with allOf
+    ElectronicsProduct:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          required:
+            - brand
+            - warranty
+          properties:
+            brand:
+              type: string
+              description: Manufacturer brand
+            model:
+              type: string
+              description: Model number
+            warranty:
+              $ref: '#/components/schemas/Warranty'
+            specifications:
+              type: object
+              additionalProperties: true
+              description: Technical specifications
+
+    # Clothing Product - extends Product with allOf
+    ClothingProduct:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          required:
+            - sizes
+            - material
+          properties:
+            sizes:
+              type: array
+              items:
+                type: string
+                enum:
+                  - XS
+                  - S
+                  - M
+                  - L
+                  - XL
+                  - XXL
+              minItems: 1
+              description: Available sizes
+            colors:
+              type: array
+              items:
+                type: string
+              description: Available colors
+            material:
+              type: string
+              description: Primary material
+            careInstructions:
+              type: string
+              description: Washing/care instructions
+
+    # Warranty
+    Warranty:
+      type: object
+      required:
+        - durationMonths
+      properties:
+        durationMonths:
+          type: integer
+          minimum: 1
+          description: Warranty duration in months
+        type:
+          type: string
+          enum:
+            - manufacturer
+            - extended
+            - lifetime
+          default: manufacturer
+        coverage:
+          type: string
+          description: What the warranty covers
+
+    # Order with complex composition
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required:
+            - customerId
+            - items
+            - status
+            - payment
+            - shipping
+          properties:
+            orderNumber:
+              type: string
+              pattern: '^ORD-[0-9]{10}$'
+              description: Order number
+            customerId:
+              type: string
+              format: uuid
+              description: Customer ID
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderItem'
+              minItems: 1
+              description: Order items
+            status:
+              type: string
+              enum:
+                - pending
+                - confirmed
+                - processing
+                - shipped
+                - delivered
+                - cancelled
+              description: Order status
+            payment:
+              oneOf:
+                - $ref: '#/components/schemas/CreditCardPayment'
+                - $ref: '#/components/schemas/PayPalPayment'
+                - $ref: '#/components/schemas/BankTransferPayment'
+              discriminator:
+                propertyName: paymentMethod
+              description: Payment must be exactly one type
+            shipping:
+              oneOf:
+                - $ref: '#/components/schemas/StandardShipping'
+                - $ref: '#/components/schemas/ExpressShipping'
+                - $ref: '#/components/schemas/OvernightShipping'
+              discriminator:
+                propertyName: shippingMethod
+              description: Shipping must be exactly one type
+            totals:
+              $ref: '#/components/schemas/OrderTotals'
+
+    OrderItem:
+      type: object
+      required:
+        - productId
+        - quantity
+        - unitPrice
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          minimum: 0
+        discount:
+          type: number
+          minimum: 0
+          maximum: 100
+        subtotal:
+          type: number
+          minimum: 0
+
+    OrderTotals:
+      type: object
+      required:
+        - subtotal
+        - tax
+        - shipping
+        - total
+      properties:
+        subtotal:
+          type: number
+          minimum: 0
+        tax:
+          type: number
+          minimum: 0
+        shipping:
+          type: number
+          minimum: 0
+        discount:
+          type: number
+          minimum: 0
+        total:
+          type: number
+          minimum: 0
+
+    # Payment Methods - oneOf for exclusive choice
+    CreditCardPayment:
+      type: object
+      required:
+        - paymentMethod
+        - cardNumber
+        - expiryMonth
+        - expiryYear
+      properties:
+        paymentMethod:
+          type: string
+          const: credit_card
+        cardNumber:
+          type: string
+          pattern: '^[0-9]{13,19}$'
+        expiryMonth:
+          type: integer
+          minimum: 1
+          maximum: 12
+        expiryYear:
+          type: integer
+          minimum: 2024
+        cvv:
+          type: string
+          pattern: '^[0-9]{3,4}$'
+        cardholderName:
+          type: string
+
+    PayPalPayment:
+      type: object
+      required:
+        - paymentMethod
+        - paypalEmail
+      properties:
+        paymentMethod:
+          type: string
+          const: paypal
+        paypalEmail:
+          type: string
+          format: email
+        paypalTransactionId:
+          type: string
+
+    BankTransferPayment:
+      type: object
+      required:
+        - paymentMethod
+        - accountNumber
+        - routingNumber
+      properties:
+        paymentMethod:
+          type: string
+          const: bank_transfer
+        accountNumber:
+          type: string
+        routingNumber:
+          type: string
+        bankName:
+          type: string
+
+    # Shipping Methods - oneOf for exclusive choice
+    StandardShipping:
+      type: object
+      required:
+        - shippingMethod
+        - estimatedDays
+      properties:
+        shippingMethod:
+          type: string
+          const: standard
+        estimatedDays:
+          type: integer
+          minimum: 5
+          maximum: 10
+        cost:
+          type: number
+          minimum: 0
+
+    ExpressShipping:
+      type: object
+      required:
+        - shippingMethod
+        - estimatedDays
+      properties:
+        shippingMethod:
+          type: string
+          const: express
+        estimatedDays:
+          type: integer
+          minimum: 2
+          maximum: 4
+        cost:
+          type: number
+          minimum: 0
+
+    OvernightShipping:
+      type: object
+      required:
+        - shippingMethod
+        - guaranteedDate
+      properties:
+        shippingMethod:
+          type: string
+          const: overnight
+        guaranteedDate:
+          type: string
+          format: date
+        cost:
+          type: number
+          minimum: 0
+
+    # Customer with allOf and anyOf
+    Customer:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required:
+            - email
+            - firstName
+            - lastName
+            - contactPreferences
+          properties:
+            email:
+              type: string
+              format: email
+            firstName:
+              type: string
+              minLength: 1
+            lastName:
+              type: string
+              minLength: 1
+            phoneNumber:
+              type: string
+              pattern: '^\+?[1-9]\d{1,14}$'
+            addresses:
+              type: array
+              items:
+                $ref: '#/components/schemas/Address'
+            contactPreferences:
+              anyOf:
+                - $ref: '#/components/schemas/EmailPreference'
+                - $ref: '#/components/schemas/SMSPreference'
+                - $ref: '#/components/schemas/PushPreference'
+              description: Customer must have at least one contact preference
+            loyaltyTier:
+              oneOf:
+                - $ref: '#/components/schemas/BronzeTier'
+                - $ref: '#/components/schemas/SilverTier'
+                - $ref: '#/components/schemas/GoldTier'
+                - $ref: '#/components/schemas/PlatinumTier'
+              discriminator:
+                propertyName: tierLevel
+
+    Address:
+      type: object
+      required:
+        - street
+        - city
+        - country
+        - postalCode
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+          pattern: '^[A-Z]{2}$'
+        postalCode:
+          type: string
+        addressType:
+          type: string
+          enum:
+            - billing
+            - shipping
+            - both
+
+    # Contact Preferences - anyOf for flexible options
+    EmailPreference:
+      type: object
+      required:
+        - emailEnabled
+      properties:
+        preferenceType:
+          type: string
+          const: email
+        emailEnabled:
+          type: boolean
+        frequency:
+          type: string
+          enum:
+            - daily
+            - weekly
+            - monthly
+
+    SMSPreference:
+      type: object
+      required:
+        - smsEnabled
+      properties:
+        preferenceType:
+          type: string
+          const: sms
+        smsEnabled:
+          type: boolean
+        phoneNumber:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+
+    PushPreference:
+      type: object
+      required:
+        - pushEnabled
+      properties:
+        preferenceType:
+          type: string
+          const: push
+        pushEnabled:
+          type: boolean
+        deviceTokens:
+          type: array
+          items:
+            type: string
+
+    # Loyalty Tiers - oneOf for exclusive membership
+    BronzeTier:
+      type: object
+      required:
+        - tierLevel
+        - discountPercent
+      properties:
+        tierLevel:
+          type: string
+          const: bronze
+        discountPercent:
+          type: number
+          const: 5
+        pointsRequired:
+          type: integer
+          const: 0
+
+    SilverTier:
+      type: object
+      required:
+        - tierLevel
+        - discountPercent
+      properties:
+        tierLevel:
+          type: string
+          const: silver
+        discountPercent:
+          type: number
+          const: 10
+        pointsRequired:
+          type: integer
+          const: 1000
+        freeShipping:
+          type: boolean
+          const: true
+
+    GoldTier:
+      type: object
+      required:
+        - tierLevel
+        - discountPercent
+      properties:
+        tierLevel:
+          type: string
+          const: gold
+        discountPercent:
+          type: number
+          const: 15
+        pointsRequired:
+          type: integer
+          const: 5000
+        freeShipping:
+          type: boolean
+          const: true
+        prioritySupport:
+          type: boolean
+          const: true
+
+    PlatinumTier:
+      type: object
+      required:
+        - tierLevel
+        - discountPercent
+      properties:
+        tierLevel:
+          type: string
+          const: platinum
+        discountPercent:
+          type: number
+          const: 20
+        pointsRequired:
+          type: integer
+          const: 10000
+        freeShipping:
+          type: boolean
+          const: true
+        prioritySupport:
+          type: boolean
+          const: true
+        personalShopper:
+          type: boolean
+          const: true
+        exclusiveAccess:
+          type: boolean
+          const: true
+
+paths:
+  /products:
+    get:
+      summary: List all products
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+  /products/electronics:
+    get:
+      summary: List electronics products
+      responses:
+        '200':
+          description: Electronics list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ElectronicsProduct'
+
+  /orders:
+    post:
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+      responses:
+        '201':
+          description: Order created
+
+  /customers:
+    post:
+      summary: Create a customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        '201':
+          description: Customer created
+

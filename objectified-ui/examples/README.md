@@ -310,9 +310,131 @@ To add new examples:
 
 ---
 
-**Last Updated**: December 21, 2025
+## Advanced Composition Examples (Import Testing)
 
-**Total Examples**: 20 files  
-**Total Features Covered**: 20+ OpenAPI 3.1 features  
-**Use Cases**: Testing, validation, learning, documentation
+### 21. allOf Inheritance (`21-advanced-allof-inheritance.yaml`) ⭐ ADVANCED
+Demonstrates complex inheritance hierarchies using allOf:
+- **Base entities**: Common properties with BaseEntity
+- **Auditable entities**: Adds audit trail to base
+- **Multi-level inheritance**: Animal → Pet → Dog/Cat
+- **Nested composition**: Vaccination extends AuditableEntity
+- **Real-world pattern**: Veterinary clinic management system
+- **Schema count**: 12 schemas with 3-4 levels of inheritance
+- **Use case**: Testing allOf import, inheritance visualization, type hierarchies
+
+**Key Features:**
+- BaseEntity (id, createdAt, updatedAt)
+- AuditableEntity extends BaseEntity
+- Animal extends BaseEntity
+- Pet extends Animal
+- Dog/Cat extend Pet
+- User with nested Address and EmergencyContact
+- MedicalDocument with multiple allOf schemas
+
+### 22. oneOf Polymorphism (`22-advanced-oneof-polymorphism.yaml`) ⭐ ADVANCED
+Demonstrates polymorphism and exclusive choice patterns using oneOf:
+- **Payment methods**: Credit card, bank transfer, PayPal, cryptocurrency
+- **Notification channels**: Email, SMS, push, webhook
+- **Document types**: Text, image, video, audio
+- **Discriminator support**: Type-safe polymorphism
+- **Real-world pattern**: Payment processing system
+- **Schema count**: 16 schemas with discriminated unions
+- **Use case**: Testing oneOf import, polymorphism detection, variant types
+
+**Key Features:**
+- Payment with oneOf for different payment methods
+- Notification with oneOf for delivery channels
+- Document with oneOf for content types
+- Discriminator fields for type identification
+- Const values for type discrimination
+
+### 23. anyOf Flexible Matching (`23-advanced-anyof-flexible.yaml`) ⭐ ADVANCED
+Demonstrates flexible schema matching using anyOf:
+- **Contact methods**: Multiple ways to reach someone (email, phone, address, social)
+- **Search criteria**: Flexible query parameters (at least one required)
+- **Product pricing**: Multiple pricing models (fixed, tiered, subscription, auction)
+- **Media formats**: Content in multiple formats simultaneously
+- **Verification methods**: Multiple identity verification options
+- **Real-world pattern**: Contact management and flexible search
+- **Schema count**: 24 schemas with flexible validation
+- **Use case**: Testing anyOf import, optional combinations, multi-format support
+
+**Key Features:**
+- ContactInfo with anyOf for contact methods
+- SearchCriteria with anyOf required fields
+- Product with anyOf pricing models
+- MediaContent with anyOf format support
+- UserProfile with anyOf verification methods
+
+### 24. Combined Composition (`24-advanced-combined-composition.yaml`) ⭐ ADVANCED
+Demonstrates all three patterns working together:
+- **allOf**: Product hierarchy with inheritance
+- **oneOf**: Exclusive payment and shipping methods
+- **anyOf**: Flexible availability and contact preferences
+- **Complex nesting**: Multiple patterns in single schema
+- **Real-world pattern**: Complete e-commerce system
+- **Schema count**: 30+ schemas with mixed composition
+- **Use case**: Testing complex imports, combined pattern detection, real-world scenarios
+
+**Key Features:**
+- Product extends BaseEntity with allOf
+- ElectronicsProduct/ClothingProduct extend Product
+- Order with oneOf for payment and shipping
+- Availability with anyOf for multiple states
+- Customer with allOf base + anyOf preferences + oneOf loyalty tier
+- Complete type hierarchy with all composition patterns
+
+---
+
+## Testing the Advanced Examples
+
+### Import Testing Workflow:
+1. **Navigate to Import**: Dashboard → Import button
+2. **Select File**: Choose one of the advanced examples (21-24)
+3. **Analyze**: Review detected composition patterns
+4. **Verify Metrics**:
+   - Check "Schema Composition" shows correct counts
+   - Verify allOf/oneOf/anyOf badges appear
+   - Confirm schema count matches specification
+5. **Preview Schemas**: Select schemas with composition
+6. **Switch Views**: Test JSON/YAML views in Monaco Editor
+7. **Import**: Complete import process
+8. **Validate**: Check imported schema relationships
+
+### Expected Results:
+
+**Example 21 (allOf Inheritance):**
+- ✅ Should show: allOf: 8 (or more)
+- ✅ Should detect: Multi-level inheritance chains
+- ✅ Should import: BaseEntity → AuditableEntity → Animal → Pet → Dog/Cat
+
+**Example 22 (oneOf Polymorphism):**
+- ✅ Should show: oneOf: 4 (or more)
+- ✅ Should detect: Discriminator fields
+- ✅ Should import: Payment variants, Notification variants, Document variants
+
+**Example 23 (anyOf Flexible):**
+- ✅ Should show: anyOf: 5 (or more)
+- ✅ Should detect: Flexible validation patterns
+- ✅ Should import: ContactInfo, SearchCriteria, Product with multiple pricing
+
+**Example 24 (Combined):**
+- ✅ Should show: allOf: 5+, oneOf: 8+, anyOf: 2+
+- ✅ Should detect: All three composition patterns
+- ✅ Should import: Complete e-commerce schema hierarchy
+
+### Composition Pattern Visual Indicators:
+Look for these in the Analysis screen:
+```
+Schema Composition:  [allOf: 8]  [oneOf: 4]  [anyOf: 5]
+                     └blue───┘   └purple──┘  └indigo─┘
+```
+
+---
+
+**Last Updated**: December 23, 2024
+
+**Total Examples**: 24 files  
+**Total Features Covered**: 20+ OpenAPI 3.1 features + 4 advanced composition patterns  
+**Use Cases**: Testing, validation, learning, documentation, import functionality testing
 
