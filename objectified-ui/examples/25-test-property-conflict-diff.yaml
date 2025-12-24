@@ -1,0 +1,137 @@
+openapi: 3.1.0
+info:
+  title: Property Conflict Test - Different Definitions
+  version: 1.0.0
+  description: |
+    This spec tests property conflicts where multiple schemas use properties
+    with the same name BUT different definitions. The importer should create
+    SEPARATE properties in the library because they have different signatures.
+
+components:
+  schemas:
+    Customer:
+      type: object
+      description: Customer account
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Customer unique identifier (UUID)
+        name:
+          type: string
+          maxLength: 100
+          description: Customer full name (max 100 chars)
+        status:
+          type: string
+          enum: [active, inactive, pending]
+          description: Customer account status (3 options)
+        metadata:
+          type: object
+          description: Customer metadata as object
+          properties:
+            source:
+              type: string
+            campaign:
+              type: string
+      required:
+        - id
+        - name
+
+    Transaction:
+      type: object
+      description: Financial transaction
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Transaction ID (integer, not UUID!)
+        name:
+          type: string
+          minLength: 1
+          description: Transaction name (min 1 char, no max)
+        status:
+          type: string
+          enum: [pending, completed, failed, cancelled]
+          description: Transaction status (4 options, different from Customer)
+        metadata:
+          type: string
+          description: Transaction metadata as JSON string (not object!)
+      required:
+        - id
+        - status
+
+    Shipment:
+      type: object
+      description: Product shipment
+      properties:
+        id:
+          type: string
+          pattern: "^SHP-[0-9]{6}$"
+          description: Shipment ID with pattern (not UUID!)
+        name:
+          type: string
+          description: Shipment name (no constraints, different from others)
+        status:
+          type: string
+          enum: [scheduled, in_transit, delivered]
+          description: Shipment status (different options)
+        metadata:
+          type: array
+          description: Shipment metadata as array of strings
+          items:
+            type: string
+      required:
+        - id
+
+    Document:
+      type: object
+      description: Document record
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Document unique identifier (UUID - same as Customer!)
+        name:
+          type: string
+          maxLength: 100
+          description: Document name (max 100 chars - same as Customer!)
+        status:
+          type: string
+          enum: [draft, published, archived]
+          description: Document status (different options again)
+        metadata:
+          type: object
+          description: Document metadata as object (same structure as Customer!)
+          properties:
+            author:
+              type: string
+            tags:
+              type: array
+              items:
+                type: string
+      required:
+        - id
+
+# Expected behavior:
+# - Property library should contain:
+#   * id (uuid) - used by Customer, Document (REUSED - same definition)
+#   * id (int64) - used by Transaction (SEPARATE - different type)
+#   * id (pattern string) - used by Shipment (SEPARATE - different format)
+#
+#   * name (max 100) - used by Customer, Document (REUSED - same constraints)
+#   * name (min 1) - used by Transaction (SEPARATE - different constraints)
+#   * name (no constraints) - used by Shipment (SEPARATE - no constraints)
+#
+#   * status (active/inactive/pending) - used by Customer (SEPARATE)
+#   * status (pending/completed/failed/cancelled) - used by Transaction (SEPARATE)
+#   * status (scheduled/in_transit/delivered) - used by Shipment (SEPARATE)
+#   * status (draft/published/archived) - used by Document (SEPARATE)
+#
+#   * metadata (object with source/campaign) - used by Customer (SEPARATE)
+#   * metadata (string) - used by Transaction (SEPARATE)
+#   * metadata (array of strings) - used by Shipment (SEPARATE)
+#   * metadata (object with author/tags) - used by Document (SEPARATE)
+#
+# Total expected properties: 14 unique properties
+# This tests that the importer correctly identifies conflicts and creates separate properties
+

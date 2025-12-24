@@ -1,440 +1,259 @@
-# OpenAPI 3.1 Example Specifications
+# OpenAPI Import Test Examples
 
-This directory contains comprehensive OpenAPI 3.1 specification examples demonstrating all the advanced features supported by Objectified. These examples are designed for UI/UX testing and import validation.
+This directory contains comprehensive test examples for validating the OpenAPI importer's property deduplication logic.
 
----
+## Overview
 
-## Example Files Overview
+The importer must correctly handle:
+1. **Property Reuse** - Same property name + same definition → One library property, reused across classes
+2. **Property Conflicts** - Same property name + different definition → Separate library properties
+3. **Mixed Scenarios** - Realistic combination of reuse and conflicts
+4. **Edge Cases** - Subtle differences that should or shouldn't trigger separate properties
 
-### 1. Numeric Constraints (`01-numeric-constraints.yaml`)
-Demonstrates OpenAPI 3.1 numeric constraints:
-- **Inclusive ranges**: `minimum`, `maximum` (≥, ≤)
-- **Exclusive ranges**: `exclusiveMinimum`, `exclusiveMaximum` (>, <)
-- **multipleOf**: Value must be a multiple of specified number
-- **Use case**: Temperature measurements, ratings, quantities
+## Test Files
 
-### 2. Array Contains (`02-array-contains.yaml`)
-Demonstrates array validation constraints:
-- **contains**: Schema that array items must contain
-- **minContains**: Minimum items matching contains schema
-- **maxContains**: Maximum items matching contains schema
-- **Use case**: Product tags, categorization
+### 1. 📄 test-property-reuse-same.yaml
+**Test Focus:** Property reuse with identical definitions
 
-### 3. Object Properties (`03-object-properties.yaml`)
-Demonstrates object property constraints:
-- **minProperties**: Minimum number of properties
-- **maxProperties**: Maximum number of properties
-- **patternProperties**: Properties matching regex patterns
-- **Use case**: Configuration objects, settings
+**Scenario:** 4 schemas (User, Product, Order, Invoice) share common properties like `id`, `status`, `email` with identical types and constraints.
 
-### 4. Constant and Not (`04-constant-not.yaml`)
-Demonstrates constant and negation constraints:
-- **const**: Property must have exact constant value
-- **not**: Value must NOT match specified schema
-- **Use case**: API versions, status validation
+**Expected Outcome:**
+- ✅ 9 properties in library (not 20+)
+- ✅ Properties reused 2-4 times each
+- ✅ Import log shows: `Creating property: id (used as: id)`
 
-### 5. Dependent Schemas (`05-dependent-schemas.yaml`)
-Demonstrates conditional validation:
-- **dependentSchemas**: Apply schemas when trigger property present
-- **if/then/else**: Conditional schema application
-- **Use case**: Payment methods, credit card validation
-
-### 6. Dependent Required (`06-dependent-required.yaml`)
-Demonstrates dependent field requirements:
-- **dependentRequired**: Properties required when trigger present
-- **Use case**: Billing addresses, shipping information
-
-### 7. Nullable Types (`07-nullable-types.yaml`)
-Demonstrates OpenAPI 3.1 nullable types:
-- **Type arrays**: `type: [string, "null"]` format
-- Replaces deprecated `nullable: true` from OpenAPI 3.0
-- **Visual indicator**: Shows "?" in UI
-- **Use case**: Optional user profile fields
-
-### 8. Multiple Examples (`08-multiple-examples.yaml`)
-Demonstrates multiple examples per property:
-- **examples**: Array of example values
-- **Auto-generation**: Schema-based example generation
-- **Use case**: Product catalog, varied data samples
-
-### 9. Unevaluated Properties (`09-unevaluated-properties.yaml`)
-Demonstrates advanced inheritance control:
-- **unevaluatedProperties**: Control for properties not matched by:
-  - `properties`
-  - `patternProperties`
-  - Inherited schemas (allOf, oneOf, anyOf)
-- **Use case**: Strict inheritance, flexible extensions
-
-### 10. If-Then-Else (`10-if-then-else.yaml`)
-Demonstrates conditional schema composition:
-- **if/then/else**: Nested conditional validation
-- **Complex conditions**: Multiple condition branches
-- **Use case**: Vehicle types, conditional requirements
-
-### 11. Unevaluated Items (`11-unevaluated-items.yaml`)
-Demonstrates array item validation:
-- **unevaluatedItems**: Control items beyond prefixItems
-- **Strict tuples**: No additional items allowed
-- **Flexible tuples**: Typed additional items
-- **Use case**: Coordinates, structured arrays
-
-### 12. Additional Properties with References (`12-additional-properties-ref.yaml`)
-Demonstrates schema references in additionalProperties:
-- **additionalProperties**: Schema references via `$ref`
-- **Typed dictionaries**: All properties match schema
-- **Use case**: Metadata objects, dynamic properties
-
-### 13. Property Name Constraints (`13-property-name-constraints.yaml`)
-Demonstrates property name validation:
-- **propertyNames**: Schema for property names
-- **format**: Email, UUID, etc.
-- **pattern**: Regex validation
-- **minLength/maxLength**: Name length constraints
-- **Use case**: Email-keyed objects, UUID keys
-
-### 14. Custom Extensions (`14-custom-extensions.yaml`)
-Demonstrates custom x- tags:
-- **Schema-level**: `x-version`, `x-team-owner`
-- **Property-level**: `x-database-column`, `x-indexed`
-- **Metadata**: Custom business logic annotations
-- **Use case**: Database mapping, internal metadata
-
-### 15. External Documentation (`15-external-docs.yaml`)
-Demonstrates external documentation links:
-- **Schema-level**: Documentation portals
-- **Property-level**: Field-specific guides
-- **externalDocs**: URL and description
-- **Use case**: API documentation, reference materials
-
-### 16. Discriminator Mapping (`16-discriminator-mapping.yaml`)
-Demonstrates polymorphism with discriminators:
-- **discriminator**: Type discrimination
-- **propertyName**: Discriminator field
-- **mapping**: Type to schema mappings
-- **x- extensions**: Custom discriminator metadata
-- **Use case**: Pet types, vehicle inheritance
-
-### 17. Deprecated Features (`17-deprecated-features.yaml`)
-Demonstrates deprecation marking:
-- **Schema deprecation**: Entire schemas marked deprecated
-- **Property deprecation**: Individual fields
-- **x-deprecated-since**: Custom deprecation metadata
-- **x-migration-guide**: Migration documentation
-- **Use case**: Legacy API versions, field migration
-
-### 18. Prefix Items (Tuples) (`18-prefix-items-tuples.yaml`)
-Demonstrates ordered array schemas:
-- **prefixItems**: Define schemas for specific positions
-- **Tuple mode**: `[string, number, boolean]`
-- **Position-specific types**: Each index has its schema
-- **items**: Control additional items beyond prefix
-- **Use cases**:
-  - Coordinates (2D, 3D)
-  - CSV rows
-  - Function arguments
-  - Database rows
-
-### 19. Enumeration Sorting (`19-enumeration-sorting.yaml`)
-Demonstrates enumeration orderings:
-- **Ascending order**: Priority levels, sizes
-- **Descending order**: Reverse alphabetical
-- **Logical order**: Status workflows, months
-- **Numeric enums**: Sorted numbers
-- **Use case**: Dropdown options, status values
-
-### 20. Comprehensive Features (`20-comprehensive-features.yaml`)
-Demonstrates multiple features in one schema:
-- Combines 15+ different constraint types
-- Complex nested validation
-- Multiple conditional schemas
-- Real-world order processing example
-- **Use case**: Complete integration testing
+**What This Tests:**
+- Basic deduplication working
+- Same signature = same property
+- Proper library creation
 
 ---
 
-## Usage
+### 2. 📄 test-property-conflict-diff.yaml
+**Test Focus:** Property conflicts with different definitions
 
-### Importing Examples
-1. Navigate to Objectified Studio
-2. Click "Import" or "Open"
-3. Select any example file
-4. Schema will be loaded into canvas
+**Scenario:** 4 schemas (Customer, Transaction, Shipment, Document) use properties with the same name but completely different definitions.
 
-### Testing Features
-Each example is designed to test specific UI/UX features:
-- Property constraints visualization
-- Nullable type indicators ("?")
-- Multiple examples display
-- Deprecation warnings
-- External documentation links
-- Custom x- tag display
+Examples:
+- `id`: UUID vs int64 vs patterned string
+- `status`: Different enum values
+- `metadata`: Object vs string vs array
 
-### Validation Testing
-Use these examples to validate:
-- Import functionality
-- Schema rendering
-- Constraint enforcement
-- Export accuracy (OpenAPI, JSON Schema, Arazzo)
-- Code generation
+**Expected Outcome:**
+- ✅ 14 properties in library
+- ✅ All usage counts = 1 (no reuse)
+- ✅ Each variant creates separate library entry
+
+**What This Tests:**
+- Conflict detection working
+- Different signature = separate property
+- Type/constraint differences handled
 
 ---
 
-## OpenAPI 3.1 Feature Coverage
+### 3. 📄 test-property-mixed.yaml
+**Test Focus:** Realistic mix of reuse and conflicts
 
-| Feature | Example File(s) | Status |
-|---------|----------------|--------|
-| Numeric constraints (inclusive) | 01, 20 | ✅ |
-| Numeric constraints (exclusive) | 01, 20 | ✅ |
-| multipleOf | 01, 20 | ✅ |
-| Array contains | 02, 20 | ✅ |
-| minContains/maxContains | 02, 20 | ✅ |
-| minProperties/maxProperties | 03, 20 | ✅ |
-| const | 04, 20 | ✅ |
-| not | 04, 20 | ✅ |
-| patternProperties | 03, 20 | ✅ |
-| dependentSchemas | 05, 20 | ✅ |
-| dependentRequired | 06, 20 | ✅ |
-| Nullable types (type array) | 07, 20 | ✅ |
-| Multiple examples | 08, 20 | ✅ |
-| unevaluatedProperties | 09, 20 | ✅ |
-| if/then/else | 10, 20 | ✅ |
-| unevaluatedItems | 11, 20 | ✅ |
-| additionalProperties with $ref | 12, 20 | ✅ |
-| propertyNames constraints | 13, 20 | ✅ |
-| Custom x- extensions | 14, 20 | ✅ |
-| External documentation | 15, 20 | ✅ |
-| Discriminator mapping | 16 | ✅ |
-| Deprecated schemas | 17 | ✅ |
-| Deprecated properties | 17, 20 | ✅ |
-| prefixItems (tuples) | 18, 20 | ✅ |
-| Enumeration ordering | 19, 20 | ✅ |
+**Scenario:** 4 schemas (Person, Employee, Contract, Vendor) with some shared properties (uuid id, email) and some conflicts (different id types, age constraints).
+
+**Expected Outcome:**
+- ✅ 16 properties in library
+- ✅ 5 properties reused (2-3 times each)
+- ✅ 11 properties unique (1 time each)
+
+**What This Tests:**
+- Combined scenario handling
+- Correct identification of reuse vs conflict
+- Most realistic use case
 
 ---
 
-## Test Scenarios
+### 4. 📄 test-property-edge-cases.yaml
+**Test Focus:** Subtle edge cases
 
-### Basic Import Test
+**Scenario:** 3 schemas (Article, NewsPost, VideoPost) testing:
+- Description differences (should NOT create separate properties)
+- Constraint differences (should create separate properties)
+- Nested structure differences (should create separate properties)
+
+**Expected Outcome:**
+- ✅ 9 properties in library
+- ✅ `content` reused 3x (despite description differences)
+- ✅ `title` variants separate (different maxLength)
+- ✅ Nested `author` variants separate
+
+**What This Tests:**
+- Description metadata vs schema definition
+- Constraint sensitivity
+- Nested object handling
+
+---
+
+## Quick Start
+
+### Run All Tests
+
 ```bash
-# Import each example file
-for file in examples/*.yaml; do
-  echo "Testing: $file"
-  # Import via UI or API
-done
+# 1. Start the application
+yarn --cwd objectified/objectified-ui dev
+
+# 2. Navigate to: ADE → Dashboard → Projects → Import
+
+# 3. Import each test file:
+#    - 28-test-property-reuse-same.yaml
+#    - 25-test-property-conflict-diff.yaml
+#    - 27-test-property-mixed.yaml
+#    - 26-test-property-edge-cases.yaml
+
+# 4. For each import:
+#    a. Upload YAML file
+#    b. Review analysis
+#    c. Select all schemas in preview
+#    d. Click "Import →"
+#    e. Monitor Live Progress and Import Log
 ```
 
-### Feature Validation Test
-1. **Nullable Types**: Check for "?" indicator in UI
-2. **Multiple Examples**: Verify example carousel/list
-3. **Deprecation**: Verify warning badges/strikethrough
-4. **External Docs**: Check for documentation links
-5. **Custom x-**: Verify custom tags display
+### Expected Import Log Output
 
-### Export Validation Test
-1. Import example
-2. Export as OpenAPI
-3. Compare with original
-4. Export as JSON Schema
-5. Validate against JSON Schema Draft 2020-12
+**For test-property-reuse-same.yaml:**
+```
+CREATING_PROPERTIES: Creating 9 unique properties in library
+DEBUG_PROPERTY: Creating property: id (used as: id)
+DEBUG_PROPERTY: Creating property: name (used as: name)
+DEBUG_PROPERTY: Creating property: email (used as: email)
+...
+CLASS_CREATED: Imported class: User
+CLASS_CREATED: Imported class: Product
+CLASS_CREATED: Imported class: Order
+CLASS_CREATED: Imported class: Invoice
+```
 
-### Canvas Rendering Test
-1. Import comprehensive example (20)
-2. Verify all classes render
-3. Check property display
-4. Validate relationships
-5. Test layout algorithms
-
----
-
-## Example Complexity Matrix
-
-| Example | Lines | Schemas | Features | Complexity |
-|---------|-------|---------|----------|------------|
-| 01 | 30 | 1 | 3 | Simple |
-| 02 | 40 | 1 | 3 | Simple |
-| 03 | 45 | 1 | 3 | Simple |
-| 04 | 50 | 1 | 2 | Simple |
-| 05 | 75 | 1 | 2 | Medium |
-| 06 | 50 | 1 | 1 | Simple |
-| 07 | 55 | 1 | 1 | Simple |
-| 08 | 60 | 1 | 1 | Simple |
-| 09 | 65 | 3 | 2 | Medium |
-| 10 | 70 | 1 | 1 | Medium |
-| 11 | 60 | 3 | 1 | Medium |
-| 12 | 70 | 3 | 1 | Medium |
-| 13 | 75 | 3 | 4 | Medium |
-| 14 | 65 | 1 | 10+ | Medium |
-| 15 | 80 | 1 | 1 | Simple |
-| 16 | 100 | 4 | 3 | Complex |
-| 17 | 90 | 2 | 2 | Simple |
-| 18 | 160 | 5 | 1 | Complex |
-| 19 | 75 | 1 | 7 | Simple |
-| 20 | 250+ | 1 | 15+ | Very Complex |
+**For test-property-conflict-diff.yaml:**
+```
+CREATING_PROPERTIES: Creating 14 unique properties in library
+DEBUG_PROPERTY: Creating property: id (used as: id)
+DEBUG_PROPERTY: Creating property: id (used as: id)
+DEBUG_PROPERTY: Creating property: id (used as: id)
+...
+(14 separate property creations)
+```
 
 ---
 
-## Best Practices
+## Verification
 
-### When Creating Examples
-1. **Keep it simple**: One or two features per example
-2. **Use realistic names**: "Product", "Order", "User"
-3. **Include multiple examples**: Show variety in data
-4. **Add descriptions**: Explain what's being demonstrated
-5. **Test edge cases**: Min/max values, nulls, empty arrays
+### Method 1: Check Import Log
 
-### When Using Examples
-1. **Start simple**: Test basic features first
-2. **Validate thoroughly**: Check all constraints work
-3. **Test export**: Ensure round-trip accuracy
-4. **Check UI**: Verify proper rendering
-5. **Document issues**: Report any problems found
+Look for the `CREATING_PROPERTIES` event:
+```
+✅ test-property-reuse-same.yaml → "Creating 9 unique properties"
+✅ test-property-conflict-diff.yaml → "Creating 14 unique properties"
+✅ test-property-mixed.yaml → "Creating 16 unique properties"
+✅ test-property-edge-cases.yaml → "Creating 9 unique properties"
+```
+
+### Method 2: Database Query
+
+```sql
+-- Count properties in library
+SELECT COUNT(*) FROM odb.properties 
+WHERE project_id = '<imported-project-id>';
+
+-- See reuse pattern
+SELECT 
+  p.name,
+  p.description,
+  COUNT(cp.id) as usage_count
+FROM odb.properties p
+LEFT JOIN odb.class_properties cp ON cp.property_id = p.id
+WHERE p.project_id = '<imported-project-id>'
+GROUP BY p.id, p.name, p.description
+ORDER BY usage_count DESC, p.name;
+```
+
+### Method 3: Studio Code View
+
+1. Open imported project in Studio
+2. Switch to "Code" view
+3. Select "OpenAPI Specification"
+4. Verify properties have descriptions
+5. Check that identical properties appear the same across schemas
+
+---
+
+## Test Results Reference
+
+| Test File | Expected Properties | Key Validation |
+|-----------|-------------------|----------------|
+| reuse-same | 9 | High reuse counts (2-4x) |
+| conflict-diff | 14 | All count=1, no reuse |
+| mixed | 16 | 5 reused, 11 unique |
+| edge-cases | 9 | content reused 3x |
+
+---
+
+## Common Issues & Solutions
+
+### ❌ Issue: Too many properties created
+**Symptom:** 20+ properties instead of 9
+**Cause:** Descriptions included in signature matching
+**Solution:** Verify signature generation excludes description field
+
+### ❌ Issue: Properties not reused when they should be
+**Symptom:** All usage counts = 1
+**Cause:** Signature matching too strict or inconsistent
+**Solution:** Check JSON.stringify produces consistent output
+
+### ❌ Issue: Conflicts not detected
+**Symptom:** Different definitions being reused
+**Cause:** Signature matching too loose
+**Solution:** Ensure all relevant fields included in signature
+
+---
+
+## Additional Resources
+
+- **Comprehensive Test Guide:** `../docs/PROPERTY_DEDUPLICATION_TEST_SUITE.md`
+- **Quick Reference:** `TEST_QUICK_REFERENCE.md`
+- **Implementation Docs:** `../docs/PROPERTY_LIBRARY_NAMING.md`
+
+---
+
+## Test Status
+
+| Date | Test | Result | Notes |
+|------|------|--------|-------|
+| 2024-12-24 | Initial Creation | ⏳ Pending | Test files created |
+| | reuse-same | ⏳ | Awaiting execution |
+| | conflict-diff | ⏳ | Awaiting execution |
+| | mixed | ⏳ | Awaiting execution |
+| | edge-cases | ⏳ | Awaiting execution |
 
 ---
 
 ## Contributing
 
-To add new examples:
-1. Create new `.yaml` file with sequential number
-2. Focus on specific feature(s)
-3. Include comprehensive examples
-4. Add documentation to this README
-5. Test import/export thoroughly
+When adding new test cases:
+
+1. **Name clearly:** `test-property-<scenario>.yaml`
+2. **Document expected behavior** in file comments
+3. **Add to this README** with expected counts
+4. **Update test guide** with verification steps
+5. **Run and document results**
 
 ---
 
-## Related Documentation
+## Success Criteria
 
-- [OpenAPI 3.1 Specification](https://spec.openapis.org/oas/v3.1.0)
-- [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core.html)
-- [Objectified Documentation](https://docs.example.com)
-- [YouTube Tutorials](https://www.youtube.com/@objectifieddev)
-
----
-
-## Advanced Composition Examples (Import Testing)
-
-### 21. allOf Inheritance (`21-advanced-allof-inheritance.yaml`) ⭐ ADVANCED
-Demonstrates complex inheritance hierarchies using allOf:
-- **Base entities**: Common properties with BaseEntity
-- **Auditable entities**: Adds audit trail to base
-- **Multi-level inheritance**: Animal → Pet → Dog/Cat
-- **Nested composition**: Vaccination extends AuditableEntity
-- **Real-world pattern**: Veterinary clinic management system
-- **Schema count**: 12 schemas with 3-4 levels of inheritance
-- **Use case**: Testing allOf import, inheritance visualization, type hierarchies
-
-**Key Features:**
-- BaseEntity (id, createdAt, updatedAt)
-- AuditableEntity extends BaseEntity
-- Animal extends BaseEntity
-- Pet extends Animal
-- Dog/Cat extend Pet
-- User with nested Address and EmergencyContact
-- MedicalDocument with multiple allOf schemas
-
-### 22. oneOf Polymorphism (`22-advanced-oneof-polymorphism.yaml`) ⭐ ADVANCED
-Demonstrates polymorphism and exclusive choice patterns using oneOf:
-- **Payment methods**: Credit card, bank transfer, PayPal, cryptocurrency
-- **Notification channels**: Email, SMS, push, webhook
-- **Document types**: Text, image, video, audio
-- **Discriminator support**: Type-safe polymorphism
-- **Real-world pattern**: Payment processing system
-- **Schema count**: 16 schemas with discriminated unions
-- **Use case**: Testing oneOf import, polymorphism detection, variant types
-
-**Key Features:**
-- Payment with oneOf for different payment methods
-- Notification with oneOf for delivery channels
-- Document with oneOf for content types
-- Discriminator fields for type identification
-- Const values for type discrimination
-
-### 23. anyOf Flexible Matching (`23-advanced-anyof-flexible.yaml`) ⭐ ADVANCED
-Demonstrates flexible schema matching using anyOf:
-- **Contact methods**: Multiple ways to reach someone (email, phone, address, social)
-- **Search criteria**: Flexible query parameters (at least one required)
-- **Product pricing**: Multiple pricing models (fixed, tiered, subscription, auction)
-- **Media formats**: Content in multiple formats simultaneously
-- **Verification methods**: Multiple identity verification options
-- **Real-world pattern**: Contact management and flexible search
-- **Schema count**: 24 schemas with flexible validation
-- **Use case**: Testing anyOf import, optional combinations, multi-format support
-
-**Key Features:**
-- ContactInfo with anyOf for contact methods
-- SearchCriteria with anyOf required fields
-- Product with anyOf pricing models
-- MediaContent with anyOf format support
-- UserProfile with anyOf verification methods
-
-### 24. Combined Composition (`24-advanced-combined-composition.yaml`) ⭐ ADVANCED
-Demonstrates all three patterns working together:
-- **allOf**: Product hierarchy with inheritance
-- **oneOf**: Exclusive payment and shipping methods
-- **anyOf**: Flexible availability and contact preferences
-- **Complex nesting**: Multiple patterns in single schema
-- **Real-world pattern**: Complete e-commerce system
-- **Schema count**: 30+ schemas with mixed composition
-- **Use case**: Testing complex imports, combined pattern detection, real-world scenarios
-
-**Key Features:**
-- Product extends BaseEntity with allOf
-- ElectronicsProduct/ClothingProduct extend Product
-- Order with oneOf for payment and shipping
-- Availability with anyOf for multiple states
-- Customer with allOf base + anyOf preferences + oneOf loyalty tier
-- Complete type hierarchy with all composition patterns
+All tests pass when:
+- ✅ Property counts match expected values
+- ✅ Reuse patterns match expected patterns
+- ✅ No import errors in logs
+- ✅ Descriptions preserved
+- ✅ Round-trip (import → export → import) maintains integrity
+- ✅ Studio Code view generates correct OpenAPI spec
 
 ---
 
-## Testing the Advanced Examples
-
-### Import Testing Workflow:
-1. **Navigate to Import**: Dashboard → Import button
-2. **Select File**: Choose one of the advanced examples (21-24)
-3. **Analyze**: Review detected composition patterns
-4. **Verify Metrics**:
-   - Check "Schema Composition" shows correct counts
-   - Verify allOf/oneOf/anyOf badges appear
-   - Confirm schema count matches specification
-5. **Preview Schemas**: Select schemas with composition
-6. **Switch Views**: Test JSON/YAML views in Monaco Editor
-7. **Import**: Complete import process
-8. **Validate**: Check imported schema relationships
-
-### Expected Results:
-
-**Example 21 (allOf Inheritance):**
-- ✅ Should show: allOf: 8 (or more)
-- ✅ Should detect: Multi-level inheritance chains
-- ✅ Should import: BaseEntity → AuditableEntity → Animal → Pet → Dog/Cat
-
-**Example 22 (oneOf Polymorphism):**
-- ✅ Should show: oneOf: 4 (or more)
-- ✅ Should detect: Discriminator fields
-- ✅ Should import: Payment variants, Notification variants, Document variants
-
-**Example 23 (anyOf Flexible):**
-- ✅ Should show: anyOf: 5 (or more)
-- ✅ Should detect: Flexible validation patterns
-- ✅ Should import: ContactInfo, SearchCriteria, Product with multiple pricing
-
-**Example 24 (Combined):**
-- ✅ Should show: allOf: 5+, oneOf: 8+, anyOf: 2+
-- ✅ Should detect: All three composition patterns
-- ✅ Should import: Complete e-commerce schema hierarchy
-
-### Composition Pattern Visual Indicators:
-Look for these in the Analysis screen:
-```
-Schema Composition:  [allOf: 8]  [oneOf: 4]  [anyOf: 5]
-                     └blue───┘   └purple──┘  └indigo─┘
-```
-
----
-
-**Last Updated**: December 23, 2024
-
-**Total Examples**: 24 files  
-**Total Features Covered**: 20+ OpenAPI 3.1 features + 4 advanced composition patterns  
-**Use Cases**: Testing, validation, learning, documentation, import functionality testing
+Generated: December 24, 2024
 

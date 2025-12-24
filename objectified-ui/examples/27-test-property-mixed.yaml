@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: Property Mixed Test - Reuse and Conflicts Combined
+  version: 1.0.0
+  description: |
+    This spec combines both scenarios - some properties are reused (same definition)
+    while others conflict (different definitions). This is the most realistic scenario.
+
+components:
+  schemas:
+    Person:
+      type: object
+      description: Person entity
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique person identifier
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Person's first name
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Person's last name
+        email:
+          type: string
+          format: email
+          description: Contact email
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+          description: Person's age in years
+        tags:
+          type: array
+          description: Person tags
+          items:
+            type: string
+      required:
+        - id
+        - email
+
+    Employee:
+      type: object
+      description: Employee record
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique employee identifier (SAME as Person)
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Employee's first name (SAME as Person)
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Employee's last name (SAME as Person)
+        email:
+          type: string
+          format: email
+          description: Work email (SAME format as Person)
+        employeeId:
+          type: string
+          pattern: "^EMP-[0-9]{5}$"
+          description: Employee ID number
+        age:
+          type: integer
+          minimum: 18
+          maximum: 70
+          description: Employee age (DIFFERENT - min 18 for employment)
+        tags:
+          type: array
+          description: Employee tags (SAME as Person)
+          items:
+            type: string
+      required:
+        - id
+        - employeeId
+
+    Contract:
+      type: object
+      description: Employment contract
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Contract ID (DIFFERENT - integer not UUID)
+        firstName:
+          type: string
+          description: Contractor first name (DIFFERENT - no constraints)
+        lastName:
+          type: string
+          description: Contractor last name (DIFFERENT - no constraints)
+        email:
+          type: string
+          pattern: "^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$"
+          description: Contract email (DIFFERENT - pattern not format)
+        duration:
+          type: integer
+          minimum: 1
+          maximum: 60
+          description: Contract duration in months
+        tags:
+          type: object
+          description: Contract tags as key-value pairs (DIFFERENT - object not array)
+          additionalProperties:
+            type: string
+      required:
+        - id
+        - duration
+
+    Vendor:
+      type: object
+      description: Vendor/supplier record
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique vendor identifier (SAME as Person/Employee)
+        companyName:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Vendor company name
+        email:
+          type: string
+          format: email
+          description: Vendor contact email (SAME as Person/Employee)
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Vendor rating
+        tags:
+          type: array
+          description: Vendor tags (SAME as Person/Employee)
+          items:
+            type: string
+      required:
+        - id
+        - companyName
+
+# Expected behavior:
+# Property library should contain:
+#
+# REUSED PROPERTIES (same signature across multiple schemas):
+#   * id (uuid) - used by Person, Employee, Vendor (3 times)
+#   * firstName (string, min 1, max 50) - used by Person, Employee (2 times)
+#   * lastName (string, min 1, max 50) - used by Person, Employee (2 times)
+#   * email (email format) - used by Person, Employee, Vendor (3 times)
+#   * tags (array of strings) - used by Person, Employee, Vendor (3 times)
+#
+# SEPARATE PROPERTIES (different signatures):
+#   * id (int64) - used by Contract (DIFFERENT from uuid)
+#   * firstName (no constraints) - used by Contract (DIFFERENT from Person/Employee)
+#   * lastName (no constraints) - used by Contract (DIFFERENT from Person/Employee)
+#   * email (pattern) - used by Contract (DIFFERENT from format)
+#   * age (0-150) - used by Person (DIFFERENT from Employee)
+#   * age (18-70) - used by Employee (DIFFERENT from Person)
+#   * tags (object) - used by Contract (DIFFERENT from array)
+#   * employeeId - unique to Employee
+#   * duration - unique to Contract
+#   * companyName - unique to Vendor
+#   * rating - unique to Vendor
+#
+# Total: 5 reused properties + 11 unique properties = 16 property library entries
+#
+# This tests:
+# 1. Correct reuse when properties match exactly
+# 2. Separate properties when they differ (even slightly)
+# 3. Mixed scenario handling (realistic use case)
+

@@ -1,0 +1,140 @@
+openapi: 3.1.0
+info:
+  title: Property Reuse Test - Same Definitions
+  version: 1.0.0
+  description: |
+    This spec tests property reuse where multiple schemas use properties
+    with the same name AND the same definition. The importer should create
+    ONE property in the library and reuse it across all classes.
+
+components:
+  schemas:
+    User:
+      type: object
+      description: User account information
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        name:
+          type: string
+          description: Full name of the user
+        email:
+          type: string
+          format: email
+          description: Email address
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+          description: Account status
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+      required:
+        - id
+        - email
+
+    Product:
+      type: object
+      description: Product catalog item
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        name:
+          type: string
+          description: Full name of the product
+        description:
+          type: string
+          description: Product description
+        price:
+          type: number
+          format: double
+          description: Product price in USD
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+          description: Product availability status
+        createdAt:
+          type: string
+          format: date-time
+          description: Product creation timestamp
+      required:
+        - id
+        - name
+        - price
+
+    Order:
+      type: object
+      description: Customer order
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+          description: Order status
+        total:
+          type: number
+          format: double
+          description: Order total amount
+        email:
+          type: string
+          format: email
+          description: Customer email address
+        createdAt:
+          type: string
+          format: date-time
+          description: Order creation timestamp
+      required:
+        - id
+        - total
+
+    Invoice:
+      type: object
+      description: Customer invoice
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        amount:
+          type: number
+          format: double
+          description: Invoice amount
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+          description: Invoice payment status
+        email:
+          type: string
+          format: email
+          description: Billing email address
+        createdAt:
+          type: string
+          format: date-time
+          description: Invoice creation timestamp
+      required:
+        - id
+        - amount
+
+# Expected behavior:
+# - Property library should contain:
+#   * id (uuid string) - used 4 times
+#   * name (string) - used 2 times
+#   * email (email string) - used 3 times
+#   * status (enum) - used 4 times
+#   * createdAt (date-time) - used 4 times
+#   * description (string) - used 1 time
+#   * price (double) - used 1 time
+#   * total (double) - used 1 time
+#   * amount (double) - used 1 time
+#
+# - Each schema should link to the reused properties
+# - Import log should show property deduplication working correctly
+

@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: Property Edge Cases Test
+  version: 1.0.0
+  description: |
+    This spec tests edge cases in property handling:
+    - Same name, same type, but different descriptions
+    - Properties with nested objects
+    - Properties with array items that differ
+    - Properties with additional constraints
+
+components:
+  schemas:
+    Article:
+      type: object
+      description: Blog article
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          description: Article title (max 200 characters)
+        content:
+          type: string
+          description: Article main content in markdown
+        author:
+          type: object
+          description: Article author information
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+        comments:
+          type: array
+          description: Article comments
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              userId:
+                type: string
+                format: uuid
+      required:
+        - title
+        - author
+
+    NewsPost:
+      type: object
+      description: News post
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          description: News headline (max 200 characters - SAME constraint as Article)
+        content:
+          type: string
+          description: News body text in plain text (DIFFERENT description)
+        author:
+          type: object
+          description: News author details (DIFFERENT nested structure)
+          properties:
+            name:
+              type: string
+            bio:
+              type: string
+        comments:
+          type: array
+          description: News comments (DIFFERENT item structure)
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              author:
+                type: string
+      required:
+        - title
+
+    VideoPost:
+      type: object
+      description: Video post
+      properties:
+        title:
+          type: string
+          maxLength: 150
+          description: Video title (DIFFERENT max length)
+        content:
+          type: string
+          description: Video description (SAME description text as NewsPost)
+        author:
+          type: object
+          description: Video creator information (SAME nested structure as Article)
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+        comments:
+          type: array
+          description: Video comments
+          items:
+            type: string
+      required:
+        - title
+        - author
