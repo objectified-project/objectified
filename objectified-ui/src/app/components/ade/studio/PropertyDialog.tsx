@@ -57,6 +57,8 @@ export interface PropertyItem {
   additionalProperties?: boolean | any;
   minProperties?: number;
   maxProperties?: number;
+  patternProperties?: Record<string, any>;
+  dependentSchemas?: Record<string, any>;
   // Tuple mode (OpenAPI 3.1)
   tupleMode?: boolean;
   prefixItems?: any[]; // OpenAPI 3.1: Array of schemas for specific positions
@@ -241,6 +243,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         propertyNamesPattern: minMaxSource.propertyNames?.pattern || '',
         propertyNamesMinLength: minMaxSource.propertyNames?.minLength?.toString() || '',
         propertyNamesMaxLength: minMaxSource.propertyNames?.maxLength?.toString() || '',
+        // Dependent Schemas (JSON Schema 2019-09+)
+        dependentSchemas: minMaxSource.dependentSchemas || undefined,
         // NOT composition (OpenAPI 3.1)
         not: minMaxSource.not ? JSON.stringify(minMaxSource.not, null, 2) : '',
         // Extensions (x- prefixed properties)
@@ -721,6 +725,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               delete itemsSchema.patternProperties;
             }
 
+            // Handle dependentSchemas (JSON Schema 2019-09+)
+            if (formData.dependentSchemas && Object.keys(formData.dependentSchemas).length > 0) {
+              itemsSchema.dependentSchemas = formData.dependentSchemas;
+            } else {
+              delete itemsSchema.dependentSchemas;
+            }
+
             // Handle propertyNames constraints for object items (OpenAPI 3.1)
             const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
             if (hasPropertyNamesConstraints) {
@@ -855,6 +866,13 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             dataObject.patternProperties = formData.patternProperties;
           } else {
             delete dataObject.patternProperties;
+          }
+
+          // Handle dependentSchemas (JSON Schema 2019-09+)
+          if (formData.dependentSchemas && Object.keys(formData.dependentSchemas).length > 0) {
+            dataObject.dependentSchemas = formData.dependentSchemas;
+          } else {
+            delete dataObject.dependentSchemas;
           }
 
           // Handle propertyNames constraints (OpenAPI 3.1)

@@ -229,6 +229,9 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       propertyNamesMinLength: schema.propertyNames?.minLength?.toString() || '',
       propertyNamesMaxLength: schema.propertyNames?.maxLength?.toString() || '',
 
+      // Dependent Schemas (JSON Schema 2019-09+)
+      dependentSchemas: schema.dependentSchemas || undefined,
+
       // NOT composition (OpenAPI 3.1)
       not: schema.not ? JSON.stringify(schema.not, null, 2) : '',
 
@@ -363,6 +366,13 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         targetSchema.patternProperties = formData.patternProperties;
       } else {
         delete targetSchema.patternProperties;
+      }
+
+      // Handle dependentSchemas (JSON Schema 2019-09+)
+      if (formData.dependentSchemas && Object.keys(formData.dependentSchemas).length > 0) {
+        targetSchema.dependentSchemas = formData.dependentSchemas;
+      } else {
+        delete targetSchema.dependentSchemas;
       }
 
       // Handle unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects

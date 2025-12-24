@@ -189,7 +189,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema',
     additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
     patternProperties: [] as Array<{ pattern: string; schemaType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'ref'; schemaRef: string }>,
-    dependentSchemas: [] as Array<{ triggerProperty: string; schemaRef: string }>, // When triggerProperty is present, apply the referenced schema
+    dependentSchemas: {} as Record<string, any>, // Full dependent schemas objects (if/then/else, not just refs)
     dependentRequired: [] as Array<{ triggerProperty: string; requiredProperties: string[] }>, // When triggerProperty is present, these properties become required
     deprecated: false,
     deprecationMessage: '',
@@ -288,13 +288,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               });
             }
 
-            // Extract dependentSchemas
-            const dependentSchemasArray: Array<{ triggerProperty: string; schemaRef: string }> = [];
+            // Extract dependentSchemas - preserve full objects (if/then/else, not just refs)
+            const dependentSchemasObj: Record<string, any> = {};
             if (schema.dependentSchemas && typeof schema.dependentSchemas === 'object') {
-              Object.entries(schema.dependentSchemas).forEach(([triggerProperty, schemaValue]: [string, any]) => {
-                if (schemaValue.$ref) {
-                  dependentSchemasArray.push({ triggerProperty, schemaRef: schemaValue.$ref.split('/').pop() || '' });
-                }
+              Object.entries(schema.dependentSchemas).forEach(([key, value]) => {
+                dependentSchemasObj[key] = value;
               });
             }
 
@@ -321,7 +319,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
               patternProperties: patternPropsArray,
-              dependentSchemas: dependentSchemasArray,
+              dependentSchemas: dependentSchemasObj,
               dependentRequired: dependentRequiredArray,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
@@ -360,13 +358,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 }
               });
             }
-            // Extract dependentSchemas for error case
-            const dependentSchemasArrayError: Array<{ triggerProperty: string; schemaRef: string }> = [];
+            // Extract dependentSchemas for error case - preserve full objects
+            const dependentSchemasObjError: Record<string, any> = {};
             if (schema.dependentSchemas && typeof schema.dependentSchemas === 'object') {
-              Object.entries(schema.dependentSchemas).forEach(([triggerProperty, schemaValue]: [string, any]) => {
-                if (schemaValue.$ref) {
-                  dependentSchemasArrayError.push({ triggerProperty, schemaRef: schemaValue.$ref.split('/').pop() || '' });
-                }
+              Object.entries(schema.dependentSchemas).forEach(([key, value]) => {
+                dependentSchemasObjError[key] = value;
               });
             }
             // Extract dependentRequired for error case
@@ -391,7 +387,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
               patternProperties: patternPropsArrayError,
-              dependentSchemas: dependentSchemasArrayError,
+              dependentSchemas: dependentSchemasObjError,
               dependentRequired: dependentRequiredArrayError,
               deprecated: schema.deprecated || false,
               deprecationMessage: schema.deprecationMessage || '',
@@ -421,7 +417,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           additionalPropertiesType: 'default',
           additionalPropertiesSchema: '',
           patternProperties: [],
-          dependentSchemas: [],
+          dependentSchemas: {},
           dependentRequired: [],
           deprecated: false,
           deprecationMessage: '',
@@ -492,17 +488,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     }
 
     // Add dependentSchemas if defined
-    if (formData.dependentSchemas.length > 0) {
-      schema.dependentSchemas = {};
-      formData.dependentSchemas.forEach(({ triggerProperty, schemaRef }) => {
-        if (triggerProperty.trim() && schemaRef) {
-          schema.dependentSchemas[triggerProperty] = { $ref: `#/components/schemas/${schemaRef}` };
-        }
-      });
-      // Remove dependentSchemas if empty after filtering
-      if (Object.keys(schema.dependentSchemas).length === 0) {
-        delete schema.dependentSchemas;
-      }
+    // Add dependentSchemas if defined - preserve full schema objects
+    if (Object.keys(formData.dependentSchemas).length > 0) {
+      schema.dependentSchemas = formData.dependentSchemas;
+    } else {
+      delete schema.dependentSchemas;
     }
 
     // Add dependentRequired if defined
@@ -1316,77 +1306,255 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setFormData(prev => ({
-                        ...prev,
-                        dependentSchemas: [...prev.dependentSchemas, { triggerProperty: '', schemaRef: '' }]
-                      }))}
+                      onClick={() => {
+                        const propertyName = prompt('Enter the trigger property name:');
+                        if (propertyName && propertyName.trim()) {
+                          setFormData(prev => ({
+                            ...prev,
+                            dependentSchemas: {
+                              ...prev.dependentSchemas,
+                              [propertyName.trim()]: {
+                                if: { properties: { [propertyName.trim()]: {} } },
+                                then: { required: [] },
+                                else: { required: [] }
+                              }
+                            }
+                          }));
+                        }
+                      }}
                     >
-                      <Plus size={14} className="mr-1" /> Add Dependency
+                      <Plus size={14} className="mr-1" /> Add Dependent Schema
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mb-4">When a trigger property is present, apply additional schema constraints.</p>
+                <p className="text-xs text-gray-500 mb-4">Define conditional validation: when a property has a specific value, apply additional constraints.</p>
 
-                {formData.dependentSchemas.length === 0 ? (
+                {Object.keys(formData.dependentSchemas).length === 0 ? (
                   <div className="p-6 text-center bg-white dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
                     <p className="text-sm text-gray-500">No dependent schemas defined.</p>
+                    <p className="text-xs text-gray-400 mt-1">Add conditional validation rules based on property values.</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {formData.dependentSchemas.map((depSchema, index) => (
-                      <div key={index} className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700 flex gap-3 items-end">
-                        <div className="flex-1 flex flex-col md:flex-row gap-3">
-                          <div className="flex-1 space-y-1">
-                            <Label>Trigger Property</Label>
-                            <Input
-                              value={depSchema.triggerProperty}
+                  <div className="space-y-4">
+                    {Object.entries(formData.dependentSchemas).map(([triggerProp, depSchema]: [string, any]) => {
+                      // Extract values from the schema structure
+                      const ifCondition = depSchema?.if?.properties?.[triggerProp] || depSchema?.if || {};
+                      const thenRequired = depSchema?.then?.required || [];
+                      const elseRequired = depSchema?.else?.required || [];
+                      const conditionValue = ifCondition?.const || ifCondition?.enum?.[0] || '';
+                      const conditionType = ifCondition?.const !== undefined ? 'const' : (ifCondition?.enum ? 'enum' : 'present');
+
+                      return (
+                        <div key={triggerProp} className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                          {/* Header with delete button */}
+                          <div className="flex gap-3 items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded text-sm font-mono font-semibold">
+                                {triggerProp}
+                              </span>
+                              <span className="text-sm text-gray-500">triggers conditional validation</span>
+                            </div>
+                            {!isReadOnly && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 h-8 w-8"
+                                onClick={() => {
+                                  const newDeps = { ...formData.dependentSchemas };
+                                  delete newDeps[triggerProp];
+                                  setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* IF Condition */}
+                          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded">IF</span>
+                              <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">{triggerProp}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              <Select
+                                value={conditionType}
+                                onValueChange={(val) => {
+                                  const newDeps = { ...formData.dependentSchemas };
+                                  const newSchema = { ...depSchema };
+                                  if (val === 'const') {
+                                    newSchema.if = { properties: { [triggerProp]: { const: conditionValue || '' } } };
+                                  } else if (val === 'enum') {
+                                    newSchema.if = { properties: { [triggerProp]: { enum: conditionValue ? [conditionValue] : [] } } };
+                                  } else {
+                                    newSchema.if = { properties: { [triggerProp]: {} }, required: [triggerProp] };
+                                  }
+                                  newDeps[triggerProp] = newSchema;
+                                  setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                }}
+                                disabled={isReadOnly}
+                              >
+                                <SelectTrigger className="w-[140px] h-8 text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="present">is present</SelectItem>
+                                  <SelectItem value="const">equals</SelectItem>
+                                  <SelectItem value="enum">is one of</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {(conditionType === 'const' || conditionType === 'enum') && (
+                                <Input
+                                  className="flex-1 min-w-[150px] h-8 text-sm"
+                                  value={conditionValue}
+                                  onChange={(e) => {
+                                    const newDeps = { ...formData.dependentSchemas };
+                                    const newSchema = { ...depSchema };
+                                    if (conditionType === 'const') {
+                                      newSchema.if = { properties: { [triggerProp]: { const: e.target.value } } };
+                                    } else {
+                                      newSchema.if = { properties: { [triggerProp]: { enum: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } } };
+                                    }
+                                    newDeps[triggerProp] = newSchema;
+                                    setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                  }}
+                                  placeholder={conditionType === 'enum' ? 'value1, value2, ...' : 'value'}
+                                  disabled={isReadOnly}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* THEN - Required Properties */}
+                          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded">THEN</span>
+                              <span className="text-sm text-green-700 dark:text-green-300">require these properties:</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              {thenRequired.map((prop: string, idx: number) => (
+                                <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-800/50 text-green-800 dark:text-green-200 rounded text-sm">
+                                  {prop}
+                                  {!isReadOnly && (
+                                    <button
+                                      className="ml-1 hover:text-red-500"
+                                      onClick={() => {
+                                        const newDeps = { ...formData.dependentSchemas };
+                                        const newSchema = { ...depSchema, then: { ...depSchema.then, required: thenRequired.filter((_: any, i: number) => i !== idx) } };
+                                        newDeps[triggerProp] = newSchema;
+                                        setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                      }}
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  )}
+                                </span>
+                              ))}
+                              {!isReadOnly && (
+                                <Select
+                                  value=""
+                                  onValueChange={(val) => {
+                                    if (val && !thenRequired.includes(val)) {
+                                      const newDeps = { ...formData.dependentSchemas };
+                                      const newSchema = { ...depSchema, then: { ...depSchema.then, required: [...thenRequired, val] } };
+                                      newDeps[triggerProp] = newSchema;
+                                      setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[150px] h-8 text-sm">
+                                    <SelectValue placeholder="+ Add property" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(editingClassData?.properties || [])
+                                      .filter((p: any) => !thenRequired.includes(p.name))
+                                      .map((p: any) => (
+                                        <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ELSE - Required Properties (Optional) */}
+                          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="px-2 py-0.5 bg-amber-500 text-white text-xs font-bold rounded">ELSE</span>
+                              <span className="text-sm text-amber-700 dark:text-amber-300">require these properties instead:</span>
+                              <span className="text-xs text-amber-600 dark:text-amber-400">(optional)</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              {elseRequired.map((prop: string, idx: number) => (
+                                <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200 rounded text-sm">
+                                  {prop}
+                                  {!isReadOnly && (
+                                    <button
+                                      className="ml-1 hover:text-red-500"
+                                      onClick={() => {
+                                        const newDeps = { ...formData.dependentSchemas };
+                                        const newSchema = { ...depSchema, else: { ...depSchema.else, required: elseRequired.filter((_: any, i: number) => i !== idx) } };
+                                        newDeps[triggerProp] = newSchema;
+                                        setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                      }}
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  )}
+                                </span>
+                              ))}
+                              {!isReadOnly && (
+                                <Select
+                                  value=""
+                                  onValueChange={(val) => {
+                                    if (val && !elseRequired.includes(val)) {
+                                      const newDeps = { ...formData.dependentSchemas };
+                                      const newSchema = { ...depSchema, else: { ...(depSchema.else || {}), required: [...elseRequired, val] } };
+                                      newDeps[triggerProp] = newSchema;
+                                      setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[150px] h-8 text-sm">
+                                    <SelectValue placeholder="+ Add property" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(editingClassData?.properties || [])
+                                      .filter((p: any) => !elseRequired.includes(p.name))
+                                      .map((p: any) => (
+                                        <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Show raw JSON toggle */}
+                          <details className="mt-3">
+                            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                              View/Edit Raw JSON
+                            </summary>
+                            <Textarea
+                              className="mt-2 font-mono text-xs"
+                              rows={6}
+                              value={JSON.stringify(depSchema, null, 2)}
                               onChange={(e) => {
-                                const newDeps = [...formData.dependentSchemas];
-                                newDeps[index] = { ...newDeps[index], triggerProperty: e.target.value };
-                                setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                try {
+                                  const parsed = JSON.parse(e.target.value);
+                                  const newDeps = { ...formData.dependentSchemas };
+                                  newDeps[triggerProp] = parsed;
+                                  setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
+                                } catch {
+                                  // Invalid JSON, don't update
+                                }
                               }}
                               disabled={isReadOnly}
-                              placeholder="e.g., paymentMethod"
                             />
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <Label>Required Schema</Label>
-                            <Select
-                              value={depSchema.schemaRef || '__none__'}
-                              onValueChange={(val) => {
-                                const newDeps = [...formData.dependentSchemas];
-                                newDeps[index] = { ...newDeps[index], schemaRef: val === '__none__' ? '' : val };
-                                setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
-                              }}
-                              disabled={isReadOnly}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select class..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">Select class...</SelectItem>
-                                {availableClasses.map((cls) => (
-                                  <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          </details>
                         </div>
-                        {!isReadOnly && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 h-9 w-9"
-                            onClick={() => {
-                              const newDeps = formData.dependentSchemas.filter((_, i) => i !== index);
-                              setFormData(prev => ({ ...prev, dependentSchemas: newDeps }));
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

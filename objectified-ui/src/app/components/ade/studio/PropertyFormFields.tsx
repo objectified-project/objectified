@@ -106,6 +106,9 @@ export interface PropertyFormData {
   propertyNamesMinLength?: string;
   propertyNamesMaxLength?: string;
 
+  // Composition constraints
+  dependentSchemas?: Record<string, any>; // Map of property names to conditional schemas
+
   // unevaluatedProperties (OpenAPI 3.1/JSON Schema 2020-12) - for objects
   unevaluatedProperties?: 'default' | 'allow' | 'disallow' | 'schema'; // Control for properties not matched by properties, patternProperties, or inherited schemas
   unevaluatedPropertiesSchema?: string; // JSON string of schema when unevaluatedProperties is 'schema'
@@ -2222,6 +2225,200 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   </Box>
                 </Box>
               )}
+            </Box>
+
+            {/* Dependent Schemas (JSON Schema 2019-09+) */}
+            <Box sx={{
+              mt: 2.5,
+              p: 2.5,
+              bgcolor: isDark ? '#0f172a' : 'white',
+              borderRadius: 2.5,
+              border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                mb: 2,
+                pb: 1.5,
+                borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
+              }}>
+                <Box sx={{
+                  p: 0.75,
+                  borderRadius: 1.5,
+                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <CodeIcon sx={{ color: '#6366f1', fontSize: 16 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                    Dependent Schemas
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Conditional schemas based on property values
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{
+                  px: 1,
+                  py: 0.25,
+                  bgcolor: 'rgba(99, 102, 241, 0.1)',
+                  color: '#4f46e5',
+                  borderRadius: 1,
+                  fontWeight: 600,
+                  fontSize: '0.65rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}>
+                  JSON Schema 2019-09
+                </Typography>
+              </Box>
+
+              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+                Define conditional validation schemas based on the value of a property. Each dependent schema applies when the property name matches.
+              </Typography>
+
+              {(() => {
+                const dependentSchemas = data.dependentSchemas || {};
+                const schemaEntries = Object.entries(dependentSchemas);
+
+                return (
+                  <Box>
+                    {schemaEntries.length > 0 && (
+                      <List sx={{ mb: 2, bgcolor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 2, p: 1 }}>
+                        {schemaEntries.map(([propName, depSchema], index) => (
+                          <ListItem
+                            key={index}
+                            sx={{
+                              borderBottom: index < schemaEntries.length - 1 ? '1px solid' : 'none',
+                              borderColor: isDark ? '#334155' : '#e2e8f0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'stretch',
+                              gap: 1,
+                              py: 1.5,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                                  fontSize: '0.85rem',
+                                  color: '#6366f1',
+                                  flex: 1,
+                                  bgcolor: isDark ? '#0f172a' : 'white',
+                                  px: 1,
+                                  py: 0.5,
+                                  borderRadius: 1,
+                                  border: '1px solid',
+                                  borderColor: isDark ? '#475569' : '#e2e8f0',
+                                }}
+                              >
+                                {propName}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const newSchemas = { ...dependentSchemas };
+                                  delete newSchemas[propName];
+                                  onChange('dependentSchemas', Object.keys(newSchemas).length > 0 ? newSchemas : undefined);
+                                }}
+                                sx={{ color: isDark ? '#94a3b8' : '#64748b' }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <PatternPropertySchemaEditor
+                              schemaValue={depSchema}
+                              onChange={(newSchema) => {
+                                const newSchemas = { ...dependentSchemas };
+                                newSchemas[propName] = newSchema;
+                                onChange('dependentSchemas', newSchemas);
+                              }}
+                              isDark={isDark}
+                              rows={5}
+                              size="small"
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    )}
+
+                    {(() => {
+                      const [newPropName, setNewPropName] = React.useState('');
+                      const [newDepSchema, setNewDepSchema] = React.useState({ if: {}, then: {}, else: {} } as any);
+
+                      return (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <TextField
+                            label="Property Name"
+                            size={size}
+                            fullWidth
+                            value={newPropName}
+                            onChange={(e) => setNewPropName(e.target.value)}
+                            placeholder="propertyName"
+                            helperText="The property that triggers this dependent schema"
+                            sx={{
+                              '& .MuiInputBase-input': {
+                                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                                fontSize: '0.85rem',
+                              },
+                              '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                              '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                            }}
+                          />
+                          <PatternPropertySchemaEditor
+                            schemaValue={newDepSchema}
+                            onChange={(newSchema) => setNewDepSchema(newSchema)}
+                            isDark={isDark}
+                            rows={5}
+                            size={size}
+                          />
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <IconButton
+                              size="small"
+                              disabled={!newPropName.trim()}
+                              onClick={() => {
+                                if (!newPropName.trim()) return;
+                                const schemaObj = typeof newDepSchema === 'string' ? JSON.parse(newDepSchema) : newDepSchema;
+                                const newSchemas = { ...(dependentSchemas || {}), [newPropName]: schemaObj };
+                                onChange('dependentSchemas', newSchemas);
+                                setNewPropName('');
+                                setNewDepSchema({ if: {}, then: {}, else: {} });
+                              }}
+                              sx={{
+                                bgcolor: '#6366f1',
+                                color: 'white',
+                                '&:hover': { bgcolor: '#4f46e5' },
+                                '&.Mui-disabled': { bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: isDark ? '#475569' : '#94a3b8' },
+                              }}
+                            >
+                              <AddIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      );
+                    })()}
+
+                    {schemaEntries.length === 0 && (
+                      <Box sx={{
+                        p: 2,
+                        bgcolor: 'rgba(99, 102, 241, 0.06)',
+                        borderRadius: 1.5,
+                        border: '1px dashed rgba(99, 102, 241, 0.3)',
+                      }}>
+                        <Typography variant="caption" sx={{ color: '#4f46e5' }}>
+                          <strong>Example:</strong> Define conditional validation for a property. If the property value matches, the dependent schema applies.
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })()}
             </Box>
 
             {/* Nested Properties Display */}
