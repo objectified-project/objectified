@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode } from 'lucide-react';
+import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
 import { Button } from '../../../components/ui/Button';
 import { AnalysisPanel } from './AnalysisPanel';
 import { PreviewPanel, ImportOptions } from './PreviewPanel';
-import { analyzeSpecification, AnalysisResult } from '../../../utils/openapi-analyzer';
+import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import ImportExecutionPanel from './ImportExecutionPanel';
 import { startImport, getImportStatus } from '../../../../../lib/db/import-actions';
 
@@ -34,6 +34,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [importOptions, setImportOptions] = useState<ImportOptions | null>(null);
@@ -61,6 +63,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setCurrentStep('source');
       setSelectedSource(null);
       setSelectedFile(null);
+      setFileMetadata(null);
     }
   };
 
@@ -74,6 +77,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setCurrentStep('source');
     setSelectedSource(null);
     setSelectedFile(null);
+    setFileMetadata(null);
     setAnalysisResult(null);
     setImportOptions(null);
     setJobId(null);
@@ -130,13 +134,29 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     }
   };
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     const validExtensions = ['.yaml', '.yml', '.json', '.zip'];
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
     if (validExtensions.includes(fileExtension)) {
       setSelectedFile(file);
+      setFileMetadata(null);
       console.log('File selected:', file.name);
+
+      // Extract metadata immediately for preview
+      if (fileExtension !== '.zip') {
+        setIsLoadingMetadata(true);
+        try {
+          const content = await file.text();
+          const metadata = extractFileMetadata(content);
+          setFileMetadata(metadata);
+          console.log('File metadata extracted:', metadata);
+        } catch (error) {
+          console.error('Error extracting metadata:', error);
+        } finally {
+          setIsLoadingMetadata(false);
+        }
+      }
     } else {
       console.error('Invalid file type');
       // TODO: Show error message
@@ -504,7 +524,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                           {(selectedFile.size / 1024).toFixed(2)} KB
                         </p>
                         <button
-                          onClick={() => setSelectedFile(null)}
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setFileMetadata(null);
+                          }}
                           className="text-sm text-red-600 dark:text-red-400 hover:underline"
                         >
                           Remove file
@@ -542,6 +565,137 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* File Metadata Preview */}
+              {selectedFile && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <FileCode className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    File Preview
+                  </h3>
+
+                  {isLoadingMetadata ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+                      <span className="ml-3 text-gray-600 dark:text-gray-400">Analyzing file...</span>
+                    </div>
+                  ) : fileMetadata ? (
+                    <div className="space-y-4">
+                      {/* Unsupported Format Warning */}
+                      {!fileMetadata.formatSupported && fileMetadata.format !== 'unknown' && (
+                        <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <div>
+                              <div className="font-medium text-amber-900 dark:text-amber-200">
+                                Format Not Available for Import
+                              </div>
+                              <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                The detected format <span className="font-semibold">{fileMetadata.formatDisplayName}</span> is not yet supported for import.
+                                Currently supported formats: OpenAPI 3.x, Swagger 2.x, and JSON Schema.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Parse Error */}
+                      {!fileMetadata.syntaxValid && (
+                        <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                            <div>
+                              <div className="font-medium text-red-900 dark:text-red-200">
+                                File Parse Error
+                              </div>
+                              <div className="text-sm text-red-700 dark:text-red-300 mt-1">
+                                {fileMetadata.parseError || 'Unable to parse file content'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Metadata Grid */}
+                      <div className="grid grid-cols-3 gap-4">
+                        {/* Format */}
+                        <div className={`rounded-lg p-4 border ${fileMetadata.formatSupported ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {fileMetadata.formatSupported ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            ) : (
+                              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            )}
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Detected Format
+                            </span>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {fileMetadata.formatDisplayName}
+                          </div>
+                        </div>
+
+                        {/* Spec Version */}
+                        <div className="rounded-lg p-4 border bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Version
+                            </span>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {fileMetadata.specVersion || fileMetadata.version || 'N/A'}
+                          </div>
+                        </div>
+
+                        {/* Syntax */}
+                        <div className={`rounded-lg p-4 border ${fileMetadata.syntaxValid ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {fileMetadata.syntaxValid ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            ) : (
+                              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            )}
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Syntax
+                            </span>
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {fileMetadata.syntaxValid ? `Valid ${fileMetadata.syntax.toUpperCase()}` : 'Invalid'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Title */}
+                      {fileMetadata.title && (
+                        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Title
+                          </span>
+                          <div className="text-base font-semibold text-gray-900 dark:text-white mt-1">
+                            {fileMetadata.title}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Description */}
+                      {fileMetadata.description && (
+                        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Description
+                          </span>
+                          <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 leading-relaxed line-clamp-3">
+                            {fileMetadata.description}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      <p className="text-sm">ZIP files will be analyzed after clicking Analyze</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
               );
             } else if (currentStep === 'analysis' && analysisResult) {
@@ -622,7 +776,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                 {currentStep === 'file-upload' && (
                   <Button
                     onClick={handleAnalyze}
-                    disabled={!selectedFile || isAnalyzing}
+                    disabled={!selectedFile || isAnalyzing || (fileMetadata !== null && !fileMetadata.formatSupported)}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
@@ -633,7 +787,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                     onClick={() => {
                       setCurrentStep('preview');
                     }}
-                    disabled={!analysisResult?.isValid}
+                    disabled={!analysisResult?.isValid || !analysisResult?.formatSupported}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     Next →

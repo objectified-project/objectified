@@ -7,11 +7,13 @@ import YAML from 'yaml';
 
 export interface AnalysisResult {
   isValid: boolean;
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'unknown';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'arazzo' | 'raml' | 'asyncapi' | 'unknown';
   version: string;
   syntax: 'json' | 'yaml';
   syntaxValid: boolean;
   schemaValid: boolean;
+  formatSupported: boolean;
+  formatDisplayName: string;
 
   // Metrics
   metrics: {
@@ -87,19 +89,87 @@ function parseContent(content: string, syntax: 'json' | 'yaml'): { valid: boolea
 }
 
 /**
+ * Format detection result with support status
+ */
+interface FormatDetectionResult {
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'arazzo' | 'raml' | 'asyncapi' | 'unknown';
+  version: string;
+  supported: boolean;
+  displayName: string;
+}
+
+/**
  * Detect specification format and version
  */
-function detectFormat(doc: any): { format: string; version: string } {
+function detectFormat(doc: any): FormatDetectionResult {
+  // OpenAPI 3.x
   if (doc.openapi) {
-    return { format: 'openapi', version: doc.openapi };
+    return {
+      format: 'openapi',
+      version: doc.openapi,
+      supported: true,
+      displayName: `OpenAPI ${doc.openapi}`
+    };
   }
+
+  // Swagger 2.x
   if (doc.swagger) {
-    return { format: 'swagger', version: doc.swagger };
+    return {
+      format: 'swagger',
+      version: doc.swagger,
+      supported: true,
+      displayName: `Swagger ${doc.swagger}`
+    };
   }
+
+  // JSON Schema
   if (doc.$schema) {
-    return { format: 'jsonschema', version: doc.$schema };
+    return {
+      format: 'jsonschema',
+      version: doc.$schema,
+      supported: true,
+      displayName: 'JSON Schema'
+    };
   }
-  return { format: 'unknown', version: 'unknown' };
+
+  // Arazzo - not yet supported for import
+  if (doc.arazzo) {
+    return {
+      format: 'arazzo',
+      version: doc.arazzo,
+      supported: false,
+      displayName: `Arazzo ${doc.arazzo}`
+    };
+  }
+
+  // RAML - detect by version header pattern (typically in YAML content)
+  // RAML files typically start with #%RAML version
+  if (doc['#%RAML'] || (typeof doc === 'object' && doc.title && doc.baseUri && doc.version)) {
+    const ramlVersion = doc['#%RAML'] || '1.0';
+    return {
+      format: 'raml',
+      version: ramlVersion,
+      supported: false,
+      displayName: `RAML ${ramlVersion}`
+    };
+  }
+
+  // AsyncAPI
+  if (doc.asyncapi) {
+    return {
+      format: 'asyncapi',
+      version: doc.asyncapi,
+      supported: false,
+      displayName: `AsyncAPI ${doc.asyncapi}`
+    };
+  }
+
+  return {
+    format: 'unknown',
+    version: 'unknown',
+    supported: false,
+    displayName: 'Unknown Format'
+  };
 }
 
 /**
@@ -445,6 +515,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
       syntax,
       syntaxValid: false,
       schemaValid: false,
+      formatSupported: false,
+      formatDisplayName: 'Unknown Format',
       metrics: {
         schemaCount: 0,
         propertyCount: 0,
@@ -480,10 +552,10 @@ export async function analyzeSpecification(fileContent: string, fileName: string
   const doc = parseResult.data;
 
   // Detect format
-  const { format, version } = detectFormat(doc);
+  const formatDetection = detectFormat(doc);
 
   // Validate meta-schema
-  const validation = validateMetaSchema(doc, format);
+  const validation = validateMetaSchema(doc, formatDetection.format);
 
   // Collect metrics
   const refs = findReferences(doc);
@@ -506,11 +578,13 @@ export async function analyzeSpecification(fileContent: string, fileName: string
 
   return {
     isValid: validation.valid,
-    format: format as any,
-    version,
+    format: formatDetection.format,
+    version: formatDetection.version,
     syntax,
     syntaxValid: true,
     schemaValid: validation.valid,
+    formatSupported: formatDetection.supported,
+    formatDisplayName: formatDetection.displayName,
     metrics,
     qualityScore,
     errors: validation.errors,
@@ -519,3 +593,54 @@ export async function analyzeSpecification(fileContent: string, fileName: string
   };
 }
 
+/**
+ * Quick metadata preview result
+ */
+export interface FileMetadataPreview {
+  syntaxValid: boolean;
+  syntax: 'json' | 'yaml';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'arazzo' | 'raml' | 'asyncapi' | 'unknown';
+  version: string;
+  formatDisplayName: string;
+  formatSupported: boolean;
+  title?: string;
+  description?: string;
+  specVersion?: string;
+  parseError?: string;
+}
+
+/**
+ * Quick metadata extraction - faster than full analysis
+ * Used to show file info immediately after selection
+ */
+export function extractFileMetadata(content: string): FileMetadataPreview {
+  const syntax = detectSyntax(content);
+  const parseResult = parseContent(content, syntax);
+
+  if (!parseResult.valid) {
+    return {
+      syntaxValid: false,
+      syntax,
+      format: 'unknown',
+      version: 'unknown',
+      formatDisplayName: 'Unknown Format',
+      formatSupported: false,
+      parseError: parseResult.error
+    };
+  }
+
+  const doc = parseResult.data;
+  const formatDetection = detectFormat(doc);
+
+  return {
+    syntaxValid: true,
+    syntax,
+    format: formatDetection.format,
+    version: formatDetection.version,
+    formatDisplayName: formatDetection.displayName,
+    formatSupported: formatDetection.supported,
+    title: doc.info?.title,
+    description: doc.info?.description,
+    specVersion: doc.info?.version
+  };
+}

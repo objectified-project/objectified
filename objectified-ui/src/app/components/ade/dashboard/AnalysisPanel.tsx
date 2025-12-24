@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, AlertCircle, XCircle, FileCode } from 'lucide-react';
+import { CheckCircle2, AlertCircle, XCircle, FileCode, AlertTriangle } from 'lucide-react';
 import * as Progress from '@radix-ui/react-progress';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
 
@@ -145,24 +145,81 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Format Detection
         </h3>
+
+        {/* Unsupported Format Warning */}
+        {!analysis.formatSupported && analysis.format !== 'unknown' && (
+          <div className="mb-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium text-amber-900 dark:text-amber-200">
+                  Format Not Available for Import
+                </div>
+                <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  The detected format <span className="font-semibold">{analysis.formatDisplayName}</span> is not yet supported for import.
+                  Currently supported formats: OpenAPI 3.x, Swagger 2.x, and JSON Schema.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* File Metadata Summary */}
+        <div className="mb-4 p-4 rounded-lg bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Detected Format
+              </span>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1 flex items-center gap-2">
+                {analysis.formatDisplayName}
+                {analysis.formatSupported ? (
+                  <span className="px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                    Supported
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded">
+                    Not Supported
+                  </span>
+                )}
+              </div>
+            </div>
+            <div>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Spec Version
+              </span>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
+                {analysis.version !== 'unknown' ? analysis.version : 'N/A'}
+              </div>
+            </div>
+          </div>
+          {analysis.document?.info?.description && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Description
+              </span>
+              <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 leading-relaxed">
+                {analysis.document.info.description}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-3 gap-4">
           {/* Format Card */}
-          <div className={`rounded-lg p-4 border ${analysis.isValid ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+          <div className={`rounded-lg p-4 border ${analysis.formatSupported ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'}`}>
             <div className="flex items-center gap-2 mb-2">
-              {analysis.isValid ? (
+              {analysis.formatSupported ? (
                 <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
               ) : (
-                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               )}
               <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Format
               </span>
             </div>
             <div className="text-sm font-medium text-gray-900 dark:text-white">
-              {analysis.format === 'openapi' && `OpenAPI ${analysis.version}`}
-              {analysis.format === 'swagger' && `Swagger ${analysis.version}`}
-              {analysis.format === 'jsonschema' && `JSON Schema`}
-              {analysis.format === 'unknown' && 'Unknown Format'}
+              {analysis.formatDisplayName}
             </div>
           </div>
 
