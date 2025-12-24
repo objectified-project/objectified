@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Package, Search, Check, FileJson, FileCode2, List, ChevronRight, ArrowUpAZ, ArrowDownAZ } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
@@ -16,10 +16,6 @@ export interface ImportOptions {
   projectName: string;
   versionSource: 'spec' | 'manual';
   targetVersion: string;
-  autoLayout: boolean;
-  createRelationships: boolean;
-  applyNamingConvention: boolean;
-  generateDocumentation: boolean;
   selectedSchemas: string[];
 }
 
@@ -94,12 +90,15 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     projectName: analysis.document?.info?.title || 'New Project',
     versionSource: 'spec',
     targetVersion: analysis.document?.info?.version || '1.0.0',
-    autoLayout: true,
-    createRelationships: true,
-    applyNamingConvention: true,
-    generateDocumentation: false,
     selectedSchemas: schemas.map(s => s.name)
   });
+
+  // Notify parent of initial import options on mount
+  useEffect(() => {
+    if (onImportOptionsChange) {
+      onImportOptionsChange(importOptions);
+    }
+  }, []); // Empty dependency array - run only on mount
 
 
   const selectedSchema = selectedSchemaName
@@ -657,7 +656,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
           Import Options
         </h3>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-6">
           {/* Project Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -675,15 +674,24 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
             </div>
           </div>
 
-          {/* Version Source Selection */}
+          {/* Version Configuration */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Version
             </label>
-            <div className="space-y-3">
+            <div className="space-y-2">
+              {/* Version Input */}
+              <input
+                type="text"
+                value={importOptions.targetVersion}
+                onChange={(e) => handleVersionChange(e.target.value)}
+                placeholder={importOptions.versionSource === 'spec' ? 'Version from spec' : 'Enter version (e.g., 1.0.0)'}
+                disabled={importOptions.versionSource === 'spec'}
+                className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:disabled:bg-gray-800"
+              />
               {/* Radio buttons for version source */}
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="radio"
                     name="versionSource"
@@ -692,11 +700,11 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                     onChange={() => handleVersionSourceChange('spec')}
                     className="w-4 h-4 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Use version from specification
+                  <span className="text-xs text-gray-700 dark:text-gray-300">
+                    From spec
                   </span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="radio"
                     name="versionSource"
@@ -705,112 +713,17 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                     onChange={() => handleVersionSourceChange('manual')}
                     className="w-4 h-4 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Manually enter version
+                  <span className="text-xs text-gray-700 dark:text-gray-300">
+                    Manual
                   </span>
                 </label>
               </div>
-
-              {/* Version Input */}
-              <div>
-                <input
-                  type="text"
-                  value={importOptions.targetVersion}
-                  onChange={(e) => handleVersionChange(e.target.value)}
-                  placeholder={importOptions.versionSource === 'spec' ? 'Version from spec' : 'Enter version (e.g., 1.0.0)'}
-                  disabled={importOptions.versionSource === 'spec'}
-                  className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:disabled:bg-gray-800"
-                />
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {importOptions.versionSource === 'spec'
-                    ? `Using version "${analysis.document?.info?.version || '1.0.0'}" from specification`
-                    : 'Allowed characters: 0-9, A-Z, a-z, . (dot), - (dash)'}
-                </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {importOptions.versionSource === 'spec'
+                  ? `Using "${analysis.document?.info?.version || '1.0.0'}" from specification`
+                  : 'Allowed: 0-9, A-Z, a-z, . (dot), - (dash)'}
               </div>
             </div>
-          </div>
-
-          {/* Import Options Checkboxes */}
-          <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <Checkbox.Root
-                checked={importOptions.autoLayout}
-                onCheckedChange={(checked) => handleOptionChange('autoLayout', checked)}
-                className="mt-0.5 w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center"
-              >
-                <Checkbox.Indicator>
-                  <Check className="w-4 h-4 text-white" />
-                </Checkbox.Indicator>
-              </Checkbox.Root>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Auto-layout imported schemas on canvas
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Automatically arrange schemas using the selected layout algorithm
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <Checkbox.Root
-                checked={importOptions.createRelationships}
-                onCheckedChange={(checked) => handleOptionChange('createRelationships', checked)}
-                className="mt-0.5 w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center"
-              >
-                <Checkbox.Indicator>
-                  <Check className="w-4 h-4 text-white" />
-                </Checkbox.Indicator>
-              </Checkbox.Root>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Create relationships from $ref
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Automatically create relationships based on schema references
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <Checkbox.Root
-                checked={importOptions.applyNamingConvention}
-                onCheckedChange={(checked) => handleOptionChange('applyNamingConvention', checked)}
-                className="mt-0.5 w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center"
-              >
-                <Checkbox.Indicator>
-                  <Check className="w-4 h-4 text-white" />
-                </Checkbox.Indicator>
-              </Checkbox.Root>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Apply naming convention (PascalCase)
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Convert schema names to PascalCase format
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <Checkbox.Root
-                checked={importOptions.generateDocumentation}
-                onCheckedChange={(checked) => handleOptionChange('generateDocumentation', checked)}
-                className="mt-0.5 w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center"
-              >
-                <Checkbox.Indicator>
-                  <Check className="w-4 h-4 text-white" />
-                </Checkbox.Indicator>
-              </Checkbox.Root>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Generate documentation from descriptions
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Create documentation based on schema descriptions
-                </div>
-              </div>
-            </label>
           </div>
         </div>
       </div>

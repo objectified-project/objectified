@@ -13,11 +13,12 @@ import { AnalysisPanel } from './AnalysisPanel';
 import { PreviewPanel, ImportOptions } from './PreviewPanel';
 import { analyzeSpecification, AnalysisResult } from '../../../utils/openapi-analyzer';
 import ImportExecutionPanel from './ImportExecutionPanel';
-import { startImport } from '../../../../../lib/db/import-actions';
+import { startImport, getImportStatus } from '../../../../../lib/db/import-actions';
 
 interface ImportDialogProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
   tenantId: string;
   userId: string;
 }
@@ -25,6 +26,7 @@ interface ImportDialogProps {
 const ImportDialog: React.FC<ImportDialogProps> = ({
   open,
   onClose,
+  onSuccess,
   tenantId, // Will be used in future steps for project creation
   userId    // Will be used in future steps for tracking import activity
 }) => {
@@ -36,6 +38,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [importOptions, setImportOptions] = useState<ImportOptions | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [importSucceeded, setImportSucceeded] = useState(false);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -62,12 +65,19 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const handleClose = () => {
+    // Call onSuccess callback if import completed successfully
+    if (importSucceeded && onSuccess) {
+      onSuccess();
+    }
+
+    // Reset all state
     setCurrentStep('source');
     setSelectedSource(null);
     setSelectedFile(null);
     setAnalysisResult(null);
     setImportOptions(null);
     setJobId(null);
+    setImportSucceeded(false);
     onClose();
   };
 
@@ -158,10 +168,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         description: 'Imported from OpenAPI specification'
       },
       options: {
-        selectedSchemas: importOptions.selectedSchemas,
-        autoLayout: importOptions.autoLayout,
-        createRelationships: importOptions.createRelationships,
-        applyNamingConvention: importOptions.applyNamingConvention
+        selectedSchemas: importOptions.selectedSchemas
       }
     });
 
@@ -558,7 +565,18 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               );
             } else if (currentStep === 'import' && jobId) {
               return (
-                <ImportExecutionPanel jobId={jobId} onDone={() => setCurrentStep('done')} />
+                <ImportExecutionPanel
+                  jobId={jobId}
+                  onDone={() => {
+                    // Check import status to determine if it was successful
+                    getImportStatus(jobId).then((status) => {
+                      if (status.state === 'completed') {
+                        setImportSucceeded(true);
+                      }
+                    });
+                    setCurrentStep('done');
+                  }}
+                />
               );
             } else if (currentStep === 'done') {
               return jobId ? (

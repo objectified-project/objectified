@@ -380,6 +380,7 @@ const Projects = () => {
       <ImportDialog
         open={showNewImportDialog}
         onClose={() => setShowNewImportDialog(false)}
+        onSuccess={handleImportSuccess}
         tenantId={currentTenantId}
         userId={currentUserId}
       />
