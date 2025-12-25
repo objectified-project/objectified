@@ -7,6 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:import": "jest import-validation",
+    "test:setup": "./scripts/setup-test-db.sh",
     "docker:build": "./build-docker.sh",
     "docker:build:fast": "./build-docker.sh --no-test",
     "docker:build:package": "./build-docker.sh --package",
@@ -68,10 +73,12 @@
     "yaml": "^2.8.2"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^6",
     "@types/diff": "^7.0.2",
     "@types/handlebars": "^4.1.0",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.19.26",
     "@types/pg": "^8",
     "@types/react": "^19",
@@ -80,7 +87,10 @@
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9",
     "eslint-config-next": "16.0.0",
+    "jest": "^30.2.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

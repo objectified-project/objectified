@@ -1,0 +1,41 @@
+/**
+ * Test Setup
+ *
+ * This file runs before all tests and sets up the testing environment
+ */
+
+// Extend Jest matchers
+expect.extend({
+  toBeValidSchema(received: any) {
+    const pass = received && typeof received === 'object' && received.type;
+    return {
+      pass,
+      message: () => pass
+        ? `Expected schema not to be valid`
+        : `Expected schema to be valid (must have a 'type' property)`,
+    };
+  },
+});
+
+// Set longer timeout for integration tests
+jest.setTimeout(30000);
+
+// Suppress console logs during tests (optional)
+if (process.env.SUPPRESS_LOGS === 'true') {
+  global.console = {
+    ...console,
+    log: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
+}
+
+// Ensure test environment variables are set
+process.env.NODE_ENV = 'test';
+process.env.TEST_POSTGRES_DB = process.env.TEST_POSTGRES_DB || 'objectified_test';
+
+console.log('Test environment initialized');
+console.log(`Test database: ${process.env.TEST_POSTGRES_DB}`);
+
