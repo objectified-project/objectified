@@ -247,6 +247,8 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       propertyNamesPattern: schema.propertyNames?.pattern || '',
       propertyNamesMinLength: schema.propertyNames?.minLength?.toString() || '',
       propertyNamesMaxLength: schema.propertyNames?.maxLength?.toString() || '',
+      propertyNamesFormat: schema.propertyNames?.format || '',
+      propertyNamesDescription: schema.propertyNames?.description || '',
 
       // Dependent Schemas (JSON Schema 2019-09+)
       dependentSchemas: schema.dependentSchemas || undefined,
@@ -426,7 +428,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       }
 
       // Handle propertyNames constraints (OpenAPI 3.1)
-      const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
+      const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength || formData.propertyNamesFormat || formData.propertyNamesDescription;
       if (hasPropertyNamesConstraints) {
         targetSchema.propertyNames = { type: 'string' };
         if (formData.propertyNamesPattern) {
@@ -437,6 +439,12 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         }
         if (formData.propertyNamesMaxLength) {
           targetSchema.propertyNames.maxLength = parseInt(formData.propertyNamesMaxLength);
+        }
+        if (formData.propertyNamesFormat) {
+          targetSchema.propertyNames.format = formData.propertyNamesFormat;
+        }
+        if (formData.propertyNamesDescription) {
+          targetSchema.propertyNames.description = formData.propertyNamesDescription;
         }
       } else {
         delete targetSchema.propertyNames;

@@ -266,6 +266,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         propertyNamesPattern: minMaxSource.propertyNames?.pattern || '',
         propertyNamesMinLength: minMaxSource.propertyNames?.minLength?.toString() || '',
         propertyNamesMaxLength: minMaxSource.propertyNames?.maxLength?.toString() || '',
+        propertyNamesFormat: minMaxSource.propertyNames?.format || '',
+        propertyNamesDescription: minMaxSource.propertyNames?.description || '',
         // Dependent Schemas (JSON Schema 2019-09+)
         dependentSchemas: minMaxSource.dependentSchemas || undefined,
         // NOT composition (OpenAPI 3.1)
@@ -432,12 +434,14 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           if (formData.maxProperties) itemsSchema.maxProperties = parseInt(formData.maxProperties);
 
           // Handle propertyNames constraints for object items (OpenAPI 3.1)
-          const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
+          const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength || formData.propertyNamesFormat || formData.propertyNamesDescription;
           if (hasPropertyNamesConstraints) {
             itemsSchema.propertyNames = { type: 'string' };
             if (formData.propertyNamesPattern) itemsSchema.propertyNames.pattern = formData.propertyNamesPattern;
             if (formData.propertyNamesMinLength) itemsSchema.propertyNames.minLength = parseInt(formData.propertyNamesMinLength);
             if (formData.propertyNamesMaxLength) itemsSchema.propertyNames.maxLength = parseInt(formData.propertyNamesMaxLength);
+            if (formData.propertyNamesFormat) itemsSchema.propertyNames.format = formData.propertyNamesFormat;
+            if (formData.propertyNamesDescription) itemsSchema.propertyNames.description = formData.propertyNamesDescription;
           }
         }
 
@@ -528,12 +532,14 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         if (formData.maxProperties) schema.maxProperties = parseInt(formData.maxProperties);
 
         // Handle propertyNames constraints (OpenAPI 3.1)
-        const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
+        const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength || formData.propertyNamesFormat || formData.propertyNamesDescription;
         if (hasPropertyNamesConstraints) {
           schema.propertyNames = { type: 'string' };
           if (formData.propertyNamesPattern) schema.propertyNames.pattern = formData.propertyNamesPattern;
           if (formData.propertyNamesMinLength) schema.propertyNames.minLength = parseInt(formData.propertyNamesMinLength);
           if (formData.propertyNamesMaxLength) schema.propertyNames.maxLength = parseInt(formData.propertyNamesMaxLength);
+          if (formData.propertyNamesFormat) schema.propertyNames.format = formData.propertyNamesFormat;
+          if (formData.propertyNamesDescription) schema.propertyNames.description = formData.propertyNamesDescription;
         }
       }
 
@@ -804,7 +810,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             }
 
             // Handle propertyNames constraints for object items (OpenAPI 3.1)
-            const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength;
+            const hasPropertyNamesConstraints = formData.propertyNamesPattern || formData.propertyNamesMinLength || formData.propertyNamesMaxLength || formData.propertyNamesFormat || formData.propertyNamesDescription;
             if (hasPropertyNamesConstraints) {
               itemsSchema.propertyNames = { type: 'string' };
               if (formData.propertyNamesPattern) {
@@ -815,6 +821,12 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               }
               if (formData.propertyNamesMaxLength) {
                 itemsSchema.propertyNames.maxLength = parseInt(formData.propertyNamesMaxLength);
+              }
+              if (formData.propertyNamesFormat) {
+                itemsSchema.propertyNames.format = formData.propertyNamesFormat;
+              }
+              if (formData.propertyNamesDescription) {
+                itemsSchema.propertyNames.description = formData.propertyNamesDescription;
               }
             } else {
               delete itemsSchema.propertyNames;

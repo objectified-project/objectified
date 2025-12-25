@@ -112,6 +112,8 @@ export interface PropertyFormData {
   propertyNamesPattern?: string;
   propertyNamesMinLength?: string;
   propertyNamesMaxLength?: string;
+  propertyNamesFormat?: string; // Format constraint for property names (e.g., email, uuid)
+  propertyNamesDescription?: string; // Description for property name constraints
 
   // Composition constraints
   dependentSchemas?: Record<string, any>; // Map of property names to conditional schemas
@@ -2212,7 +2214,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 Define constraints for property names (keys) in this object. Useful for objects with dynamic keys like dictionaries or maps.
               </Typography>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, mb: 2 }}>
                 <TextField
                   label="Min Length"
                   type="number"
@@ -2222,7 +2224,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   onChange={(e) => onChange('propertyNamesMinLength', e.target.value)}
                   inputProps={{ min: 0 }}
                   placeholder="e.g., 1"
-                  helperText="Minimum name length"
+                  helperText="Minimum"
                   sx={{
                     bgcolor: isDark ? '#1e293b' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
@@ -2238,13 +2240,36 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   onChange={(e) => onChange('propertyNamesMaxLength', e.target.value)}
                   inputProps={{ min: 0 }}
                   placeholder="e.g., 50"
-                  helperText="Maximum name length"
+                  helperText="Maximum"
                   sx={{
                     bgcolor: isDark ? '#1e293b' : 'white',
                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                     '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
                   }}
                 />
+                <FormControl size={size} fullWidth>
+                  <Typography variant="caption" sx={{ mb: 0.5, color: isDark ? '#94a3b8' : '#64748b', fontSize: '0.7rem' }}>Format</Typography>
+                  <MuiSelect
+                    value={data.propertyNamesFormat ?? ''}
+                    onChange={(e) => onChange('propertyNamesFormat', e.target.value)}
+                    displayEmpty
+                    sx={{
+                      bgcolor: isDark ? '#1e293b' : 'white',
+                      borderRadius: 2,
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    <MenuItem value=""><em>None</em></MenuItem>
+                    <MenuItem value="email">email</MenuItem>
+                    <MenuItem value="uuid">uuid</MenuItem>
+                    <MenuItem value="uri">uri</MenuItem>
+                    <MenuItem value="hostname">hostname</MenuItem>
+                    <MenuItem value="ipv4">ipv4</MenuItem>
+                    <MenuItem value="ipv6">ipv6</MenuItem>
+                    <MenuItem value="date">date</MenuItem>
+                    <MenuItem value="date-time">date-time</MenuItem>
+                  </MuiSelect>
+                </FormControl>
               </Box>
 
               <TextField
@@ -2274,7 +2299,26 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 }}
               />
 
-              {(data.propertyNamesPattern ?? data.propertyNamesMinLength ?? data.propertyNamesMaxLength) && (
+
+              <TextField
+                label="Description"
+                size={size}
+                fullWidth
+                multiline
+                rows={2}
+                value={data.propertyNamesDescription ?? ''}
+                onChange={(e) => onChange('propertyNamesDescription', e.target.value)}
+                placeholder="e.g., Property names must be lowercase, start with letter..."
+                helperText="Describe the property name requirements"
+                sx={{
+                  mt: 2,
+                  bgcolor: isDark ? '#1e293b' : 'white',
+                  '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                  '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                }}
+              />
+
+              {(data.propertyNamesPattern ?? data.propertyNamesMinLength ?? data.propertyNamesMaxLength ?? data.propertyNamesFormat ?? data.propertyNamesDescription) && (
                 <Box sx={{
                   mt: 2,
                   p: 2,
@@ -2285,7 +2329,15 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   <Typography variant="caption" sx={{ color: '#6d28d9', display: 'block', fontWeight: 600, mb: 1 }}>
                     Property Name Rules:
                   </Typography>
+                  {data.propertyNamesDescription && (
+                    <Typography variant="caption" sx={{ color: '#7c3aed', display: 'block', mb: 1, fontStyle: 'italic' }}>
+                      {data.propertyNamesDescription}
+                    </Typography>
+                  )}
                   <Box component="ul" sx={{ m: 0, pl: 2, '& li': { fontSize: '0.75rem', color: '#7c3aed', mb: 0.5 } }}>
+                    {data.propertyNamesFormat && (
+                      <li>Names must be valid <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesFormat}</code> format</li>
+                    )}
                     {data.propertyNamesMinLength && (
                       <li>Names must be at least <code style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '1px 4px', borderRadius: 3 }}>{data.propertyNamesMinLength}</code> characters</li>
                     )}
