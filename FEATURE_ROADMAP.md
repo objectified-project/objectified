@@ -291,12 +291,12 @@
 
 The import system provides comprehensive, enterprise-level capabilities for importing OpenAPI specifications and related formats. It supports multiple input methods, validation layers, conflict resolution, and seamless integration with existing projects.
 
-#### 4.1 Import Methods 📋 PLANNED
+#### 4.1 Import Methods ✅ PARTIALLY IMPLEMENTED
 
 ##### File Upload
-- 📋 **Single File Upload**: Standard file picker for individual files
+- ✅ **Single File Upload**: Standard file picker for individual files
 - 📋 **Multi-File Upload**: Batch import multiple specification files
-- 📋 **Drag & Drop Zone**: Visual dropzone with file type indicators
+- ✅ **Drag & Drop Zone**: Visual dropzone with file type indicators
 - 📋 **Folder Upload**: Import entire specification directories
 - 📋 **Archive Support**: Import from ZIP, TAR.GZ containing specs
 - 📋 **Large File Handling**: Chunked upload for files > 10MB
@@ -323,10 +323,10 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Registry Import**: Import from schema registries
 - 📋 **Webhook Import**: Automated import via webhook triggers
 
-#### 4.2 Supported Formats 📋 PLANNED
+#### 4.2 Supported Formats ✅ PARTIALLY IMPLEMENTED
 
 ##### OpenAPI Specifications
-- 📋 **OpenAPI 3.1.x**: Full JSON Schema Draft 2020-12 support
+- ✅ **OpenAPI 3.1.x**: Full JSON Schema Draft 2020-12 support
 - 📋 **OpenAPI 3.0.x**: Backward compatible import with upgrade path
 - 📋 **OpenAPI 2.0 (Swagger)**: Legacy support with automatic conversion
 - 📋 **Multi-File Specs**: Support for $ref across multiple files
@@ -1006,9 +1006,9 @@ The import wizard adapts to smaller screens:
 - 📋 **Relationship counts**: Badge showing connection count
 - 📋 **Deprecation indicators**: Visual warning for deprecated items
 
-#### Charts & Metrics 📋 PLANNED
-- 📋 **Quality score gauge**: Visual score indicator (0-100)
-- 📋 **Complexity charts**: Schema complexity visualization
+#### Charts & Metrics ✅ PARTIALLY COMPLETE
+- ✅ **Quality score gauge**: Visual score indicator (0-100)
+- ✅ **Complexity charts**: Schema complexity visualization
 - 📋 **Relationship graphs**: Visual dependency maps
 - 📋 **Timeline views**: Schema evolution over time
 - 📋 **Comparison views**: Before/after schema changes
@@ -1017,7 +1017,7 @@ The import wizard adapts to smaller screens:
 
 ### 10. Sidebar & Panels
 
-#### Current Sidebars ✅ IMPLEMENTED
+#### Current Sidebars ✅ PARTIALLY COMPLETE
 - ✅ **Classes sidebar**: List of all classes with search
 - ✅ **Properties panel**: Edit class properties
 - 📋 **Annotations drawer**: Right-side notes (Lucidchart style)
@@ -2333,7 +2333,7 @@ The import wizard adapts to smaller screens:
   - ✅ PlantUML code
   - ✅ GraphML (for yEd, Gephi)
   - ✅ DOT (Graphviz)
-  - 📋 JSON (raw data)
+  - ✅ JSON (raw data)
 - **High-Resolution Export**: 
   - 1x (default), 2x, 4x, 8x resolution
   - Customizable DPI (72, 150, 300, 600)
@@ -2363,7 +2363,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| [#203] | Export as JSON      |
 
 ---
 

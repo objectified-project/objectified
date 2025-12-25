@@ -1521,6 +1521,103 @@ const StudioContent = () => {
     }
   }, [projects, versions, selectedProjectId, selectedVersionId, nodes, edges, alertDialog]);
 
+  // Handle JSON export
+  const handleExportJson = useCallback(async () => {
+    try {
+      // Get project and version info for filename
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
+      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}-canvas.json`;
+
+      // Show loading state
+      setLoadingMessage('Exporting canvas as JSON...');
+      setIsLoadingCanvas(true);
+
+      // Build the canvas data structure
+      const canvasData = {
+        metadata: {
+          projectName: selectedProject?.name || 'Unknown',
+          projectSlug: selectedProject?.slug || '',
+          versionId: selectedVersion?.version_id || '',
+          versionDescription: selectedVersion?.description || '',
+          exportDate: new Date().toISOString(),
+          exportFormat: 'objectified-canvas-v1',
+        },
+        nodes: nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          data: {
+            id: node.data.id,
+            name: node.data.name,
+            description: node.data.description,
+            properties: Array.isArray(node.data.properties) ? node.data.properties.map((prop: any) => ({
+              id: prop.id,
+              name: prop.name,
+              description: prop.description,
+              data: prop.data,
+              parent_id: prop.parent_id,
+            })) : [],
+            schema: node.data.schema,
+            tags: Array.isArray(node.data.tags) ? node.data.tags.map((tag: any) => ({
+              id: tag.id,
+              name: tag.tag_name,
+              color: tag.tag_color,
+              description: tag.tag_description,
+            })) : [],
+          },
+        })),
+        edges: edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          type: edge.type,
+          label: edge.label,
+          data: edge.data,
+        })),
+        viewport: {
+          x: 0,
+          y: 0,
+          zoom: 1,
+        },
+      };
+
+      // Create a blob and download
+      const jsonContent = JSON.stringify(canvasData, null, 2);
+      const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      // Hide loading state
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+
+      // Close the export dropdown
+      setExportDropdownOpen(false);
+
+      // Show success message
+      await alertDialog({
+        message: `Canvas exported as ${filename}. This JSON file contains the complete canvas structure including nodes, edges, and metadata.`,
+        variant: 'success',
+      });
+    } catch (error) {
+      console.error('Error exporting JSON:', error);
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+
+      await alertDialog({
+        message: 'Failed to export canvas as JSON. Please try again.',
+        variant: 'error',
+      });
+    }
+  }, [projects, versions, selectedProjectId, selectedVersionId, nodes, edges, alertDialog]);
+
   // Define custom node types
   const nodeTypes = {
     classNode: ClassNode,
@@ -3243,6 +3340,16 @@ const StudioContent = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         <span>PDF Document</span>
+                      </button>
+                      <button
+                        onClick={handleExportJson}
+                        className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 3v6a1 1 0 001 1h6" />
+                        </svg>
+                        <span>JSON Data</span>
                       </button>
                       <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                       <button
