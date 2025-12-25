@@ -75,6 +75,8 @@ interface PropertyDialogProps {
     description: string | null;
     data: any;
   }) => Promise<void>;
+  // Available class names for schema references
+  availableClasses?: string[];
 }
 
 export const PropertyDialog: React.FC<PropertyDialogProps> = ({
@@ -83,6 +85,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                                                                 mode,
                                                                 property,
                                                                 onSubmit,
+                                                                availableClasses = [],
                                                               }) => {
   const { mode: colorMode, systemMode } = useColorScheme();
   const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
@@ -175,9 +178,27 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
       }
 
       // Determine additionalProperties value
-      let additionalPropsValue: 'default' | 'true' | 'false' = 'default';
+      let additionalPropsValue: 'default' | 'true' | 'false' | 'type' | 'schema' = 'default';
+      let additionalPropsType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' = 'string';
+      let additionalPropsSchema = '';
       if (minMaxSource.hasOwnProperty('additionalProperties')) {
-        additionalPropsValue = minMaxSource.additionalProperties === false ? 'false' : 'true';
+        if (minMaxSource.additionalProperties === true) {
+          additionalPropsValue = 'true';
+        } else if (minMaxSource.additionalProperties === false) {
+          additionalPropsValue = 'false';
+        } else if (typeof minMaxSource.additionalProperties === 'object' && minMaxSource.additionalProperties.$ref) {
+          additionalPropsValue = 'schema';
+          // Extract just the class name from the $ref path (e.g., "#/components/schemas/ClassName" -> "ClassName")
+          const refPath = minMaxSource.additionalProperties.$ref;
+          additionalPropsSchema = refPath.split('/').pop() || refPath;
+        } else if (typeof minMaxSource.additionalProperties === 'object' && minMaxSource.additionalProperties.type) {
+          additionalPropsValue = 'type';
+          additionalPropsType = minMaxSource.additionalProperties.type;
+        } else if (typeof minMaxSource.additionalProperties === 'object') {
+          // Other object schema - treat as schema
+          additionalPropsValue = 'schema';
+          additionalPropsSchema = JSON.stringify(minMaxSource.additionalProperties);
+        }
       }
 
       // Extract extensions (x- prefixed properties)
@@ -236,6 +257,8 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         examples: property.examples ? property.examples.map((ex: any) => JSON.stringify(ex)) : [],
         // Object constraints
         additionalProperties: additionalPropsValue,
+        additionalPropertiesType: additionalPropsType,
+        additionalPropertiesSchema: additionalPropsSchema,
         minProperties: minMaxSource.minProperties?.toString() || '',
         maxProperties: minMaxSource.maxProperties?.toString() || '',
         patternProperties: minMaxSource.patternProperties || undefined,
@@ -387,6 +410,21 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             itemsSchema.additionalProperties = true;
           } else if (formData.additionalProperties === 'false') {
             itemsSchema.additionalProperties = false;
+          } else if (formData.additionalProperties === 'type' && formData.additionalPropertiesType) {
+            itemsSchema.additionalProperties = { type: formData.additionalPropertiesType };
+          } else if (formData.additionalProperties === 'schema' && formData.additionalPropertiesSchema) {
+            const schemaValue = formData.additionalPropertiesSchema.trim();
+            if (schemaValue.startsWith('{')) {
+              try {
+                itemsSchema.additionalProperties = JSON.parse(schemaValue);
+              } catch {
+                itemsSchema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+              }
+            } else if (schemaValue.startsWith('#/') || schemaValue.startsWith('$ref')) {
+              itemsSchema.additionalProperties = { $ref: schemaValue };
+            } else {
+              itemsSchema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+            }
           }
 
           // Handle minProperties and maxProperties for object items
@@ -467,6 +505,22 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
           schema.additionalProperties = true;
         } else if (formData.additionalProperties === 'false') {
           schema.additionalProperties = false;
+        } else if (formData.additionalProperties === 'type' && formData.additionalPropertiesType) {
+          schema.additionalProperties = { type: formData.additionalPropertiesType };
+        } else if (formData.additionalProperties === 'schema' && formData.additionalPropertiesSchema) {
+          // Check if it's already a $ref or JSON, or just a class name
+          const schemaValue = formData.additionalPropertiesSchema.trim();
+          if (schemaValue.startsWith('{')) {
+            try {
+              schema.additionalProperties = JSON.parse(schemaValue);
+            } catch {
+              schema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+            }
+          } else if (schemaValue.startsWith('#/') || schemaValue.startsWith('$ref')) {
+            schema.additionalProperties = { $ref: schemaValue };
+          } else {
+            schema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+          }
         }
 
         // Handle minProperties and maxProperties
@@ -704,6 +758,23 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               itemsSchema.additionalProperties = true;
             } else if (formData.additionalProperties === 'false') {
               itemsSchema.additionalProperties = false;
+            } else if (formData.additionalProperties === 'type' && formData.additionalPropertiesType) {
+              itemsSchema.additionalProperties = { type: formData.additionalPropertiesType };
+            } else if (formData.additionalProperties === 'schema' && formData.additionalPropertiesSchema) {
+              const schemaValue = formData.additionalPropertiesSchema.trim();
+              if (schemaValue.startsWith('{')) {
+                try {
+                  itemsSchema.additionalProperties = JSON.parse(schemaValue);
+                } catch {
+                  itemsSchema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+                }
+              } else if (schemaValue.startsWith('#/') || schemaValue.startsWith('$ref')) {
+                itemsSchema.additionalProperties = { $ref: schemaValue };
+              } else {
+                itemsSchema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+              }
+            } else {
+              delete itemsSchema.additionalProperties;
             }
 
             // Handle minProperties and maxProperties for object items
@@ -1066,6 +1137,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               showMetadata={true}
               showTitle={true}
               size="medium"
+              availableClasses={availableClasses}
             />
           </>
         ) : (

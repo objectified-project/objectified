@@ -11,6 +11,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed dependentProperties editing in the class editor, adds a logic builder
   - Fixed unevaluatedProperties in comprehension section of schemas
   - Fixed if/then/else in comprehension section of schemas
+  - Fixed additionalProperties in property editor to allow for types and schemas
 - Moved import to its own feature, completely rewrote the logic
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!

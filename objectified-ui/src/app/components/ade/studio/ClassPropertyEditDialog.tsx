@@ -146,9 +146,26 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
 
     // Determine additionalProperties value
-    let additionalPropsValue: 'default' | 'true' | 'false' = 'default';
+    let additionalPropsValue: 'default' | 'true' | 'false' | 'type' | 'schema' = 'default';
+    let additionalPropsType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' = 'string';
+    let additionalPropsSchema = '';
     if (schema.hasOwnProperty('additionalProperties')) {
-      additionalPropsValue = schema.additionalProperties === false ? 'false' : 'true';
+      if (schema.additionalProperties === true) {
+        additionalPropsValue = 'true';
+      } else if (schema.additionalProperties === false) {
+        additionalPropsValue = 'false';
+      } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.$ref) {
+        additionalPropsValue = 'schema';
+        // Extract just the class name from the $ref path (e.g., "#/components/schemas/ClassName" -> "ClassName")
+        const refPath = schema.additionalProperties.$ref;
+        additionalPropsSchema = refPath.split('/').pop() || refPath;
+      } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.type) {
+        additionalPropsValue = 'type';
+        additionalPropsType = schema.additionalProperties.type;
+      } else if (typeof schema.additionalProperties === 'object') {
+        additionalPropsValue = 'schema';
+        additionalPropsSchema = JSON.stringify(schema.additionalProperties);
+      }
     }
 
     // Extract extensions (x- prefixed properties) from the property data
@@ -213,6 +230,8 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
 
       // Object constraints
       additionalProperties: additionalPropsValue,
+      additionalPropertiesType: additionalPropsType,
+      additionalPropertiesSchema: additionalPropsSchema,
       minProperties: schema.minProperties?.toString() || '',
       maxProperties: schema.maxProperties?.toString() || '',
       patternProperties: schema.patternProperties || undefined,
@@ -345,6 +364,21 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         targetSchema.additionalProperties = true;
       } else if (formData.additionalProperties === 'false') {
         targetSchema.additionalProperties = false;
+      } else if (formData.additionalProperties === 'type' && formData.additionalPropertiesType) {
+        targetSchema.additionalProperties = { type: formData.additionalPropertiesType };
+      } else if (formData.additionalProperties === 'schema' && formData.additionalPropertiesSchema) {
+        const schemaValue = formData.additionalPropertiesSchema.trim();
+        if (schemaValue.startsWith('{')) {
+          try {
+            targetSchema.additionalProperties = JSON.parse(schemaValue);
+          } catch {
+            targetSchema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+          }
+        } else if (schemaValue.startsWith('#/') || schemaValue.startsWith('$ref')) {
+          targetSchema.additionalProperties = { $ref: schemaValue };
+        } else {
+          targetSchema.additionalProperties = { $ref: `#/components/schemas/${schemaValue}` };
+        }
       } else {
         delete targetSchema.additionalProperties;
       }
@@ -723,6 +757,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                     ? (allClassProperties || []).filter(p => p.parent_id === editingClassProperty.id)
                     : undefined
                 }
+                availableClasses={existingClassNames}
               />
             </>
           );

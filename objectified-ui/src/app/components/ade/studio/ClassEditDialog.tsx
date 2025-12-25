@@ -186,8 +186,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     discriminatorUseAuto: true,
     discriminatorMapping: {} as Record<string, string>, // Maps property value to schema name
     additionalProperties: null as boolean | null,
-    additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema',
+    additionalPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema' | 'type',
     additionalPropertiesSchema: '', // Class name reference for "Must Match Schema" option
+    additionalPropertiesInlineType: 'string' as 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array', // For inline type schema
     unevaluatedProperties: null as boolean | null,
     unevaluatedPropertiesType: 'default' as 'default' | 'allow' | 'disallow' | 'schema' | 'type',
     unevaluatedPropertiesSchema: '', // Class name reference for "Must Match Schema" option
@@ -265,8 +266,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             const tagIds = classTags.map((ct: any) => ct.tag_id);
 
             // Determine additionalProperties type and schema
-            let additionalPropsType: 'default' | 'allow' | 'disallow' | 'schema' = 'default';
+            let additionalPropsType: 'default' | 'allow' | 'disallow' | 'schema' | 'type' = 'default';
             let additionalPropsSchema = '';
+            let additionalPropsInlineType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' = 'string';
             if (schema.additionalProperties !== undefined) {
               if (schema.additionalProperties === true) {
                 additionalPropsType = 'allow';
@@ -275,6 +277,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.$ref) {
                 additionalPropsType = 'schema';
                 additionalPropsSchema = schema.additionalProperties.$ref.split('/').pop() || '';
+              } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.type) {
+                // Inline type schema like { type: 'string' }
+                additionalPropsType = 'type';
+                additionalPropsInlineType = schema.additionalProperties.type;
+              } else if (typeof schema.additionalProperties === 'object') {
+                // Other inline schema - default to 'type' with string
+                additionalPropsType = 'type';
               }
             }
 
@@ -344,6 +353,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
+              additionalPropertiesInlineType: additionalPropsInlineType,
               unevaluatedProperties: schema.unevaluatedProperties !== undefined ? schema.unevaluatedProperties : null,
               unevaluatedPropertiesType: unevaluatedPropsType,
               unevaluatedPropertiesSchema: unevaluatedPropsSchema,
@@ -363,8 +373,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           } catch (error) {
             console.error('Error loading tags:', error);
             // Determine additionalProperties type and schema for error case
-            let additionalPropsType: 'default' | 'allow' | 'disallow' | 'schema' = 'default';
+            let additionalPropsType: 'default' | 'allow' | 'disallow' | 'schema' | 'type' = 'default';
             let additionalPropsSchema = '';
+            let additionalPropsInlineType: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' = 'string';
             if (schema.additionalProperties !== undefined) {
               if (schema.additionalProperties === true) {
                 additionalPropsType = 'allow';
@@ -373,6 +384,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.$ref) {
                 additionalPropsType = 'schema';
                 additionalPropsSchema = schema.additionalProperties.$ref.split('/').pop() || '';
+              } else if (typeof schema.additionalProperties === 'object' && schema.additionalProperties.type) {
+                additionalPropsType = 'type';
+                additionalPropsInlineType = schema.additionalProperties.type;
+              } else if (typeof schema.additionalProperties === 'object') {
+                additionalPropsType = 'type';
               }
             }
             // Determine unevaluatedProperties type and schema for error case
@@ -435,6 +451,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               additionalProperties: schema.additionalProperties !== undefined ? schema.additionalProperties : null,
               additionalPropertiesType: additionalPropsType,
               additionalPropertiesSchema: additionalPropsSchema,
+              additionalPropertiesInlineType: additionalPropsInlineType,
               unevaluatedProperties: schema.unevaluatedProperties !== undefined ? schema.unevaluatedProperties : null,
               unevaluatedPropertiesType: unevaluatedPropsType,
               unevaluatedPropertiesSchema: unevaluatedPropsSchema,
@@ -469,6 +486,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           additionalProperties: null,
           additionalPropertiesType: 'default',
           additionalPropertiesSchema: '',
+          additionalPropertiesInlineType: 'string',
           unevaluatedProperties: null,
           unevaluatedPropertiesType: 'default',
           unevaluatedPropertiesSchema: '',
@@ -523,6 +541,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       schema.additionalProperties = false;
     } else if (formData.additionalPropertiesType === 'schema' && formData.additionalPropertiesSchema) {
       schema.additionalProperties = { $ref: `#/components/schemas/${formData.additionalPropertiesSchema}` };
+    } else if (formData.additionalPropertiesType === 'type') {
+      schema.additionalProperties = { type: formData.additionalPropertiesInlineType };
     }
     // 'default' means no additionalProperties field is added
 
@@ -1171,7 +1191,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <h4 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Additional Properties</h4>
                     <div className="space-y-2">
-                      {(['default', 'allow', 'disallow', 'schema'] as const).map((value) => (
+                      {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
                         <label key={value} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="radio"
@@ -1184,7 +1204,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                                 ...prev,
                                 additionalPropertiesType: val,
                                 additionalProperties: val === 'default' ? null : val === 'allow' ? true : val === 'disallow' ? false : null,
-                                additionalPropertiesSchema: val === 'schema' ? prev.additionalPropertiesSchema : ''
+                                additionalPropertiesSchema: val === 'schema' ? prev.additionalPropertiesSchema : '',
+                                additionalPropertiesInlineType: val === 'type' ? prev.additionalPropertiesInlineType : 'string'
                               }));
                             }}
                             disabled={isReadOnly}
@@ -1194,10 +1215,32 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                             {value === 'default' && 'Not specified (default)'}
                             {value === 'allow' && 'Allow Any (true)'}
                             {value === 'disallow' && 'Disallow (false)'}
+                            {value === 'type' && 'Must Be Type'}
                             {value === 'schema' && 'Must Match Schema'}
                           </span>
                         </label>
                       ))}
+                      {formData.additionalPropertiesType === 'type' && (
+                        <div className="mt-2 pl-6">
+                          <Select
+                            value={formData.additionalPropertiesInlineType}
+                            onValueChange={(val) => setFormData(prev => ({ ...prev, additionalPropertiesInlineType: val as any }))}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="string">string</SelectItem>
+                              <SelectItem value="number">number</SelectItem>
+                              <SelectItem value="integer">integer</SelectItem>
+                              <SelectItem value="boolean">boolean</SelectItem>
+                              <SelectItem value="object">object</SelectItem>
+                              <SelectItem value="array">array</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       {formData.additionalPropertiesType === 'schema' && (
                         <div className="mt-2 pl-6">
                           <Select

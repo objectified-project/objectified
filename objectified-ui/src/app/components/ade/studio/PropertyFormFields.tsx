@@ -103,7 +103,9 @@ export interface PropertyFormData {
   examples?: string[]; // Array of example values (JSON strings)
 
   // Object constraints
-  additionalProperties?: 'default' | 'true' | 'false';
+  additionalProperties?: 'default' | 'true' | 'false' | 'type' | 'schema';
+  additionalPropertiesType?: 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array'; // For inline type schema
+  additionalPropertiesSchema?: string; // Class name reference for schema option
   minProperties?: string;
   maxProperties?: string;
   patternProperties?: Record<string, any>; // Map of regex patterns to schemas
@@ -359,6 +361,9 @@ export interface PropertyFormFieldsProps {
     data: any;
     description?: string;
   }>;
+
+  // Available class names for schema references
+  availableClasses?: string[];
 }
 
 export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
@@ -370,6 +375,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                                                         showTitle = true,
                                                                         size = 'medium',
                                                                         nestedProperties,
+                                                                        availableClasses = [],
                                                                       }) => {
   const { mode: colorMode, systemMode } = useColorScheme();
   const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
@@ -378,6 +384,13 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   const [enumError, setEnumError] = React.useState('');
   const [exampleInput, setExampleInput] = React.useState('');
   const [exampleError, setExampleError] = React.useState('');
+
+  // State for pattern properties form
+  const [newPattern, setNewPattern] = React.useState('');
+  const [newPatternSchema, setNewPatternSchema] = React.useState({ type: 'string' } as any);
+
+  // State for dependent schemas form
+  const [newDepPropName, setNewDepPropName] = React.useState('');
 
   // DnD sensors for enum reordering
   const sensors = useSensors(
@@ -1780,20 +1793,82 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <FormControlLabel
-                  control={<Radio checked={data.additionalProperties === 'default'} onChange={() => onChange('additionalProperties', 'default')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Default (allows additional)</Typography>}
+                  control={<Radio checked={data.additionalProperties === 'default' || !data.additionalProperties} onChange={() => onChange('additionalProperties', 'default')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Not specified (default)</Typography>}
                   sx={{ m: 0 }}
                 />
                 <FormControlLabel
                   control={<Radio checked={data.additionalProperties === 'true'} onChange={() => onChange('additionalProperties', 'true')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Allow additional properties</Typography>}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Allow Any (true)</Typography>}
                   sx={{ m: 0 }}
                 />
                 <FormControlLabel
                   control={<Radio checked={data.additionalProperties === 'false'} onChange={() => onChange('additionalProperties', 'false')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
-                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Strict (no extra properties)</Typography>}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Disallow (false)</Typography>}
                   sx={{ m: 0 }}
                 />
+                <FormControlLabel
+                  control={<Radio checked={data.additionalProperties === 'type'} onChange={() => onChange('additionalProperties', 'type')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Must Be Type</Typography>}
+                  sx={{ m: 0 }}
+                />
+                {data.additionalProperties === 'type' && (
+                  <Box sx={{ pl: 4, mt: 0.5 }}>
+                    <FormControl size="small" fullWidth>
+                      <MuiSelect
+                        value={data.additionalPropertiesType || 'string'}
+                        onChange={(e) => onChange('additionalPropertiesType', e.target.value)}
+                        sx={{ fontSize: '0.85rem' }}
+                      >
+                        <MenuItem value="string">string</MenuItem>
+                        <MenuItem value="number">number</MenuItem>
+                        <MenuItem value="integer">integer</MenuItem>
+                        <MenuItem value="boolean">boolean</MenuItem>
+                        <MenuItem value="object">object</MenuItem>
+                        <MenuItem value="array">array</MenuItem>
+                      </MuiSelect>
+                    </FormControl>
+                  </Box>
+                )}
+                <FormControlLabel
+                  control={<Radio checked={data.additionalProperties === 'schema'} onChange={() => onChange('additionalProperties', 'schema')} size="small" sx={{ '&.Mui-checked': { color: '#6366f1' } }} />}
+                  label={<Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>Must Match Schema</Typography>}
+                  sx={{ m: 0 }}
+                />
+                {data.additionalProperties === 'schema' && (
+                  <Box sx={{ pl: 4, mt: 0.5 }}>
+                    {availableClasses.length > 0 ? (
+                      <FormControl size="small" fullWidth>
+                        <MuiSelect
+                          value={data.additionalPropertiesSchema || ''}
+                          onChange={(e) => onChange('additionalPropertiesSchema', e.target.value)}
+                          displayEmpty
+                          sx={{ fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="" disabled>
+                            <em>Select a class...</em>
+                          </MenuItem>
+                          {availableClasses.map((cls) => (
+                            <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                          ))}
+                        </MuiSelect>
+                      </FormControl>
+                    ) : (
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={data.additionalPropertiesSchema || ''}
+                        onChange={(e) => onChange('additionalPropertiesSchema', e.target.value)}
+                        placeholder="ClassName or #/components/schemas/ClassName"
+                        helperText="Enter class name or $ref path"
+                        sx={{
+                          '& .MuiInputBase-input': { fontSize: '0.85rem' },
+                          '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                        }}
+                      />
+                    )}
+                  </Box>
+                )}
               </Box>
             </Box>
 
@@ -1906,61 +1981,54 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       </List>
                     )}
 
-                    {(() => {
-                      const [newPattern, setNewPattern] = React.useState('');
-                      const [newSchema, setNewSchema] = React.useState({ type: 'string' } as any);
-
-                      return (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                          <TextField
-                            label="Pattern (regex)"
-                            size={size}
-                            fullWidth
-                            value={newPattern}
-                            onChange={(e) => setNewPattern(e.target.value)}
-                            placeholder="^env_|^flag_"
-                            helperText="Regular expression to match property names"
-                            sx={{
-                              '& .MuiInputBase-input': {
-                                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-                                fontSize: '0.85rem',
-                              },
-                              '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                              '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
-                            }}
-                          />
-                          <PatternPropertySchemaEditor
-                            schemaValue={newSchema}
-                            onChange={(newSchema) => setNewSchema(newSchema)}
-                            isDark={isDark}
-                            rows={5}
-                            size={(size === 'medium' || size === 'small') ? size : 'small'}
-                          />
-                          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <IconButton
-                              size="small"
-                              disabled={!newPattern.trim()}
-                              onClick={() => {
-                                if (!newPattern.trim()) return;
-                                const schemaObj = typeof newSchema === 'string' ? JSON.parse(newSchema) : newSchema;
-                                const newPatterns = { ...(patterns || {}), [newPattern]: schemaObj };
-                                onChange('patternProperties', newPatterns);
-                                setNewPattern('');
-                                setNewSchema({ type: 'string' });
-                              }}
-                              sx={{
-                                bgcolor: '#6366f1',
-                                color: 'white',
-                                '&:hover': { bgcolor: '#4f46e5' },
-                                '&.Mui-disabled': { bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: isDark ? '#475569' : '#94a3b8' },
-                              }}
-                            >
-                              <AddIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Box>
-                      );
-                    })()}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <TextField
+                        label="Pattern (regex)"
+                        size={size}
+                        fullWidth
+                        value={newPattern}
+                        onChange={(e) => setNewPattern(e.target.value)}
+                        placeholder="^env_|^flag_"
+                        helperText="Regular expression to match property names"
+                        sx={{
+                          '& .MuiInputBase-input': {
+                            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                            fontSize: '0.85rem',
+                          },
+                          '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                          '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                        }}
+                      />
+                      <PatternPropertySchemaEditor
+                        schemaValue={newPatternSchema}
+                        onChange={(schema) => setNewPatternSchema(schema)}
+                        isDark={isDark}
+                        rows={5}
+                        size={(size === 'medium' || size === 'small') ? size : 'small'}
+                      />
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <IconButton
+                          size="small"
+                          disabled={!newPattern.trim()}
+                          onClick={() => {
+                            if (!newPattern.trim()) return;
+                            const schemaObj = typeof newPatternSchema === 'string' ? JSON.parse(newPatternSchema) : newPatternSchema;
+                            const newPatterns = { ...(patterns || {}), [newPattern]: schemaObj };
+                            onChange('patternProperties', newPatterns);
+                            setNewPattern('');
+                            setNewPatternSchema({ type: 'string' });
+                          }}
+                          sx={{
+                            bgcolor: '#6366f1',
+                            color: 'white',
+                            '&:hover': { bgcolor: '#4f46e5' },
+                            '&.Mui-disabled': { bgcolor: isDark ? '#1e293b' : '#e2e8f0', color: isDark ? '#475569' : '#94a3b8' },
+                          }}
+                        >
+                          <AddIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </Box>
 
                     {patternEntries.length === 0 && (
                       <Box sx={{
@@ -2375,7 +2443,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                         if (val === 'const') {
                                           newSchema.if = { properties: { [triggerProp]: { const: conditionValue || '' } } };
                                         } else if (val === 'enum') {
-                                          newSchema.if = { properties: { [triggerProp]: { enum: conditionValue ? conditionValue.split(',').map(s => s.trim()).filter(Boolean) : [] } } };
+                                          newSchema.if = { properties: { [triggerProp]: { enum: conditionValue ? conditionValue.split(',').map((s: string) => s.trim()).filter(Boolean) : [] } } };
                                         } else {
                                           newSchema.if = { properties: { [triggerProp]: {} }, required: [triggerProp] };
                                         }
@@ -2399,7 +2467,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                         if (conditionType === 'const') {
                                           newSchema.if = { properties: { [triggerProp]: { const: e.target.value } } };
                                         } else {
-                                          newSchema.if = { properties: { [triggerProp]: { enum: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } } };
+                                          newSchema.if = { properties: { [triggerProp]: { enum: e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean) } } };
                                         }
                                         newSchemas[triggerProp] = newSchema;
                                         onChange('dependentSchemas', newSchemas);
@@ -2566,54 +2634,48 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     )}
 
                     {/* Add new dependent schema */}
-                    {(() => {
-                      const [newPropName, setNewPropName] = React.useState('');
-
-                      return (
-                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                          <TextField
-                            size="small"
-                            value={newPropName}
-                            onChange={(e) => setNewPropName(e.target.value)}
-                            placeholder="Enter trigger property name"
-                            sx={{
-                              flex: 1,
-                              '& .MuiInputBase-input': {
-                                fontFamily: '"JetBrains Mono", monospace',
-                                fontSize: '0.85rem',
-                              },
-                            }}
-                          />
-                          <Button
-                            variant="contained"
-                            size="small"
-                            disabled={!newPropName.trim()}
-                            onClick={() => {
-                              if (newPropName.trim()) {
-                                const newSchemas = {
-                                  ...(dependentSchemas || {}),
-                                  [newPropName.trim()]: {
-                                    if: { properties: { [newPropName.trim()]: {} } },
-                                    then: { required: [] },
-                                    else: { required: [] }
-                                  }
-                                };
-                                onChange('dependentSchemas', newSchemas);
-                                setNewPropName('');
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <TextField
+                        size="small"
+                        value={newDepPropName}
+                        onChange={(e) => setNewDepPropName(e.target.value)}
+                        placeholder="Enter trigger property name"
+                        sx={{
+                          flex: 1,
+                          '& .MuiInputBase-input': {
+                            fontFamily: '"JetBrains Mono", monospace',
+                            fontSize: '0.85rem',
+                          },
+                        }}
+                      />
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={!newDepPropName.trim()}
+                        onClick={() => {
+                          if (newDepPropName.trim()) {
+                            const newSchemas = {
+                              ...(dependentSchemas || {}),
+                              [newDepPropName.trim()]: {
+                                if: { properties: { [newDepPropName.trim()]: {} } },
+                                then: { required: [] },
+                                else: { required: [] }
                               }
-                            }}
-                            sx={{
-                              bgcolor: '#6366f1',
-                              '&:hover': { bgcolor: '#4f46e5' },
-                              textTransform: 'none',
-                            }}
-                            startIcon={<AddIcon />}
-                          >
-                            Add
-                          </Button>
-                        </Box>
-                      );
-                    })()}
+                            };
+                            onChange('dependentSchemas', newSchemas);
+                            setNewDepPropName('');
+                          }
+                        }}
+                        sx={{
+                          bgcolor: '#6366f1',
+                          '&:hover': { bgcolor: '#4f46e5' },
+                          textTransform: 'none',
+                        }}
+                        startIcon={<AddIcon />}
+                      >
+                        Add
+                      </Button>
+                    </Box>
 
                     {schemaEntries.length === 0 && (
                       <Box sx={{

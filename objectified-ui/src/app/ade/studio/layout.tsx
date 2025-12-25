@@ -269,8 +269,14 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       />
 
       {/* Property Dialog */}
-      <PropertyDialog open={propertyDialog.open} onClose={() => setPropertyDialog({ open: false, mode: 'add', selectedProperty: null })}
-                      mode={propertyDialog.mode} property={propertyDialog.selectedProperty} onSubmit={handlePropertySubmit} />
+      <PropertyDialog
+        open={propertyDialog.open}
+        onClose={() => setPropertyDialog({ open: false, mode: 'add', selectedProperty: null })}
+        mode={propertyDialog.mode}
+        property={propertyDialog.selectedProperty}
+        onSubmit={handlePropertySubmit}
+        availableClasses={classes.map(c => c.name)}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, target: null })}>
