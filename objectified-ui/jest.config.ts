@@ -26,7 +26,26 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  testTimeout: 30000, // 30 seconds for import operations
+  testTimeout: 30000,
+
+  // Verbose output configuration - provides detailed pass/fail info per test
+  verbose: true,
+  bail: false,
+  notify: false,
+  notifyMode: 'failure-change',
+
+  // Built-in reporter with verbose output
+  reporters: [
+    [
+      'default',
+      {
+        verbose: true,
+      }
+    ]
+  ],
+
+  // Test name pattern for verbose logging
+  testNamePattern: '.*',
 };
 
 export default config;

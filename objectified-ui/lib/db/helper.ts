@@ -351,8 +351,8 @@ export async function copyClassesFromVersion(sourceVersionId: string, targetVers
         const newClassId = copiedClass.id;
 
         // Copy all class properties (including parent_id for nested properties)
-        // We need to map old property IDs to new ones to maintain parent_id relationships
-        
+        // We need to map old property IDs to new ones to maintain parent-child relationships
+
         // First, get all properties from the original class
         const originalPropertiesResult = await connectionPool.query(
           `SELECT id, property_id, name, description, data, parent_id
@@ -1098,13 +1098,15 @@ export async function extractObjectPropertyToClass(
     }
 
     const classProperty = propertyResult.rows[0];
-    const propData = typeof classProperty.data === 'string'
-      ? JSON.parse(classProperty.data)
-      : classProperty.data;
+    const rawData = classProperty?.data;
+    const propData = rawData == null
+      ? {}
+      : (typeof rawData === 'string' ? (() => { try { return JSON.parse(rawData); } catch { return {}; } })() : rawData);
 
     // Validate that it's an object type
-    const isDirectObject = propData.type === 'object' && !propData.$ref;
-    const isArrayOfObjects = propData.type === 'array' && propData.items?.type === 'object' && !propData.items?.$ref;
+    const propType = (propData as any)?.type;
+    const isDirectObject = propType === 'object' && !(propData as any)?.$ref;
+    const isArrayOfObjects = propType === 'array' && (propData as any)?.items?.type === 'object' && !(propData as any)?.items?.$ref;
 
     if (!isDirectObject && !isArrayOfObjects) {
       return JSON.stringify({
@@ -1184,18 +1186,17 @@ export async function extractObjectPropertyToClass(
     // 1. Have property_id !== NULL (from property library), OR
     // 2. Are references (have $ref in data)
     for (const nestedProp of allNestedPropsResult.rows) {
-      const nestedData = typeof nestedProp.data === 'string'
-        ? JSON.parse(nestedProp.data)
-        : nestedProp.data;
+      const rawNested = nestedProp?.data;
+      const nestedData = rawNested == null
+        ? {}
+        : (typeof rawNested === 'string' ? (() => { try { return JSON.parse(rawNested); } catch { return {}; } })() : rawNested);
 
       // Check if this property satisfies the database constraint
       const hasPropertyId = nestedProp.property_id !== null;
-      const isReference = nestedData.$ref || (nestedData.type === 'array' && nestedData.items?.$ref);
+      const isReference = (nestedData as any)?.$ref || ((nestedData as any)?.type === 'array' && (nestedData as any)?.items?.$ref);
       const canBeCopied = hasPropertyId || isReference;
 
       if (!canBeCopied) {
-        // Skip inline properties that don't have property_id and aren't references
-        // They will remain in the class schema's properties field
         console.warn(`Skipping inline property "${nestedProp.name}" at depth ${nestedProp.depth} - not from library and not a reference`);
         continue;
       }
@@ -1226,7 +1227,7 @@ export async function extractObjectPropertyToClass(
     }
 
     // Update the original property to reference the new class
-    const updatedPropData = { ...propData };
+    const updatedPropData: any = { ...(propData as any) };
     if (isArrayOfObjects) {
       updatedPropData.items = {
         $ref: `#/components/schemas/${newClassName.trim()}`
@@ -2304,7 +2305,7 @@ export async function updateTag(tagId: string, name: string | null = null, color
     const result = await connectionPool.query(
       `UPDATE odb.tags
        SET ${updates.join(', ')}
-       WHERE id = $${paramIndex}
+       WHERE id = $1
        RETURNING id, project_id, name, color, description, created_at, updated_at`,
       params
     );
