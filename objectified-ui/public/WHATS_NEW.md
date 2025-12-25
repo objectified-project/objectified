@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 - Bug fixes:
   - Added support for missing patternProperties in the property editor
+  - Added support for discriminator mapping in the class editor
   - Fixed dependentProperties editing in the class editor, adds a logic builder
   - Fixed unevaluatedProperties in comprehension section of schemas
   - Fixed if/then/else in comprehension section of schemas
