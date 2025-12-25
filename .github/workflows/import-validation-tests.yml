@@ -1,0 +1,101 @@
+name: Import Validation Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Import Validation Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: objectified_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: |
+          cd objectified-ui
+          yarn install --frozen-lockfile
+
+      - name: Run import validation tests
+        run: |
+          cd objectified-ui
+          yarn test:import --ci
+        env:
+          TEST_POSTGRES_DB: objectified_test
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          NODE_ENV: test
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./objectified-ui/coverage/lcov.info
+          flags: import-validation
+          name: import-validation-coverage
+
+      - name: Generate test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Import Validation Test Results
+          path: objectified-ui/coverage/junit.xml
+          reporter: jest-junit
+          fail-on-error: true
+
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const coverage = fs.readFileSync('objectified-ui/coverage/coverage-summary.json', 'utf8');
+            const summary = JSON.parse(coverage);
+            
+            const comment = `## 🧪 Import Validation Test Results
+            
+            **Coverage Summary:**
+            - Statements: ${summary.total.statements.pct}%
+            - Branches: ${summary.total.branches.pct}%
+            - Functions: ${summary.total.functions.pct}%
+            - Lines: ${summary.total.lines.pct}%
+            
+            All example files were successfully imported and validated! ✅
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
