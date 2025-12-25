@@ -160,6 +160,15 @@ export async function startImport(input: ImportJobInput) {
       const norm = importer.normalize({ document: input.document, options: { selectedSchemas: input.options.selectedSchemas } });
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));
 
+      // Log normalized class info for debugging
+      for (const cls of norm.classes) {
+        emit(job, 'info', 'DEBUG_NORMALIZED_CLASS', `Normalized class: ${cls.name}`, {
+          propertyCount: cls.properties?.length || 0,
+          properties: cls.properties?.map(p => p.name).join(', ') || 'none',
+          hasDiscriminator: !!cls.schema?.discriminator
+        });
+      }
+
       if (job.canceled) throw new Error('Import canceled');
 
       setProgress(job, 'creating-project', 1, 0, input.project.name);
