@@ -1,5 +1,28 @@
 # Changelog
 
+### December 26, 2025 - Version 3.2.5
+
+- **Reusable Property Patterns** ✅ COMPLETED
+  - Pre-built property templates for common fields:
+    - ✅ **Identifiers**: UUID, ULID, nanoid, auto-increment
+    - ✅ **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
+    - ✅ **Audit Fields**: createdBy, updatedBy, version
+    - ✅ **Status Fields**: status enum, isActive boolean, state machine
+    - ✅ **Address Fields**: street, city, state, zip, country
+    - ✅ **Contact Fields**: email, phone, mobile, fax
+    - ✅ **Money Fields**: amount, currency (ISO 4217)
+    - ✅ **Geolocation**: latitude, longitude, geohash
+    - ✅ **Internationalization**: locale, timezone, language
+    - ✅ **Pagination**: page, limit, offset, cursor
+    - ✅ **Search**: query, filters, sort, fields
+  - ✅ Property templates include:
+    - ✅ Data type and format
+    - ✅ Validation rules (regex, min/max, enum)
+    - ✅ Default values
+    - ✅ Examples
+    - ✅ Documentation
+
+
 ### December 20, 2025 - Version 3.2.4 (DOT/GraphViz Export Implementation)
 - **Implemented Canvas Export as DOT (GraphViz)** ✅ COMPLETED
     - Created handleExportDot function for GraphViz DOT language export

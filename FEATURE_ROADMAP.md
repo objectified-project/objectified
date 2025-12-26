@@ -1505,29 +1505,9 @@ The import wizard adapts to smaller screens:
 
 ### Property Templates
 
-**Reusable Property Patterns** ✅ COMPLETE
-- Pre-built property templates for common fields:
-  - ✅ **Identifiers**: UUID, ULID, nanoid, auto-increment
-  - ✅ **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
-  - ✅ **Audit Fields**: createdBy, updatedBy, version
-  - ✅ **Status Fields**: status enum, isActive boolean, state machine
-  - ✅ **Address Fields**: street, city, state, zip, country
-  - ✅ **Contact Fields**: email, phone, mobile, fax
-  - ✅ **Money Fields**: amount, currency (ISO 4217)
-  - ✅ **Geolocation**: latitude, longitude, geohash
-  - ✅ **Internationalization**: locale, timezone, language
-  - ✅ **Pagination**: page, limit, offset, cursor
-  - ✅ **Search**: query, filters, sort, fields
-- ✅ Property templates include:
-  - ✅ Data type and format
-  - ✅ Validation rules (regex, min/max, enum)
-  - ✅ Default values
-  - ✅ Examples
-  - ✅ Documentation
-
 **Property Template Library** 📋 PLANNED
 - ✅ Browse property templates by category
-- 📋 Search property templates
+- ✅ Search property templates
 - Preview property configuration
 - "Add to Class" quick action
 - Customize property before adding
@@ -1537,7 +1517,6 @@ The import wizard adapts to smaller screens:
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
 | [#218] | Browse property template library by category |
-| [#219] | Add ability to search property templates     |
 
 ---
 

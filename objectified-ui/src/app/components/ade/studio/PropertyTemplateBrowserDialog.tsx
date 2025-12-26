@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Search, Package, Clock, Star, ChevronRight, Plus, Filter, Tag } from 'lucide-react';
 import { Button } from '../../ui/Button';
@@ -108,7 +108,11 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
     try {
       const result = JSON.parse(await getPropertyTemplates(tenantId, selectedCategory));
       if (result.success) {
-        setTemplates(result.templates);
+        // Sort templates alphabetically by name
+        const sortedTemplates = result.templates.sort((a: PropertyTemplate, b: PropertyTemplate) =>
+          a.name.localeCompare(b.name)
+        );
+        setTemplates(sortedTemplates);
       } else {
         setError(result.error || 'Failed to load templates');
       }
@@ -130,7 +134,11 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
     try {
       const result = JSON.parse(await searchPropertyTemplates(searchQuery.trim(), tenantId, selectedCategory));
       if (result.success) {
-        setTemplates(result.templates);
+        // Sort search results alphabetically by name
+        const sortedTemplates = result.templates.sort((a: PropertyTemplate, b: PropertyTemplate) =>
+          a.name.localeCompare(b.name)
+        );
+        setTemplates(sortedTemplates);
       } else {
         setError(result.error || 'Search failed');
       }
@@ -189,18 +197,6 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
     setSelectedTemplate(template);
     setCustomName(template.name);
   };
-
-  // Group templates by category
-  const groupedTemplates = useMemo(() => {
-    const groups: Record<string, PropertyTemplate[]> = {};
-    templates.forEach(template => {
-      if (!groups[template.category]) {
-        groups[template.category] = [];
-      }
-      groups[template.category].push(template);
-    });
-    return groups;
-  }, [templates]);
 
   // Format schema for preview
   const formatSchemaPreview = (schema: any) => {
@@ -334,8 +330,8 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     No templates found
                   </div>
-                ) : selectedCategory ? (
-                  // Single category view
+                ) : (
+                  // Show all templates alphabetically (works for both single category and all categories)
                   <div className="space-y-2">
                     {templates.map((template) => (
                       <TemplateCard
@@ -345,36 +341,6 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
                         onClick={() => handleSelectTemplate(template)}
                       />
                     ))}
-                  </div>
-                ) : (
-                  // Grouped by category
-                  <div className="space-y-6">
-                    {Object.entries(groupedTemplates).map(([category, categoryTemplates]) => {
-                      const config = getCategoryConfig(category);
-                      return (
-                        <div key={category}>
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="text-lg">{config.icon}</span>
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                              {config.label}
-                            </h3>
-                            <span className="text-xs text-gray-500 dark:text-gray-500">
-                              ({categoryTemplates.length})
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {categoryTemplates.map((template) => (
-                              <TemplateCard
-                                key={template.id}
-                                template={template}
-                                isSelected={selectedTemplate?.id === template.id}
-                                onClick={() => handleSelectTemplate(template)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 )}
               </div>
