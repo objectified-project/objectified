@@ -425,6 +425,63 @@ describe('Database Helper - Project Functions', () => {
       ['proj-1']
     );
   });
+
+  test('permanentDeleteProject should delete project and all related data', async () => {
+    const { permanentDeleteProject } = await import('../lib/db/helper');
+    const db = require('../lib/db/db');
+
+    // Mock the connection pool connect method for transaction
+    const mockClient = {
+      query: jest.fn(),
+      release: jest.fn()
+    };
+
+    db.connect = jest.fn().mockResolvedValue(mockClient);
+
+    // Mock the queries in order
+    mockClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: 'ver-1' }, { id: 'ver-2' }] }) // Get versions
+      .mockResolvedValueOnce({ rows: [{ id: 'class-1' }, { id: 'class-2' }] }) // Get classes
+      .mockResolvedValueOnce({}) // Delete class_properties
+      .mockResolvedValueOnce({}) // Delete classes
+      .mockResolvedValueOnce({}) // Delete versions
+      .mockResolvedValueOnce({}) // Delete properties
+      .mockResolvedValueOnce({}) // Delete project
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const result = await permanentDeleteProject('proj-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+    expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  test('permanentDeleteProject should rollback on error', async () => {
+    const { permanentDeleteProject } = await import('../lib/db/helper');
+    const db = require('../lib/db/db');
+
+    const mockClient = {
+      query: jest.fn(),
+      release: jest.fn()
+    };
+
+    db.connect = jest.fn().mockResolvedValue(mockClient);
+
+    mockClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockRejectedValueOnce(new Error('Database error')); // Simulate error
+
+    const result = await permanentDeleteProject('proj-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Database error');
+    expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(mockClient.release).toHaveBeenCalled();
+  });
 });
 
 describe('Database Helper - Version Functions', () => {

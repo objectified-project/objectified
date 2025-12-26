@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, Lock, Globe, Copy, ExternalLink, Search, FileText } from 'lucide-react';
+import { Eye, Lock, Globe, Copy, ExternalLink, Search, FileText, MoreVertical } from 'lucide-react';
 import { getPublishedVersionsForTenant, updateVersionVisibility } from '../../../../../lib/db/helper';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -37,6 +37,10 @@ const PublishedVersions = () => {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [changingVisibility, setChangingVisibility] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Dropdown state
+  const [openVersionDropdown, setOpenVersionDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
@@ -262,24 +266,120 @@ const PublishedVersions = () => {
                         <div className="text-xs text-gray-500 dark:text-gray-400">by {version.creator_name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <Select onValueChange={(value) => handleAction(value, version)}>
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Actions" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="open"><div className="flex items-center gap-2"><ExternalLink className="h-4 w-4 text-blue-600" />View OpenAPI</div></SelectItem>
-                            <SelectItem value="arazzo"><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-orange-600" />View Arazzo</div></SelectItem>
-                            <SelectItem value="json"><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-orange-600" />View JSON Schema</div></SelectItem>
-                            <SelectItem value="swagger"><div className="flex items-center gap-2"><FileText className="h-4 w-4 text-purple-600" />Swagger UI</div></SelectItem>
-                            <SelectItem value="copy"><div className="flex items-center gap-2"><Copy className="h-4 w-4 text-blue-600" />Copy URL</div></SelectItem>
-                            <SelectItem value="visibility">
-                              <div className="flex items-center gap-2">
-                                {version.visibility === 'public' ? <Lock className="h-4 w-4 text-gray-700" /> : <Globe className="h-4 w-4 text-green-600" />}
-                                {version.visibility === 'public' ? 'Make Private' : 'Make Public'}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setDropdownPosition({
+                                top: rect.bottom + 4,
+                                right: window.innerWidth - rect.right
+                              });
+                              setOpenVersionDropdown(openVersionDropdown === version.id ? null : version.id);
+                            }}
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                            title="Actions"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+
+                          {openVersionDropdown === version.id && dropdownPosition && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                }}
+                              />
+                              <div
+                                className="fixed w-52 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+                                style={{
+                                  top: `${dropdownPosition.top}px`,
+                                  right: `${dropdownPosition.right}px`
+                                }}>
+                                <div className="py-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleAction('open', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <ExternalLink className="w-4 h-4 text-blue-500" />
+                                    View OpenAPI
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleAction('arazzo', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <FileText className="w-4 h-4 text-orange-500" />
+                                    View Arazzo
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleAction('json', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <FileText className="w-4 h-4 text-orange-500" />
+                                    View JSON Schema
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleAction('swagger', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <FileText className="w-4 h-4 text-purple-500" />
+                                    Swagger UI
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleAction('copy', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    <Copy className="w-4 h-4 text-blue-500" />
+                                    Copy URL
+                                  </button>
+                                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenVersionDropdown(null);
+                                      handleAction('visibility', version);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  >
+                                    {version.visibility === 'public' ? (
+                                      <>
+                                        <Lock className="w-4 h-4 text-gray-500" />
+                                        Make Private
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Globe className="w-4 h-4 text-green-500" />
+                                        Make Public
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                               </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

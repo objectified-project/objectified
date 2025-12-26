@@ -283,6 +283,74 @@ export async function deleteProject(projectId: string) {
   }
 }
 
+export async function permanentDeleteProject(projectId: string) {
+  try {
+    // Begin transaction to ensure all related data is deleted atomically
+    const client = await connectionPool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get all version IDs for this project
+      const versionsResult = await client.query(
+        `SELECT id FROM odb.versions WHERE project_id = $1`,
+        [projectId]
+      );
+      const versionIds = versionsResult.rows.map((row: any) => row.id);
+
+      if (versionIds.length > 0) {
+        // Get all class IDs for these versions
+        const classesResult = await client.query(
+          `SELECT id FROM odb.classes WHERE version_id = ANY($1)`,
+          [versionIds]
+        );
+        const classIds = classesResult.rows.map((row: any) => row.id);
+
+        if (classIds.length > 0) {
+          // Delete all class_properties for these classes
+          await client.query(
+            `DELETE FROM odb.class_properties WHERE class_id = ANY($1)`,
+            [classIds]
+          );
+
+          // Delete all classes for these versions
+          await client.query(
+            `DELETE FROM odb.classes WHERE version_id = ANY($1)`,
+            [versionIds]
+          );
+        }
+
+        // Delete all versions for this project
+        await client.query(
+          `DELETE FROM odb.versions WHERE project_id = $1`,
+          [projectId]
+        );
+      }
+
+      // Delete all properties directly linked to the project
+      await client.query(
+        `DELETE FROM odb.properties WHERE project_id = $1`,
+        [projectId]
+      );
+
+      // Finally, delete the project itself
+      await client.query(
+        `DELETE FROM odb.projects WHERE id = $1`,
+        [projectId]
+      );
+
+      await client.query('COMMIT');
+      return successResponse();
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    return errorResponse(error.message);
+  }
+}
+
 // Version Management Functions
 
 export async function getVersionsForProject(projectId: string) {

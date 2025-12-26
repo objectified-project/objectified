@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -79,6 +79,10 @@ const Versions = () => {
   const [sourceVersionId, setSourceVersionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Dropdown state
+  const [openVersionDropdown, setOpenVersionDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
 
   const [showOpenApiDialog, setShowOpenApiDialog] = useState(false);
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
@@ -455,19 +459,104 @@ const Versions = () => {
                     {version.published_at && <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Published: {formatDate(version.published_at)}</div>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <Select onValueChange={(val) => handleRowAction(val, version)}>
-                      <SelectTrigger className="w-36"><SelectValue placeholder="Actions" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="view"><div className="flex items-center gap-2"><Eye className="h-4 w-4 text-purple-600" />View Spec</div></SelectItem>
-                        <SelectItem value="edit" disabled={!!version.published}><div className="flex items-center gap-2"><Edit2 className="h-4 w-4 text-blue-600" />Edit</div></SelectItem>
-                        {!version.published ? (
-                          <SelectItem value="publish"><div className="flex items-center gap-2"><Lock className="h-4 w-4 text-green-600" />Publish</div></SelectItem>
-                        ) : (
-                          <SelectItem value="unpublish"><div className="flex items-center gap-2"><Unlock className="h-4 w-4 text-orange-600" />Unpublish</div></SelectItem>
-                        )}
-                        <SelectItem value="delete"><div className="flex items-center gap-2"><Trash2 className="h-4 w-4 text-red-600" />Delete</div></SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setDropdownPosition({
+                            top: rect.bottom + 4,
+                            right: window.innerWidth - rect.right
+                          });
+                          setOpenVersionDropdown(openVersionDropdown === version.id ? null : version.id);
+                        }}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                        title="Actions"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+
+                      {openVersionDropdown === version.id && dropdownPosition && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenVersionDropdown(null);
+                            }}
+                          />
+                          <div
+                            className="fixed w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              right: `${dropdownPosition.right}px`
+                            }}>
+                            <div className="py-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('view', version);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                              >
+                                <Eye className="w-4 h-4 text-purple-500" />
+                                View Spec
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('edit', version);
+                                }}
+                                disabled={!!version.published}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Edit2 className="w-4 h-4 text-blue-500" />
+                                Edit
+                              </button>
+                              {!version.published ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('publish', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Lock className="w-4 h-4 text-green-500" />
+                                  Publish
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('unpublish', version);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Unlock className="w-4 h-4 text-orange-500" />
+                                  Unpublish
+                                </button>
+                              )}
+                              <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('delete', version);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

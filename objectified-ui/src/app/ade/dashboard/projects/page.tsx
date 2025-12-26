@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-  import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import { Alert } from '../../../components/ui/Alert';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
-import { getProjectsForTenant, createProject, updateProject, deleteProject } from '../../../../../lib/db/helper';
+import { getProjectsForTenant, createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
@@ -62,6 +62,10 @@ const Projects = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [editTabValue, setEditTabValue] = useState('basic');
+
+  // Dropdown state
+  const [openProjectDropdown, setOpenProjectDropdown] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
 
   // Metadata state
   const [metadataSummary, setMetadataSummary] = useState('');
@@ -223,6 +227,40 @@ const Projects = () => {
     }
   };
 
+  const handlePermanentDelete = async (project: Project) => {
+    const confirmed = await confirmDialog({
+      title: 'Permanently Delete Project',
+      message: `Are you absolutely sure you want to permanently delete "${project.name}"?\n\nThis will permanently delete:\n• All versions of this project\n• All publications associated with those versions\n• All classes and their properties\n• All properties directly linked to this project\n\nThis action CANNOT be undone and all data will be lost forever.`,
+      variant: 'danger',
+      confirmLabel: 'Permanently Delete',
+      cancelLabel: 'Cancel',
+    });
+    if (!confirmed) return;
+
+    // Double confirmation for safety
+    const doubleConfirmed = await confirmDialog({
+      title: 'Final Confirmation',
+      message: `Type "DELETE" mentally and confirm: You are about to permanently destroy all data for project "${project.name}". This is your last chance to cancel.`,
+      variant: 'danger',
+      confirmLabel: 'Yes, Delete Everything',
+      cancelLabel: 'Cancel',
+    });
+    if (!doubleConfirmed) return;
+
+    try {
+      const result = await permanentDeleteProject(project.id);
+      const response = JSON.parse(result);
+      if (response.success) {
+        await alertDialog({ message: 'Project and all associated data have been permanently deleted.', variant: 'success' });
+        await loadProjects();
+      } else {
+        await alertDialog({ message: response.error || 'Failed to permanently delete project', variant: 'error' });
+      }
+    } catch (error: any) {
+      await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
@@ -324,13 +362,77 @@ const Projects = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(project.created_at)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => handleEditClick(project)} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-colors group" title="Edit">
-                        <Edit2 className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          setDropdownPosition({
+                            top: rect.bottom + 4,
+                            right: window.innerWidth - rect.right
+                          });
+                          setOpenProjectDropdown(openProjectDropdown === project.id ? null : project.id);
+                        }}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                        title="Actions"
+                      >
+                        <MoreVertical className="h-4 w-4" />
                       </button>
-                      <button onClick={() => handleDelete(project.id)} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors group" title="Delete">
-                        <Trash2 className="h-4 w-4 text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
-                      </button>
+
+                      {openProjectDropdown === project.id && dropdownPosition && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenProjectDropdown(null);
+                            }}
+                          />
+                          <div
+                            className="fixed w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              right: `${dropdownPosition.right}px`
+                            }}>
+                            <div className="py-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenProjectDropdown(null);
+                                  handleEditClick(project);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4 text-indigo-500" />
+                                Edit Project
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenProjectDropdown(null);
+                                  handleDelete(project.id);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                                Delete Project
+                              </button>
+                              <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenProjectDropdown(null);
+                                  handlePermanentDelete(project);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                              >
+                                <AlertTriangle className="w-4 h-4" />
+                                Permanently Delete
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
