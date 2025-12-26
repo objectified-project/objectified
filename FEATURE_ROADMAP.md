@@ -1516,7 +1516,7 @@ The import wizard adapts to smaller screens:
   - ✅ **Money Fields**: amount, currency (ISO 4217)
   - ✅ **Geolocation**: latitude, longitude, geohash
   - ✅ **Internationalization**: locale, timezone, language
-  - 📋 **Pagination**: page, limit, offset, cursor
+  - ✅ **Pagination**: page, limit, offset, cursor
   - 📋 **Search**: query, filters, sort, fields
 - 📋 Property templates include:
   - 📋 Data type and format
