@@ -152,7 +152,7 @@ VALUES (
     '{
         "type": "string",
         "description": "City or locality name",
-        "examples": ["New York", "Los Angeles", "London", "Tokyo", "São Paulo"],
+        "examples": ["New York", "Los Angeles", "London", "Tokyo", "Sao Paulo"],
         "minLength": 1,
         "maxLength": 100
     }',
@@ -324,7 +324,7 @@ VALUES (
     '{
         "type": ["string", "null"],
         "description": "Region, state, or province name",
-        "examples": ["California", "Ontario", "Bavaria", "Île-de-France", null],
+        "examples": ["California", "Ontario", "Bavaria", "Ile-de-France", null],
         "maxLength": 100
     }',
     ARRAY['region', 'state', 'province', 'address', 'nullable'],
@@ -1046,11 +1046,11 @@ VALUES (
                 "countryCode": "DE"
             },
             {
-                "streetAddress": "55 Rue du Faubourg Saint-Honoré",
+                "streetAddress": "55 Rue du Faubourg Saint-Honore",
                 "streetAddress2": null,
                 "postalCode": "75008",
                 "city": "Paris",
-                "region": "Île-de-France",
+                "region": "Ile-de-France",
                 "countryCode": "FR"
             }
         ]

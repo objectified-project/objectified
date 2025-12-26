@@ -178,6 +178,9 @@
 - 📋 **Layout sharing**: Share with team, pin as default, version control
 - 📋 **Export/Import layouts**: JSON format for portability
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 #### Navigation & Controls ✅ PARTIALLY COMPLETE
 - ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
 - ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)

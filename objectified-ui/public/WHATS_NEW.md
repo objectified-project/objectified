@@ -14,9 +14,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed unevaluatedProperties in comprehension section of schemas
   - Fixed if/then/else in comprehension section of schemas
   - Fixed additionalProperties in property editor to allow for types and schemas
-- Moved import to its own feature, completely rewrote the logic
+- Implemented a more advanced import system
 - Added ability to import from a file into classes (add a class from a file)
-- Removed Mermaid diagram display, changed to export option
+- Added property templates
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
