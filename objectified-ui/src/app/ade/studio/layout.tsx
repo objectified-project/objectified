@@ -11,6 +11,7 @@ import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '
 import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
 import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
 import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
+import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
 import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
 
@@ -40,6 +41,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const [classDialog, setClassDialog] = useState({ open: false, selectedClass: null as ClassItem | null });
   const [classImportDialog, setClassImportDialog] = useState({ open: false });
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
+  const [propertyTemplateDialog, setPropertyTemplateDialog] = useState({ open: false });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null as { type: 'class' | 'property'; id: string } | null });
 
 
@@ -160,6 +162,13 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setPropertyDialog({ open: true, mode: 'add', selectedProperty: null });
   };
 
+  const handlePropertyTemplates = async () => {
+    if (!(await checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog))) return;
+    if (!(await checkPermissions(!isReadOnly, 'Cannot add properties to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
+
+    setPropertyTemplateDialog({ open: true });
+  };
+
   const handlePropertyEdit = async (propertyItem: PropertyItem) => {
     if (!(await checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog))) return;
     if (!(await checkPermissions(!isReadOnly, 'Cannot edit properties in a published version. Please select an unpublished version to make changes.', alertDialog))) return;
@@ -226,7 +235,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         zoomToClassFn(classItem.id);
       }
     },
-    onPropertyAdd: handlePropertyAdd, onPropertyEdit: handlePropertyEdit, onPropertyDelete: handlePropertyDelete,
+    onPropertyAdd: handlePropertyAdd, onPropertyEdit: handlePropertyEdit, onPropertyDelete: handlePropertyDelete, onPropertyTemplates: handlePropertyTemplates,
     onPropertySelect: (propertyItem) => console.log('Property selected:', propertyItem),
   };
 
@@ -298,6 +307,17 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         property={propertyDialog.selectedProperty}
         onSubmit={handlePropertySubmit}
         availableClasses={classes.map(c => c.name)}
+      />
+
+      {/* Property Template Browser Dialog */}
+      <PropertyTemplateBrowserDialog
+        open={propertyTemplateDialog.open}
+        onClose={() => setPropertyTemplateDialog({ open: false })}
+        onSuccess={() => {
+          setRefreshKey(prev => prev + 1);
+        }}
+        projectId={selectedProjectId || ''}
+        tenantId={currentTenantId}
       />
 
       {/* Delete Confirmation Dialog */}

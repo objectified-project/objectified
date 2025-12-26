@@ -16,7 +16,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
 import { useColorScheme } from '@mui/material/styles';
-import { Search, Add, Edit, Delete, Upload } from '@mui/icons-material';
+import { Search, Add, Edit, Delete, Upload, LibraryBooks } from '@mui/icons-material';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 
 export interface ClassItem {
@@ -74,6 +74,7 @@ export interface StudioSideNavCallbacks {
   onPropertyEdit?: (propertyItem: PropertyItem) => void;
   onPropertyDelete?: (propertyId: string) => void;
   onPropertySelect?: (propertyItem: PropertyItem) => void;
+  onPropertyTemplates?: () => void;
 }
 
 interface StudioSideNavProps {
@@ -791,8 +792,30 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                 )}
               </Box>
 
-              {/* Add Button */}
-              <Box sx={{ position: 'absolute', bottom: 20, right: 20 }}>
+              {/* Action Buttons */}
+              <Box sx={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 1 }}>
+                <Fab
+                  size="small"
+                  onClick={() => callbacks.onPropertyTemplates?.()}
+                  disabled={!selectedProjectId || isReadOnly}
+                  aria-label="Browse property templates"
+                  title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Browse property templates'}
+                  sx={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-2px) scale(1.05)',
+                      boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)',
+                    },
+                    '&:disabled': {
+                      background: isDark ? '#475569' : '#e2e8f0',
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  <LibraryBooks />
+                </Fab>
                 <Fab
                   color="primary"
                   size="small"

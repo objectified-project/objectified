@@ -2474,3 +2474,377 @@ export async function removeTagFromClass(classId: string, tagId: string) {
   }
 }
 
+// =============================================================================
+// Property Templates
+// =============================================================================
+
+export interface PropertyTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  schema: any;
+  tags: string[];
+  tenant_id: string | null;
+  created_by: string | null;
+  is_system: boolean;
+  is_public: boolean;
+  usage_count: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PropertyTemplateCategory {
+  category: string;
+  count: number;
+}
+
+/**
+ * Get all property templates visible to a tenant
+ * Returns system templates + tenant's own templates + public templates from other tenants
+ */
+export async function getPropertyTemplates(tenantId?: string | null, category?: string | null) {
+  try {
+    let query = `
+      SELECT id, name, description, category, schema, tags, tenant_id, created_by,
+             is_system, is_public, usage_count, enabled, created_at, updated_at
+      FROM odb.property_templates
+      WHERE deleted_at IS NULL AND enabled = true
+        AND (
+          is_system = true 
+          OR is_public = true
+          ${tenantId ? 'OR tenant_id = $1' : ''}
+        )
+    `;
+
+    const params: any[] = [];
+    if (tenantId) {
+      params.push(tenantId);
+    }
+
+    if (category) {
+      params.push(category);
+      query += ` AND category = $${params.length}`;
+    }
+
+    query += ' ORDER BY is_system DESC, category, usage_count DESC, name';
+
+    const result = await connectionPool.query(query, params);
+    return JSON.stringify({ success: true, templates: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching property templates:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Get property template categories with counts
+ */
+export async function getPropertyTemplateCategories(tenantId?: string | null) {
+  try {
+    let query = `
+      SELECT category, COUNT(*) as count
+      FROM odb.property_templates
+      WHERE deleted_at IS NULL AND enabled = true
+        AND (
+          is_system = true 
+          OR is_public = true
+          ${tenantId ? 'OR tenant_id = $1' : ''}
+        )
+      GROUP BY category
+      ORDER BY category
+    `;
+
+    const params = tenantId ? [tenantId] : [];
+    const result = await connectionPool.query(query, params);
+    return JSON.stringify({ success: true, categories: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching property template categories:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Search property templates by name, description, or tags
+ */
+export async function searchPropertyTemplates(
+  searchQuery: string,
+  tenantId?: string | null,
+  category?: string | null
+) {
+  try {
+    const params: any[] = [searchQuery];
+    let paramIndex = 2;
+
+    let query = `
+      SELECT id, name, description, category, schema, tags, tenant_id, created_by,
+             is_system, is_public, usage_count, enabled, created_at, updated_at,
+             ts_rank(to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(description, '')), 
+                     plainto_tsquery('english', $1)) as rank
+      FROM odb.property_templates
+      WHERE deleted_at IS NULL AND enabled = true
+        AND (
+          is_system = true 
+          OR is_public = true
+          ${tenantId ? `OR tenant_id = $${paramIndex++}` : ''}
+        )
+        AND (
+          to_tsvector('english', COALESCE(name, '') || ' ' || COALESCE(description, '')) @@ plainto_tsquery('english', $1)
+          OR name ILIKE '%' || $1 || '%'
+          OR $1 = ANY(tags)
+        )
+    `;
+
+    if (tenantId) {
+      params.push(tenantId);
+    }
+
+    if (category) {
+      params.push(category);
+      query += ` AND category = $${paramIndex++}`;
+    }
+
+    query += ' ORDER BY rank DESC, is_system DESC, usage_count DESC, name';
+
+    const result = await connectionPool.query(query, params);
+    return JSON.stringify({ success: true, templates: result.rows });
+  } catch (error: any) {
+    console.error('Error searching property templates:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Get a single property template by ID
+ */
+export async function getPropertyTemplateById(templateId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, name, description, category, schema, tags, tenant_id, created_by,
+              is_system, is_public, usage_count, enabled, created_at, updated_at
+       FROM odb.property_templates
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [templateId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Template not found' });
+    }
+
+    return JSON.stringify({ success: true, template: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching property template:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Create a custom property template for a tenant
+ */
+export async function createPropertyTemplate(
+  tenantId: string,
+  createdBy: string,
+  name: string,
+  description: string | null,
+  category: string,
+  schema: any,
+  tags: string[] = [],
+  isPublic: boolean = false
+) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Template name is required' });
+    }
+
+    if (!category || category.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Category is required' });
+    }
+
+    if (!schema) {
+      return JSON.stringify({ success: false, error: 'Schema is required' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.property_templates 
+       (tenant_id, created_by, name, description, category, schema, tags, is_system, is_public)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8)
+       RETURNING id, name, description, category, schema, tags, tenant_id, created_by,
+                 is_system, is_public, usage_count, enabled, created_at, updated_at`,
+      [tenantId, createdBy, name.trim(), description, category.trim(), JSON.stringify(schema), tags, isPublic]
+    );
+
+    return JSON.stringify({ success: true, template: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating property template:', error);
+
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A template with this name already exists in this category' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Update a custom property template (only owner can update, system templates cannot be updated)
+ */
+export async function updatePropertyTemplate(
+  templateId: string,
+  tenantId: string,
+  name: string,
+  description: string | null,
+  category: string,
+  schema: any,
+  tags: string[] = [],
+  isPublic: boolean = false
+) {
+  try {
+    // Check if template exists and is editable
+    const existing = await connectionPool.query(
+      `SELECT is_system, tenant_id FROM odb.property_templates WHERE id = $1 AND deleted_at IS NULL`,
+      [templateId]
+    );
+
+    if (existing.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Template not found' });
+    }
+
+    if (existing.rows[0].is_system) {
+      return JSON.stringify({ success: false, error: 'System templates cannot be modified' });
+    }
+
+    if (existing.rows[0].tenant_id !== tenantId) {
+      return JSON.stringify({ success: false, error: 'You can only edit templates owned by your tenant' });
+    }
+
+    const result = await connectionPool.query(
+      `UPDATE odb.property_templates 
+       SET name = $1, description = $2, category = $3, schema = $4, tags = $5, 
+           is_public = $6, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7 AND deleted_at IS NULL
+       RETURNING id, name, description, category, schema, tags, tenant_id, created_by,
+                 is_system, is_public, usage_count, enabled, created_at, updated_at`,
+      [name.trim(), description, category.trim(), JSON.stringify(schema), tags, isPublic, templateId]
+    );
+
+    return JSON.stringify({ success: true, template: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating property template:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Delete a custom property template (soft delete)
+ */
+export async function deletePropertyTemplate(templateId: string, tenantId: string) {
+  try {
+    // Check if template exists and is deletable
+    const existing = await connectionPool.query(
+      `SELECT is_system, tenant_id FROM odb.property_templates WHERE id = $1 AND deleted_at IS NULL`,
+      [templateId]
+    );
+
+    if (existing.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Template not found' });
+    }
+
+    if (existing.rows[0].is_system) {
+      return JSON.stringify({ success: false, error: 'System templates cannot be deleted' });
+    }
+
+    if (existing.rows[0].tenant_id !== tenantId) {
+      return JSON.stringify({ success: false, error: 'You can only delete templates owned by your tenant' });
+    }
+
+    await connectionPool.query(
+      `UPDATE odb.property_templates SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [templateId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting property template:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Increment usage count when a template is used
+ */
+export async function incrementTemplateUsage(templateId: string) {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.property_templates SET usage_count = usage_count + 1 WHERE id = $1`,
+      [templateId]
+    );
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error incrementing template usage:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Use a property template: creates a property in the project from the template
+ * Returns the created property
+ */
+export async function usePropertyTemplate(
+  templateId: string,
+  projectId: string,
+  customName?: string | null
+) {
+  try {
+    // Get the template
+    const templateResult = await connectionPool.query(
+      `SELECT id, name, description, schema FROM odb.property_templates 
+       WHERE id = $1 AND deleted_at IS NULL AND enabled = true`,
+      [templateId]
+    );
+
+    if (templateResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Template not found' });
+    }
+
+    const template = templateResult.rows[0];
+    const propertyName = customName?.trim() || template.name;
+
+    // Check if property with this name already exists in the project
+    const existingCheck = await connectionPool.query(
+      `SELECT id FROM odb.properties WHERE project_id = $1 AND name = $2 AND deleted_at IS NULL`,
+      [projectId, propertyName]
+    );
+
+    if (existingCheck.rowCount > 0) {
+      return JSON.stringify({
+        success: false,
+        error: `A property named "${propertyName}" already exists in this project`
+      });
+    }
+
+    // Create the property from the template
+    const propertyResult = await connectionPool.query(
+      `INSERT INTO odb.properties (project_id, name, description, data)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, project_id, name, description, data, enabled, created_at, updated_at`,
+      [projectId, propertyName, template.description, template.schema]
+    );
+
+    // Increment template usage count
+    await connectionPool.query(
+      `UPDATE odb.property_templates SET usage_count = usage_count + 1 WHERE id = $1`,
+      [templateId]
+    );
+
+    return JSON.stringify({ success: true, property: propertyResult.rows[0] });
+  } catch (error: any) {
+    console.error('Error using property template:', error);
+
+    if (error.code === '23505') {
+      return JSON.stringify({ success: false, error: 'A property with this name already exists in the project' });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
