@@ -1503,21 +1503,6 @@ The import wizard adapts to smaller screens:
 - Intelligent property merging
 - Relationship reconciliation
 
-### Property Templates
-
-**Property Template Library** 📋 PLANNED
-- ✅ Browse property templates by category
-- ✅ Search property templates
-- Preview property configuration
-- "Add to Class" quick action
-- Customize property before adding
-- Create custom property templates
-- Share property templates with team
-
-| Ticket | Feature Description                          |
-|--------|----------------------------------------------|
-| [#218] | Browse property template library by category |
-
 ---
 
 ## 🏆 Schema Showcase (NEW)
