@@ -1510,8 +1510,8 @@ The import wizard adapts to smaller screens:
   - ✅ **Identifiers**: UUID, ULID, nanoid, auto-increment
   - ✅ **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
   - ✅ **Audit Fields**: createdBy, updatedBy, version
-  - 📋 **Status Fields**: status enum, isActive boolean, state machine
-  - 📋 **Address Fields**: street, city, state, zip, country
+  - ✅ **Status Fields**: status enum, isActive boolean, state machine
+  - ✅ **Address Fields**: street, city, state, zip, country
   - 📋 **Contact Fields**: email, phone, mobile, fax
   - 📋 **Money Fields**: amount, currency (ISO 4217)
   - 📋 **Geolocation**: latitude, longitude, geohash
@@ -1537,7 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#209] | Property templates for status fields         |
 | [#210] | Property templates for addresses             |
 | [#211] | Property templates for money                 |
 | [#212] | Property templates for geolocation           |
