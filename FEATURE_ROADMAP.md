@@ -1517,7 +1517,7 @@ The import wizard adapts to smaller screens:
   - ✅ **Geolocation**: latitude, longitude, geohash
   - ✅ **Internationalization**: locale, timezone, language
   - ✅ **Pagination**: page, limit, offset, cursor
-  - 📋 **Search**: query, filters, sort, fields
+  - ✅ **Search**: query, filters, sort, fields
 - 📋 Property templates include:
   - 📋 Data type and format
   - 📋 Validation rules (regex, min/max, enum)
@@ -1537,8 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#214] | Property templates for pagination            |
-| [#215] | Property templates for search                |
 | [#216] | Properties templates store definitions       |
 | [#218] | Browse property template library by category |
 | [#219] | Add ability to search property templates     |
