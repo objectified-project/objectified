@@ -10,6 +10,7 @@ import { useDialog } from '../../components/providers/DialogProvider';
 import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '@/app/components/ade/studio/StudioSideNav';
 import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
 import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
+import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
 
@@ -37,6 +38,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
 
   // Dialog state
   const [classDialog, setClassDialog] = useState({ open: false, selectedClass: null as ClassItem | null });
+  const [classImportDialog, setClassImportDialog] = useState({ open: false });
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null as { type: 'class' | 'property'; id: string } | null });
 
@@ -142,6 +144,13 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setDeleteDialog({ open: true, target: { type: 'class', id: classId } });
   };
 
+  const handleClassImport = async () => {
+    if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
+    if (!(await checkPermissions(!isReadOnly, 'Cannot import classes to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
+
+    setClassImportDialog({ open: true });
+  };
+
 
   // Property handlers
   const handlePropertyAdd = async () => {
@@ -209,7 +218,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   };
 
   const callbacks: StudioSideNavCallbacks = {
-    onClassAdd: handleClassAdd, onClassEdit: handleClassEdit, onClassDelete: handleClassDelete,
+    onClassAdd: handleClassAdd, onClassEdit: handleClassEdit, onClassDelete: handleClassDelete, onClassImport: handleClassImport,
     onClassSelect: (classItem) => {
       console.log('Class selected:', classItem);
       // Only zoom if click-to-focus mode is enabled
@@ -266,6 +275,19 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         projectId={selectedProjectId || ''}
         versionId={selectedVersionId || ''}
         projectTags={projectTags}
+      />
+
+      {/* Class Import Dialog */}
+      <ClassImportDialog
+        open={classImportDialog.open}
+        onClose={() => setClassImportDialog({ open: false })}
+        onSuccess={() => {
+          setRefreshKey(prev => prev + 1);
+          triggerCanvasRefresh();
+        }}
+        versionId={selectedVersionId || ''}
+        projectId={selectedProjectId || ''}
+        existingClassNames={classes.map(c => c.name)}
       />
 
       {/* Property Dialog */}

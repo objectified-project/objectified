@@ -16,7 +16,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
 import { useColorScheme } from '@mui/material/styles';
-import { Search, Add, Edit, Delete } from '@mui/icons-material';
+import { Search, Add, Edit, Delete, Upload } from '@mui/icons-material';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 
 export interface ClassItem {
@@ -67,6 +67,7 @@ export interface StudioSideNavCallbacks {
   onClassEdit?: (classItem: ClassItem) => void;
   onClassDelete?: (classId: string) => void;
   onClassSelect?: (classItem: ClassItem) => void;
+  onClassImport?: () => void;
 
   // Properties callbacks
   onPropertyAdd?: () => void;
@@ -457,8 +458,31 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                 )}
               </Box>
 
-              {/* Add Button */}
-              <Box sx={{ position: 'absolute', bottom: 20, right: 20 }}>
+              {/* Add and Import Buttons */}
+              <Box sx={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 1 }}>
+                <Fab
+                  color="secondary"
+                  size="small"
+                  onClick={() => callbacks.onClassImport?.()}
+                  disabled={!selectedVersionId || isReadOnly}
+                  aria-label="Import classes"
+                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot import to published version' : 'Import classes from file'}
+                  sx={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-2px) scale(1.05)',
+                      boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)',
+                    },
+                    '&:disabled': {
+                      background: isDark ? '#475569' : '#e2e8f0',
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  <Upload />
+                </Fab>
                 <Fab
                   color="primary"
                   size="small"
