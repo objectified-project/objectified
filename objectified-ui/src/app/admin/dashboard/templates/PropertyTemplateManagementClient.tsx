@@ -16,6 +16,7 @@ import {
   Eye,
   Tag,
   Copy,
+  MoreVertical,
 } from 'lucide-react';
 import {
   getAllPropertyTemplates,
@@ -112,6 +113,7 @@ export default function PropertyTemplateManagementClient() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PropertyTemplate | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -587,35 +589,79 @@ export default function PropertyTemplateManagementClient() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="relative flex justify-end">
                         <button
-                          onClick={() => openViewDialog(template)}
+                          onClick={() => setOpenDropdownId(openDropdownId === template.id ? null : template.id)}
                           className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                          title="View Details"
                         >
-                          <Eye className="w-4 h-4 text-gray-400" />
+                          <MoreVertical className="w-4 h-4 text-gray-400" />
                         </button>
-                        <button
-                          onClick={() => openEditDialog(template)}
-                          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4 text-blue-400" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(template)}
-                          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                          title={template.enabled ? 'Disable' : 'Enable'}
-                        >
-                          <Power className={`w-4 h-4 ${template.enabled ? 'text-green-400' : 'text-red-400'}`} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(template)}
-                          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-400" />
-                        </button>
+
+                        {openDropdownId === template.id && (
+                          <>
+                            {/* Backdrop to close dropdown when clicking outside */}
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setOpenDropdownId(null)}
+                            />
+
+                            {/* Dropdown menu */}
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-gray-700 border border-gray-600 rounded-lg shadow-lg z-20 py-1">
+                              <button
+                                onClick={() => {
+                                  openViewDialog(template);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
+                              >
+                                <Eye className="w-4 h-4 text-gray-400" />
+                                View Details
+                              </button>
+                              <button
+                                onClick={() => {
+                                  openEditDialog(template);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
+                              >
+                                <Edit className="w-4 h-4 text-blue-400" />
+                                Edit Template
+                              </button>
+                              <button
+                                onClick={() => {
+                                  copySchemaToClipboard(template.schema);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
+                              >
+                                <Copy className="w-4 h-4 text-gray-400" />
+                                Copy Schema
+                              </button>
+                              <div className="border-t border-gray-600 my-1" />
+                              <button
+                                onClick={() => {
+                                  handleToggleStatus(template);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-200 hover:bg-gray-600 transition-colors"
+                              >
+                                <Power className={`w-4 h-4 ${template.enabled ? 'text-green-400' : 'text-red-400'}`} />
+                                {template.enabled ? 'Disable Template' : 'Enable Template'}
+                              </button>
+                              <div className="border-t border-gray-600 my-1" />
+                              <button
+                                onClick={() => {
+                                  handleDelete(template);
+                                  setOpenDropdownId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-gray-600 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Delete Template
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
