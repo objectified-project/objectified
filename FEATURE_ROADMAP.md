@@ -1537,7 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#216] | Properties templates store definitions       |
 | [#218] | Browse property template library by category |
 | [#219] | Add ability to search property templates     |
 
