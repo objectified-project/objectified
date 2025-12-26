@@ -1515,7 +1515,7 @@ The import wizard adapts to smaller screens:
   - 📋 **Contact Fields**: email, phone, mobile, fax
   - ✅ **Money Fields**: amount, currency (ISO 4217)
   - ✅ **Geolocation**: latitude, longitude, geohash
-  - 📋 **Internationalization**: locale, timezone, language
+  - ✅ **Internationalization**: locale, timezone, language
   - 📋 **Pagination**: page, limit, offset, cursor
   - 📋 **Search**: query, filters, sort, fields
 - 📋 Property templates include:
@@ -1537,7 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#213] | Property templates for internationalization  |
 | [#214] | Property templates for pagination            |
 | [#215] | Property templates for search                |
 | [#216] | Properties templates store definitions       |
