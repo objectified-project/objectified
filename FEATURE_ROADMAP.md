@@ -1509,7 +1509,7 @@ The import wizard adapts to smaller screens:
 - Pre-built property templates for common fields:
   - ✅ **Identifiers**: UUID, ULID, nanoid, auto-increment
   - ✅ **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
-  - 📋 **Audit Fields**: createdBy, updatedBy, version
+  - ✅ **Audit Fields**: createdBy, updatedBy, version
   - 📋 **Status Fields**: status enum, isActive boolean, state machine
   - 📋 **Address Fields**: street, city, state, zip, country
   - 📋 **Contact Fields**: email, phone, mobile, fax
@@ -1537,8 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#207] | Property templates for timestamps            |
-| [#208] | Property templates for audit fields          |
 | [#209] | Property templates for status fields         |
 | [#210] | Property templates for addresses             |
 | [#211] | Property templates for money                 |
