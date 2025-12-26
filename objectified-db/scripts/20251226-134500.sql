@@ -818,15 +818,6 @@ VALUES (
                 "country": "United States",
                 "countryCode": "US",
                 "sortingCode": null
-            },
-            {
-                "addressLines": ["〒100-0001", "東京都千代田区千代田1-1"],
-                "locality": "千代田区",
-                "administrativeArea": "東京都",
-                "postalCode": "100-0001",
-                "country": "Japan",
-                "countryCode": "JP",
-                "sortingCode": null
             }
         ]
     }',
