@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useStudio } from './StudioContext';
-import { Copy, Download, Check, Eye, Code, Settings } from 'lucide-react';
+import { Copy, Download, Check, Settings } from 'lucide-react';
 import * as Switch from '@radix-ui/react-switch';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -15,7 +15,6 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import YAML from 'yaml';
 import ClassPropertyEditDialog from '../../components/ade/studio/ClassPropertyEditDialog';
 import ReferenceDialog from '../../components/ade/studio/ReferenceDialog';
-import MermaidPreview, { type MermaidPreviewRef } from '../../components/ade/studio/MermaidPreview';
 import TagManager from '../../components/ade/studio/TagManager';
 import ClassEditDialog from '../../components/ade/studio/ClassEditDialog';
 import { generateOpenApiSpec } from '../../utils/openapi';
@@ -76,7 +75,7 @@ interface Version {
   published: boolean;
 }
 
-type ViewMode = 'canvas' | 'code' | 'mermaid';
+type ViewMode = 'canvas' | 'code';
 
 const StudioContent = () => {
   const { data: session } = useSession();
@@ -154,10 +153,6 @@ const StudioContent = () => {
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
   const [arazzoSpec, setArazzoSpec] = useState<string>('');
   const [jsonSchemaSpec, setJsonSchemaSpec] = useState<string>('');
-  const [mermaidCode, setMermaidCode] = useState<string>('');
-  const [mermaidViewMode, setMermaidViewMode] = useState<'code' | 'preview'>('preview');
-  const [mermaidSvgReady, setMermaidSvgReady] = useState(false);
-  const mermaidPreviewRef = useRef<MermaidPreviewRef>(null);
 
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
@@ -200,7 +195,6 @@ const StudioContent = () => {
 
   // Copy button states
   const [codeCopied, setCodeCopied] = useState(false);
-  const [mermaidCopied, setMermaidCopied] = useState(false);
 
   // Export dropdown state
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -1100,6 +1094,61 @@ const StudioContent = () => {
       });
     }
   }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
+
+  // Handle Mermaid Diagram export
+  const handleExportMermaid = useCallback(async () => {
+    try {
+      // Get project and version info for filename
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      const selectedVersion = versions.find(v => v.id === selectedVersionId);
+      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram';
+      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+      const filename = `${projectSlug}-${versionSlug}-diagram.mmd`;
+
+      // Show loading state
+      setLoadingMessage('Exporting canvas as Mermaid diagram...');
+      setIsLoadingCanvas(true);
+
+      // Generate Mermaid content from nodes
+      const classesWithProperties = nodes.map(node => ({
+        id: node.id,
+        name: (node.data as any)?.name || 'Unknown',
+        description: (node.data as any)?.description,
+        schema: (node.data as any)?.schema,
+        properties: (node.data as any)?.properties || [],
+      }));
+
+      const mermaidContent = generateMermaidDiagram(classesWithProperties);
+
+      // Create and download the file
+      const blob = new Blob([mermaidContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Close dropdown
+      setExportDropdownOpen(false);
+      setIsLoadingCanvas(false);
+
+      await alertDialog({
+        message: `Canvas exported as ${filename}. You can visualize this file using Mermaid Live Editor or other Mermaid-compatible tools.`,
+        variant: 'success',
+      });
+    } catch (error) {
+      setIsLoadingCanvas(false);
+      console.error('Error exporting Mermaid:', error);
+
+      await alertDialog({
+        message: 'Failed to export canvas as Mermaid diagram. Please try again.',
+        variant: 'error',
+      });
+    }
+  }, [nodes, projects, versions, selectedProjectId, selectedVersionId, alertDialog]);
 
   // Handle PlantUML export
   const handleExportPlantUml = useCallback(async () => {
@@ -2489,11 +2538,6 @@ const StudioContent = () => {
             setJsonSchemaSpec(jsonSchemaContent);
             console.log('Generated JSON Schema');
           }
-        } else if (viewMode === 'mermaid') {
-          // Generate fresh Mermaid diagram
-          const mermaid = generateMermaidDiagram(classesWithProperties);
-          setMermaidCode(mermaid);
-          console.log('Generated Mermaid diagram');
         }
       } catch (error) {
         console.error('Failed to generate content:', error);
@@ -2797,15 +2841,6 @@ const StudioContent = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                   </svg>
                   Code
-                </ToggleGroup.Item>
-                <ToggleGroup.Item
-                  value="mermaid"
-                  className="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Diagram
                 </ToggleGroup.Item>
               </ToggleGroup.Root>
 
@@ -3353,6 +3388,15 @@ const StudioContent = () => {
                       </button>
                       <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                       <button
+                        onClick={handleExportMermaid}
+                        className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Mermaid Diagram</span>
+                      </button>
+                      <button
                         onClick={handleExportPlantUml}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
@@ -3647,168 +3691,6 @@ const StudioContent = () => {
                   selectOnLineNumbers: true,
                 }}
               />
-            </div>
-          </div>
-        ) : viewMode === 'mermaid' ? (
-          // Mermaid Diagram View
-          <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/80 dark:border-gray-700/80 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/25">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                      Mermaid Class Diagram
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {selectedProject?.name} • v{selectedVersion?.version_id}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 items-center">
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
-                    <button
-                      onClick={() => setMermaidViewMode('preview')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                        mermaidViewMode === 'preview'
-                          ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                      }`}
-                      title="Preview diagram"
-                    >
-                      <Eye size={16} />
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => setMermaidViewMode('code')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                        mermaidViewMode === 'code'
-                          ? 'bg-white dark:bg-gray-600 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                      }`}
-                      title="View code"
-                    >
-                      <Code size={16} />
-                      Code
-                    </button>
-                  </div>
-
-                  {/* Separator */}
-                  <div className="h-6 w-px bg-gray-200 dark:bg-gray-600" />
-
-                  {/* Mode-specific actions */}
-                  {mermaidViewMode === 'preview' ? (
-                    <>
-                      <button
-                        onClick={() => mermaidPreviewRef.current?.exportSVG()}
-                        disabled={!mermaidSvgReady}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40"
-                        title="Export as SVG"
-                      >
-                        <Download size={16} />
-                        SVG
-                      </button>
-                      <button
-                        onClick={() => mermaidPreviewRef.current?.exportPNG()}
-                        disabled={!mermaidSvgReady}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
-                        title="Export as PNG"
-                      >
-                        <Download size={16} />
-                        PNG
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(mermaidCode);
-                          setMermaidCopied(true);
-                          setTimeout(() => setMermaidCopied(false), 2000);
-                        }}
-                        disabled={mermaidCopied}
-                        className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                          mermaidCopied
-                            ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                        title="Copy code to clipboard"
-                      >
-                        {mermaidCopied ? <Check size={16} /> : <Copy size={16} />}
-                        {mermaidCopied ? 'Copied!' : 'Copy'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Create a blob from the Mermaid code
-                          const blob = new Blob([mermaidCode], { type: 'text/plain' });
-                          const url = URL.createObjectURL(blob);
-
-                          // Create a temporary download link
-                          const link = document.createElement('a');
-                          link.href = url;
-
-                          // Generate filename from project and version
-                          const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram';
-                          const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-                          link.download = `${projectSlug}-${versionSlug}-diagram.mmd`;
-
-                          // Trigger download
-                          document.body.appendChild(link);
-                          link.click();
-
-                          // Cleanup
-                          document.body.removeChild(link);
-                          URL.revokeObjectURL(url);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-lg transition-all duration-200 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40"
-                        title="Download as .mmd file"
-                      >
-                        <Download size={16} />
-                        Export
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex-1">
-              {mermaidViewMode === 'preview' ? (
-                <MermaidPreview
-                  ref={mermaidPreviewRef}
-                  code={mermaidCode}
-                  projectSlug={selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram'}
-                  versionSlug={selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0'}
-                  onSvgReady={setMermaidSvgReady}
-                />
-              ) : (
-                <Editor
-                  height="100%"
-                  language="markdown"
-                  value={mermaidCode || '# No classes defined'}
-                  theme="vs-dark"
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: true },
-                    scrollBeyondLastLine: false,
-                    fontSize: 13,
-                    lineNumbers: 'on',
-                    renderWhitespace: 'selection',
-                    automaticLayout: true,
-                    wordWrap: 'on',
-                    folding: true,
-                    formatOnPaste: true,
-                    formatOnType: true,
-                    contextmenu: true,
-                    selectOnLineNumbers: true,
-                  }}
-                />
-              )}
             </div>
           </div>
         ) : null}
