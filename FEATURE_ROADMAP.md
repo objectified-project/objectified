@@ -1513,7 +1513,7 @@ The import wizard adapts to smaller screens:
   - ✅ **Status Fields**: status enum, isActive boolean, state machine
   - ✅ **Address Fields**: street, city, state, zip, country
   - 📋 **Contact Fields**: email, phone, mobile, fax
-  - 📋 **Money Fields**: amount, currency (ISO 4217)
+  - ✅ **Money Fields**: amount, currency (ISO 4217)
   - 📋 **Geolocation**: latitude, longitude, geohash
   - 📋 **Internationalization**: locale, timezone, language
   - 📋 **Pagination**: page, limit, offset, cursor
@@ -1537,7 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#210] | Property templates for addresses             |
 | [#211] | Property templates for money                 |
 | [#212] | Property templates for geolocation           |
 | [#213] | Property templates for internationalization  |
