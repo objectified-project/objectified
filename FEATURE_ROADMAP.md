@@ -1508,7 +1508,7 @@ The import wizard adapts to smaller screens:
 **Reusable Property Patterns** ✅ PARTIALLY COMPLETE
 - Pre-built property templates for common fields:
   - ✅ **Identifiers**: UUID, ULID, nanoid, auto-increment
-  - 📋 **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
+  - ✅ **Timestamps**: createdAt, updatedAt, deletedAt (soft delete)
   - 📋 **Audit Fields**: createdBy, updatedBy, version
   - 📋 **Status Fields**: status enum, isActive boolean, state machine
   - 📋 **Address Fields**: street, city, state, zip, country
@@ -1537,7 +1537,6 @@ The import wizard adapts to smaller screens:
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| [#206] | Property templates for identifiers           |
 | [#207] | Property templates for timestamps            |
 | [#208] | Property templates for audit fields          |
 | [#209] | Property templates for status fields         |
