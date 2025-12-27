@@ -1932,13 +1932,9 @@ The import flow is designed as a multi-step wizard with clear visual progression
 
 | Ticket | Feature Description                                                                                     |
 |--------|---------------------------------------------------------------------------------------------------------|
-| [#152] ✅ | Create visual containers to group related classes together                                              |
-| [#153] ✅ | Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain") |
 | [#154] | Collapsible groups to reduce canvas clutter                                                             |
 | [#155] | Nested groups for hierarchical organization                                                             |
 | [#156] | Group-level operations: move, delete, export, duplicate, bulk edit                                      |
-| [#157] ✅ | Named groups with descriptions and metadata                                                             |
-| [#158] ✅ | Visual styling options for group containers                                                             |
 | [#159] | Pre-defined group templates for common patterns                                                         |
 | [#160] | Save and share custom group templates                                                                   |
 | [#161] | Share group templates across projects/tenants                                                           |

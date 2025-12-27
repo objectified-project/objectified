@@ -47,7 +47,9 @@ import {
   deleteClass,
   updateClassPropertyRef,
   getTagsForProject,
-  createProperty
+  createProperty,
+  saveDefaultCanvasLayout,
+  getDefaultCanvasLayout
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../components/ade/studio/GroupNode';
@@ -163,6 +165,7 @@ const StudioContent = () => {
 
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const currentUserId = (session?.user as any)?.user_id;
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -202,6 +205,9 @@ const StudioContent = () => {
 
   // Copy button states
   const [codeCopied, setCodeCopied] = useState(false);
+
+  // Layout saved state
+  const [layoutSaved, setLayoutSaved] = useState(false);
 
   // Export dropdown state
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -427,11 +433,7 @@ const StudioContent = () => {
 
   // Apply layout algorithm with animation
   const onLayoutAlgorithm = useCallback((algorithm: LayoutAlgorithm) => {
-    if (!autoLayoutEnabled) {
-      setLayoutAlgorithm(algorithm);
-      return;
-    }
-
+    // Always apply the layout when a button is clicked
     setIsLoadingCanvas(true);
     setLoadingMessage(`Applying ${getLayoutAlgorithmName(algorithm)} layout...`);
     setIsAnimating(true); // Enable CSS transitions
@@ -939,46 +941,36 @@ const StudioContent = () => {
   const handleCreateGroup = useCallback(() => {
     if (isReadOnly) return;
 
-    // Get selected class nodes (not group nodes)
-    const selectedClassNodes = nodes.filter(
-      n => n.selected && n.type === 'classNode'
-    );
+    // Get viewport center position for new empty group
+    const viewport = getViewport();
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
 
-    if (selectedClassNodes.length < 1) {
-      alertDialog({
-        message: 'Please select at least one class to create a group.',
-        variant: 'warning',
-      });
-      return;
-    }
+    // Calculate center position in the flow coordinate system
+    const centerX = (canvasWidth / 2 - viewport.x) / viewport.zoom;
+    const centerY = (canvasHeight / 2 - viewport.y) / viewport.zoom;
 
-    // Calculate bounding box of selected nodes
-    const padding = 40;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    // Default group dimensions
+    const defaultWidth = 400;
+    const defaultHeight = 300;
 
-    selectedClassNodes.forEach(node => {
-      const x = node.position.x;
-      const y = node.position.y;
-      const width = (node.measured?.width || node.width || 250) as number;
-      const height = (node.measured?.height || node.height || 150) as number;
+    // Position group at center minus half its size
+    const position = {
+      x: centerX - defaultWidth / 2,
+      y: centerY - defaultHeight / 2
+    };
 
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + width);
-      maxY = Math.max(maxY, y + height);
-    });
-
-    // Create new group
+    // Create new empty group
     const groupId = generateGroupId();
     const newGroup = {
       id: groupId,
       name: `Group ${groups.length + 1}`,
       color: GROUP_COLORS[groups.length % GROUP_COLORS.length].name,
-      nodeIds: selectedClassNodes.map(n => n.id),
-      position: { x: minX - padding, y: minY - padding },
+      nodeIds: [], // Empty group - no nodes initially
+      position: position,
       dimensions: {
-        width: maxX - minX + padding * 2,
-        height: maxY - minY + padding * 2 + 20 // Extra space for header
+        width: defaultWidth,
+        height: defaultHeight
       }
     };
 
@@ -1010,7 +1002,7 @@ const StudioContent = () => {
     // Add group node to canvas
     setNodes(prevNodes => [groupNode, ...prevNodes]);
 
-  }, [nodes, groups, isReadOnly, alertDialog, addGroup, generateGroupId, setNodes]);
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport]);
 
   // Handle group rename
   const handleGroupRename = useCallback((groupId: string, newName: string) => {
@@ -1100,6 +1092,165 @@ const StudioContent = () => {
 
   // ============================================================================
   // END GROUP MANAGEMENT HANDLERS
+  // ============================================================================
+
+  // ============================================================================
+  // LAYOUT SAVE/LOAD HANDLERS
+  // ============================================================================
+
+  // Save current canvas layout
+  const handleSaveLayout = useCallback(async () => {
+    if (isReadOnly || !selectedVersionId || !currentUserId) return;
+
+    try {
+      setLoadingMessage('Saving canvas layout...');
+      setIsLoadingCanvas(true);
+
+      // Get current viewport
+      const viewport = getViewport();
+
+      // Extract node positions and dimensions
+      const nodeData = nodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        dimensions: {
+          width: node.measured?.width || node.width || node.style?.width,
+          height: node.measured?.height || node.height || node.style?.height
+        },
+        data: node.type === 'groupNode' ? {
+          name: node.data.name,
+          color: node.data.color,
+          nodeIds: node.data.nodeIds
+        } : undefined
+      }));
+
+      // Extract edge data
+      const edgeData = edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle
+      }));
+
+      // Save to database
+      const result = await saveDefaultCanvasLayout(
+        selectedVersionId,
+        currentUserId,
+        viewport,
+        nodeData,
+        edgeData,
+        groups
+      );
+
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        // Show "Saved" state temporarily
+        setLayoutSaved(true);
+        setTimeout(() => {
+          setLayoutSaved(false);
+        }, 2000);
+      } else {
+        await alertDialog({
+          message: response.error || 'Failed to save canvas layout',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error saving canvas layout:', error);
+      await alertDialog({
+        message: 'An error occurred while saving the canvas layout',
+        variant: 'error',
+      });
+    } finally {
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+    }
+  }, [isReadOnly, selectedVersionId, currentUserId, nodes, edges, groups, getViewport, alertDialog]);
+
+  // Load saved canvas layout
+  const handleLoadLayout = useCallback(async () => {
+    if (!selectedVersionId || !currentUserId) return;
+
+    try {
+      setLoadingMessage('Loading canvas layout...');
+      setIsLoadingCanvas(true);
+
+      // Fetch saved layout from database
+      const result = await getDefaultCanvasLayout(selectedVersionId, currentUserId);
+      const response = JSON.parse(result);
+
+      if (!response.success || !response.layout) {
+        await alertDialog({
+          message: 'No saved layout found for this version',
+          variant: 'warning',
+        });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+        setLayoutDropdownOpen(false);
+        return;
+      }
+
+      const layout = response.layout;
+
+      // Restore viewport
+      if (layout.viewport) {
+        setCenter(layout.viewport.x, layout.viewport.y, { zoom: layout.viewport.zoom, duration: 800 });
+      }
+
+      // Restore groups first
+      if (layout.groups && Array.isArray(layout.groups)) {
+        setGroups(layout.groups);
+      }
+
+      // Restore nodes - need to reload classes and apply saved positions
+      await reloadClasses(false);
+
+      // After classes are loaded, apply saved positions
+      setTimeout(() => {
+        if (layout.nodes && Array.isArray(layout.nodes)) {
+          setNodes(prevNodes => {
+            return prevNodes.map(node => {
+              const savedNode = layout.nodes.find((n: any) => n.id === node.id);
+              if (savedNode) {
+                return {
+                  ...node,
+                  position: savedNode.position,
+                  ...(savedNode.dimensions && {
+                    style: {
+                      ...node.style,
+                      width: savedNode.dimensions.width,
+                      height: savedNode.dimensions.height
+                    }
+                  })
+                };
+              }
+              return node;
+            });
+          });
+        }
+
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+        setLayoutDropdownOpen(false);
+      }, 500);
+
+    } catch (error) {
+      console.error('Error loading canvas layout:', error);
+      await alertDialog({
+        message: 'An error occurred while loading the canvas layout',
+        variant: 'error',
+      });
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+      setLayoutDropdownOpen(false);
+    }
+  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setCenter, alertDialog]);
+
+  // ============================================================================
+  // END LAYOUT SAVE/LOAD HANDLERS
   // ============================================================================
 
   // Handle PNG export
@@ -3507,6 +3658,65 @@ const StudioContent = () => {
                         </p>
                       </div>
 
+                      {/* Save/Load Layout Buttons */}
+                      <div className="px-4 py-3 mb-1 border-b border-gray-100 dark:border-gray-700">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={handleSaveLayout}
+                            disabled={autoLayoutEnabled || isReadOnly || layoutSaved}
+                            className={`
+                              px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2
+                              ${layoutSaved
+                                ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700'
+                                : !autoLayoutEnabled && !isReadOnly
+                                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-700'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-200 dark:border-gray-600'
+                              }
+                            `}
+                            title={layoutSaved ? 'Layout saved!' : autoLayoutEnabled ? 'Disable auto-layout to save' : isReadOnly ? 'Cannot save in read-only mode' : 'Save current layout'}
+                          >
+                            {layoutSaved ? (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span>Saved</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                </svg>
+                                <span>Save</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={handleLoadLayout}
+                            disabled={autoLayoutEnabled}
+                            className={`
+                              px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2
+                              ${!autoLayoutEnabled
+                                ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-200 dark:border-gray-600'
+                              }
+                            `}
+                            title={autoLayoutEnabled ? 'Disable auto-layout to load' : 'Load saved layout'}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <span>Load</span>
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          {autoLayoutEnabled
+                            ? 'Turn off auto-layout to save or load custom layouts'
+                            : 'Save or load your canvas layout per version'
+                          }
+                        </p>
+                      </div>
+
                       {/* Layout Algorithms Header */}
                       <div className="px-4 pt-2 pb-1">
                         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -3525,12 +3735,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('hierarchical-tb');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'hierarchical-tb' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-tb' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">↓</span>
@@ -3542,12 +3747,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('hierarchical-lr');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'hierarchical-lr' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-lr' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">→</span>
@@ -3559,12 +3759,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('hierarchical-bt');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'hierarchical-bt' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-bt' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">↑</span>
@@ -3576,12 +3771,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('hierarchical-rl');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'hierarchical-rl' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-rl' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">←</span>
@@ -3600,12 +3790,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('force-directed');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'force-directed' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'force-directed' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">🔄</span>
@@ -3617,12 +3802,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('circular');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'circular' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'circular' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">⭕</span>
@@ -3634,12 +3814,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('grid');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'grid' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'grid' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">⊞</span>
@@ -3651,12 +3826,7 @@ const StudioContent = () => {
                               onLayoutAlgorithm('layered');
                               setLayoutDropdownOpen(false);
                             }}
-                            disabled={!autoLayoutEnabled}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors ${
-                              autoLayoutEnabled
-                                ? 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                                : 'text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                            } ${layoutAlgorithm === 'layered' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'layered' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
                           >
                             <div className="flex flex-col items-center text-center gap-2">
                               <span className="text-2xl">📚</span>

@@ -18,6 +18,9 @@ We continue to improve the platform based on your feedback with improvements and
 - Canvas improvements
   - Added ability to import from a file into classes (add a class from a file)
   - Added ability to persist layout settings for versions
+  - Added creation of groups on the canvas
+  - Added Save and Load buttons for manual layout management (only available when auto-layout is disabled)
+  - Layout algorithm buttons now apply layouts one time without enabling auto-layout
 - Added property templates
   - Fixed property copying to a class that contains an object with nested properties
 
@@ -33,5 +36,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: December 14, 2025*
+*Last updated: December 27, 2025*
 

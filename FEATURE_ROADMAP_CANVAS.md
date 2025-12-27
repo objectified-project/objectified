@@ -50,7 +50,7 @@
 
 | Ticket | Feature                                      |
 |--------|----------------------------------------------|
-| [#162] | Save current canvas arrangement with a name  |
+| [#162] | Save current canvas arrangement              |
 | [#163] | Multiple saved layouts per version           |
 | [#164] | Auto-save layout changes (tuneable interval) |
 | [#165] | Version control for layouts                  |
