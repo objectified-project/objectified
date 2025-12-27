@@ -2,6 +2,17 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+// Group definition for canvas grouping
+export interface CanvasGroup {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  nodeIds: string[];
+  position: { x: number; y: number };
+  dimensions: { width: number; height: number };
+}
+
 interface StudioContextType {
   selectedProjectId: string | null;
   setSelectedProjectId: (id: string | null) => void;
@@ -17,6 +28,14 @@ interface StudioContextType {
   setZoomToClassFn: (fn: ((classId: string) => void) | null) => void;
   clickToFocusEnabled: boolean;
   setClickToFocusEnabled: (value: boolean) => void;
+  // Group management
+  groups: CanvasGroup[];
+  setGroups: (groups: CanvasGroup[]) => void;
+  addGroup: (group: CanvasGroup) => void;
+  updateGroup: (groupId: string, updates: Partial<CanvasGroup>) => void;
+  deleteGroup: (groupId: string) => void;
+  addNodeToGroup: (groupId: string, nodeId: string) => void;
+  removeNodeFromGroup: (groupId: string, nodeId: string) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -29,6 +48,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [zoomToClassFn, setZoomToClassFn] = useState<((classId: string) => void) | null>(null);
   const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(true);
+  const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -36,6 +56,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const triggerSidebarRefresh = () => {
     setSidebarRefreshKey(prev => prev + 1);
+  };
+
+  const addGroup = (group: CanvasGroup) => {
+    setGroups(prev => [...prev, group]);
+  };
+
+  const updateGroup = (groupId: string, updates: Partial<CanvasGroup>) => {
+    setGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, ...updates } : g
+    ));
+  };
+
+  const deleteGroup = (groupId: string) => {
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+  };
+
+  const addNodeToGroup = (groupId: string, nodeId: string) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id === groupId && !g.nodeIds.includes(nodeId)) {
+        return { ...g, nodeIds: [...g.nodeIds, nodeId] };
+      }
+      return g;
+    }));
+  };
+
+  const removeNodeFromGroup = (groupId: string, nodeId: string) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        return { ...g, nodeIds: g.nodeIds.filter(id => id !== nodeId) };
+      }
+      return g;
+    }));
   };
 
   return (
@@ -53,7 +105,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       zoomToClassFn,
       setZoomToClassFn,
       clickToFocusEnabled,
-      setClickToFocusEnabled
+      setClickToFocusEnabled,
+      groups,
+      setGroups,
+      addGroup,
+      updateGroup,
+      deleteGroup,
+      addNodeToGroup,
+      removeNodeFromGroup
     }}>
       {children}
     </StudioContext.Provider>

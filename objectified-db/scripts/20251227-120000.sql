@@ -50,7 +50,7 @@ COMMENT ON COLUMN canvas_layouts.is_default IS 'Whether this is the default layo
 COMMENT ON COLUMN canvas_layouts.viewport IS 'Viewport state including pan position and zoom level: { x, y, zoom }';
 COMMENT ON COLUMN canvas_layouts.nodes IS 'Array of node positions and visual states: [{ id, position: { x, y }, dimensions, collapsed, ... }]';
 COMMENT ON COLUMN canvas_layouts.edges IS 'Array of edge routing information: [{ id, sourceHandle, targetHandle, waypoints, ... }]';
-COMMENT ON COLUMN canvas_layouts.groups IS 'Array of visual groupings: [{ id, name, nodeIds, position, dimensions, color, ... }]';
+COMMENT ON COLUMN canvas_layouts.groups IS 'Array of visual group containers: [{ id, name, description, color, nodeIds: [...], position: { x, y }, dimensions: { width, height } }]';
 COMMENT ON COLUMN canvas_layouts.grid_settings IS 'Grid configuration: { enabled, size, snapToGrid, showGrid }';
 COMMENT ON COLUMN canvas_layouts.minimap_settings IS 'Minimap configuration: { enabled, position, size }';
 COMMENT ON COLUMN canvas_layouts.metadata IS 'Additional layout metadata and custom settings';

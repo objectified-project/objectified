@@ -50,6 +50,7 @@ import {
   createProperty
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
+import GroupNode, { GROUP_COLORS } from '../../components/ade/studio/GroupNode';
 import { getLayoutedElements, type LayoutDirection, applyAutoLayout, type LayoutAlgorithm } from './layoutUtils';
 import { getLayoutAlgorithmName } from './autoLayoutAlgorithms';
 
@@ -128,7 +129,12 @@ const StudioContent = () => {
     isReadOnly,
     setIsReadOnly,
     setZoomToClassFn,
-    setClickToFocusEnabled: setContextClickToFocusEnabled
+    setClickToFocusEnabled: setContextClickToFocusEnabled,
+    groups,
+    setGroups,
+    addGroup,
+    updateGroup,
+    deleteGroup: deleteGroupFromContext
   } = useStudio();
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
@@ -919,6 +925,182 @@ const StudioContent = () => {
 
   // Keep ref updated
   handleClassDeleteRef.current = handleClassDelete;
+
+  // ============================================================================
+  // GROUP MANAGEMENT HANDLERS
+  // ============================================================================
+
+  // Generate unique group ID
+  const generateGroupId = useCallback(() => {
+    return `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }, []);
+
+  // Create a new group from selected nodes
+  const handleCreateGroup = useCallback(() => {
+    if (isReadOnly) return;
+
+    // Get selected class nodes (not group nodes)
+    const selectedClassNodes = nodes.filter(
+      n => n.selected && n.type === 'classNode'
+    );
+
+    if (selectedClassNodes.length < 1) {
+      alertDialog({
+        message: 'Please select at least one class to create a group.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    // Calculate bounding box of selected nodes
+    const padding = 40;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    selectedClassNodes.forEach(node => {
+      const x = node.position.x;
+      const y = node.position.y;
+      const width = (node.measured?.width || node.width || 250) as number;
+      const height = (node.measured?.height || node.height || 150) as number;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    // Create new group
+    const groupId = generateGroupId();
+    const newGroup = {
+      id: groupId,
+      name: `Group ${groups.length + 1}`,
+      color: GROUP_COLORS[groups.length % GROUP_COLORS.length].name,
+      nodeIds: selectedClassNodes.map(n => n.id),
+      position: { x: minX - padding, y: minY - padding },
+      dimensions: {
+        width: maxX - minX + padding * 2,
+        height: maxY - minY + padding * 2 + 20 // Extra space for header
+      }
+    };
+
+    // Add group to context
+    addGroup(newGroup);
+
+    // Create group node for ReactFlow
+    const groupNode: Node = {
+      id: groupId,
+      type: 'groupNode',
+      position: newGroup.position,
+      style: {
+        width: newGroup.dimensions.width,
+        height: newGroup.dimensions.height,
+        zIndex: -1 // Groups should be behind class nodes
+      },
+      data: {
+        id: groupId,
+        name: newGroup.name,
+        color: newGroup.color,
+        nodeIds: newGroup.nodeIds,
+        onRename: handleGroupRename,
+        onDelete: handleGroupDelete,
+        onColorChange: handleGroupColorChange,
+        isReadOnly: isReadOnly
+      }
+    };
+
+    // Add group node to canvas
+    setNodes(prevNodes => [groupNode, ...prevNodes]);
+
+  }, [nodes, groups, isReadOnly, alertDialog, addGroup, generateGroupId, setNodes]);
+
+  // Handle group rename
+  const handleGroupRename = useCallback((groupId: string, newName: string) => {
+    if (isReadOnly) return;
+
+    updateGroup(groupId, { name: newName });
+
+    // Update the node data
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, name: newName }
+        };
+      }
+      return node;
+    }));
+  }, [isReadOnly, updateGroup, setNodes]);
+
+  // Handle group delete
+  const handleGroupDelete = useCallback(async (groupId: string) => {
+    if (isReadOnly) return;
+
+    const group = groups.find(g => g.id === groupId);
+    const confirmed = await confirmDialog({
+      title: 'Delete Group',
+      message: `Are you sure you want to delete the group "${group?.name || 'this group'}"? The classes inside will not be deleted.`,
+      variant: 'warning',
+      confirmLabel: 'Delete Group',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    // Remove from context
+    deleteGroupFromContext(groupId);
+
+    // Remove group node from canvas
+    setNodes(prevNodes => prevNodes.filter(node => node.id !== groupId));
+  }, [isReadOnly, groups, confirmDialog, deleteGroupFromContext, setNodes]);
+
+  // Handle group color change
+  const handleGroupColorChange = useCallback((groupId: string, newColor: string) => {
+    if (isReadOnly) return;
+
+    updateGroup(groupId, { color: newColor });
+
+    // Update the node data
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, color: newColor }
+        };
+      }
+      return node;
+    }));
+  }, [isReadOnly, updateGroup, setNodes]);
+
+  // Update group dimensions when nodes move
+  const handleGroupResize = useCallback((groupId: string, position: { x: number; y: number }, dimensions: { width: number; height: number }) => {
+    updateGroup(groupId, { position, dimensions });
+  }, [updateGroup]);
+
+  // Custom onNodesChange that syncs group positions/dimensions
+  const handleNodesChange = useCallback((changes: any[]) => {
+    // First, apply the default changes
+    onNodesChange(changes);
+
+    // Then, sync group state for any group node changes
+    changes.forEach((change: any) => {
+      if (change.type === 'position' && change.position) {
+        // Check if this is a group node
+        const node = nodes.find(n => n.id === change.id);
+        if (node?.type === 'groupNode') {
+          updateGroup(change.id, { position: change.position });
+        }
+      } else if (change.type === 'dimensions' && change.dimensions) {
+        // Check if this is a group node being resized
+        const node = nodes.find(n => n.id === change.id);
+        if (node?.type === 'groupNode') {
+          updateGroup(change.id, { dimensions: change.dimensions });
+        }
+      }
+    });
+  }, [onNodesChange, nodes, updateGroup]);
+
+  // ============================================================================
+  // END GROUP MANAGEMENT HANDLERS
+  // ============================================================================
 
   // Handle PNG export
   const handleExportPng = useCallback(async () => {
@@ -1828,6 +2010,7 @@ const StudioContent = () => {
   // Define custom node types
   const nodeTypes = {
     classNode: ClassNode,
+    groupNode: GroupNode,
   };
 
   // Helper function to convert classes to React Flow nodes
@@ -3154,7 +3337,7 @@ const StudioContent = () => {
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
-              onNodesChange={onNodesChange}
+              onNodesChange={handleNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={onNodeClick}
@@ -3250,6 +3433,19 @@ const StudioContent = () => {
                   </svg>
                   <span>Collapse</span>
                 </button>
+                {/* Group Selected Button */}
+                {!isReadOnly && (
+                  <button
+                    onClick={handleCreateGroup}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-1.5 border border-transparent hover:border-purple-200 dark:hover:border-purple-700"
+                    title="Group selected classes"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span>Group</span>
+                  </button>
+                )}
               </div>
             </Panel>
 

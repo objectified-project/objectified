@@ -1902,9 +1902,9 @@ The import flow is designed as a multi-step wizard with clear visual progression
 
 ### Node Grouping & Organization
 
-**Group Containers** 📋 PLANNED
-- 📋 Create visual containers to group related classes together
-- 📋 Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain")
+**Group Containers** ✅ PARTIALLY IMPLEMENTED
+- ✅ Create visual containers to group related classes together
+- ✅ Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain")
 - 📋 Collapsible groups to reduce canvas clutter
   - 📋 Click to collapse: shows only group title and count
   - 📋 Expand/collapse all groups with keyboard shortcut
@@ -1914,31 +1914,31 @@ The import flow is designed as a multi-step wizard with clear visual progression
   - 📋 Breadcrumb navigation when drilling into nested groups
   - 📋 Max depth of 3 levels to prevent confusion
 - 📋 Group-level operations:
-  - 📋 Move entire group with one drag
+  - ✅ Move entire group with one drag
   - 📋 Delete all classes in a group
   - 📋 Export group as separate schema file
   - 📋 Duplicate entire group with all classes
   - 📋 Apply bulk property changes to all classes in group
-- 📋 Named groups with descriptions and metadata
+- ✅ Named groups with descriptions and metadata
   - 📋 Group description shows on hover
   - 📋 Tags for groups (searchable)
   - 📋 Group owner and last modified timestamp
-- 📋 Visual styling:
-  - 📋 Rounded rectangle containers with subtle shadows
-  - 📋 Dashed or solid borders with custom colors
-  - 📋 Group headers with collapse/expand icons
-  - 📋 Background color/opacity customization
+- ✅ Visual styling:
+  - ✅ Rounded rectangle containers with subtle shadows
+  - ✅ Dashed or solid borders with custom colors
+  - ✅ Group headers with collapse/expand icons
+  - ✅ Background color/opacity customization
   - 📋 Optional group icons from icon library
 
 | Ticket | Feature Description                                                                                     |
 |--------|---------------------------------------------------------------------------------------------------------|
-| [#152] | Create visual containers to group related classes together                                              |
-| [#153] | Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain") |
+| [#152] ✅ | Create visual containers to group related classes together                                              |
+| [#153] ✅ | Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain") |
 | [#154] | Collapsible groups to reduce canvas clutter                                                             |
 | [#155] | Nested groups for hierarchical organization                                                             |
 | [#156] | Group-level operations: move, delete, export, duplicate, bulk edit                                      |
-| [#157] | Named groups with descriptions and metadata                                                             |
-| [#158] | Visual styling options for group containers                                                             |
+| [#157] ✅ | Named groups with descriptions and metadata                                                             |
+| [#158] ✅ | Visual styling options for group containers                                                             |
 | [#159] | Pre-defined group templates for common patterns                                                         |
 | [#160] | Save and share custom group templates                                                                   |
 | [#161] | Share group templates across projects/tenants                                                           |
@@ -2003,18 +2003,18 @@ The import flow is designed as a multi-step wizard with clear visual progression
 | [#164] | Auto-save layout changes every 30 seconds (tuneable) |
 | [#165] | Version control for layouts                          |
 | [#166] | Default layout setting per user or per team          |
-| [#167] | Export/import layouts                               |
-| [#168] | Take quick snapshots of current layout              |
-| [#169] | Thumbnail preview of each snapshot                  |
+| [#167] | Export/import layouts                                |
+| [#168] | Take quick snapshots of current layout               |
+| [#169] | Thumbnail preview of each snapshot                   |
 | [#170] | Restore any snapshot with one click                  |
-| [#171] | Compare two snapshots side-by-side                  |
-| [#172] | Snapshot gallery view with search/filter            |
-| [#173] | Snapshot metadata: timestamp, author, description |
-| [#174] | Share layout configurations with team members       |
-| [#175] | "Pin" layout as team default                        |
-| [#176] | Layout permissions (view, edit, delete)            |
-| [#177] | Layout comments and annotations                     |
-| [#178] | Layout versioning with diff viewer                  |
+| [#171] | Compare two snapshots side-by-side                   |
+| [#172] | Snapshot gallery view with search/filter             |
+| [#173] | Snapshot metadata: timestamp, author, description    |
+| [#174] | Share layout configurations with team members        |
+| [#175] | "Pin" layout as team default                         |
+| [#176] | Layout permissions (view, edit, delete)              |
+| [#177] | Layout comments and annotations                      |
+| [#178] | Layout versioning with diff viewer                   |
 
 ### Canvas Navigation & Controls
 

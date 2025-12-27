@@ -15,7 +15,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed if/then/else in comprehension section of schemas
   - Fixed additionalProperties in property editor to allow for types and schemas
 - Implemented a more advanced import system
-- Added ability to import from a file into classes (add a class from a file)
+- Canvas improvements
+  - Added ability to import from a file into classes (add a class from a file)
+  - Added ability to persist layout settings for versions
 - Added property templates
   - Fixed property copying to a class that contains an object with nested properties
 
