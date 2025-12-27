@@ -1,5 +1,86 @@
 # Changelog
 
+### December 27, 2025 - Version 3.2.6
+
+**Schema Composition** ✅ FULLY IMPLEMENTED
+- ✅ `allOf`: Combine multiple schemas (inheritance/mixins)
+- ✅ `anyOf`: Match at least one schema (union types)
+- ✅ `oneOf`: Match exactly one schema (discriminated unions)
+- ✅ `not`: Negation - must NOT match schema
+- ✅ Discriminator with property name and mapping
+- ✅ Auto-discriminator generation from property values
+- ✅ Manual discriminator mapping editor
+
+**Type System** ✅ FULLY IMPLEMENTED
+- ✅ Type arrays for nullable: `['string', 'null']` (replaces deprecated `nullable: true`)
+- ✅ `const`: Single constant value
+- ✅ `enum`: Enumerated values with drag-and-drop reordering
+- ✅ `default`: Default values
+- ✅ `type`: All JSON Schema types (string, number, integer, boolean, object, array, null)
+
+**String Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `minLength`: Minimum string length
+- ✅ `maxLength`: Maximum string length
+- ✅ `pattern`: Regular expression validation with live tester
+- ✅ `format`: Standard formats (date, date-time, time, email, uri, uuid, etc.)
+
+**Numeric Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `minimum`: Minimum value (inclusive by default)
+- ✅ `maximum`: Maximum value (inclusive by default)
+- ✅ `exclusiveMinimum`: Exclusive minimum (OpenAPI 3.1 style)
+- ✅ `exclusiveMaximum`: Exclusive maximum (OpenAPI 3.1 style)
+- ✅ `multipleOf`: Value must be multiple of specified number
+- ✅ Radio buttons for inclusive (≥) vs exclusive (>) boundaries
+
+**Array Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `minItems`: Minimum array length
+- ✅ `maxItems`: Maximum array length
+- ✅ `uniqueItems`: All items must be unique
+- ✅ `items`: Schema for all array items
+- ✅ `prefixItems`: Tuple mode - ordered schemas for specific positions (OpenAPI 3.1)
+- ✅ `contains`: At least one item must match this schema (OpenAPI 3.1)
+- ✅ `minContains`: Minimum items matching contains schema (OpenAPI 3.1)
+- ✅ `maxContains`: Maximum items matching contains schema (OpenAPI 3.1)
+- ✅ `unevaluatedItems`: Control for items not matched by prefixItems/items/contains (JSON Schema 2020-12)
+
+**Object Constraints** ✅ FULLY IMPLEMENTED
+- ✅ `properties`: Define object properties
+- ✅ `required`: Array of required property names
+- ✅ `additionalProperties`: Allow/disallow/schema for extra properties
+- ✅ `minProperties`: Minimum number of properties
+- ✅ `maxProperties`: Maximum number of properties
+- ✅ `patternProperties`: Regex-based property schemas (e.g., `^x-` for extensions)
+- ✅ `propertyNames`: Validate property names with pattern/minLength/maxLength (OpenAPI 3.1)
+- ✅ `dependentRequired`: Properties that require other properties (OpenAPI 3.1)
+- ✅ `dependentSchemas`: Apply schema when specific property exists (OpenAPI 3.1)
+- ✅ `unevaluatedProperties`: Control for properties not matched by properties/patternProperties/allOf (JSON Schema 2020-12)
+
+**Conditional Schemas** ✅ FULLY IMPLEMENTED
+- ✅ `if`/`then`/`else`: Conditional schema application (OpenAPI 3.1)
+  - ✅ Visual conditional rule builder
+  - ✅ Multiple operators: equals, enum, type, required, pattern, minimum, maximum
+  - ✅ THEN schema with required properties and constraints
+  - ✅ Optional ELSE schema for when condition is false
+  - ✅ Support for complex nested conditions
+
+**Metadata & Documentation** ✅ FULLY IMPLEMENTED
+- ✅ `title`: Display title for schemas
+- ✅ `description`: Rich text descriptions
+- ✅ `examples`: Array of example values (replaces deprecated `example`)
+- ✅ `deprecated`: Mark as deprecated with custom deprecation message
+- ✅ `readOnly`: Property is read-only (response only)
+- ✅ `writeOnly`: Property is write-only (request only)
+- ✅ `externalDocs`: Link to external documentation with URL and description
+
+**Extension Properties** ✅ FULLY IMPLEMENTED
+- ✅ Custom `x-` prefixed vendor extensions
+- ✅ Extensions at class/schema level
+- ✅ Extensions at property level
+- ✅ JSON editor for extension values
+- ✅ Support for any valid JSON structure in extensions
+
+
+
 ### December 26, 2025 - Version 3.2.5
 
 - **Reusable Property Patterns** ✅ COMPLETED
@@ -22,10 +103,69 @@
     - ✅ Examples
     - ✅ Documentation
 
-**Property Template Library** ✅ COMPLETED
-- ✅ Browse property templates by category
-- ✅ Search property templates
-- ✅ Preview property configuration
+- **Property Template Library** ✅ COMPLETED
+  - ✅ Browse property templates by category
+  - ✅ Search property templates
+  - ✅ Preview property configuration
+
+#### Auto Layout Algorithms ✅ IMPLEMENTED
+- ✅ **8 Layout Algorithms**: Hierarchical (TB/LR/BT/RL), Force-directed, Circular, Grid, Layered
+- ✅ **Layout Controls**: Compact button with dropdown menu for algorithm selection
+- ✅ **Intelligent Suggestions**: AI-powered recommendations based on schema structure
+
+#### Minimap ✅ IMPLEMENTED
+- ✅ Bird's-eye view in bottom-right corner
+- ✅ Shows entire canvas with current viewport highlighted
+- ✅ Click to jump to any area
+- ✅ Zoom minimap independently
+- ✅ Show/hide with keyboard shortcut (M key)
+- ✅ Minimap shows group boundaries
+- ✅ Color-coded nodes on minimap (by type or group)
+- ✅ Draggable viewport rectangle on minimap
+
+#### Zoom & Pan ✅ IMPLEMENTED
+- ✅ Smooth zoom with mouse wheel
+- ✅ Zoom to fit (show entire canvas)
+- ✅ Zoom presets: 25%, 50%, 100%, 150%, 200%
+- ✅ Pan with middle mouse button or space+drag
+- ✅ Touchpad gesture support (pinch to zoom)
+
+#### Caching ✅ IMPLEMENTED
+- ✅ Cache rendered node SVG/Canvas elements
+- ✅ Cache layout calculations
+- ✅ Cache relationship paths
+- ✅ Invalidate cache only on changes
+
+#### Request Animation Frame ✅ IMPLEMENTED
+- ✅ Smooth 60fps animations
+- ✅ Batch DOM updates
+- ✅ Throttle mouse move events
+
+#### Export Formats ✅ IMPLEMENTED
+- ✅ PNG (raster image)
+- ✅ JPG (photo quality)
+- ✅ SVG (vector, scalable)
+- ✅ PDF (document format)
+- ✅ Mermaid diagram code
+- ✅ PlantUML code
+- ✅ GraphML (for yEd, Gephi)
+- ✅ DOT (Graphviz)
+- ✅ JSON (raw data)
+
+#### Virtual Rendering ✅ IMPLEMENTED
+- ✅ Render only visible nodes (viewport culling)
+- ✅ Node pooling and recycling
+- ✅ Progressive rendering for large schemas (1000+ nodes)
+
+**Minimap** ✅ IMPLEMENTED
+- ✅ Bird's-eye view in bottom-right corner
+- ✅ Shows entire canvas with current viewport highlighted
+- ✅ Click to jump to any area
+- ✅ Zoom minimap independently
+- ✅ Show/hide with keyboard shortcut (M key)
+- ✅ Minimap shows group boundaries
+- ✅ Color-coded nodes on minimap (by type or group)
+- ✅ Draggable viewport rectangle on minimap
 
 
 ### December 20, 2025 - Version 3.2.4 (DOT/GraphViz Export Implementation)

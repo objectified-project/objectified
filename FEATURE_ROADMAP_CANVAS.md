@@ -268,19 +268,22 @@
 
 #### Canvas Themes 📋 PLANNED
 - 📋 Pre-built themes:
-    - 📋 Light mode (default)
-    - 📋 Dark mode
-    - 📋 High contrast
-    - 📋 Blueprint (blue grid on dark)
-    - 📋 Whiteboard (minimal)
-    - 📋 Solarized, Nord, Dracula
+  - 📋 Light mode (default)
+  - 📋 Dark mode
+  - 📋 High contrast
+  - 📋 Blueprint (blue grid on dark)
+  - 📋 Whiteboard (minimal)
+  - 📋 Solarized
+  - 📋 Nord
+  - 📋 Darcula
 - 📋 Custom theme creator with full color control
 - 📋 Save and share custom themes
 - 📋 Theme marketplace
 
-| Ticket | Feature                                                |
-|--------|--------------------------------------------------------|
-| #309   | Custom color themes to choose from                     |
+| Ticket | Feature                                                            |
+|--------|--------------------------------------------------------------------|
+| #309   | Custom color themes to choose from                                 |
+| [#185] | Custom Colors: Per-class color picker, color by group, stereotypes |
 
 #### Grid & Alignment 📋 PLANNED
 - 📋 **Grid Snapping**: Snap nodes to grid, adjustable grid size
@@ -453,55 +456,6 @@
 ---
 
 ## Implemented Features Summary
-
-#### Auto Layout Algorithms ✅ IMPLEMENTED
-- ✅ **8 Layout Algorithms**: Hierarchical (TB/LR/BT/RL), Force-directed, Circular, Grid, Layered
-- ✅ **Layout Controls**: Compact button with dropdown menu for algorithm selection
-- ✅ **Intelligent Suggestions**: AI-powered recommendations based on schema structure
-
-#### Minimap ✅ IMPLEMENTED
-- ✅ Bird's-eye view in bottom-right corner
-- ✅ Shows entire canvas with current viewport highlighted
-- ✅ Click to jump to any area
-- ✅ Zoom minimap independently
-- ✅ Show/hide with keyboard shortcut (M key)
-- ✅ Minimap shows group boundaries
-- ✅ Color-coded nodes on minimap (by type or group)
-- ✅ Draggable viewport rectangle on minimap
-
-#### Zoom & Pan ✅ IMPLEMENTED
-- ✅ Smooth zoom with mouse wheel
-- ✅ Zoom to fit (show entire canvas)
-- ✅ Zoom presets: 25%, 50%, 100%, 150%, 200%
-- ✅ Pan with middle mouse button or space+drag
-- ✅ Touchpad gesture support (pinch to zoom)
-
-#### Caching ✅ IMPLEMENTED
-- ✅ Cache rendered node SVG/Canvas elements
-- ✅ Cache layout calculations
-- ✅ Cache relationship paths
-- ✅ Invalidate cache only on changes
-
-#### Request Animation Frame ✅ IMPLEMENTED
-- ✅ Smooth 60fps animations
-- ✅ Batch DOM updates
-- ✅ Throttle mouse move events
-
-#### Export Formats ✅ IMPLEMENTED
-- ✅ PNG (raster image)
-- ✅ JPG (photo quality)
-- ✅ SVG (vector, scalable)
-- ✅ PDF (document format)
-- ✅ Mermaid diagram code
-- ✅ PlantUML code
-- ✅ GraphML (for yEd, Gephi)
-- ✅ DOT (Graphviz)
-- ✅ JSON (raw data)
-
-#### Virtual Rendering ✅ IMPLEMENTED
-- ✅ Render only visible nodes (viewport culling)
-- ✅ Node pooling and recycling
-- ✅ Progressive rendering for large schemas (1000+ nodes)
 
 ---
 

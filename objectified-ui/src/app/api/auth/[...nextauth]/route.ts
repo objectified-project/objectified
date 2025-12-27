@@ -138,8 +138,6 @@ export const authOptions: NextAuthOptions = {
         payload.session.user.name = payload.token.name;
       }
 
-      console.log('Token', payload);
-
       return payload.session;
     },
     async jwt(payload: any) {

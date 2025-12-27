@@ -2,7 +2,7 @@
 
 > Comprehensive list of features and improvements to make Objectified a world-class enterprise schema development platform
 > 
-> **Last Updated**: December 19, 2025
+> **Last Updated**: December 27, 2025
 > **Version**: 3.1 - Schema Showcase, Marketplace, Validation & Enterprise Enhancement
 
 ---
@@ -175,11 +175,14 @@
 - 📋 **Save & Load Layouts**: Named layouts ("Development", "Presentation", "Logical", "Dependency")
 - 📋 **Layout Snapshots**: Quick snapshots with thumbnails, compare side-by-side
 - 📋 **Auto-save layouts**: Every 30 seconds (configurable)
-- 📋 **Layout sharing**: Share with team, pin as default, version control
 - 📋 **Export/Import layouts**: JSON format for portability
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                    |
+|--------|--------------------------------------------------------|
+| #313   | Adds a canvas layout table to store layout information |
+| #314   | Canvas snapshots                                       |
+| #315   | Canvas auto-save of layout                             |
+| #316   | Export/import canvas layouts                           |
 
 #### Navigation & Controls ✅ PARTIALLY COMPLETE
 - ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
@@ -192,7 +195,13 @@
 - 📋 **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
 - 📋 **Focus Mode**: Isolate selected classes and relationships, blur non-focused
 
+| Ticket | Feature Description                                          |
+|--------|--------------------------------------------------------------|
+| #317   | Add the ability to search for classes inside the canvas view |
+| #318   | Canvas search focus mode                                     |
+
 #### Visual Customization 📋 PLANNED
+
 **Node Styling:**
 - 📋 Custom colors (per-class, by group, by stereotype, gradients)
 - 📋 Node icons (1000+ built-in, custom upload, Font Awesome, Material Icons)
@@ -200,6 +209,9 @@
 - 📋 Node shapes (rectangle, rounded, circle, hexagon, diamond, custom SVG)
 - 📋 Node borders (thickness, style, shadow effects)
 - 📋 Node labels (font size/family, bold/italic, positioning, multi-line)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Edge Styling:**
 - 📋 Line styles (solid, dashed, dotted, double for bidirectional)
@@ -209,28 +221,36 @@
 - 📋 Animated edges (flowing dots for data flow)
 - 📋 Edge hover effects (highlight and tooltip)
 
-**Grid & Alignment:**
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Grid & Alignment:** 📋 PLANNED
 - 📋 Grid snapping (adjustable size: 10px, 20px, 50px)
 - 📋 Grid style (dots, lines, crosses)
-- 📋 Alignment tools (left/right/top/bottom edges, centers, distribute)
 - 📋 Smart guides on drag
 - 📋 Horizontal/vertical rulers
 - 📋 Equal spacing tools
 
-**Canvas Background:**
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+| #324   | Canvas grid snapping settings                    |
+| #325   | Add grid styling to the canvas                   |
+| #326   | Add smart guides when dragging nodes             |
+| #327   | Add Horizontal and Vertical rulers to the canvas |
+| #328   | Equal Spacing tools for the canvas               |
+
+**Canvas Background:** 📋 PLANNED
 - 📋 Background options (solid color, grid pattern, custom image, gradient, textures)
 - 📋 Background opacity and blur
-- 📋 Infinite canvas scrolling
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+| #329   | Add background options to the canvas |
+| #330   | Add background opacity and blur      |
 
 ---
 
 ### 2. Theme System ✅ PARTIALLY COMPLETE
-
-#### Current Implementation ✅
-- ✅ **Dark Mode**: Full support (admin and studio)
-- ✅ **Auto-switch**: Based on system preference
-- ✅ **Canvas dark mode**: Separate from UI dark mode
-- ✅ **Radix UI**: Modern accessible components
 
 #### Planned Enhancements 📋
 - 📋 **Pre-built Canvas Themes**:
@@ -253,6 +273,9 @@
   - Import themes from files
   - Theme marketplace
   - Custom theme scheduling (dark at night)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -305,7 +328,10 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Large File Handling**: Chunked upload for files > 10MB
 - 📋 **Upload Resume**: Resume interrupted uploads
 
-##### URL Import
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+##### URL Import 📋 PLANNED
 - 📋 **Direct URL Import**: Fetch spec from public URL
 - 📋 **Authenticated URL**: Support for Bearer, API Key, Basic Auth
 - 📋 **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket
@@ -314,17 +340,28 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Swagger Hub Integration**: Direct import from SwaggerHub
 - 📋 **Postman Collection Import**: Import from Postman workspace URL
 
-##### Clipboard Import
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+| #311   | Ability to import a URL                          |
+
+##### Clipboard Import 📋 PLANNED
 - 📋 **Paste JSON/YAML**: Direct paste into import dialog
 - 📋 **Syntax Highlighting**: Live preview of pasted content
 - 📋 **Format Auto-Detection**: Automatically detect JSON vs YAML
 - 📋 **Quick Import Button**: One-click import from clipboard
+
+| Ticket | Feature Description                      |
+|--------|------------------------------------------|
+| #312   | Import from clipboard functionality      |
 
 ##### Integration Import
 - 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong
 - 📋 **CI/CD Pipeline Integration**: Import from build artifacts
 - 📋 **Registry Import**: Import from schema registries
 - 📋 **Webhook Import**: Automated import via webhook triggers
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.2 Supported Formats ✅ PARTIALLY IMPLEMENTED
 
@@ -335,11 +372,17 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Multi-File Specs**: Support for $ref across multiple files
 - 📋 **External References**: Resolve external $ref URLs
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### JSON Schema
 - 📋 **JSON Schema Draft 2020-12**: Latest specification
 - 📋 **JSON Schema Draft 07**: Common enterprise format
 - 📋 **JSON Schema Draft 04**: Legacy support
 - 📋 **Bundled Schemas**: Multi-schema documents
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Related Formats
 - 📋 **Arazzo Specification**: Workflow orchestration import
@@ -352,10 +395,16 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Insomnia Export**: Import from Insomnia workspaces
 - 📋 **HAR Files**: HTTP Archive format for API discovery
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Data Formats
 - 📋 **YAML**: Full YAML 1.2 support with anchors/aliases
 - 📋 **JSON**: Standard JSON with comments support (JSONC)
 - 📋 **JSON5**: Extended JSON format support
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.3 Pre-Import Analysis 📋 PLANNED
 
@@ -366,12 +415,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Schema Validation**: Validate against official meta-schemas
 - 📋 **Custom Validation Rules**: Enterprise-specific validation
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Specification Analysis
 - 📋 **Schema Count**: Number of schemas to be imported
 - 📋 **Property Count**: Total properties across all schemas
 - 📋 **Reference Analysis**: Count and map all $ref relationships
 - 📋 **Circular Reference Detection**: Identify circular dependencies
 - 📋 **External Reference Inventory**: List all external URLs
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Compatibility Check
 - 📋 **Feature Compatibility**: Identify unsupported features
@@ -380,12 +435,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Security Scheme Analysis**: Identify auth requirements
 - 📋 **Breaking Change Detection**: Compare with existing version
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Quality Score
 - 📋 **Completeness Score**: Descriptions, examples, documentation
 - 📋 **Consistency Score**: Naming conventions, patterns
 - 📋 **Best Practices Score**: Industry standard compliance
 - 📋 **Security Score**: Security scheme coverage
 - 📋 **Overall Quality Rating**: A-F grade with breakdown
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.4 Import Preview & Mapping 📋 PLANNED
 
@@ -396,12 +457,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Side-by-Side Comparison**: Compare with existing schemas
 - 📋 **Diff Highlighting**: Visual diff for updates
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Schema Selection
 - 📋 **Select All / None**: Bulk selection controls
 - 📋 **Individual Selection**: Cherry-pick specific schemas
 - 📋 **Dependency Resolution**: Auto-select required dependencies
 - 📋 **Search & Filter**: Find schemas by name, type, tags
 - 📋 **Category Grouping**: Group by tag, path, or custom criteria
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Name Mapping
 - 📋 **Auto-Generated Names**: Smart naming from schema context
@@ -410,12 +477,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Prefix/Suffix Rules**: Apply consistent naming patterns
 - 📋 **Reserved Name Detection**: Prevent conflicts with keywords
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Property Mapping
 - 📋 **Type Mapping**: Map external types to internal types
 - 📋 **Default Value Assignment**: Set defaults during import
 - 📋 **Required Field Override**: Modify required status
 - 📋 **Description Enhancement**: Add/modify descriptions
 - 📋 **Example Generation**: Auto-generate missing examples
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.5 Conflict Resolution 📋 PLANNED
 
@@ -426,12 +499,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Type Mismatches**: Incompatible type assignments
 - 📋 **Semantic Conflicts**: Logically incompatible constraints
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Resolution Strategies
 - 📋 **Keep Existing**: Preserve current schema, skip import
 - 📋 **Replace**: Overwrite existing with imported schema
 - 📋 **Merge**: Intelligently merge properties and constraints
 - 📋 **Rename**: Import with modified name to avoid conflict
 - 📋 **Create Version**: Import as new version of existing schema
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Merge Options
 - 📋 **Additive Merge**: Add new properties, keep existing
@@ -440,12 +519,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Deep Merge**: Recursively merge nested objects
 - 📋 **Array Merge Strategies**: Append, replace, or deduplicate
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Conflict Report
 - 📋 **Conflict Summary**: Overview of all detected conflicts
 - 📋 **Impact Analysis**: What will change if resolved
 - 📋 **Resolution Recommendations**: AI-suggested resolutions
 - 📋 **Batch Resolution**: Apply same strategy to similar conflicts
 - 📋 **Conflict Export**: Export conflict report for review
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.6 Import Execution 📋 PLANNED
 
@@ -456,12 +541,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Time Estimate**: Estimated completion time
 - 📋 **Speed Metrics**: Schemas per second
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Execution Options
 - 📋 **Dry Run Mode**: Preview changes without committing
 - 📋 **Transaction Mode**: All-or-nothing import
 - 📋 **Incremental Mode**: Import available, skip failures
 - 📋 **Background Import**: Continue working during import
 - 📋 **Scheduled Import**: Queue import for later execution
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Real-Time Feedback
 - 📋 **Live Log**: Streaming import log
@@ -470,12 +561,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Error Indicators**: Red for failures with details
 - 📋 **Skip Indicators**: Gray for intentionally skipped items
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Error Handling
 - 📋 **Graceful Degradation**: Continue on non-critical errors
 - 📋 **Error Recovery**: Retry failed operations
 - 📋 **Rollback Support**: Undo partial imports
 - 📋 **Error Export**: Download detailed error report
 - 📋 **Support Ticket Creation**: One-click issue reporting
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.7 Post-Import Actions 📋 PLANNED
 
@@ -486,12 +583,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Skip Count**: Intentionally skipped items
 - 📋 **Time Taken**: Total import duration
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Automatic Actions
 - 📋 **Auto-Layout**: Arrange imported schemas on canvas
 - 📋 **Auto-Connect**: Create relationships from $ref
 - 📋 **Auto-Tag**: Apply tags based on source/category
 - 📋 **Auto-Document**: Generate descriptions from context
 - 📋 **Auto-Validate**: Run validation on imported schemas
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Review & Verification
 - 📋 **Import Review Mode**: Highlight newly imported items
@@ -500,12 +603,19 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Quality Assessment**: Post-import quality score
 - 📋 **Relationship Verification**: Confirm all refs resolved
 
-##### Follow-Up Actions
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+##### Follow-Up Actions 📋 PLANNED
 - 📋 **Open in Canvas**: Navigate to imported schemas
 - 📋 **Generate Documentation**: Create docs from import
 - 📋 **Share Import Report**: Send summary to team
 - 📋 **Schedule Re-Import**: Set up recurring import
 - 📋 **Export Transformed**: Export in different format
+
+| Ticket | Feature Description          |
+|--------|------------------------------|
+| #319   | Open in canvas after import  |
 
 #### 4.8 Import History & Audit 📋 PLANNED
 
@@ -516,6 +626,9 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **User Attribution**: Who performed the import
 - 📋 **Version Tracking**: Import version history
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Audit Trail
 - 📋 **Change Log**: Detailed record of all changes
 - 📋 **Before/After Snapshots**: State comparison
@@ -523,12 +636,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Compliance Reporting**: Audit-ready reports
 - 📋 **Retention Policies**: Configurable history retention
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Re-Import Capabilities
 - 📋 **Saved Import Configs**: Reuse import settings
 - 📋 **Scheduled Re-Imports**: Periodic sync from source
 - 📋 **Incremental Updates**: Only import changes
 - 📋 **Change Detection**: Notify when source changes
 - 📋 **Sync Status**: Dashboard of import freshness
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.9 Import Templates & Presets 📋 PLANNED
 
@@ -539,6 +658,9 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Migration Mode**: Optimized for legacy conversion
 - 📋 **Strict Mode**: Fail on any validation error
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Custom Presets
 - 📋 **Save Current Settings**: Create preset from current config
 - 📋 **Preset Library**: Organization-wide preset sharing
@@ -546,12 +668,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Preset Versioning**: Track preset changes over time
 - 📋 **Preset Import/Export**: Share presets across instances
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Transformation Rules
 - 📋 **Property Transformations**: Rename, restructure properties
 - 📋 **Type Coercion Rules**: Convert between types
 - 📋 **Constraint Adjustments**: Modify min/max, patterns
 - 📋 **Metadata Injection**: Add standard metadata
 - 📋 **Sanitization Rules**: Clean up imported data
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.10 Enterprise Features 📋 PLANNED
 
@@ -562,12 +690,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Import Quotas**: Limit import volume per user/org
 - 📋 **Source Restrictions**: Whitelist allowed import sources
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Integration & Automation
 - 📋 **REST API**: Programmatic import via API
 - 📋 **CLI Tool**: Command-line import utility
 - 📋 **SDK Support**: Language-specific import libraries
 - 📋 **Webhook Notifications**: Import event webhooks
 - 📋 **CI/CD Integration**: GitHub Actions, GitLab CI, Jenkins
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ##### Compliance & Governance
 - 📋 **Policy Enforcement**: Automatic policy validation
@@ -576,12 +710,18 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Prohibited Patterns**: Block disallowed constructs
 - 📋 **Compliance Certification**: Mark imports as certified
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ##### Performance & Scale
 - 📋 **Parallel Processing**: Multi-threaded import
 - 📋 **Queue Management**: Handle import backlog
 - 📋 **Rate Limiting**: Prevent system overload
 - 📋 **Caching**: Cache resolved external references
 - 📋 **Optimization**: Memory-efficient large imports
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### 4.11 Import Flow UI Design 📋 PLANNED
 
@@ -905,20 +1045,6 @@ The import flow is designed as a multi-step wizard with clear visual progression
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-##### Mobile/Responsive Considerations
-
-The import wizard adapts to smaller screens:
-- **Tablet**: Side-by-side panels stack vertically
-- **Mobile**: Single-column layout with collapsible sections
-- **Touch**: Larger tap targets, swipe between steps
-- **Accessibility**: Full keyboard navigation, screen reader support
-
-##### Theme Adaptation
-
-- **Light Mode**: White backgrounds, subtle gray borders, blue accent colors
-- **Dark Mode**: Dark gray backgrounds (#1a1a2e), lighter borders (#2d2d44), blue accents (#4f8cff)
-- **High Contrast**: Enhanced borders, larger fonts, distinct colors for status indicators
-
 ---
 
 ### 5. Canvas Interactions
@@ -930,11 +1056,17 @@ The import wizard adapts to smaller screens:
 - 📋 **Property dragging**: Drag properties between classes
 - 📋 **Group dragging**: Drag to add nodes to groups
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 #### Visual Feedback
 - 📋 **Dropzone highlighting**: Visual cues for valid drop targets
 - 📋 **Ghost preview**: Show preview while dragging
 - 📋 **Invalid drop indicator**: Clear feedback for invalid drops
 - 📋 **Snap indicators**: Show snap points during drag
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -947,6 +1079,9 @@ The import wizard adapts to smaller screens:
 - 📋 **Touch-friendly controls**: Larger hit areas
 - 📋 **Gesture support**: Pinch to zoom, swipe navigation
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 #### Accessibility (a11y) 📋 PLANNED
 - 📋 **Keyboard navigation**: Full app control without mouse
 - 📋 **Screen reader support**: ARIA labels, semantic HTML
@@ -956,6 +1091,9 @@ The import wizard adapts to smaller screens:
 - 📋 **Color blind friendly**: Patterns in addition to colors
 - 📋 **Skip navigation**: Jump to main content
 - 📋 **Reduced motion**: Respect prefers-reduced-motion
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -969,6 +1107,9 @@ The import wizard adapts to smaller screens:
 - 📋 **Transition effects**: Smooth page/modal transitions
 - 📋 **Skeleton screens**: Content placeholders during load
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 #### Progress Indicators ✅ PARTIALLY COMPLETE
 - ✅ **Canvas loading**: Animated progress bar
 - ✅ **Operation progress**: Real-time status updates
@@ -976,17 +1117,23 @@ The import wizard adapts to smaller screens:
 - 📋 **Export progress**: Large export operations
 - 📋 **Background tasks**: Persistent progress notifications
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ---
 
 ### 7. Interactive Elements
 
-#### Tooltips & Help 📋 PLANNED
+#### Tooltips & Help ✅ PARTIALLY COMPLETE
 - 📋 **Rich tooltips**: Contextual help with examples
 - 📋 **Keyboard shortcut hints**: Show shortcuts in tooltips
 - 📋 **Interactive tutorials**: First-run product tour
 - 📋 **Contextual help**: Help button in each section
-- 📋 **Video tutorials**: Embedded walkthrough videos
-- 📋 **What's New**: Highlights for new features
+- ✅ **Video tutorials**: Embedded walkthrough videos
+- ✅ **What's New**: Highlights for new features
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### Modals & Dialogs ✅ PARTIALLY COMPLETE
 - ✅ **Radix UI modals**: Accessible, keyboard-friendly
@@ -995,6 +1142,9 @@ The import wizard adapts to smaller screens:
 - 📋 **Stackable modals**: Multiple modals if needed
 - 📋 **Confirmation dialogs**: Clear yes/no choices
 - 📋 **Smart defaults**: Pre-selected common choices
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -1007,14 +1157,23 @@ The import wizard adapts to smaller screens:
 - ✅ **Mermaid diagrams**: Export with preview/code toggle
 - 📋 **Property counts**: Badge showing property count
 - 📋 **Relationship counts**: Badge showing connection count
-- 📋 **Deprecation indicators**: Visual warning for deprecated items
+- ✅ **Deprecation indicators**: Visual warning for deprecated items
+
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| #320 | Property counts in the class node listing in the sidebar |
+| #321 | Relationship counts in the class node listing in the sidebar |
 
 #### Charts & Metrics ✅ PARTIALLY COMPLETE
 - ✅ **Quality score gauge**: Visual score indicator (0-100)
 - ✅ **Complexity charts**: Schema complexity visualization
 - 📋 **Relationship graphs**: Visual dependency maps
 - 📋 **Timeline views**: Schema evolution over time
-- 📋 **Comparison views**: Before/after schema changes
+
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| #322   | Display the relationship graph for a schema  |
+| #323   | Timeline view of schema changes over time    |
 
 ---
 
@@ -1028,6 +1187,9 @@ The import wizard adapts to smaller screens:
 - 📋 **Layers panel**: Toggle visibility of canvas layers
 - 📋 **Bookmarks panel**: Quick navigation to saved views
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 #### Panel Behaviors 📋 PLANNED
 - 📋 **Resizable panels**: Drag to resize
 - 📋 **Collapsible panels**: Minimize to edge
@@ -1036,22 +1198,31 @@ The import wizard adapts to smaller screens:
 - 📋 **Panel tabs**: Stack multiple panels with tabs
 - 📋 **Panel positions**: Left, right, top, bottom
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ---
 
 ### 11. Export & Sharing
 
 #### Current Export ✅ PARTIALLY COMPLETE
 - ✅ **Export button**: Icon-only button in canvas area (upper right)
-- 📋 **Export dropdown**: PNG, JPEG, SVG options
+- ✅ **Export dropdown**: PNG, JPEG, SVG options
 - 📋 **Export settings**: Resolution, quality, transparent background
 - 📋 **PDF export**: Multi-page with table of contents
-- 📋 **Mermaid export** ✅: Already implemented
+- ✅ **Mermaid export**
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 #### Sharing Features 📋 PLANNED
 - 📋 **Share link**: Generate shareable view-only link
 - 📋 **Embed code**: Embed canvas in external sites
 - 📋 **Social sharing**: Share to Twitter, LinkedIn with preview
 - 📋 **QR code**: Generate QR for quick mobile access
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -1089,18 +1260,18 @@ The import wizard adapts to smaller screens:
 
 ### 📊 Implementation Tickets Summary
 
-| Category | Completed | Planned | Total |
-|----------|-----------|---------|-------|
-| Layout & Navigation | 12 | 20 | 32 |
-| Visual Customization | 0 | 25 | 25 |
-| Theme System | 4 | 10 | 14 |
-| UX Features | 2 | 15 | 17 |
-| Keyboard & Commands | 0 | 10 | 10 |
-| Responsive & a11y | 0 | 12 | 12 |
-| Animations | 6 | 8 | 14 |
-| Panels & Sidebars | 2 | 10 | 12 |
-| Export & Sharing | 2 | 8 | 10 |
-| **TOTAL** | **28** | **118** | **146** |
+| Category             | Completed  | Planned  | Total   |
+|----------------------|------------|----------|---------|
+| Layout & Navigation  | 12         | 20       | 32      |
+| Visual Customization | 0          | 25       | 25      |
+| Theme System         | 4          | 10       | 14      |
+| UX Features          | 2          | 15       | 17      |
+| Keyboard & Commands  | 0          | 10       | 10      |
+| Responsive & a11y    | 0          | 12       | 12      |
+| Animations           | 6          | 8        | 14      |
+| Panels & Sidebars    | 2          | 10       | 12      |
+| Export & Sharing     | 2          | 8        | 10      |
+| **TOTAL**            | **28**     | **118**  | **146** |
 
 **Current Progress**: 19% Complete (28 of 146 items)
 
@@ -1242,6 +1413,9 @@ The import wizard adapts to smaller screens:
   - Compression support
   - Conditional requests (ETag, If-Modified-Since)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Custom Validation Rules**
 - Rule builder UI for custom validation logic
 - JavaScript/TypeScript rules engine
@@ -1250,6 +1424,9 @@ The import wizard adapts to smaller screens:
 - Import/export rule sets
 - Rule versioning and history
 - A/B testing rules before enforcement
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Violation Detection & Reporting
 
@@ -1262,6 +1439,9 @@ The import wizard adapts to smaller screens:
 - Hover over node to see violation count
 - Click to see detailed violation list
 - Filter canvas by violation severity
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Violation Panel**
 - Dedicated violations panel (bottom drawer)
@@ -1277,6 +1457,9 @@ The import wizard adapts to smaller screens:
 - Bulk fix similar violations
 - Export violations as CSV/JSON
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Auto-Fix Capabilities**
 - One-click fix for common violations:
   - Rename to proper case (PascalCase → camelCase)
@@ -1288,12 +1471,18 @@ The import wizard adapts to smaller screens:
 - Undo auto-fixes
 - Batch auto-fix all low-risk violations
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Violation Suppression**
 - Suppress specific violations with justification
 - Temporary suppressions (expires after date)
 - Permanent suppressions (with approval workflow)
 - Suppression audit trail
 - Review suppressed violations regularly
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Schema Health Insights
 
@@ -1310,6 +1499,9 @@ The import wizard adapts to smaller screens:
   - Compare score with team average
   - Compare with industry benchmarks
   - Version-to-version improvements
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Actionable Recommendations** 📋 PLANNED
 - 📋 AI-powered suggestions for improvement:
@@ -1335,6 +1527,9 @@ The import wizard adapts to smaller screens:
 - Maintainability index
 - Technical debt metrics
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Best Practice Suggestions**
 - Context-aware tips based on schema type:
   - E-commerce: "Consider adding inventory tracking"
@@ -1343,6 +1538,9 @@ The import wizard adapts to smaller screens:
 - Industry-specific patterns
 - Security hardening suggestions
 - Performance optimization tips
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Validation Reports & Compliance
 
@@ -1353,6 +1551,9 @@ The import wizard adapts to smaller screens:
 - Executive summary + detailed breakdown
 - Historical comparison
 - Action items and recommendations
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Compliance Checking**
 - Pre-configured rule sets for compliance:
@@ -1365,6 +1566,9 @@ The import wizard adapts to smaller screens:
 - Missing compliance controls highlighted
 - Remediation guides for compliance violations
 - Attestation and sign-off workflow
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **CI/CD Integration**
 - Validation gate for build pipelines
@@ -1444,6 +1648,9 @@ The import wizard adapts to smaller screens:
   - License (MIT, Apache, etc.)
   - Downloads count and rating
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Template Discovery**
 - Browse templates by category
 - Search templates by keyword
@@ -1458,6 +1665,9 @@ The import wizard adapts to smaller screens:
 - Trending templates (this week/month)
 - Related templates suggestions
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Template Preview**
 - Visual preview of template structure
 - Canvas preview showing classes and relationships
@@ -1465,6 +1675,9 @@ The import wizard adapts to smaller screens:
 - Sample OpenAPI spec preview
 - Screenshots/diagrams
 - Live demo (interactive playground)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Template Import & Customization
 
@@ -1495,6 +1708,9 @@ The import wizard adapts to smaller screens:
 - Fork template and modify
 - Merge template updates while preserving customizations
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Smart Merging**
 - Detect conflicts with existing schema
 - Preview merge conflicts
@@ -1505,6 +1721,9 @@ The import wizard adapts to smaller screens:
   - Rename and keep both
 - Intelligent property merging
 - Relationship reconciliation
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -1521,6 +1740,9 @@ The import wizard adapts to smaller screens:
 - Company branding and recognition for featured schemas
 - Direct links to schema details and documentation
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Showcase Eligibility**
 - Quality score threshold:
   - Minimum score: 90/100
@@ -1534,6 +1756,9 @@ The import wizard adapts to smaller screens:
 - Schema must be public or organization must opt-in
 - Active maintenance (updated within last 90 days)
 - "Submit" option for tenants to submit their schemas to the Showcase
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Showcase Categories**
 - **Industry Leaders**:
@@ -1555,6 +1780,9 @@ The import wizard adapts to smaller screens:
   - Highest community ratings
   - Most helpful templates derived
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Showcase Display**
 - **Showcase Gallery Page**:
   - Hero section with "Schema of the Month"
@@ -1568,6 +1796,9 @@ The import wizard adapts to smaller screens:
     - Preview thumbnail of canvas
   - Filter by industry/category
   - Search showcase archives
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Schema Detail View**:
   - Full schema visualization
@@ -1578,6 +1809,9 @@ The import wizard adapts to smaller screens:
   - Interactive preview
   - "Use This Template" button
   - Link to company profile
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Company Benefits**
 - **Recognition**:
@@ -1596,6 +1830,9 @@ The import wizard adapts to smaller screens:
   - Schema template usage
   - Clone/fork statistics
   - Traffic referral data
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Nomination & Selection**
 - **Automatic Consideration**:
@@ -1617,6 +1854,9 @@ The import wizard adapts to smaller screens:
   - Maintain quality score benefits
   - Privacy-focused organizations
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Showcase Management**
 - **Admin Dashboard**:
   - Review nominated schemas
@@ -1633,6 +1873,9 @@ The import wizard adapts to smaller screens:
   - Schedule social media posts
   - Manage company bio
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Showcase Archive**
 - Browse past months' showcases
 - Filter by date, industry, category
@@ -1641,12 +1884,18 @@ The import wizard adapts to smaller screens:
 - Trending schemas over time
 - Historical quality score data
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Integration with Quality Score**
 - Real-time quality monitoring for featured schemas
 - Alert if featured schema drops below threshold
 - Automatic removal if score falls below 85
 - Grace period for fixing issues
 - Re-showcase opportunity after improvements
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Social & Marketing**
 - **Social Sharing**:
@@ -1666,6 +1915,9 @@ The import wizard adapts to smaller screens:
   - Company interviews
   - Best practices guides
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Gamification**
 - **Achievement Badges**:
   - "Featured Schema" badge
@@ -1683,6 +1935,9 @@ The import wizard adapts to smaller screens:
   - Premium features access
   - Exclusive beta access
   - Speaking opportunities at events
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Technical Implementation**
 - Showcase database schema
@@ -1707,7 +1962,7 @@ The import wizard adapts to smaller screens:
 
 ### Node Grouping & Organization
 
-**Group Containers**
+**Group Containers** 📋 PLANNED
 - 📋 Create visual containers to group related classes together
 - 📋 Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services", "Core Domain")
 - 📋 Collapsible groups to reduce canvas clutter
@@ -1735,15 +1990,6 @@ The import wizard adapts to smaller screens:
   - 📋 Background color/opacity customization
   - 📋 Optional group icons from icon library
 
-**Group Templates**
-- Pre-defined group structures for common patterns:
-  - REST Resource Group (Create, Read, Update, Delete classes)
-  - Authentication Group (User, Token, Session, Role)
-  - E-commerce Group (Product, Cart, Order, Payment)
-  - Audit Group (Event, Log, History)
-- Save custom groups as reusable templates
-- Share group templates across projects/tenants
-
 | Ticket | Feature Description                                                                                     |
 |--------|---------------------------------------------------------------------------------------------------------|
 | [#152] | Create visual containers to group related classes together                                              |
@@ -1760,6 +2006,18 @@ The import wizard adapts to smaller screens:
 | [#190] | Create an export button to the canvas header                                                            |
 | [#284] | Dragging and dropping a node to a group will add it                                                     |
 | [#285] | Ungrouping nodes from a group by deleting it                                                            |
+
+**Group Templates**
+- Pre-defined group structures for common patterns:
+  - REST Resource Group (Create, Read, Update, Delete classes)
+  - Authentication Group (User, Token, Session, Role)
+  - E-commerce Group (Product, Cart, Order, Payment)
+  - Audit Group (Event, Log, History)
+- Save custom groups as reusable templates
+- Share group templates across projects/tenants
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Canvas Layout Management
 
@@ -1787,6 +2045,9 @@ The import wizard adapts to smaller screens:
 - Snapshot gallery view with search/filter
 - Auto-snapshots before major changes
 - Snapshot metadata: timestamp, author, description
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Layout Sharing**
 - Share layout configurations with team members
@@ -1817,16 +2078,6 @@ The import wizard adapts to smaller screens:
 
 ### Canvas Navigation & Controls
 
-**Minimap** ✅ IMPLEMENTED
-- ✅ Bird's-eye view in bottom-right corner
-- ✅ Shows entire canvas with current viewport highlighted
-- ✅ Click to jump to any area
-- ✅ Zoom minimap independently
-- ✅ Show/hide with keyboard shortcut (M key)
-- ✅ Minimap shows group boundaries
-- ✅ Color-coded nodes on minimap (by type or group)
-- ✅ Draggable viewport rectangle on minimap
-
 **Zoom & Pan**
 - Smooth zoom with mouse wheel
 - Zoom to fit (show entire canvas)
@@ -1838,6 +2089,9 @@ The import wizard adapts to smaller screens:
 - Pan to edges on node drag
 - Touchpad gesture support (pinch to zoom)
 - Reset zoom and position button
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Search & Focus**
 - 📋 Global search box (Cmd+F) to find classes
@@ -1869,6 +2123,9 @@ The import wizard adapts to smaller screens:
 - Bookmark thumbnails
 - Organize bookmarks in folders
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Canvas Layers**
 - Separate visual layers for different content:
   - **Background Layer**: Grid (dots vs. lines), annotations, shapes
@@ -1883,6 +2140,9 @@ The import wizard adapts to smaller screens:
 - Reorder layer z-index
 - Per-layer opacity control
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Node Visibility Controls**
 - Hide/show individual nodes
 - Hide all nodes except selected
@@ -1895,6 +2155,9 @@ The import wizard adapts to smaller screens:
 - Quick restore hidden nodes
 - Visibility history
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Focus Mode**
 - Isolate selected classes and immediate relationships
 - Blur/dim non-focused nodes
@@ -1902,6 +2165,9 @@ The import wizard adapts to smaller screens:
 - Expand focus incrementally
 - Focus on group (show only group members)
 - Exit focus mode (Esc key)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Visual Customization
 
@@ -1945,6 +2211,9 @@ The import wizard adapts to smaller screens:
   - Multi-line labels with wrapping
   - Label background color/opacity
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Edge/Relationship Styling**
 - Different line styles for relationship types:
   - Solid for direct references
@@ -1969,69 +2238,8 @@ The import wizard adapts to smaller screens:
 - Animated edges (flowing dots for data flow)
 - Edge hover effects (highlight and tooltip)
 
-**Canvas Themes** 📋 PLANNED
-- 📋 Pre-built themes:
-  - 📋 Light mode (default)
-  - 📋 Dark mode
-  - 📋 High contrast
-  - 📋 Blueprint (blue grid on dark)
-  - 📋 Whiteboard (minimal)
-  - 📋 Solarized
-  - 📋 Nord
-  - 📋 Darcula
-- Custom theme creator:
-  - Canvas background color
-  - Grid color and opacity
-  - Node default colors
-  - Edge default colors
-  - Text colors
-  - Selection colors
-  - Hover colors
-- Save and share custom themes
-- Import themes from files
-- Theme marketplace
-
-| Ticket | Feature Description                                                |
-|--------|--------------------------------------------------------------------|
-| [#185] | Custom Colors: Per-class color picker, color by group, stereotypes |
-
-**Grid & Alignment**
-- **Grid Snapping**: 
-  - Snap nodes to grid on move
-  - Adjustable grid size (10px, 20px, 50px)
-  - Show/hide grid
-  - Grid style (dots, lines, crosses)
-- **Alignment Tools**: 
-  - Align left edges
-  - Align right edges
-  - Align top edges
-  - Align bottom edges
-  - Align centers horizontally
-  - Align centers vertically
-  - Distribute horizontally
-  - Distribute vertically
-  - Match size (width, height, both)
-- **Guides & Rulers**: 
-  - Smart guides appear on drag (show alignment)
-  - Horizontal/vertical ruler bars
-  - Custom guide lines (drag from ruler)
-  - Snap to guides
-  - Guide colors and styles
-- **Spacing Tools**: 
-  - Equal spacing between selected nodes
-  - Margin indicators
-  - Padding visualization
-
-**Canvas Background**
-- Background options:
-  - Solid color
-  - Grid pattern (square, dot, isometric)
-  - Custom image upload
-  - Gradient backgrounds
-  - Texture patterns (paper, fabric, concrete)
-- Background opacity
-- Background blur
-- Infinite canvas scrolling
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Annotations & Documentation
 
@@ -2048,6 +2256,9 @@ The import wizard adapts to smaller screens:
 - Note search across canvas
 - Filter notes by author, date, color
 - Convert notes to tasks
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Arrows & Shapes**
 - **Arrows**: 
@@ -2071,6 +2282,9 @@ The import wizard adapts to smaller screens:
   - Add visual separators
   - Annotate for presentations
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Text Labels**
 - Add free-form text anywhere on canvas
 - Rich text formatting
@@ -2079,15 +2293,20 @@ The import wizard adapts to smaller screens:
 - Link text to URLs
 - Text search included in canvas search
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Canvas Captures**
 - Screenshot selected area
 - Screenshot entire canvas
 - Screenshot current viewport
 - Copy to clipboard
-- Download as PNG/JPG
 - Adjustable resolution
 - Include/exclude UI elements
 - Annotate screenshot before saving
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Presentation Mode**
 - Full-screen canvas mode
@@ -2098,6 +2317,9 @@ The import wizard adapts to smaller screens:
 - Presenter controls (keyboard shortcuts)
 - Laser pointer mode
 - Recording mode (capture presentation as video)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Undo/Redo System
 
@@ -2120,6 +2342,9 @@ The import wizard adapts to smaller screens:
   - Complete state for undo/redo
   - Affected entities
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Undo/Redo UI**
 - Keyboard shortcuts:
   - `Cmd+Z` / `Ctrl+Z` - Undo
@@ -2128,6 +2353,9 @@ The import wizard adapts to smaller screens:
 - Dropdown shows last 10 actions with descriptions
 - Click any action to undo/redo to that point
 - Visual indicator when undo/redo is available
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **History Panel**
 - Dedicated history panel (toggle with Cmd+H)
@@ -2140,11 +2368,17 @@ The import wizard adapts to smaller screens:
 - Jump to any point in history
 - Branch visualization for collaborative edits
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Selective Undo**
 - Undo specific actions from history without undoing everything
 - "Undo this action only" option
 - Intelligent conflict resolution
 - Warning when selective undo may cause issues
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Branch History**
 - When collaborative editing, track branches
@@ -2152,6 +2386,9 @@ The import wizard adapts to smaller screens:
 - Merge branches with conflict resolution
 - Visual branch diagram
 - Compare branches before merging
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Persistent History**
 - Save undo history in browser localStorage
@@ -2162,12 +2399,18 @@ The import wizard adapts to smaller screens:
 - History sync across devices
 - Import/export history
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Collaborative Undo**
 - See other users' actions in history
 - Undo only your own actions or all actions
 - Conflict resolution for simultaneous edits
 - Lock mechanism to prevent undo conflicts
 - Real-time history synchronization
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Implementation Details**
 - **Command Pattern**: Each action is a Command object with execute/undo
@@ -2179,6 +2422,9 @@ The import wizard adapts to smaller screens:
 - **Web Workers**: History calculations in background thread
 - **IndexedDB**: Store large histories client-side
 - **Server Sync**: Periodic sync to server for backup
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Smart Canvas Features
 
@@ -2193,6 +2439,9 @@ The import wizard adapts to smaller screens:
 - ✅ Preview suggestions before applying
 - 📋 Rating system for suggestions (thumbs up/down to improve)
 - 📋 Machine learning from user preferences
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Canvas Analysis** ✅ PARTIALLY IMPLEMENTED
 - **Schema Metrics**: 
@@ -2212,6 +2461,9 @@ The import wizard adapts to smaller screens:
   - 📋 "Group these 5 classes - they're all related"
   - 📋 "Class X is isolated - consider adding relationships"
   - 📋 "Large clusters detected - consider splitting into groups"
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Canvas Performance Optimizations** ✅ IMPLEMENTED
 - **Virtual Rendering**: 
@@ -2277,6 +2529,9 @@ The import wizard adapts to smaller screens:
   - Message history
   - Chat bubbles above cursors
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Canvas Export Options**
 - **Export Formats**: 
   - ✅ PNG (raster image)
@@ -2335,12 +2590,18 @@ The import wizard adapts to smaller screens:
   - Search and filter paths
   - Path count badges per tag/group
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Path Creation Wizard**:
   - Step-by-step path creation flow
   - Auto-suggest path parameters from schema properties
   - Path templates for common patterns (CRUD, search, bulk operations)
   - Duplicate path with modifications
   - Batch path creation from schema (generate CRUD endpoints)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 - **Path Editor Panel**:
   - Inline path editing with syntax highlighting
@@ -2349,6 +2610,9 @@ The import wizard adapts to smaller screens:
   - Path description and summary fields
   - Deprecated path marking with sunset date
   - External documentation links
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Path Parameters** 📋 PLANNED
 - **Parameter Types**:
@@ -2394,12 +2658,18 @@ The import wizard adapts to smaller screens:
   - File upload template
   - Pagination template
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Security per Operation** 📋 PLANNED
 - Override global security at operation level
 - Multiple security schemes (AND/OR logic)
 - OAuth2 scopes per operation
 - API key requirements
 - No security option for public endpoints
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Request Body Editor
 
@@ -2423,6 +2693,9 @@ The import wizard adapts to smaller screens:
   - Example values (multiple examples)
   - Default values
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Form Data & File Uploads** 📋 PLANNED
 - Multipart form field definitions
 - File upload with binary/base64 encoding
@@ -2431,12 +2704,18 @@ The import wizard adapts to smaller screens:
 - File size limits
 - Mixed form data and file uploads
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Encoding Configuration** 📋 PLANNED
 - Per-property encoding for form data
 - Content-Type override per property
 - Headers per property
 - Style and explode for arrays/objects
 - Allow reserved characters option
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Response Builder
 
@@ -2454,6 +2733,9 @@ The import wizard adapts to smaller screens:
   - Headers in response
   - Links to other operations (HATEOAS)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Response Templates** 📋 PLANNED
 - Standard error response template
 - Pagination response wrapper
@@ -2461,12 +2743,18 @@ The import wizard adapts to smaller screens:
 - HAL/JSON:API response format
 - Problem Details (RFC 7807) for errors
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Response Examples** 📋 PLANNED
 - Multiple named examples per response
 - Example value or external reference
 - Summary and description per example
 - Generate examples from schema (json-schema-faker)
 - Import examples from real API responses
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Path Tags & Grouping
 
@@ -2487,12 +2775,18 @@ The import wizard adapts to smaller screens:
   - Export operations by tag
   - Tag-based access control (future)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Path Grouping** 📋 PLANNED
 - Group paths by resource (e.g., all `/users` paths together)
 - Group paths by domain (e.g., "Authentication", "Billing")
 - Visual separators in path list
 - Collapsible path groups
 - Group-level operations (bulk delete, bulk deprecate)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Canvas Integration for Paths
 
@@ -2508,11 +2802,17 @@ The import wizard adapts to smaller screens:
   - Automatic layout with schemas and paths
   - Filter canvas to show specific path's schemas
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Path Flow Diagrams** 📋 PLANNED
 - Visualize request/response flow
 - Show authentication requirements
 - Display data transformations
 - Export as sequence diagrams
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### OpenAPI Specification Output
 
@@ -2533,6 +2833,9 @@ The import wizard adapts to smaller screens:
   - `tags` (tag definitions with descriptions)
   - `externalDocs` (external documentation)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Security Schemes** 📋 PLANNED
 - API Key (header, query, cookie)
 - HTTP Basic/Bearer authentication
@@ -2541,12 +2844,18 @@ The import wizard adapts to smaller screens:
 - Mutual TLS (mTLS)
 - Custom security schemes
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Server Configuration** 📋 PLANNED
 - Multiple server definitions
 - Server variables with enum values
 - Environment-specific servers (dev, staging, prod)
 - Server descriptions
 - Relative server paths
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Code Generation for Paths
 
@@ -2565,6 +2874,9 @@ The import wizard adapts to smaller screens:
   - Error handling with typed errors
   - Retry logic and timeouts
   - Request/response interceptors
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Server Stub Generation** 📋 PLANNED
 - **Server Frameworks**:
@@ -2585,6 +2897,9 @@ The import wizard adapts to smaller screens:
   - Request/response type safety
   - Mock data generation
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### CRUD Operation Stubs (NEW)
 
 **Automatic CRUD Generation** 📋 PLANNED
@@ -2595,45 +2910,69 @@ The import wizard adapts to smaller screens:
   - Proper HTTP methods and status codes
   - Request/response schemas automatically configured
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **CRUD Operation Templates**:
   - **Create (POST /resources)**:
     - Request body: Full schema
     - Response: 201 Created with created resource
     - Validation: Required fields, constraints
     - Error responses: 400 (validation), 409 (conflict)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Read/Get Single (GET /resources/{id})**:
     - Path parameter: Resource ID
     - Response: 200 OK with resource
     - Error responses: 404 (not found), 403 (forbidden)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **List/Get All (GET /resources)**:
     - Query parameters: pagination (page, limit, offset)
     - Query parameters: filtering, sorting
     - Response: 200 OK with array of resources
     - Pagination metadata in response
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Update (PUT /resources/{id})**:
     - Path parameter: Resource ID
     - Request body: Full schema (replace entire resource)
     - Response: 200 OK with updated resource
     - Error responses: 404 (not found), 400 (validation), 409 (conflict)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Partial Update (PATCH /resources/{id})**:
     - Path parameter: Resource ID
     - Request body: Partial schema (only changed fields)
     - Response: 200 OK with updated resource
     - Error responses: 404 (not found), 400 (validation)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Delete (DELETE /resources/{id})**:
     - Path parameter: Resource ID
     - Response: 204 No Content or 200 OK with deleted resource
     - Error responses: 404 (not found), 409 (conflict if dependencies)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Bulk Operations** (Optional):
   - **Bulk Create (POST /resources/bulk)**
   - **Bulk Update (PUT /resources/bulk)**
   - **Bulk Delete (DELETE /resources/bulk)**
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **CRUD Customization** 📋 PLANNED
 - **URL Pattern Customization**:
@@ -2643,11 +2982,17 @@ The import wizard adapts to smaller screens:
   - Singular vs plural resource names
   - Nested resources (/users/{userId}/posts)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Operation Selection**:
   - Enable/disable specific operations
   - Read-only APIs (GET operations only)
   - Write-only APIs (POST operations only)
   - Custom operation combinations
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 - **Response Customization**:
   - Choose response wrapper format
@@ -2656,12 +3001,18 @@ The import wizard adapts to smaller screens:
   - Custom error response schema
   - HATEOAS links (include navigation links)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Request Validation**:
   - Auto-generate validation rules from schema
   - Custom validation messages
   - Field-level validation
   - Business rule validation hooks
   - Async validation support
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Mock Data Generation** 📋 PLANNED
 - **Stub Response Data**:
@@ -2671,12 +3022,18 @@ The import wizard adapts to smaller screens:
   - Multiple example variations
   - Configurable data set size
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Mock Data Strategies**:
   - Static examples from schema
   - Dynamic random generation
   - Incremental IDs
   - Timestamp generation
   - Related data consistency (foreign keys)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Server Stub Implementation** 📋 PLANNED
 - **Framework-Specific Stubs**:
@@ -2734,6 +3091,9 @@ The import wizard adapts to smaller screens:
   - Request builder with autocomplete
   - Response visualization with syntax highlighting
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Enhanced Testing Features**:
   - **Test from Studio**:
     - "Test API" button on each operation
@@ -2741,6 +3101,9 @@ The import wizard adapts to smaller screens:
     - Parameter auto-completion
     - Authentication token management
     - Save test requests as collections
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Mock Server Integration**:
     - One-click mock server startup
@@ -2748,6 +3111,9 @@ The import wizard adapts to smaller screens:
     - Configurable mock behavior
     - Request logging and inspection
     - Hot-reload on spec changes
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **CRUD Operation Testing** 📋 PLANNED
 - **Visual CRUD Testing Panel**:
@@ -2757,6 +3123,9 @@ The import wizard adapts to smaller screens:
   - Automatic ID propagation between operations
   - Test data persistence within session
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Test Scenarios**:
   - **Happy Path Testing**:
     - Create resource with valid data
@@ -2764,6 +3133,9 @@ The import wizard adapts to smaller screens:
     - Update resource
     - Delete resource
     - Verify 404 after deletion
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Error Path Testing**:
     - Invalid data validation (400)
@@ -2771,6 +3143,9 @@ The import wizard adapts to smaller screens:
     - Duplicate resource (409)
     - Unauthorized access (401)
     - Forbidden operation (403)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
   - **Edge Case Testing**:
     - Empty list response
@@ -2778,6 +3153,9 @@ The import wizard adapts to smaller screens:
     - Large data sets
     - Special characters in data
     - Boundary value testing
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Request Collections** 📋 PLANNED
 - **Test Collection Management**:
@@ -2787,12 +3165,18 @@ The import wizard adapts to smaller screens:
   - Import/export Postman collections
   - Version control for collections
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Collection Runner**:
   - Execute entire collection sequentially
   - Variable substitution between requests
   - Assertions and test validation
   - Response time tracking
   - Success/failure reporting
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Mock Server Features** 📋 PLANNED
 - **Local Development Server**:
@@ -2803,6 +3187,9 @@ The import wizard adapts to smaller screens:
   - Configurable response delays
   - Error injection for testing
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Mock Server Controls**:
   - Start/stop server from Studio
   - View server logs in real-time
@@ -2810,6 +3197,9 @@ The import wizard adapts to smaller screens:
   - Modify mock data on the fly
   - Reset data to initial state
   - Export mock data as JSON
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **API Testing Playground** 📋 PLANNED
 - **Interactive Playground**:
@@ -2820,6 +3210,9 @@ The import wizard adapts to smaller screens:
   - Headers and cookies inspection
   - WebSocket testing support
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Advanced Testing Features**:
   - Environment variables for different endpoints
   - Pre-request scripts (JavaScript)
@@ -2827,6 +3220,9 @@ The import wizard adapts to smaller screens:
   - Chain requests with data flow
   - Performance testing (load simulation)
   - Response schema validation
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Swagger UI Customization** 📋 PLANNED
 - **UI Configuration**:
@@ -2837,6 +3233,9 @@ The import wizard adapts to smaller screens:
   - Sort operations
   - Show/hide model schemas
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Try-It-Out Enhancements**:
   - Example selector dropdown
   - Generate random data button
@@ -2844,6 +3243,9 @@ The import wizard adapts to smaller screens:
   - Copy as cURL command
   - Copy as code snippet (multiple languages)
   - Download response as file
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Documentation Integration** 📋 PLANNED
 - **Rich API Documentation**:
@@ -2853,6 +3255,9 @@ The import wizard adapts to smaller screens:
   - Video/image embedding
   - Interactive diagrams
   - Version-specific documentation
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 - **Testing Guides**:
   - Auto-generated testing guide
@@ -2979,12 +3384,18 @@ The import wizard adapts to smaller screens:
 - Create requirements.txt/pyproject.toml
 - Add mypy/pylint configuration
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **OpenAPI Client Generation**
 - One-click client SDK generation
 - Integrate with OpenAPI Generator
 - Support for all major languages
 - Download as package/library
 - NPM/PyPI/Maven publishing integration
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Testing & Validation
 
@@ -3001,6 +3412,9 @@ The import wizard adapts to smaller screens:
 - Auto-fix common issues
 - Validation on save/publish
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Mock Data Generation**
 - Generate realistic mock data from schemas
 - Uses json-schema-faker (already integrated)
@@ -3014,6 +3428,9 @@ The import wizard adapts to smaller screens:
 - Seed database with mock data
 - Use mocks in API testing
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **API Testing Integration**
 - Generate Postman collections from schemas
 - Generate Insomnia workspaces
@@ -3021,6 +3438,9 @@ The import wizard adapts to smaller screens:
 - Test history and results
 - Performance testing (load times)
 - Contract testing (Pact integration)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Documentation
 
@@ -3038,6 +3458,9 @@ The import wizard adapts to smaller screens:
 - ✅ Dark mode support
 - 📋 Customizable branding
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Interactive API Explorer** ✅ IMPLEMENTED
 - ✅ Test APIs directly from generated docs
 - ✅ Try-it-out functionality (via Swagger UI)
@@ -3046,12 +3469,18 @@ The import wizard adapts to smaller screens:
 - ✅ Save example requests
 - 📋 Share API examples with team
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Changelog** 📋 PLANNED
 - Auto-generate changelogs between versions
 - Highlight breaking changes
 - Migration guide generation
 - Deprecation notices
 - Visual diff view
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Developer Tools
 
@@ -3061,6 +3490,9 @@ The import wizard adapts to smaller screens:
 - Fork schemas for experimentation
 - Share playground links
 - Embed playground in docs
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **IDE Extensions**
 - **VS Code Extension**: 
@@ -3073,6 +3505,9 @@ The import wizard adapts to smaller screens:
   - Snippets and templates
 - **JetBrains Plugin**: IntelliJ, WebStorm, PyCharm support
 - **Vim Plugin**: For terminal lovers
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Git Integration** ✅ IMPLEMENTED
 - ✅ Push schemas to Git repositories (GitHub, GitLab, Bitbucket)
@@ -3088,6 +3523,9 @@ The import wizard adapts to smaller screens:
 - ✅ PAT (Personal Access Token) support
 - ✅ Repository search and filtering
 - ✅ Private repository support with lock icons
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Advanced Property Editor
 
@@ -3141,6 +3579,9 @@ The import wizard adapts to smaller screens:
 - Deprecate properties
 - Property marketplace (community-shared)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Constraint Visualization** ✅ IMPLEMENTED
 - Visual indicators for constraints on canvas:
   - ✅ Required (bold border)
@@ -3153,84 +3594,10 @@ The import wizard adapts to smaller screens:
 - ✅ Constraint summary panel
 - ✅ Tags displayed on class nodes
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### OpenAPI 3.1 / JSON Schema 2020-12 Feature Coverage
-
-**Schema Composition** ✅ FULLY IMPLEMENTED
-- ✅ `allOf`: Combine multiple schemas (inheritance/mixins)
-- ✅ `anyOf`: Match at least one schema (union types)
-- ✅ `oneOf`: Match exactly one schema (discriminated unions)
-- ✅ `not`: Negation - must NOT match schema
-- ✅ Discriminator with property name and mapping
-- ✅ Auto-discriminator generation from property values
-- ✅ Manual discriminator mapping editor
-
-**Type System** ✅ FULLY IMPLEMENTED
-- ✅ Type arrays for nullable: `['string', 'null']` (replaces deprecated `nullable: true`)
-- ✅ `const`: Single constant value
-- ✅ `enum`: Enumerated values with drag-and-drop reordering
-- ✅ `default`: Default values
-- ✅ `type`: All JSON Schema types (string, number, integer, boolean, object, array, null)
-
-**String Constraints** ✅ FULLY IMPLEMENTED
-- ✅ `minLength`: Minimum string length
-- ✅ `maxLength`: Maximum string length
-- ✅ `pattern`: Regular expression validation with live tester
-- ✅ `format`: Standard formats (date, date-time, time, email, uri, uuid, etc.)
-
-**Numeric Constraints** ✅ FULLY IMPLEMENTED
-- ✅ `minimum`: Minimum value (inclusive by default)
-- ✅ `maximum`: Maximum value (inclusive by default)
-- ✅ `exclusiveMinimum`: Exclusive minimum (OpenAPI 3.1 style)
-- ✅ `exclusiveMaximum`: Exclusive maximum (OpenAPI 3.1 style)
-- ✅ `multipleOf`: Value must be multiple of specified number
-- ✅ Radio buttons for inclusive (≥) vs exclusive (>) boundaries
-
-**Array Constraints** ✅ FULLY IMPLEMENTED
-- ✅ `minItems`: Minimum array length
-- ✅ `maxItems`: Maximum array length
-- ✅ `uniqueItems`: All items must be unique
-- ✅ `items`: Schema for all array items
-- ✅ `prefixItems`: Tuple mode - ordered schemas for specific positions (OpenAPI 3.1)
-- ✅ `contains`: At least one item must match this schema (OpenAPI 3.1)
-- ✅ `minContains`: Minimum items matching contains schema (OpenAPI 3.1)
-- ✅ `maxContains`: Maximum items matching contains schema (OpenAPI 3.1)
-- ✅ `unevaluatedItems`: Control for items not matched by prefixItems/items/contains (JSON Schema 2020-12)
-
-**Object Constraints** ✅ FULLY IMPLEMENTED
-- ✅ `properties`: Define object properties
-- ✅ `required`: Array of required property names
-- ✅ `additionalProperties`: Allow/disallow/schema for extra properties
-- ✅ `minProperties`: Minimum number of properties
-- ✅ `maxProperties`: Maximum number of properties
-- ✅ `patternProperties`: Regex-based property schemas (e.g., `^x-` for extensions)
-- ✅ `propertyNames`: Validate property names with pattern/minLength/maxLength (OpenAPI 3.1)
-- ✅ `dependentRequired`: Properties that require other properties (OpenAPI 3.1)
-- ✅ `dependentSchemas`: Apply schema when specific property exists (OpenAPI 3.1)
-- ✅ `unevaluatedProperties`: Control for properties not matched by properties/patternProperties/allOf (JSON Schema 2020-12)
-
-**Conditional Schemas** ✅ FULLY IMPLEMENTED
-- ✅ `if`/`then`/`else`: Conditional schema application (OpenAPI 3.1)
-  - ✅ Visual conditional rule builder
-  - ✅ Multiple operators: equals, enum, type, required, pattern, minimum, maximum
-  - ✅ THEN schema with required properties and constraints
-  - ✅ Optional ELSE schema for when condition is false
-  - ✅ Support for complex nested conditions
-
-**Metadata & Documentation** ✅ FULLY IMPLEMENTED
-- ✅ `title`: Display title for schemas
-- ✅ `description`: Rich text descriptions
-- ✅ `examples`: Array of example values (replaces deprecated `example`)
-- ✅ `deprecated`: Mark as deprecated with custom deprecation message
-- ✅ `readOnly`: Property is read-only (response only)
-- ✅ `writeOnly`: Property is write-only (request only)
-- ✅ `externalDocs`: Link to external documentation with URL and description
-
-**Extension Properties** ✅ FULLY IMPLEMENTED
-- ✅ Custom `x-` prefixed vendor extensions
-- ✅ Extensions at class/schema level
-- ✅ Extensions at property level
-- ✅ JSON editor for extension values
-- ✅ Support for any valid JSON structure in extensions
 
 **Not Yet Implemented** 📋 PLANNED (Low Priority)
 - 📋 `$id`: Schema identifier for referencing
@@ -3243,6 +3610,9 @@ The import wizard adapts to smaller screens:
 - 📋 `contentMediaType`: Media type for string content
 - 📋 `contentEncoding`: Content encoding (base64, etc.)
 - 📋 `contentSchema`: Schema for decoded content
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Summary**: Objectified implements **95%+ of OpenAPI 3.1 / JSON Schema 2020-12** features relevant to schema design. Missing features are primarily meta-schema features (`$id`, `$schema`, `$vocabulary`) and content encoding, which are rarely used in typical API development.
 
@@ -3281,6 +3651,9 @@ The import wizard adapts to smaller screens:
   - ✅ Copy classes and properties from existing version
   - ✅ Create new version based on previous version
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Draft vs Published** 📋 PLANNED
 - Work on drafts without affecting published version
 - Multiple drafts per version
@@ -3288,6 +3661,9 @@ The import wizard adapts to smaller screens:
 - Draft approval workflow
 - Scheduled publishing
 - Instant publish vs queued publish
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -3305,6 +3681,9 @@ The import wizard adapts to smaller screens:
 - Change attribution (who made each change)
 - Conflict resolution UI when needed
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Presence Indicators**
 - See who's currently viewing/editing
 - User avatars in header
@@ -3312,6 +3691,9 @@ The import wizard adapts to smaller screens:
 - "X users viewing" badge
 - Idle detection (away after 5 minutes)
 - User locations on canvas (cursor positions)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Comments & Discussions**
 - **Inline Comments**: 
@@ -3339,6 +3721,9 @@ The import wizard adapts to smaller screens:
   - Emoji reactions
   - Link to other schemas/classes
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Review & Approval Workflows
 
 **Change Requests**
@@ -3360,6 +3745,9 @@ The import wizard adapts to smaller screens:
 - Batch review multiple changes
 - Review history
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Approval Workflows**
 - Configurable approval rules:
   - Require N approvals
@@ -3369,6 +3757,9 @@ The import wizard adapts to smaller screens:
 - Approval notifications
 - Approval audit trail
 - Override mechanism for admins
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Team Management
 
@@ -3431,12 +3822,18 @@ The import wizard adapts to smaller screens:
 - Import/export preferences
 - Per-user vs per-team settings
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Responsive Design**
 - Tablet optimized (iPad Pro, Surface)
 - Mobile view (read-only, optimized for viewing)
 - Adaptive layouts based on screen size
 - Touch-friendly controls
 - Gesture support (pinch, swipe)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Keyboard Shortcuts
 
@@ -3487,6 +3884,9 @@ The import wizard adapts to smaller screens:
 - Resizable text (up to 200%)
 - No color-only information
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Accessibility Features**
 - High contrast mode
 - Increased font sizes
@@ -3497,6 +3897,9 @@ The import wizard adapts to smaller screens:
 - Accessible modal dialogs
 - Accessible tooltips
 - Accessible dropdowns
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Performance UI
 
@@ -3510,6 +3913,9 @@ The import wizard adapts to smaller screens:
 - Lazy load off-screen content
 - Optimistic UI updates
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Error Handling**
 - User-friendly error messages
 - Error recovery suggestions
@@ -3519,6 +3925,9 @@ The import wizard adapts to smaller screens:
 - Graceful degradation
 - Offline mode indicators
 - Connection status indicator
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### User Onboarding
 
@@ -3531,12 +3940,18 @@ The import wizard adapts to smaller screens:
 - Feature discovery prompts
 - Achievements/badges for learning
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Quick Start**
 - Sample project templates
 - Pre-built schema examples
 - Import wizard
 - Project setup wizard
 - Checklist for getting started
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -3559,6 +3974,9 @@ The import wizard adapts to smaller screens:
 - Share lint configs across projects
 - Lint rule templates (REST API best practices, etc.)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Metrics**
 - **Complexity Score**: 
   - Based on depth, property count, relationships
@@ -3575,6 +3993,9 @@ The import wizard adapts to smaller screens:
   - How many examples provided
   - How many tests
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Analysis**
 - Dependency graph visualization
 - Circular dependency detection
@@ -3584,6 +4005,9 @@ The import wizard adapts to smaller screens:
 - Breaking change detection
 - API surface area calculation
 - Schema statistics dashboard
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Schema Templates
 
@@ -3604,12 +4028,18 @@ The import wizard adapts to smaller screens:
 - Template ratings and reviews
 - Fork and customize templates
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Custom Templates**
 - Create templates from existing schemas
 - Template variables (placeholders)
 - Template documentation
 - Share templates privately or publicly
 - Template monetization (premium templates)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Schema Import/Export
 
@@ -3655,6 +4085,9 @@ The import wizard adapts to smaller screens:
 - 📋 Markdown documentation
 - 📋 Excel (for non-technical stakeholders)
 - 📋 PDF documentation
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Schema-to-Code**
 - Generate code from schemas in multiple languages:
@@ -3722,6 +4155,9 @@ The import wizard adapts to smaller screens:
 - Import history
 - Rollback imports
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Schema Versioning
 
 **Version Control**
@@ -3735,6 +4171,9 @@ The import wizard adapts to smaller screens:
 - Fork versions for experiments
 - Protected versions (can't be deleted)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Breaking Change Detection**
 - Auto-detect breaking changes:
   - Removed classes/properties
@@ -3746,12 +4185,18 @@ The import wizard adapts to smaller screens:
 - SemVer version recommendations
 - Block publishing if breaking changes detected (configurable)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Migration Tools**
 - Generate migration guides
 - Data migration scripts
 - Backward compatibility checker
 - Deprecation warnings
 - Sunset timeline for old versions
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -3768,6 +4213,9 @@ The import wizard adapts to smaller screens:
 - ✅ Soft delete capability
 - ✅ Full UI for key management
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Rate Limiting 📋 PLANNED
 - Per API key rate limits
 - Per tenant rate limits
@@ -3777,6 +4225,9 @@ The import wizard adapts to smaller screens:
 - Rate limit dashboard
 - Auto-throttling on spike detection
 - DDoS protection
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Audit Logging
 - Comprehensive audit trail:
@@ -3792,6 +4243,9 @@ The import wizard adapts to smaller screens:
 - Immutable audit logs
 - Audit log retention policies
 - Real-time audit alerts
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Advanced Security ✅ PARTIALLY IMPLEMENTED
 - 📋 Two-Factor Authentication (2FA)
@@ -3838,6 +4292,9 @@ The import wizard adapts to smaller screens:
   - Clear role comparison matrix
   - Role descriptions in UI
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Custom Roles** 📋 PLANNED
 - Create custom roles with granular permissions
 - Clone existing role as starting point
@@ -3845,6 +4302,9 @@ The import wizard adapts to smaller screens:
 - Enable/disable custom roles
 - Audit trail for role changes
 - Role templates for common use cases
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Permission Categories** 📋 PLANNED
 - **Tenant Permissions**:
@@ -3895,12 +4355,18 @@ The import wizard adapts to smaller screens:
   - `ai:review` - Request AI reviews
   - `ai:configure` - Configure AI settings
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Resource-Level Permissions** 📋 PLANNED
 - Permissions at project level (all versions inherit)
 - Permissions at version level (override project)
 - Permissions at class level (sensitive schemas)
 - Permissions at path level (restricted endpoints)
 - Permission inheritance with override capability
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **User Management** 📋 PLANNED
 - **User Invitation**:
@@ -3922,6 +4388,9 @@ The import wizard adapts to smaller screens:
   - Last login timestamp
   - Session management
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Team Management** 📋 PLANNED
 - Create teams within tenants
 - Assign roles to teams (not just users)
@@ -3930,6 +4399,9 @@ The import wizard adapts to smaller screens:
 - Team-based project access
 - Cross-team collaboration
 - Team activity dashboard
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Permission UI** 📋 PLANNED
 - **Role Assignment**:
@@ -3948,12 +4420,18 @@ The import wizard adapts to smaller screens:
   - Notification to approvers
   - Request history and audit trail
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Permission Checks** 📋 PLANNED
 - Real-time permission validation
 - Graceful degradation (hide unauthorized features)
 - Clear error messages for denied actions
 - "Request Access" button for denied resources
 - Permission caching for performance
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Audit & Compliance** 📋 PLANNED
 - Log all permission changes
@@ -3963,6 +4441,9 @@ The import wizard adapts to smaller screens:
 - Compliance reports (who has access to what)
 - Detect over-privileged users
 - Recommend permission cleanup
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -3980,6 +4461,9 @@ The import wizard adapts to smaller screens:
 - ✅ Active users/sessions
 - ✅ Canvas rendering performance
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Logging
 - Centralized logging (ELK, Loki)
 - Structured logs with context
@@ -3988,6 +4472,9 @@ The import wizard adapts to smaller screens:
 - Log export
 - Log retention policies
 - Real-time log streaming
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Alerting
 - Custom alert rules
@@ -3999,6 +4486,9 @@ The import wizard adapts to smaller screens:
 - Anomaly detection
 - Predictive alerts
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Health Checks
 - Service health endpoints
 - Database health checks
@@ -4007,6 +4497,9 @@ The import wizard adapts to smaller screens:
 - Health status dashboard
 - Uptime monitoring
 - Status page (public)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4039,6 +4532,9 @@ The import wizard adapts to smaller screens:
   - Schema validation tests
   - Breaking change detection
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### CI/CD Pipeline
 - GitHub Actions workflows
 - Automated build on PR
@@ -4049,6 +4545,9 @@ The import wizard adapts to smaller screens:
 - Blue-green deployments
 - Automated rollbacks
 - Smoke tests post-deployment
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4066,6 +4565,9 @@ The import wizard adapts to smaller screens:
 - 📋 Materialized views
 - 📋 Partitioning for large tables
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Caching ✅ PARTIALLY IMPLEMENTED
 - 📋 Redis caching layer
 - ✅ Cache frequently accessed schemas
@@ -4076,6 +4578,9 @@ The import wizard adapts to smaller screens:
 - ✅ Cache invalidation strategies
 - 📋 Cache warming
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Frontend Performance ✅ IMPLEMENTED
 - ✅ Code splitting
 - ✅ Tree shaking
@@ -4085,6 +4590,9 @@ The import wizard adapts to smaller screens:
 - ✅ Lighthouse score optimization
 - ✅ Web Vitals tracking (LCP, FID, CLS)
 - 📋 Service worker for offline support
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4113,12 +4621,18 @@ The import wizard adapts to smaller screens:
   - Custom integrations
   - On-premise deployment
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Usage-Based Billing
 - API calls per month
 - Charge by schema count
 - Charge by storage
 - Charge by team size
 - Overage charges
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Payment Integration
 - Stripe integration
@@ -4128,6 +4642,9 @@ The import wizard adapts to smaller screens:
 - Upgrade/downgrade flows
 - Subscription management
 - Payment method management
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4144,10 +4661,16 @@ The import wizard adapts to smaller screens:
 - ✅ Repository browser with SSO
 - ✅ PAT support for authentication
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### IDE Plugins 📋 PLANNED
 - VS Code extension
 - JetBrains plugin
 - Vim plugin
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Webhooks
 - Configurable webhooks for events:
@@ -4159,12 +4682,18 @@ The import wizard adapts to smaller screens:
 - Webhook testing tools
 - Webhook logs and retry
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### API Integrations
 - Postman integration
 - Insomnia integration
 - Swagger Hub
 - API Gateway (AWS, Kong, Apigee)
 - GraphQL gateway
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4232,6 +4761,9 @@ The import wizard adapts to smaller screens:
 - 📋 Organization-level audit logs
 - 📋 Custom branding per organization
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Advanced Tenant Management** ✅ PARTIALLY IMPLEMENTED
 - ✅ Tenant CRUD operations
 - ✅ Tenant slug management with validation
@@ -4247,6 +4779,9 @@ The import wizard adapts to smaller screens:
 - 📋 Tenant data isolation verification
 - 📋 Cross-tenant schema sharing (controlled)
 - ✅ Super Admin portal for tenant oversight
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Tenant Industry Tagging (NEW)
 
@@ -4268,17 +4803,26 @@ The import wizard adapts to smaller screens:
   - Non-Profit & NGO (Charity, Advocacy, Social Impact)
   - Other/Multi-Industry
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Multi-Industry Support**:
   - Select multiple industry tags per tenant
   - Primary industry designation
   - Industry weight/relevance scoring
   - Industry history tracking (industry changes over time)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Custom Industry Categories**:
   - Enterprise customers can define custom industries
   - Industry hierarchies (parent-child relationships)
   - Industry-specific metadata fields
   - Localized industry names (internationalization)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Industry-Specific Features** 📋 PLANNED
 - **Compliance Recommendations**:
@@ -4289,12 +4833,18 @@ The import wizard adapts to smaller screens:
   - Display relevant regulations in dashboard
   - Compliance checklist per industry
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Template Marketplace Integration**:
   - Filter templates by industry
   - "Recommended for your industry" section
   - Industry-specific property templates
   - Common patterns for specific industries
   - Showcase schemas from same industry
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 - **Schema Showcase Integration**:
   - Filter showcase by industry
@@ -4303,6 +4853,9 @@ The import wizard adapts to smaller screens:
   - Cross-industry inspiration section
   - Industry-specific awards/recognition
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Benchmarking & Analytics**:
   - Compare quality scores within industry
   - Industry average metrics (classes, properties, complexity)
@@ -4310,12 +4863,18 @@ The import wizard adapts to smaller screens:
   - API complexity trends per industry
   - Industry best practices reports
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Industry-Specific Validation Rules**:
   - Healthcare: PHI field validation
   - Financial: PCI compliance field checks
   - E-commerce: Product schema standards
   - Configurable rule sets per industry
   - Industry working groups for standards
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Tenant Profile Enhancement** 📋 PLANNED
 - **Public Profile**:
@@ -4325,12 +4884,18 @@ The import wizard adapts to smaller screens:
   - Industry expertise indicators
   - Cross-reference with showcase
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Private Dashboard**:
   - Industry-specific tips and guidance
   - Regulatory updates for industry
   - Industry news and trends
   - Peer comparisons within industry
   - Industry events and webinars
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Search & Discovery** 📋 PLANNED
 - **Global Search**:
@@ -4339,11 +4904,17 @@ The import wizard adapts to smaller screens:
   - Industry-based recommendations
   - Cross-industry pattern matching
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Browse Page**:
   - Industry facets in sidebar
   - Industry tag cloud
   - Popular industries this month
   - Emerging industries
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Admin Features** 📋 PLANNED
 - **Super Admin Dashboard**:
@@ -4353,12 +4924,18 @@ The import wizard adapts to smaller screens:
   - Industry engagement metrics
   - Manage industry taxonomy
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Industry Management**:
   - Add/edit/archive industries
   - Merge industry categories
   - Set industry aliases
   - Define compliance mappings
   - Industry hierarchy editor
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Reporting & Analytics** 📋 PLANNED
 - **Industry Reports**:
@@ -4369,12 +4946,18 @@ The import wizard adapts to smaller screens:
   - Adoption trends by industry
   - Industry market share
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Business Intelligence**:
   - Industry segmentation for marketing
   - Cross-sell opportunities by industry
   - Churn analysis by industry
   - Feature adoption by industry
   - Support ticket trends by industry
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **API Integration** 📋 PLANNED
 - Tenant industry tags in REST API
@@ -4397,6 +4980,9 @@ The import wizard adapts to smaller screens:
 - 📋 Schema ownership and stewardship
 - 📋 Data quality rules and validation
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Regulatory Compliance**
 - 📋 SOC 2 Type II compliance
 - 📋 HIPAA compliance mode
@@ -4406,6 +4992,9 @@ The import wizard adapts to smaller screens:
 - 📋 Compliance audit reports
 - 📋 Evidence collection automation
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Governance**
 - 📋 Schema approval workflows with escalation
 - 📋 Breaking change policies (block/warn/allow)
@@ -4414,6 +5003,9 @@ The import wizard adapts to smaller screens:
 - 📋 Required documentation policies
 - 📋 Schema quality gates
 - 📋 Governance dashboard with compliance scores
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Enterprise SSO & Identity
 
@@ -4428,6 +5020,9 @@ The import wizard adapts to smaller screens:
 - 📋 Session management policies
 - 📋 Privileged access management
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Multi-Factor Authentication**
 - 📋 TOTP authenticator apps
 - 📋 SMS/Email OTP
@@ -4436,6 +5031,9 @@ The import wizard adapts to smaller screens:
 - 📋 Backup codes
 - 📋 MFA enforcement policies
 - 📋 Risk-based authentication
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Enterprise Deployment
 
@@ -4448,6 +5046,9 @@ The import wizard adapts to smaller screens:
 - 📋 Offline activation
 - 📋 Self-hosted update mechanism
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **High Availability**
 - 📋 Active-active clustering
 - 📋 Automatic failover
@@ -4457,12 +5058,18 @@ The import wizard adapts to smaller screens:
 - 📋 Disaster recovery procedures
 - 📋 RPO/RTO guarantees
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Multi-Region**
 - 📋 Geographic data residency
 - 📋 Regional deployments (US, EU, APAC)
 - 📋 Cross-region replication
 - 📋 Latency-based routing
 - 📋 Regional compliance (GDPR, China regulations)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Industry-Specific Compliance (NEW)
 
@@ -4475,6 +5082,9 @@ The import wizard adapts to smaller screens:
 - 📋 Bank Secrecy Act (BSA) compliance
 - 📋 Financial data masking and encryption requirements
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Healthcare**
 - 📋 HIPAA-compliant schema design validation
 - 📋 HL7 FHIR resource templates
@@ -4483,12 +5093,18 @@ The import wizard adapts to smaller screens:
 - 📋 Consent management schema patterns
 - 📋 Healthcare interoperability standards compliance
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Government & Public Sector**
 - 📋 FedRAMP compliance controls
 - 📋 NIST 800-53 security framework mapping
 - 📋 Government data classification (CUI, FOUO)
 - 📋 Accessibility (Section 508) API compliance
 - 📋 Open Government Data Act compliance
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Advanced Enterprise Analytics (NEW)
 
@@ -4500,6 +5116,9 @@ The import wizard adapts to smaller screens:
 - 📋 Risk and compliance status summary
 - 📋 Customizable KPI widgets
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Business Intelligence Integration**
 - 📋 Tableau connector
 - 📋 Power BI connector
@@ -4508,6 +5127,9 @@ The import wizard adapts to smaller screens:
 - 📋 Custom data warehouse export
 - 📋 Scheduled report delivery (PDF, Excel)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Advanced Reporting**
 - 📋 Custom report builder with drag-and-drop
 - 📋 SQL query interface for advanced users
@@ -4515,6 +5137,9 @@ The import wizard adapts to smaller screens:
 - 📋 Multi-format export (PDF, Excel, CSV, JSON)
 - 📋 Automated report scheduling
 - 📋 Report sharing with external stakeholders
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Enterprise Support & SLA (NEW)
 
@@ -4526,6 +5151,9 @@ The import wizard adapts to smaller screens:
 - 📋 Quarterly business reviews
 - 📋 Annual architecture reviews
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Professional Services**
 - 📋 Implementation and onboarding services
 - 📋 Custom integration development
@@ -4534,12 +5162,18 @@ The import wizard adapts to smaller screens:
 - 📋 API strategy consulting
 - 📋 Schema design review services
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Service Level Agreements**
 - 📋 99.99% uptime guarantee (Enterprise tier)
 - 📋 Performance SLAs (API response < 200ms p95)
 - 📋 Data durability guarantees
 - 📋 Backup and recovery SLAs
 - 📋 SLA credit policy
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4559,6 +5193,9 @@ The import wizard adapts to smaller screens:
 - 📋 WSO2 API Manager
 - 📋 IBM API Connect
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Gateway Sync Features**
 - 📋 Bi-directional schema sync
 - 📋 Import existing APIs from gateway
@@ -4567,6 +5204,9 @@ The import wizard adapts to smaller screens:
 - 📋 Rate limit policy sync
 - 📋 Authentication policy sync
 - 📋 CORS policy management
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### API Lifecycle Management
 
@@ -4579,6 +5219,9 @@ The import wizard adapts to smaller screens:
 - 📋 API consumer tracking
 - 📋 API deprecation management
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Environment Management**
 - 📋 Environment definitions (dev, staging, prod)
 - 📋 Environment-specific configurations
@@ -4587,6 +5230,9 @@ The import wizard adapts to smaller screens:
 - 📋 Rollback capabilities
 - 📋 Feature flags per environment
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **API Versioning Strategies**
 - 📋 URL path versioning (/v1, /v2)
 - 📋 Header versioning (Accept-Version)
@@ -4594,6 +5240,9 @@ The import wizard adapts to smaller screens:
 - 📋 Content negotiation versioning
 - 📋 Version compatibility checking
 - 📋 Consumer migration tracking
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Contract Testing & Validation
 
@@ -4605,12 +5254,18 @@ The import wizard adapts to smaller screens:
 - 📋 Contract versioning
 - 📋 Consumer notification on changes
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Validation**
 - 📋 Request/response validation
 - 📋 Live traffic validation
 - 📋 Schema drift detection
 - 📋 Validation report generation
 - 📋 Automated remediation suggestions
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -4629,6 +5284,9 @@ The import wizard adapts to smaller screens:
 - 📋 Bitbucket Pipelines integration
 - 📋 Tekton tasks
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Pipeline Features**
 - 📋 Schema validation step
 - 📋 Breaking change check step
@@ -4637,6 +5295,9 @@ The import wizard adapts to smaller screens:
 - 📋 Contract test execution
 - 📋 Documentation generation
 - 📋 Gateway deployment step
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### CLI Tool (Objectified CLI)
 
@@ -4669,11 +5330,17 @@ The import wizard adapts to smaller screens:
 - 📋 Team/permission management
 - 📋 State management integration
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Kubernetes Operators**
 - 📋 Custom Resource Definitions (CRDs)
 - 📋 Schema synchronization operator
 - 📋 Auto-scaling based on usage
 - 📋 Secret management integration
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Mock Server & Testing
 
@@ -4767,6 +5434,9 @@ The import wizard adapts to smaller screens:
 - Preview changes before applying
 - Undo AI-generated changes
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Ollama Integration
 
 **Ollama Connection** 📋 PLANNED
@@ -4813,6 +5483,9 @@ The import wizard adapts to smaller screens:
   - Cache common queries
   - Semantic similarity matching
   - Cache invalidation on schema changes
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Natural Language to Schema
 
@@ -4862,6 +5535,9 @@ The import wizard adapts to smaller screens:
   - Social (posts, comments, likes, follows)
   - Healthcare (patients, appointments, records)
   - Education (courses, students, enrollments)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### AI-Powered Property Suggestions
 
@@ -4933,12 +5609,18 @@ The import wizard adapts to smaller screens:
   - One-click fixes
   - Explanation of why each issue matters
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Improvement Suggestions** 📋 PLANNED
 - "Consider adding pagination to this list endpoint"
 - "This schema could benefit from inheritance using allOf"
 - "Add a discriminator for this polymorphic type"
 - "Consider breaking this large schema into smaller components"
 - "Add error responses for common failure scenarios"
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### AI Documentation Generation
 
@@ -4948,6 +5630,9 @@ The import wizard adapts to smaller screens:
 - Generate operation summaries from path and method
 - Generate example values that make sense
 - Support multiple languages (i18n)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **API Usage Examples** 📋 PLANNED
 - Generate curl commands for each operation
@@ -4959,12 +5644,18 @@ The import wizard adapts to smaller screens:
 - Generate realistic example payloads
 - Generate test scenarios
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Integration Guides** 📋 PLANNED
 - Generate getting started guide
 - Generate authentication guide
 - Generate error handling guide
 - Generate migration guides between versions
 - Generate SDK usage examples
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### AI Chat Commands
 
@@ -5004,11 +5695,17 @@ The import wizard adapts to smaller screens:
 - Improve suggestions over time
 - Per-tenant model fine-tuning (future)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Custom Prompts & Templates** 📋 PLANNED
 - Save custom prompt templates
 - Share prompts across team
 - Prompt library with categories
 - Import prompts from community
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### AI Configuration
 
@@ -5036,6 +5733,9 @@ The import wizard adapts to smaller screens:
   - Enable/disable specific AI capabilities
   - Beta feature flags
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Security & Privacy** 📋 PLANNED
 - All AI processing on self-hosted Ollama
 - No data sent to external services
@@ -5043,6 +5743,9 @@ The import wizard adapts to smaller screens:
 - Audit logging of AI interactions
 - PII detection and redaction in prompts
 - Role-based access to AI features
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5060,12 +5763,18 @@ The import wizard adapts to smaller screens:
 - 📋 Deprecated property tracking
 - 📋 Schema growth over time
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Team Analytics**
 - 📋 Active contributors
 - 📋 Contribution heatmaps
 - 📋 Review turnaround times
 - 📋 Approval bottlenecks
 - 📋 Team productivity metrics
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **API Analytics** 📋 PLANNED
 - 📋 API endpoint popularity
@@ -5074,6 +5783,9 @@ The import wizard adapts to smaller screens:
 - 📋 Consumer adoption tracking
 - 📋 Version adoption rates
 - 📋 Deprecation impact analysis
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Reporting
 
@@ -5084,12 +5796,18 @@ The import wizard adapts to smaller screens:
 - 📋 Breaking change frequency
 - 📋 Team velocity metrics
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Custom Reports**
 - 📋 Report builder with filters
 - 📋 Scheduled report delivery
 - 📋 Export to PDF/Excel
 - 📋 Embed reports in dashboards
 - 📋 API for report data
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5112,6 +5830,9 @@ The import wizard adapts to smaller screens:
 - Webhook logs and retry
 - Webhook security (signing, verification)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Trigger Actions** 📋 PLANNED
 - Automated code generation on publish
 - Slack/Teams notifications on changes
@@ -5119,6 +5840,9 @@ The import wizard adapts to smaller screens:
 - Email digest of changes (daily/weekly)
 - GitHub Actions trigger
 - Custom webhook integrations
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Scheduled Jobs
 
@@ -5131,6 +5855,9 @@ The import wizard adapts to smaller screens:
 - License expiration alerts
 - Certificate expiration warnings
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Workflow Automation
 
 **Approval Workflows** 📋 PLANNED
@@ -5140,11 +5867,17 @@ The import wizard adapts to smaller screens:
 - Escalation on timeout
 - Notification at each step
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **CI/CD Triggers** 📋 PLANNED
 - Trigger pipeline on version publish
 - Trigger tests on schema change
 - Deploy mock server on draft
 - Generate SDK on release
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5165,6 +5898,9 @@ The import wizard adapts to smaller screens:
   - Recently updated APIs feed
   - API health status indicators
   - Deprecation warnings and sunset notices
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **API Documentation Hub**:
   - Auto-generated API reference documentation
@@ -5175,6 +5911,9 @@ The import wizard adapts to smaller screens:
   - Rate limit and quota information
   - Changelog and version history
   - Migration guides between versions
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Developer Onboarding**:
   - Self-service registration with email verification
@@ -5185,6 +5924,9 @@ The import wizard adapts to smaller screens:
   - Sandbox environment access
   - Production access request workflow
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Portal Customization** 📋 PLANNED
 - **Branding & Theming**:
   - Custom logo and favicon
@@ -5194,6 +5936,9 @@ The import wizard adapts to smaller screens:
   - Light/dark mode themes
   - Custom footer and header
   - Legal pages (Terms of Service, Privacy Policy)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Content Management**:
   - Custom landing pages
@@ -5204,6 +5949,9 @@ The import wizard adapts to smaller screens:
   - Custom documentation pages
   - Markdown and MDX support
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Developer Analytics** 📋 PLANNED
 - API usage per developer/organization
 - Endpoint popularity analytics
@@ -5211,6 +5959,9 @@ The import wizard adapts to smaller screens:
 - Latency percentiles per consumer
 - Quota usage dashboards
 - Engagement metrics (logins, page views)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### SDK Generation & Distribution
 
@@ -5227,6 +5978,9 @@ The import wizard adapts to smaller screens:
   - PHP (Packagist)
   - Rust (crates.io)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **SDK Features**:
   - Fully typed request/response models
   - Automatic authentication handling
@@ -5240,6 +5994,9 @@ The import wizard adapts to smaller screens:
   - Pagination helpers
   - File upload/download support
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **SDK Quality Assurance** 📋 PLANNED
 - Auto-generated unit tests for SDK
 - Integration test suites
@@ -5247,6 +6004,9 @@ The import wizard adapts to smaller screens:
 - SDK changelog automation
 - Semantic versioning enforcement
 - Breaking change detection in SDK
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **SDK Distribution** 📋 PLANNED
 - **Package Registry Integration**:
@@ -5257,12 +6017,18 @@ The import wizard adapts to smaller screens:
   - Automatic Go module registration
   - Private registry support (Artifactory, Nexus)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **SDK Versioning**:
   - SDK version tied to API version
   - Automatic version bumping
   - Pre-release versions for draft APIs
   - LTS version support
   - Deprecation announcements
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Local Development Environment
 
@@ -5276,6 +6042,9 @@ The import wizard adapts to smaller screens:
   - Request validation and logging
   - Latency simulation
   - Error injection for testing
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Stateful Mocking**:
   - In-memory data store
@@ -5284,6 +6053,9 @@ The import wizard adapts to smaller screens:
   - Seed data loading
   - Data reset endpoint
   - Persistent mode (SQLite)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **API Playground** 📋 PLANNED
 - **Interactive Features**:
@@ -5295,12 +6067,18 @@ The import wizard adapts to smaller screens:
   - Collection organization
   - Test assertions builder
   - Performance timing display
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Collaboration**:
   - Share request collections
   - Team workspaces
   - Request comments and annotations
   - Export to Postman/Insomnia
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### IDE Integrations
 
@@ -5375,6 +6153,9 @@ The import wizard adapts to smaller screens:
   - Throughput (bytes/second)
   - Active connections
   - Queue depth
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Business Metrics**:
   - API calls per consumer
@@ -5382,6 +6163,9 @@ The import wizard adapts to smaller screens:
   - Revenue per API (if monetized)
   - Developer activation rate
   - Time to first API call
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Dashboard Builder** 📋 PLANNED
 - Drag-and-drop dashboard creation
@@ -5392,6 +6176,9 @@ The import wizard adapts to smaller screens:
 - Mobile-responsive dashboards
 - Real-time streaming updates
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Log Management
 
 **API Log Aggregation** 📋 PLANNED
@@ -5400,6 +6187,9 @@ The import wizard adapts to smaller screens:
   - Application logs
   - Infrastructure logs
   - SDK client logs (opt-in)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Log Features**:
   - Full-text log search
@@ -5409,12 +6199,18 @@ The import wizard adapts to smaller screens:
   - Log retention policies
   - Log export to SIEM
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Log Analysis** 📋 PLANNED
 - Error pattern detection
 - Log anomaly detection
 - Request/response payload inspection
 - Sensitive data redaction
 - Log aggregation and grouping
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Alerting & Incident Management
 
@@ -5425,6 +6221,9 @@ The import wizard adapts to smaller screens:
   - Composite alerts (multiple conditions)
   - Heartbeat/synthetic monitoring
   - SLO-based alerts
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Alert Channels**:
   - Email notifications
@@ -5433,6 +6232,9 @@ The import wizard adapts to smaller screens:
   - OpsGenie integration
   - Custom webhooks
   - SMS (via Twilio)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Incident Management** 📋 PLANNED
 - Incident creation from alerts
@@ -5482,6 +6284,9 @@ The import wizard adapts to smaller screens:
   - Schema metadata and annotations
   - Schema search and discovery
   - Schema dependency tracking
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Schema Formats**:
   - OpenAPI 3.0/3.1
@@ -5492,6 +6297,9 @@ The import wizard adapts to smaller screens:
   - Protocol Buffers
   - Thrift
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Discovery** 📋 PLANNED
 - Full-text schema search
 - Tag-based filtering
@@ -5499,6 +6307,9 @@ The import wizard adapts to smaller screens:
 - Usage-based recommendations
 - Related schema suggestions
 - Schema popularity ranking
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Schema Governance
 
@@ -5508,6 +6319,9 @@ The import wizard adapts to smaller screens:
   - Property naming rules (camelCase, snake_case)
   - Path naming conventions
   - Consistent pluralization rules
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Documentation Requirements**:
   - Required descriptions for all schemas
@@ -5515,11 +6329,17 @@ The import wizard adapts to smaller screens:
   - Minimum documentation coverage
   - External docs requirements
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 - **Security Policies**:
   - PII field detection and tagging
   - Required authentication for all paths
   - Forbidden property patterns (SSN, credit card)
   - Required encryption annotations
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Quality Gates** 📋 PLANNED
 - Schema quality score calculation
@@ -5529,6 +6349,9 @@ The import wizard adapts to smaller screens:
 - Policy exemptions with approval
 - Policy version control
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Schema Lifecycle Management
 
 **Lifecycle States** 📋 PLANNED
@@ -5536,6 +6359,9 @@ The import wizard adapts to smaller screens:
   - Draft → Review → Approved → Published → Deprecated → Retired
   - State transition rules and permissions
   - Automatic state transitions (e.g., auto-deprecate after sunset date)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Lifecycle Automation**:
   - Scheduled deprecation
@@ -5543,12 +6369,18 @@ The import wizard adapts to smaller screens:
   - Consumer notification on state changes
   - Migration period enforcement
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Deprecation Management** 📋 PLANNED
 - Deprecation announcements
 - Consumer impact analysis
 - Migration path documentation
 - Deprecation timeline tracking
 - Automated sunset enforcement
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Breaking Change Management
 
@@ -5560,12 +6392,18 @@ The import wizard adapts to smaller screens:
   - Required field additions
   - Enum value removals
   - Response format changes
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Non-Breaking Changes**:
   - New optional properties
   - New endpoints
   - New optional parameters
   - Documentation updates
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 **Change Impact Analysis** 📋 PLANNED
 - Consumer impact assessment
@@ -5574,6 +6412,9 @@ The import wizard adapts to smaller screens:
 - Breaking change reports
 - Migration effort estimation
 - Rollback risk assessment
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Schema Compliance
 
@@ -5584,6 +6425,9 @@ The import wizard adapts to smaller screens:
   - ACORD (Insurance APIs)
   - OTA (Travel APIs)
   - Custom industry standards
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Regulatory Compliance**:
   - GDPR data annotations
@@ -5591,12 +6435,18 @@ The import wizard adapts to smaller screens:
   - PCI-DSS payment data flags
   - CCPA personal data indicators
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Compliance Reporting** 📋 PLANNED
 - Compliance score per schema
 - Compliance trend tracking
 - Audit-ready compliance reports
 - Compliance violation alerts
 - Remediation recommendations
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5643,6 +6493,9 @@ The import wizard adapts to smaller screens:
   - Most popular extensions
   - Recently updated
   - Staff picks
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Extension Details**:
   - Screenshots and demos
@@ -5652,6 +6505,9 @@ The import wizard adapts to smaller screens:
   - Support links
   - License information
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Publisher Program** 📋 PLANNED
 - Publisher registration
 - Extension submission workflow
@@ -5659,6 +6515,9 @@ The import wizard adapts to smaller screens:
 - Revenue sharing for paid extensions
 - Publisher analytics
 - Publisher support
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Custom Integrations
 
@@ -5669,6 +6528,9 @@ The import wizard adapts to smaller screens:
   - Field mapping editor
   - Transformation rules
   - Scheduling options
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Supported Platforms**:
   - Zapier integration
@@ -5678,6 +6540,9 @@ The import wizard adapts to smaller screens:
   - n8n integration
   - Custom webhook handlers
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Enterprise Connectors** 📋 PLANNED
 - ServiceNow connector
 - Salesforce connector
@@ -5685,6 +6550,9 @@ The import wizard adapts to smaller screens:
 - Oracle connector
 - Microsoft Dynamics connector
 - Custom ERP connectors
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5703,6 +6571,9 @@ The import wizard adapts to smaller screens:
   - Query/Mutation/Subscription builders
   - Directive configuration
   - Resolver mapping
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **GraphQL Features**:
   - Input types and arguments
@@ -5712,6 +6583,9 @@ The import wizard adapts to smaller screens:
   - Relay-style pagination
   - DataLoader patterns
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **GraphQL Tooling** 📋 PLANNED
 - GraphQL Playground integration
 - Query performance analysis
@@ -5719,6 +6593,9 @@ The import wizard adapts to smaller screens:
 - Apollo Studio integration
 - Hasura integration
 - Schema introspection
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### gRPC / Protocol Buffers
 
@@ -5730,6 +6607,9 @@ The import wizard adapts to smaller screens:
   - Map and repeated fields
   - Oneof support
   - Import management
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **gRPC Features**:
   - Unary RPC
@@ -5738,6 +6618,9 @@ The import wizard adapts to smaller screens:
   - Bidirectional streaming
   - Metadata configuration
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **gRPC Tooling** 📋 PLANNED
 - Proto file generation
 - gRPC client generation
@@ -5745,6 +6628,9 @@ The import wizard adapts to smaller screens:
 - Reflection service integration
 - gRPC testing tools
 - Proto breaking change detection
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### AsyncAPI / Event-Driven APIs
 
@@ -5755,6 +6641,9 @@ The import wizard adapts to smaller screens:
   - Protocol bindings (Kafka, AMQP, MQTT, WebSocket)
   - Server configuration
   - Security schemes for async
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Event Patterns**:
   - Publish/Subscribe patterns
@@ -5763,6 +6652,9 @@ The import wizard adapts to smaller screens:
   - CQRS patterns
   - Saga choreography
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Event Streaming Integration** 📋 PLANNED
 - Apache Kafka integration
 - Amazon Kinesis integration
@@ -5770,6 +6662,9 @@ The import wizard adapts to smaller screens:
 - RabbitMQ integration
 - Redis Streams integration
 - Google Pub/Sub integration
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Protocol Conversion
 
@@ -5781,12 +6676,18 @@ The import wizard adapts to smaller screens:
 - WSDL → OpenAPI conversion (legacy)
 - RAML → OpenAPI conversion
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Cross-Protocol Gateway** 📋 PLANNED
 - REST to GraphQL gateway
 - REST to gRPC gateway
 - GraphQL to gRPC gateway
 - Protocol negotiation
 - Unified authentication
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5805,6 +6706,9 @@ The import wizard adapts to smaller screens:
   - Biometric authentication integration
   - Risk-based adaptive authentication
   - Step-up authentication for sensitive operations
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Token Management**:
   - Short-lived access tokens
@@ -5813,12 +6717,18 @@ The import wizard adapts to smaller screens:
   - Token revocation at scale
   - JWT with rotating keys
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Authorization Framework** 📋 PLANNED
 - **Authorization Models**:
   - Attribute-Based Access Control (ABAC)
   - Policy-Based Access Control
   - ReBAC (Relationship-Based Access Control)
   - Context-aware authorization
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Policy Engine**:
   - OPA (Open Policy Agent) integration
@@ -5826,6 +6736,9 @@ The import wizard adapts to smaller screens:
   - Policy testing and simulation
   - Policy versioning and rollback
   - Policy audit logging
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### API Security
 
@@ -5835,6 +6748,9 @@ The import wizard adapts to smaller screens:
   - Certificate pinning
   - TLS 1.3 enforcement
   - Perfect forward secrecy
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **API Threat Protection**:
   - SQL injection detection
@@ -5843,12 +6759,18 @@ The import wizard adapts to smaller screens:
   - Parameter tampering detection
   - Broken object level authorization (BOLA) detection
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **API Security Testing** 📋 PLANNED
 - Automated security scanning
 - OWASP API Top 10 checks
 - Penetration testing integration
 - Security posture scoring
 - Vulnerability remediation tracking
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Secrets Management
 
@@ -5859,6 +6781,9 @@ The import wizard adapts to smaller screens:
   - Azure Key Vault
   - Google Secret Manager
   - CyberArk integration
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Secrets Features**:
   - Dynamic secret generation
@@ -5866,6 +6791,9 @@ The import wizard adapts to smaller screens:
   - Secret access auditing
   - Encryption key management
   - Certificate lifecycle management
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5885,11 +6813,17 @@ The import wizard adapts to smaller screens:
   - Can-I-Deploy checks
   - Contract versioning
   - Webhook notifications on contract changes
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Alternative Frameworks**:
   - Spring Cloud Contract support
   - Specmatic support
   - Dredd support
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Performance Testing
 
@@ -5900,6 +6834,9 @@ The import wizard adapts to smaller screens:
   - Real-time load test monitoring
   - Load test result analysis
   - Trend comparison across runs
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Performance Metrics**:
   - Requests per second
@@ -5908,12 +6845,18 @@ The import wizard adapts to smaller screens:
   - Resource utilization
   - Breaking point detection
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Chaos Engineering** 📋 PLANNED
 - Fault injection testing
 - Latency injection
 - Error response simulation
 - Dependency failure simulation
 - Recovery time measurement
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### API Quality Scoring
 
@@ -5925,6 +6868,9 @@ The import wizard adapts to smaller screens:
   - Security best practices
   - Performance optimization
   - Error handling quality
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
   
 - **Quality Dashboard**:
   - Overall quality score
@@ -5932,6 +6878,9 @@ The import wizard adapts to smaller screens:
   - Quality comparison across APIs
   - Improvement recommendations
   - Quality gates for publishing
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -5950,12 +6899,18 @@ The import wizard adapts to smaller screens:
 - Custom command aliases
 - Plugin/extension commands
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Quick Actions** 📋 PLANNED
 - Right-click context menus everywhere
 - Inline action buttons on hover
 - Floating action bar for selections
 - Quick edit popover (edit without opening dialog)
 - Bulk action toolbar
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Drag & Drop Everything
 
@@ -5969,6 +6924,9 @@ The import wizard adapts to smaller screens:
 - Drop zones with visual feedback
 - Multi-select drag operations
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Clipboard Operations** 📋 PLANNED
 - Copy/paste schemas as JSON
 - Copy/paste across browser tabs
@@ -5976,6 +6934,9 @@ The import wizard adapts to smaller screens:
 - Paste JSON to create schema
 - Paste curl command to create operation
 - Paste from Postman/Insomnia
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Smart Suggestions & Autocomplete
 
@@ -5987,12 +6948,18 @@ The import wizard adapts to smaller screens:
 - Reference autocomplete (schema, parameter, response)
 - Recent items in suggestions
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **AI-Powered Suggestions** 📋 PLANNED
 - "Did you mean?" for similar schemas
 - Suggest missing properties based on patterns
 - Recommend schema decomposition
 - Suggest common validation rules
 - Auto-generate descriptions from property names
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Inline Editing & Quick Edit
 
@@ -6003,12 +6970,18 @@ The import wizard adapts to smaller screens:
 - Inline validation feedback
 - Undo with Cmd+Z while editing
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Property Quick Edit** 📋 PLANNED
 - Edit property type inline
 - Toggle required with checkbox
 - Add constraints with inline form
 - Reorder properties with drag handle
 - Delete with inline button
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Split Views & Multi-Panel Layout
 
@@ -6020,11 +6993,17 @@ The import wizard adapts to smaller screens:
 - Save panel layouts
 - Full-screen focus mode
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Floating Panels** 📋 PLANNED
 - Detachable panels as floating windows
 - Picture-in-picture for Swagger UI
 - Floating diff viewer
 - Pop-out code editor
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Notifications & Smart Alerts
 
@@ -6036,12 +7015,18 @@ The import wizard adapts to smaller screens:
 - Notification history
 - Do not disturb mode
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Contextual Alerts** 📋 PLANNED
 - Inline warnings on schemas
 - Breaking change alerts
 - Validation error badges
 - Deprecation warnings
 - Unused schema detection
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Global Search & Navigation
 
@@ -6053,6 +7038,9 @@ The import wizard adapts to smaller screens:
 - Search history
 - Saved searches
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Navigation Enhancements** 📋 PLANNED
 - Breadcrumb navigation
 - Back/forward browser-style navigation
@@ -6060,6 +7048,9 @@ The import wizard adapts to smaller screens:
 - Favorites/starred items
 - Jump to definition (click reference to navigate)
 - Find all references
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Real-Time Validation & Linting
 
@@ -6071,6 +7062,9 @@ The import wizard adapts to smaller screens:
 - Quick fix suggestions
 - Validation summary panel
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **Schema Linting** 📋 PLANNED
 - Configurable lint rules
 - Naming convention enforcement
@@ -6078,6 +7072,9 @@ The import wizard adapts to smaller screens:
 - Unused schema detection
 - Circular reference detection
 - Complexity warnings
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Onboarding & In-App Help
 
@@ -6089,12 +7086,18 @@ The import wizard adapts to smaller screens:
 - Interactive walkthroughs
 - "What's new" announcements
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 **In-App Documentation** 📋 PLANNED
 - Searchable help center
 - OpenAPI specification reference
 - Keyboard shortcut cheat sheet
 - Troubleshooting guides
 - Community examples
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Accessibility (a11y)
 
@@ -6106,6 +7109,9 @@ The import wizard adapts to smaller screens:
 - Skip links
 - Color contrast compliance
 - Reduced motion option
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
