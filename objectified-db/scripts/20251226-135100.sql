@@ -151,7 +151,7 @@ VALUES (
            '{
                "type": "string",
                "description": "Currency symbol",
-               "examples": ["$", "€", "£", "¥", "₹", "₽", "Fr"],
+               "examples": ["$", "Fr"],
                "minLength": 1,
                "maxLength": 5
            }',
@@ -219,13 +219,6 @@ VALUES (
                        "name": "US Dollar",
                        "symbol": "$",
                        "decimalDigits": 2
-                   },
-                   {
-                       "code": "JPY",
-                       "numericCode": "392",
-                       "name": "Japanese Yen",
-                       "symbol": "¥",
-                       "decimalDigits": 0
                    }
                ]
            }',
@@ -425,9 +418,7 @@ VALUES (
                },
                "required": ["amount", "currency", "formatted"],
                "examples": [
-                   {"amount": 1234.56, "currency": "USD", "formatted": "$1,234.56"},
-                   {"amount": 1234.56, "currency": "EUR", "formatted": "€1.234,56"},
-                   {"amount": 123456, "currency": "JPY", "formatted": "¥123,456"}
+                   {"amount": 1234.56, "currency": "USD", "formatted": "$1,234.56"}
                ]
            }',
            ARRAY['money', 'composite', 'formatted', 'display'],

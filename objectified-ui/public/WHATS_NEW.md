@@ -17,6 +17,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Implemented a more advanced import system
 - Added ability to import from a file into classes (add a class from a file)
 - Added property templates
+  - Fixed property copying to a class that contains an object with nested properties
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

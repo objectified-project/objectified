@@ -46,7 +46,8 @@ import {
   removePropertyFromClass,
   deleteClass,
   updateClassPropertyRef,
-  getTagsForProject
+  getTagsForProject,
+  createProperty
 } from '../../../../lib/db/helper';
 import ClassNode from '../../components/ade/studio/ClassNode';
 import { getLayoutedElements, type LayoutDirection, applyAutoLayout, type LayoutAlgorithm } from './layoutUtils';
@@ -484,15 +485,173 @@ const StudioContent = () => {
     }, 50);
   }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
 
+// Helper function to extract inline properties from a property schema
+  const extractInlineProperties = (propData: any): { name: string; data: any; description?: string }[] => {
+    const children: { name: string; data: any; description?: string }[] = [];
+
+    // Handle inline object properties (type: 'object' with nested properties)
+    if (propData.type === 'object' && propData.properties) {
+      const nestedRequired = Array.isArray(propData.required) ? propData.required : [];
+      for (const childName of Object.keys(propData.properties)) {
+        const childSchema = propData.properties[childName];
+        const childData = { ...childSchema };
+        const description = childData.description;
+        delete childData.description;
+        if (nestedRequired.includes(childName)) {
+          childData.required = true;
+        }
+        children.push({ name: childName, data: childData, description });
+      }
+    }
+
+    // Handle arrays of objects with inline properties (type: 'array' with items.type: 'object')
+    if (propData.type === 'array' && propData.items?.type === 'object' && propData.items.properties) {
+      const nestedRequired = Array.isArray(propData.items.required) ? propData.items.required : [];
+      for (const childName of Object.keys(propData.items.properties)) {
+        const childSchema = propData.items.properties[childName];
+        const childData = { ...childSchema };
+        const description = childData.description;
+        delete childData.description;
+        if (nestedRequired.includes(childName)) {
+          childData.required = true;
+        }
+        children.push({ name: childName, data: childData, description });
+      }
+    }
+
+    return children;
+  };
+
+  // Helper function to get or create a library property for inline properties
+  const getOrCreateLibraryProperty = async (
+    projectId: string,
+    name: string,
+    description: string | null,
+    data: any
+  ): Promise<string | null> => {
+    // Skip references - they don't need library properties
+    const isReference = data.$ref || (data.type === 'array' && data.items?.$ref);
+    if (isReference) {
+      return null;
+    }
+
+    try {
+      // Create the property in the library
+      const result = await createProperty(projectId, name, description, data);
+      const response = JSON.parse(result);
+      if (response.success) {
+        return response.property.id;
+      } else {
+        // Property might already exist with this name, which is fine
+        console.warn(`Could not create library property "${name}": ${response.error}`);
+        return null;
+      }
+    } catch (error) {
+      console.warn(`Error creating library property "${name}":`, error);
+      return null;
+    }
+  };
+
+  // Helper function to recursively add a property and its inline children to a class
+  const addPropertyWithChildren = async (
+    classId: string,
+    projectId: string,
+    propertyId: string | null,
+    name: string,
+    description: string | null,
+    data: any,
+    parentId: string | null
+  ): Promise<{ success: boolean; error?: string }> => {
+    // Clone the data and remove inline properties (they'll be stored as children)
+    const cleanedData = { ...data };
+    if (cleanedData.type === 'object' && cleanedData.properties) {
+      delete cleanedData.properties;
+      delete cleanedData.required;
+    }
+    if (cleanedData.type === 'array' && cleanedData.items?.properties) {
+      const cleanedItems = { ...cleanedData.items };
+      delete cleanedItems.properties;
+      delete cleanedItems.required;
+      cleanedData.items = cleanedItems;
+    }
+
+    // Add the main property
+    const result = await addPropertyToClass(
+      classId,
+      propertyId,
+      name,
+      description,
+      cleanedData,
+      parentId
+    );
+
+    const response = JSON.parse(result);
+    if (!response.success) {
+      return { success: false, error: response.error };
+    }
+
+    const newClassPropertyId = response.classProperty.id;
+
+    // Extract and recursively add inline children
+    const inlineChildren = extractInlineProperties(data);
+    for (const child of inlineChildren) {
+      // Check if the child property is a reference (no library property needed)
+      const isReference = child.data.$ref || (child.data.type === 'array' && child.data.items?.$ref);
+
+      let childPropertyId: string | null = null;
+      if (!isReference) {
+        // Create a library property for this inline property
+        childPropertyId = await getOrCreateLibraryProperty(
+          projectId,
+          child.name,
+          child.description || null,
+          child.data
+        );
+
+        // Database constraint: property_id must be non-null unless it's a reference
+        if (childPropertyId === null) {
+          console.warn(`Skipping inline property "${child.name}" - could not create library entry`);
+          continue;
+        }
+      }
+
+      // Recursively add child properties
+      const childResult = await addPropertyWithChildren(
+        classId,
+        projectId,
+        childPropertyId,
+        child.name,
+        child.description || null,
+        child.data,
+        newClassPropertyId
+      );
+      if (!childResult.success) {
+        console.warn(`Failed to add inline child property "${child.name}": ${childResult.error}`);
+        // Continue with other children even if one fails
+      }
+    }
+
+    return { success: true };
+  };
+
 // Handle property drop on class
   const handlePropertyDrop = useCallback(async (classId: string, propertyData: any, parentId?: string | null) => {
     if (isReadOnly) return;
 
+    if (!selectedProjectId) {
+      await alertDialog({
+        message: 'No project selected. Please select a project first.',
+        variant: 'error',
+      });
+      return;
+    }
+
     try {
       console.log('Property dropped on class:', classId, propertyData, 'parentId:', parentId);
 
-      const result = await addPropertyToClass(
+      const result = await addPropertyWithChildren(
         classId,
+        selectedProjectId,
         propertyData.id,
         propertyData.name,
         propertyData.description || null,
@@ -502,12 +661,11 @@ const StudioContent = () => {
         parentId || null
       );
 
-      const response = JSON.parse(result);
-      if (response.success) {
+      if (result.success) {
         await reloadClasses(false); // Reuse existing reload function without layout
       } else {
         await alertDialog({
-          message: response.error || 'Failed to add property to class',
+          message: result.error || 'Failed to add property to class',
           variant: 'error',
         });
       }
@@ -518,7 +676,7 @@ const StudioContent = () => {
         variant: 'error',
       });
     }
-  }, [isReadOnly, reloadClasses, alertDialog]);
+  }, [isReadOnly, selectedProjectId, reloadClasses, alertDialog]);
 
   // Keep ref updated
   handlePropertyDropRef.current = handlePropertyDrop;

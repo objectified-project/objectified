@@ -16,7 +16,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
 import { useColorScheme } from '@mui/material/styles';
-import { Search, Add, Edit, Delete, Upload, LibraryBooks } from '@mui/icons-material';
+import { Search, Add, Edit, Delete, Upload, LibraryBooks, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 
 export interface ClassItem {
@@ -107,6 +107,66 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [classWarnings, setClassWarnings] = useState<Record<string, boolean>>({});
+  const [expandedPropertyIds, setExpandedPropertyIds] = useState<Set<string>>(new Set());
+
+  // Helper to check if a property has inline properties (type: 'object' with properties, or array of objects)
+  const hasInlineProperties = (prop: PropertyItem): boolean => {
+    // Check for object type with nested properties
+    if (prop.type === 'object' && (prop as any).properties && Object.keys((prop as any).properties).length > 0) {
+      return true;
+    }
+    // Check for array type with object items that have properties
+    if (prop.type === 'array' && prop.items?.type === 'object' && prop.items?.properties && Object.keys(prop.items.properties).length > 0) {
+      return true;
+    }
+    return false;
+  };
+
+  // Helper to extract inline properties from a property
+  const getInlineProperties = (prop: PropertyItem): { name: string; type: string; description?: string; required?: boolean }[] => {
+    const children: { name: string; type: string; description?: string; required?: boolean }[] = [];
+
+    // Handle object type with nested properties
+    if (prop.type === 'object' && (prop as any).properties) {
+      const requiredFields = Array.isArray((prop as any).required) ? (prop as any).required : [];
+      for (const [name, schema] of Object.entries<any>((prop as any).properties)) {
+        children.push({
+          name,
+          type: schema.type || 'object',
+          description: schema.description,
+          required: requiredFields.includes(name),
+        });
+      }
+    }
+
+    // Handle array type with object items
+    if (prop.type === 'array' && prop.items?.type === 'object' && prop.items?.properties) {
+      const requiredFields = Array.isArray(prop.items.required) ? prop.items.required : [];
+      for (const [name, schema] of Object.entries<any>(prop.items.properties)) {
+        children.push({
+          name,
+          type: schema.type || 'object',
+          description: schema.description,
+          required: requiredFields.includes(name),
+        });
+      }
+    }
+
+    return children;
+  };
+
+  // Toggle expanded state for a property
+  const togglePropertyExpanded = (propertyId: string) => {
+    setExpandedPropertyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(propertyId)) {
+        next.delete(propertyId);
+      } else {
+        next.add(propertyId);
+      }
+      return next;
+    });
+  };
 
   // Compute dangling $ref warnings when classes change
   React.useEffect(() => {
@@ -633,161 +693,290 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   </Box>
                 ) : (
                   <Box sx={{ py: 0.5 }}>
-                    {filteredProperties.map((propertyItem) => (
-                      <Box
-                        key={propertyItem.id}
-                        draggable={!isReadOnly}
-                        onDragStart={(e) => {
-                          // Prevent drag in read-only mode
-                          if (isReadOnly) {
-                            e.preventDefault();
-                            return;
-                          }
-                          // Set the property data as the drag payload
-                          e.dataTransfer.effectAllowed = 'copy';
-                          e.dataTransfer.setData('application/json', JSON.stringify({
-                            type: 'property',
-                            property: propertyItem
-                          }));
-                        }}
-                        onClick={() => handlePropertySelect(propertyItem)}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          px: 2,
-                          py: 1.5,
-                          mb: 0.5,
-                          mx: 0.5,
-                          cursor: isReadOnly ? 'default' : 'grab',
-                          backgroundColor: selectedPropertyId === propertyItem.id
-                            ? 'rgba(99, 102, 241, 0.1)'
-                            : 'transparent',
-                          borderRadius: 2,
-                          borderLeft: selectedPropertyId === propertyItem.id ? '3px solid #6366f1' : '3px solid transparent',
-                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                          '&:hover': {
-                            backgroundColor: selectedPropertyId === propertyItem.id
-                              ? 'rgba(99, 102, 241, 0.15)'
-                              : 'rgba(99, 102, 241, 0.05)',
-                            transform: isReadOnly ? 'none' : 'translateX(2px)',
-                          },
-                          '&:active': {
-                            cursor: 'grabbing',
-                            transform: 'scale(0.98)',
-                          },
-                        }}
-                      >
-                        {/* Property content */}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight: 600,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              textDecoration: propertyItem.deprecated ? 'line-through' : 'none',
-                              color: propertyItem.deprecated
-                                ? '#94a3b8'
-                                : (isDark ? '#e2e8f0' : '#334155'),
+                    {filteredProperties.map((propertyItem) => {
+                      const hasChildren = hasInlineProperties(propertyItem);
+                      const isExpanded = expandedPropertyIds.has(propertyItem.id);
+                      const inlineProps = hasChildren ? getInlineProperties(propertyItem) : [];
+
+                      return (
+                        <React.Fragment key={propertyItem.id}>
+                          <Box
+                            draggable={!isReadOnly}
+                            onDragStart={(e) => {
+                              // Prevent drag in read-only mode
+                              if (isReadOnly) {
+                                e.preventDefault();
+                                return;
+                              }
+                              // Set the property data as the drag payload
+                              e.dataTransfer.effectAllowed = 'copy';
+                              e.dataTransfer.setData('application/json', JSON.stringify({
+                                type: 'property',
+                                property: propertyItem
+                              }));
                             }}
-                            title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
+                            onClick={() => handlePropertySelect(propertyItem)}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              px: 2,
+                              py: 1.5,
+                              mb: 0.5,
+                              mx: 0.5,
+                              cursor: isReadOnly ? 'default' : 'grab',
+                              backgroundColor: selectedPropertyId === propertyItem.id
+                                ? 'rgba(99, 102, 241, 0.1)'
+                                : 'transparent',
+                              borderRadius: 2,
+                              borderLeft: selectedPropertyId === propertyItem.id ? '3px solid #6366f1' : '3px solid transparent',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              '&:hover': {
+                                backgroundColor: selectedPropertyId === propertyItem.id
+                                  ? 'rgba(99, 102, 241, 0.15)'
+                                  : 'rgba(99, 102, 241, 0.05)',
+                                transform: isReadOnly ? 'none' : 'translateX(2px)',
+                              },
+                              '&:active': {
+                                cursor: 'grabbing',
+                                transform: 'scale(0.98)',
+                              },
+                            }}
                           >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}>{propertyItem.name}</span>
-                              {propertyItem.enum && Array.isArray(propertyItem.enum) && propertyItem.enum.length > 0 && (
-                                <span
-                                  title={`Enumeration: ${propertyItem.enum.join(', ')}`}
-                                  style={{
-                                    background: 'linear-gradient(135deg, #dbeafe 0%, #c7d2fe 100%)',
-                                    color: '#4338ca',
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    padding: '2px 6px',
-                                    borderRadius: '6px',
-                                    flexShrink: 0,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.5px'
+                            {/* Expand/Collapse button for object types with inline properties */}
+                            {hasChildren ? (
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  togglePropertyExpanded(propertyItem.id);
+                                }}
+                                sx={{
+                                  p: 0.25,
+                                  color: isDark ? '#94a3b8' : '#64748b',
+                                  '&:hover': {
+                                    color: '#6366f1',
+                                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                  },
+                                }}
+                                title={isExpanded ? 'Collapse nested properties' : 'Expand nested properties'}
+                              >
+                                {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                              </IconButton>
+                            ) : (
+                              <Box sx={{ width: 24 }} /> // Spacer for alignment
+                            )}
+
+                            {/* Property content */}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 600,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  textDecoration: propertyItem.deprecated ? 'line-through' : 'none',
+                                  color: propertyItem.deprecated
+                                    ? '#94a3b8'
+                                    : (isDark ? '#e2e8f0' : '#334155'),
+                                }}
+                                title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
+                              >
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}>{propertyItem.name}</span>
+                                  {hasChildren && (
+                                    <span
+                                      style={{
+                                        background: isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
+                                        color: '#6366f1',
+                                        fontSize: 9,
+                                        fontWeight: 600,
+                                        padding: '2px 6px',
+                                        borderRadius: '6px',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {inlineProps.length}
+                                    </span>
+                                  )}
+                                  {propertyItem.enum && Array.isArray(propertyItem.enum) && propertyItem.enum.length > 0 && (
+                                    <span
+                                      title={`Enumeration: ${propertyItem.enum.join(', ')}`}
+                                      style={{
+                                        background: 'linear-gradient(135deg, #dbeafe 0%, #c7d2fe 100%)',
+                                        color: '#4338ca',
+                                        fontSize: 9,
+                                        fontWeight: 700,
+                                        padding: '2px 6px',
+                                        borderRadius: '6px',
+                                        flexShrink: 0,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.5px'
+                                      }}
+                                    >
+                                      ENUM
+                                    </span>
+                                  )}
+                                </span>
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  display: 'block',
+                                  color: isDark ? '#94a3b8' : '#64748b',
+                                  mt: 0.25,
+                                }}
+                              >
+                                {propertyItem.type && (Array.isArray(propertyItem.type) ? (
+                                  <>
+                                    {propertyItem.type[0]}{propertyItem.type[1] === 'null' && ' [nullable]'}
+                                  </>
+                                ) : (
+                                  <>
+                                    {propertyItem.type}
+                                  </>
+                                )) || propertyItem.description}
+                              </Typography>
+                            </Box>
+
+                            {/* Action buttons */}
+                            <Box sx={{ display: 'flex', gap: 0.25 }}>
+                              <IconButton
+                                size="small"
+                                disabled={!selectedProjectId || isReadOnly}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  callbacks.onPropertyEdit?.(propertyItem);
+                                }}
+                                title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Edit property'}
+                                sx={{
+                                  opacity: 0.6,
+                                  transition: 'all 0.2s ease',
+                                  '&:hover': {
+                                    opacity: 1,
+                                    color: '#6366f1',
+                                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                  },
+                                }}
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                disabled={!selectedProjectId || isReadOnly}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  callbacks.onPropertyDelete?.(propertyItem.id);
+                                }}
+                                title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Delete property'}
+                                sx={{
+                                  opacity: 0.6,
+                                  transition: 'all 0.2s ease',
+                                  '&:hover': {
+                                    opacity: 1,
+                                    color: '#ef4444',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                  },
+                                }}
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+
+                          {/* Nested Properties (shown when expanded) */}
+                          {hasChildren && isExpanded && (
+                            <Box
+                              sx={{
+                                ml: 4,
+                                mr: 1,
+                                mb: 1,
+                                pl: 2,
+                                borderLeft: '2px solid',
+                                borderColor: isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.2)',
+                                backgroundColor: isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(99, 102, 241, 0.03)',
+                                borderRadius: '0 8px 8px 0',
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  display: 'block',
+                                  color: isDark ? '#818cf8' : '#6366f1',
+                                  fontWeight: 600,
+                                  fontSize: 10,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  py: 0.75,
+                                  px: 1,
+                                }}
+                              >
+                                Nested Properties
+                              </Typography>
+                              {inlineProps.map((child, idx) => (
+                                <Box
+                                  key={`${propertyItem.id}-${child.name}-${idx}`}
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    py: 0.75,
+                                    px: 1,
+                                    borderRadius: 1,
+                                    '&:hover': {
+                                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                                    },
                                   }}
                                 >
-                                  ENUM
-                                </span>
-                              )}
-                            </span>
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              display: 'block',
-                              color: isDark ? '#94a3b8' : '#64748b',
-                              mt: 0.25,
-                            }}
-                          >
-                            {propertyItem.type && (Array.isArray(propertyItem.type) ? (
-                              <>
-                                {propertyItem.type[0]}{propertyItem.type[1] === 'null' && ' [nullable]'}
-                              </>
-                            ) : (
-                              <>
-                                {propertyItem.type}
-                              </>
-                            )) || propertyItem.description}
-                          </Typography>
-                        </Box>
-
-                        {/* Action buttons */}
-                        <Box sx={{ display: 'flex', gap: 0.25 }}>
-                          <IconButton
-                            size="small"
-                            disabled={!selectedProjectId || isReadOnly}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              callbacks.onPropertyEdit?.(propertyItem);
-                            }}
-                            title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Edit property'}
-                            sx={{
-                              opacity: 0.6,
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                opacity: 1,
-                                color: '#6366f1',
-                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                              },
-                            }}
-                          >
-                            <Edit fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            disabled={!selectedProjectId || isReadOnly}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              callbacks.onPropertyDelete?.(propertyItem.id);
-                            }}
-                            title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Delete property'}
-                            sx={{
-                              opacity: 0.6,
-                              transition: 'all 0.2s ease',
-                              '&:hover': {
-                                opacity: 1,
-                                color: '#ef4444',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              },
-                            }}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </Box>
-                    ))}
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: 12,
+                                        fontWeight: 500,
+                                        color: isDark ? '#e2e8f0' : '#334155',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      {child.required && (
+                                        <span style={{ color: '#ef4444', fontWeight: 700 }}>*</span>
+                                      )}
+                                      {child.name}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        display: 'block',
+                                        fontSize: 10,
+                                        color: isDark ? '#94a3b8' : '#64748b',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {child.type}{child.description ? ` — ${child.description}` : ''}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              ))}
+                            </Box>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </Box>
                 )}
               </Box>
