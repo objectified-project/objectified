@@ -2,6 +2,13 @@
 
 ### December 27, 2025 - Version 3.2.6
 
+**Export To** ✅ FULLY IMPLEMENTED
+- ✅ OpenAPI 3.1.0 (default)
+- ✅ JSON Schema
+- ✅ Arazzo
+- ✅ Markdown documentation
+- ✅ PDF documentation
+
 **Schema Composition** ✅ FULLY IMPLEMENTED
 - ✅ `allOf`: Combine multiple schemas (inheritance/mixins)
 - ✅ `anyOf`: Match at least one schema (union types)

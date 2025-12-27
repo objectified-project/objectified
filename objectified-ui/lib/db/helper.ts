@@ -2259,9 +2259,9 @@ export async function removePersonalAccessToken(
   }
 }
 
-// ============================================================================
-// Tag Management Functions
-// ============================================================================
+// =============================================================================
+// TAG MANAGEMENT FUNCTIONS
+// =============================================================================
 
 export async function getTagsForProject(projectId: string) {
   try {
@@ -2475,7 +2475,7 @@ export async function removeTagFromClass(classId: string, tagId: string) {
 }
 
 // =============================================================================
-// Property Templates
+// PROPERTY TEMPLATES
 // =============================================================================
 
 export interface PropertyTemplate {
@@ -2848,3 +2848,332 @@ export async function usePropertyTemplate(
     return JSON.stringify({ success: false, error: error.message });
   }
 }
+
+// =============================================================================
+// CANVAS LAYOUT FUNCTIONS
+// =============================================================================
+
+/**
+ * Get all canvas layouts for a version
+ */
+export async function getCanvasLayoutsForVersion(versionId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges, groups, 
+              grid_settings, minimap_settings, metadata, created_at, updated_at
+       FROM odb.canvas_layouts 
+       WHERE version_id = $1 
+       ORDER BY is_default DESC, updated_at DESC`,
+      [versionId]
+    );
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching canvas layouts:', error);
+    return JSON.stringify([]);
+  }
+}
+
+/**
+ * Get a specific canvas layout by ID
+ */
+export async function getCanvasLayout(layoutId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges, groups, 
+              grid_settings, minimap_settings, metadata, created_at, updated_at
+       FROM odb.canvas_layouts 
+       WHERE id = $1`,
+      [layoutId]
+    );
+    if (result.rowCount === 0) {
+      return errorResponse('Layout not found');
+    }
+    return successResponse({ layout: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Get the default canvas layout for a version (optionally user-specific)
+ */
+export async function getDefaultCanvasLayout(versionId: string, userId?: string) {
+  try {
+    // First try to get user-specific default layout
+    if (userId) {
+      const userResult = await connectionPool.query(
+        `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges, groups, 
+                grid_settings, minimap_settings, metadata, created_at, updated_at
+         FROM odb.canvas_layouts 
+         WHERE version_id = $1 AND user_id = $2 AND is_default = true`,
+        [versionId, userId]
+      );
+      if (userResult.rowCount > 0) {
+        return successResponse({ layout: userResult.rows[0] });
+      }
+    }
+
+    // Fall back to shared default layout (user_id IS NULL)
+    const sharedResult = await connectionPool.query(
+      `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges, groups, 
+              grid_settings, minimap_settings, metadata, created_at, updated_at
+       FROM odb.canvas_layouts 
+       WHERE version_id = $1 AND user_id IS NULL AND is_default = true`,
+      [versionId]
+    );
+
+    if (sharedResult.rowCount > 0) {
+      return successResponse({ layout: sharedResult.rows[0] });
+    }
+
+    return successResponse({ layout: null });
+  } catch (error: any) {
+    console.error('Error fetching default canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Create a new canvas layout
+ */
+export async function createCanvasLayout(
+  versionId: string,
+  userId: string | null,
+  name: string | null,
+  isDefault: boolean,
+  viewport: any,
+  nodes: any,
+  edges: any,
+  groups: any,
+  gridSettings: any,
+  minimapSettings: any,
+  metadata: any
+) {
+  try {
+    // If setting as default, unset other defaults for this version/user combination
+    if (isDefault) {
+      if (userId) {
+        await connectionPool.query(
+          `UPDATE odb.canvas_layouts SET is_default = false 
+           WHERE version_id = $1 AND user_id = $2 AND is_default = true`,
+          [versionId, userId]
+        );
+      } else {
+        await connectionPool.query(
+          `UPDATE odb.canvas_layouts SET is_default = false 
+           WHERE version_id = $1 AND user_id IS NULL AND is_default = true`,
+          [versionId]
+        );
+      }
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.canvas_layouts 
+       (version_id, user_id, name, is_default, viewport, nodes, edges, groups, grid_settings, minimap_settings, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id, version_id, user_id, name, is_default, viewport, nodes, edges, groups, 
+                 grid_settings, minimap_settings, metadata, created_at, updated_at`,
+      [versionId, userId, name, isDefault,
+       JSON.stringify(viewport), JSON.stringify(nodes), JSON.stringify(edges), JSON.stringify(groups),
+       JSON.stringify(gridSettings), JSON.stringify(minimapSettings), JSON.stringify(metadata)]
+    );
+
+    return successResponse({ layout: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Update an existing canvas layout
+ */
+export async function updateCanvasLayout(
+  layoutId: string,
+  updates: {
+    name?: string | null;
+    isDefault?: boolean;
+    viewport?: any;
+    nodes?: any;
+    edges?: any;
+    groups?: any;
+    gridSettings?: any;
+    minimapSettings?: any;
+    metadata?: any;
+  }
+) {
+  try {
+    // Get current layout to check version_id and user_id
+    const currentResult = await connectionPool.query(
+      `SELECT version_id, user_id FROM odb.canvas_layouts WHERE id = $1`,
+      [layoutId]
+    );
+
+    if (currentResult.rowCount === 0) {
+      return errorResponse('Layout not found');
+    }
+
+    const { version_id, user_id } = currentResult.rows[0];
+
+    // If setting as default, unset other defaults
+    if (updates.isDefault) {
+      if (user_id) {
+        await connectionPool.query(
+          `UPDATE odb.canvas_layouts SET is_default = false 
+           WHERE version_id = $1 AND user_id = $2 AND is_default = true AND id != $3`,
+          [version_id, user_id, layoutId]
+        );
+      } else {
+        await connectionPool.query(
+          `UPDATE odb.canvas_layouts SET is_default = false 
+           WHERE version_id = $1 AND user_id IS NULL AND is_default = true AND id != $2`,
+          [version_id, layoutId]
+        );
+      }
+    }
+
+    // Build dynamic update query
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (updates.name !== undefined) {
+      setClauses.push(`name = $${paramIndex++}`);
+      values.push(updates.name);
+    }
+    if (updates.isDefault !== undefined) {
+      setClauses.push(`is_default = $${paramIndex++}`);
+      values.push(updates.isDefault);
+    }
+    if (updates.viewport !== undefined) {
+      setClauses.push(`viewport = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.viewport));
+    }
+    if (updates.nodes !== undefined) {
+      setClauses.push(`nodes = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.nodes));
+    }
+    if (updates.edges !== undefined) {
+      setClauses.push(`edges = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.edges));
+    }
+    if (updates.groups !== undefined) {
+      setClauses.push(`groups = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.groups));
+    }
+    if (updates.gridSettings !== undefined) {
+      setClauses.push(`grid_settings = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.gridSettings));
+    }
+    if (updates.minimapSettings !== undefined) {
+      setClauses.push(`minimap_settings = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.minimapSettings));
+    }
+    if (updates.metadata !== undefined) {
+      setClauses.push(`metadata = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.metadata));
+    }
+
+    if (setClauses.length === 0) {
+      return errorResponse('No updates provided');
+    }
+
+    values.push(layoutId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.canvas_layouts 
+       SET ${setClauses.join(', ')}
+       WHERE id = $${paramIndex}
+       RETURNING id, version_id, user_id, name, is_default, viewport, nodes, edges, groups, 
+                 grid_settings, minimap_settings, metadata, created_at, updated_at`,
+      values
+    );
+
+    return successResponse({ layout: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Delete a canvas layout
+ */
+export async function deleteCanvasLayout(layoutId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.canvas_layouts WHERE id = $1 RETURNING id`,
+      [layoutId]
+    );
+
+    if (result.rowCount === 0) {
+      return errorResponse('Layout not found');
+    }
+
+    return successResponse({ deleted: true });
+  } catch (error: any) {
+    console.error('Error deleting canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Save or update the default canvas layout for a version
+ * This is a convenience function that creates or updates the default layout
+ */
+export async function saveDefaultCanvasLayout(
+  versionId: string,
+  userId: string | null,
+  viewport: any,
+  nodes: any,
+  edges?: any,
+  groups?: any
+) {
+  try {
+    // Check if a default layout already exists
+    let existingQuery: string;
+    let existingParams: any[];
+
+    if (userId) {
+      existingQuery = `SELECT id FROM odb.canvas_layouts 
+                       WHERE version_id = $1 AND user_id = $2 AND is_default = true`;
+      existingParams = [versionId, userId];
+    } else {
+      existingQuery = `SELECT id FROM odb.canvas_layouts 
+                       WHERE version_id = $1 AND user_id IS NULL AND is_default = true`;
+      existingParams = [versionId];
+    }
+
+    const existingResult = await connectionPool.query(existingQuery, existingParams);
+
+    if (existingResult.rowCount > 0) {
+      // Update existing default layout
+      return updateCanvasLayout(existingResult.rows[0].id, {
+        viewport,
+        nodes,
+        edges: edges || [],
+        groups: groups || []
+      });
+    } else {
+      // Create new default layout
+      return createCanvasLayout(
+        versionId,
+        userId,
+        'Default',
+        true,
+        viewport,
+        nodes,
+        edges || [],
+        groups || [],
+        { enabled: true, size: 20, snapToGrid: true, showGrid: true },
+        { enabled: true, position: 'bottom-right', size: 'medium' },
+        {}
+      );
+    }
+  } catch (error: any) {
+    console.error('Error saving default canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+

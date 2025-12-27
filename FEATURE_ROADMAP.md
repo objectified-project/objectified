@@ -172,6 +172,7 @@
 #### Layout & Organization ✅ PARTIALLY COMPLETE
 - ✅ **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
 - ✅ **Layout Controls**: Compact button with dropdown menu
+- ✅ **Database Table**: Create a database table to store layouts
 - 📋 **Save & Load Layouts**: Named layouts ("Development", "Presentation", "Logical", "Dependency")
 - 📋 **Layout Snapshots**: Quick snapshots with thumbnails, compare side-by-side
 - 📋 **Auto-save layouts**: Every 30 seconds (configurable)
@@ -179,7 +180,6 @@
 
 | Ticket | Feature Description                                    |
 |--------|--------------------------------------------------------|
-| #313   | Adds a canvas layout table to store layout information |
 | #314   | Canvas snapshots                                       |
 | #315   | Canvas auto-save of layout                             |
 | #316   | Export/import canvas layouts                           |
@@ -340,19 +340,21 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Swagger Hub Integration**: Direct import from SwaggerHub
 - 📋 **Postman Collection Import**: Import from Postman workspace URL
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #311   | Ability to import a URL                          |
+| Ticket | Feature Description                     |
+|--------|-----------------------------------------|
+| #311   | Ability to import a URL                 |
+| #332   | Ability to import SwaggerHub            |
+| #333   | Ability to import Postman Collection    |
 
 ##### Clipboard Import 📋 PLANNED
 - 📋 **Paste JSON/YAML**: Direct paste into import dialog
 - 📋 **Syntax Highlighting**: Live preview of pasted content
 - 📋 **Format Auto-Detection**: Automatically detect JSON vs YAML
-- 📋 **Quick Import Button**: One-click import from clipboard
 
-| Ticket | Feature Description                      |
-|--------|------------------------------------------|
-| #312   | Import from clipboard functionality      |
+| Ticket | Feature Description                                 |
+|--------|-----------------------------------------------------|
+| #312   | Import from clipboard functionality                 |
+| #331   | Add color syntax highlighting to pasted import page |
 
 ##### Integration Import
 - 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong
@@ -380,20 +382,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **JSON Schema Draft 07**: Common enterprise format
 - 📋 **JSON Schema Draft 04**: Legacy support
 - 📋 **Bundled Schemas**: Multi-schema documents
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
-##### Related Formats
-- 📋 **Arazzo Specification**: Workflow orchestration import
-- 📋 **AsyncAPI 2.x/3.x**: Event-driven API specifications
-- 📋 **GraphQL Schema**: SDL format import
-- 📋 **Protobuf Definitions**: gRPC service definitions
-- 📋 **RAML 1.0**: RESTful API Modeling Language
-- 📋 **API Blueprint**: Markdown-based API format
-- 📋 **Postman Collections**: v2.0 and v2.1 formats
-- 📋 **Insomnia Export**: Import from Insomnia workspaces
-- 📋 **HAR Files**: HTTP Archive format for API discovery
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -3996,6 +3984,7 @@ The import flow is designed as a multi-step wizard with clear visual progression
 ### Schema Import/Export
 
 **Import From** 📋 PLANNED
+- 📋 Arazzo
 - 📋 OpenAPI 2.0 (Swagger)
 - 📋 OpenAPI 3.0/3.1
 - 📋 JSON Schema
@@ -4021,25 +4010,7 @@ The import flow is designed as a multi-step wizard with clear visual progression
 | [#238] | Import from Protobuf        |
 | [#239] | Import from Avro            |
 | [#240] | Import from Thrift          |
-
-**Export To** 📋 PLANNED
-- ✅ OpenAPI 3.1.0 (default)
-- ✅ JSON Schema
-- ✅ Arazzo
-- 📋 GraphQL SDL
-- 📋 AsyncAPI
-- 📋 TypeScript types
-- 📋 Python models (Pydantic, Dataclasses, SQLAlchemy)
-- 📋 Java classes
-- 📋 C# classes
-- 📋 Go structs
-- 📋 SQL DDL
-- 📋 Markdown documentation
-- 📋 Excel (for non-technical stakeholders)
-- 📋 PDF documentation
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| [#299] | Import from Arazzo          |
 
 **Schema-to-Code**
 - Generate code from schemas in multiple languages:
