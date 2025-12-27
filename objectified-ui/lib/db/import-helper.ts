@@ -63,6 +63,17 @@ interface JobState {
   percent: number;
   result?: { projectId?: string; versionId?: string };
   canceled?: boolean;
+  summary?: {
+    classesCreated: number;
+    propertiesCreated: number;
+    warnings: number;
+    failed: number;
+    totalTime?: number;
+    sourceName?: string;
+    projectName?: string;
+    versionId?: string;
+    classes: Array<{ name: string; status: 'success' | 'warning' | 'failed' }>;
+  };
 }
 
 const jobs = new Map<string, JobState>();
@@ -72,6 +83,10 @@ const now = () => Date.now();
 
 function emit(job: JobState, level: ImportLogLevel, code: string, message: string, context?: any) {
   job.events.push({ id: rndId(), ts: now(), level, code, message, context });
+  // Track warnings in summary
+  if (level === 'warn' && job.summary) {
+    job.summary.warnings++;
+  }
 }
 
 function setProgress(job: JobState, phase: ProgressEvent['phase'], total: number, completed: number, currentItem?: string) {
@@ -146,7 +161,23 @@ async function writeClassWithProperties(
 
 export async function startImport(input: ImportJobInput) {
   const jobId = rndId();
-  const job: JobState = { input, state: 'queued', events: [], percent: 0 };
+  const startTime = Date.now();
+  const job: JobState = {
+    input,
+    state: 'queued',
+    events: [],
+    percent: 0,
+    summary: {
+      classesCreated: 0,
+      propertiesCreated: 0,
+      warnings: 0,
+      failed: 0,
+      sourceName: input.project.name,
+      projectName: input.project.name,
+      versionId: input.version.versionId,
+      classes: []
+    }
+  };
   jobs.set(jobId, job);
 
   (async () => {
@@ -243,6 +274,7 @@ export async function startImport(input: ImportJobInput) {
         }
         emit(job, 'info', 'DEBUG_PROPERTY_CREATED', `Property created with ID: ${resCreateProp.property.id}`);
         propertyIdMap.set(sig, resCreateProp.property.id);
+        if (job.summary) job.summary.propertiesCreated++;
       }
       emit(job, 'info', 'PROPERTIES_CREATED', `Created ${propertyIdMap.size} properties in library`);
 
@@ -252,14 +284,29 @@ export async function startImport(input: ImportJobInput) {
       for (const cls of norm.classes) {
         if (job.canceled) throw new Error('Import canceled');
         setProgress(job, 'creating-classes', 2 + norm.classes.length, 2 + classCount, cls.name);
-        await writeClassWithProperties(projectId, versionId, cls, job, propertyIdMap);
-        emit(job, 'info', 'CLASS_CREATED', `Imported class: ${cls.name}`);
+        try {
+          await writeClassWithProperties(projectId, versionId, cls, job, propertyIdMap);
+          emit(job, 'info', 'CLASS_CREATED', `Imported class: ${cls.name}`);
+          if (job.summary) {
+            job.summary.classesCreated++;
+            job.summary.classes.push({ name: cls.name, status: 'success' });
+          }
+        } catch (classErr: any) {
+          emit(job, 'error', 'CLASS_FAILED', `Failed to create class ${cls.name}: ${classErr?.message}`);
+          if (job.summary) {
+            job.summary.failed++;
+            job.summary.classes.push({ name: cls.name, status: 'failed' });
+          }
+        }
         classCount++;
       }
 
       setProgress(job, 'finalizing', 2 + norm.classes.length, 2 + norm.classes.length);
       job.state = 'completed';
       job.result = { projectId, versionId };
+      if (job.summary) {
+        job.summary.totalTime = Date.now() - startTime;
+      }
       emit(job, 'info', 'DONE', 'Import completed successfully', job.result);
     } catch (err: any) {
       if (job.canceled) {
@@ -278,7 +325,7 @@ export async function startImport(input: ImportJobInput) {
 export async function getImportStatus(jobId: string) {
   const job = jobs.get(jobId);
   if (!job) return { jobId, state: 'failed' as ImportJobState, percent: 0, events: [{ id: rndId(), ts: now(), level: 'error' as ImportLogLevel, code: 'NOT_FOUND', message: 'Job not found' }] };
-  return { jobId, state: job.state, percent: job.percent, events: job.events.slice(-200), progress: job.progress, summary: job.result };
+  return { jobId, state: job.state, percent: job.percent, events: job.events.slice(-200), progress: job.progress, summary: job.summary };
 }
 
 export async function cancelImport(jobId: string) {

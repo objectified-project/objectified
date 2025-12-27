@@ -13,6 +13,7 @@ import { AnalysisPanel } from './AnalysisPanel';
 import { PreviewPanel, ImportOptions } from './PreviewPanel';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import ImportExecutionPanel from './ImportExecutionPanel';
+import ImportCompletePanel from './ImportCompletePanel';
 import { startImport, getImportStatus } from '../../../../../lib/db/import-actions';
 
 interface ImportDialogProps {
@@ -41,6 +42,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [importOptions, setImportOptions] = useState<ImportOptions | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [importSucceeded, setImportSucceeded] = useState(false);
+  const [importComplete, setImportComplete] = useState(false);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -82,6 +84,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setImportOptions(null);
     setJobId(null);
     setImportSucceeded(false);
+    setImportComplete(false);
     onClose();
   };
 
@@ -721,20 +724,16 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               return (
                 <ImportExecutionPanel
                   jobId={jobId}
-                  onDone={() => {
-                    // Check import status to determine if it was successful
-                    getImportStatus(jobId).then((status) => {
-                      if (status.state === 'completed') {
-                        setImportSucceeded(true);
-                      }
-                    });
-                    setCurrentStep('done');
+                  isReviewing={importComplete}
+                  onComplete={(succeeded) => {
+                    setImportComplete(true);
+                    setImportSucceeded(succeeded);
                   }}
                 />
               );
             } else if (currentStep === 'done') {
               return jobId ? (
-                <ImportExecutionPanel jobId={jobId} />
+                <ImportCompletePanel jobId={jobId} />
               ) : null;
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
@@ -757,12 +756,36 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
         {/* Footer */}
         <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-          {currentStep === 'import' || currentStep === 'done' ? (
+          {currentStep === 'done' ? (
             <>
-              <div />
-              <Button variant="outline" onClick={handleClose}>
-                Close
+              <Button variant="outline" onClick={() => setCurrentStep('import')}>
+                ← Back
               </Button>
+              <Button
+                onClick={handleClose}
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+              >
+                Done
+              </Button>
+            </>
+          ) : currentStep === 'import' ? (
+            <>
+              <Button variant="outline" onClick={handleBack} disabled={!importComplete}>
+                ← Back
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleClose}>
+                  {importComplete ? 'Close' : 'Cancel'}
+                </Button>
+                {importComplete && (
+                  <Button
+                    onClick={() => setCurrentStep('done')}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    Next →
+                  </Button>
+                )}
+              </div>
             </>
           ) : currentStep !== 'source' ? (
             <>

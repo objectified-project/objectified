@@ -9,7 +9,8 @@ import { cancelImport, getImportStatus } from '../../../../../lib/db/import-acti
 
 interface ImportExecutionPanelProps {
   jobId: string;
-  onDone?: () => void;
+  onComplete?: (succeeded: boolean) => void;
+  isReviewing?: boolean; // True when viewing from 'done' step via Back button
 }
 
 type LogLevel = 'info' | 'warn' | 'error';
@@ -30,12 +31,13 @@ interface ProgressInfo {
   currentItem?: string;
 }
 
-export default function ImportExecutionPanel({ jobId, onDone }: ImportExecutionPanelProps) {
+export default function ImportExecutionPanel({ jobId, onComplete, isReviewing }: ImportExecutionPanelProps) {
   const [state, setState] = useState<'queued' | 'running' | 'completed' | 'failed' | 'canceled'>('queued');
   const [percent, setPercent] = useState(0);
   const [progress, setProgress] = useState<ProgressInfo | undefined>(undefined);
   const [events, setEvents] = useState<ImportEvent[]>([]);
   const [summary, setSummary] = useState<any>(null);
+  const [hasNotifiedComplete, setHasNotifiedComplete] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -53,21 +55,30 @@ export default function ImportExecutionPanel({ jobId, onDone }: ImportExecutionP
 
         if (['completed', 'failed', 'canceled'].includes(status.state)) {
           clearInterval(timer);
-          onDone?.();
+          // Notify parent that import is complete, but don't auto-advance
+          if (!hasNotifiedComplete && onComplete) {
+            setHasNotifiedComplete(true);
+            onComplete(status.state === 'completed');
+          }
         }
       } catch (e) {
         // Ignore transient errors
       }
     };
 
-    poll();
-    timer = setInterval(poll, 1000);
+    // If reviewing (came back from done step), just poll once to get final state
+    if (isReviewing) {
+      poll();
+    } else {
+      poll();
+      timer = setInterval(poll, 1000);
+    }
 
     return () => {
       mounted = false;
       if (timer) clearInterval(timer);
     };
-  }, [jobId, onDone]);
+  }, [jobId, onComplete, isReviewing, hasNotifiedComplete]);
 
   const onCancel = async () => {
     await cancelImport(jobId);
