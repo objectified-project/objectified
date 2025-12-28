@@ -171,7 +171,7 @@ const StudioContent = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('hierarchical-tb');
-  const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(true);
+  const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(false);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const { fitView, setCenter, getViewport } = useReactFlow();
 
@@ -232,6 +232,13 @@ const StudioContent = () => {
   const handleClassDeleteRef = useRef<any>(null);
   const handleCreateReferenceRef = useRef<any>(null);
   const handleTogglePropertyExpansionRef = useRef<any>(null);
+
+  // Refs for group handlers - initialized here, values set later
+  const handleGroupRenameRef = useRef<any>(null);
+  const handleGroupDeleteRef = useRef<any>(null);
+  const handleGroupColorChangeRef = useRef<any>(null);
+  const handleGroupStyleChangeRef = useRef<any>(null);
+  const handleGroupTagsChangeRef = useRef<any>(null);
 
   // Handle toggling property expansion
   const handleTogglePropertyExpansion = useCallback((propertyId: string) => {
@@ -938,7 +945,7 @@ const StudioContent = () => {
   }, []);
 
   // Handle group rename
-  const handleGroupRename = useCallback((groupId: string, newName: string) => {
+  const handleGroupRename = useCallback(async (groupId: string, newName: string) => {
     if (isReadOnly) return;
 
     updateGroup(groupId, { name: newName });
@@ -953,7 +960,44 @@ const StudioContent = () => {
       }
       return node;
     }));
-  }, [isReadOnly, updateGroup, setNodes]);
+
+    // Auto-save the updated groups to database
+    if (selectedVersionId && currentUserId) {
+      try {
+        const viewport = getViewport();
+        const nodeData = nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          dimensions: {
+            width: node.measured?.width || node.width || node.style?.width,
+            height: node.measured?.height || node.height || node.style?.height
+          }
+        }));
+        const edgeData = edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+
+        // Get updated groups with the new name
+        const updatedGroups = groups.map(g =>
+          g.id === groupId ? { ...g, name: newName } : g
+        );
+
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          nodeData,
+          edgeData,
+          updatedGroups
+        );
+      } catch (error) {
+        console.error('Failed to auto-save group rename:', error);
+      }
+    }
+  }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
 
   // Handle group delete
   const handleGroupDelete = useCallback(async (groupId: string) => {
@@ -978,7 +1022,7 @@ const StudioContent = () => {
   }, [isReadOnly, groups, confirmDialog, deleteGroupFromContext, setNodes]);
 
   // Handle group color change
-  const handleGroupColorChange = useCallback((groupId: string, newColor: string) => {
+  const handleGroupColorChange = useCallback(async (groupId: string, newColor: string) => {
     if (isReadOnly) return;
 
     updateGroup(groupId, { color: newColor });
@@ -993,10 +1037,46 @@ const StudioContent = () => {
       }
       return node;
     }));
-  }, [isReadOnly, updateGroup, setNodes]);
+
+    // Auto-save the updated groups to database
+    if (selectedVersionId && currentUserId) {
+      try {
+        const viewport = getViewport();
+        const nodeData = nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          dimensions: {
+            width: node.measured?.width || node.width || node.style?.width,
+            height: node.measured?.height || node.height || node.style?.height
+          }
+        }));
+        const edgeData = edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+
+        const updatedGroups = groups.map(g =>
+          g.id === groupId ? { ...g, color: newColor } : g
+        );
+
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          nodeData,
+          edgeData,
+          updatedGroups
+        );
+      } catch (error) {
+        console.error('Failed to auto-save group color change:', error);
+      }
+    }
+  }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
 
   // Handle group style change
-  const handleGroupStyleChange = useCallback((groupId: string, styleOptions: any) => {
+  const handleGroupStyleChange = useCallback(async (groupId: string, styleOptions: any) => {
     if (isReadOnly) return;
 
     updateGroup(groupId, { styleOptions });
@@ -1011,7 +1091,104 @@ const StudioContent = () => {
       }
       return node;
     }));
-  }, [isReadOnly, updateGroup, setNodes]);
+
+    // Auto-save the updated groups to database
+    if (selectedVersionId && currentUserId) {
+      try {
+        const viewport = getViewport();
+        const nodeData = nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          dimensions: {
+            width: node.measured?.width || node.width || node.style?.width,
+            height: node.measured?.height || node.height || node.style?.height
+          }
+        }));
+        const edgeData = edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+
+        const updatedGroups = groups.map(g =>
+          g.id === groupId ? { ...g, styleOptions } : g
+        );
+
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          nodeData,
+          edgeData,
+          updatedGroups
+        );
+      } catch (error) {
+        console.error('Failed to auto-save group style change:', error);
+      }
+    }
+  }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
+
+  // Handle group tags change
+  const handleGroupTagsChange = useCallback(async (groupId: string, tags: any[]) => {
+    if (isReadOnly) return;
+
+    updateGroup(groupId, { tags });
+
+    // Update the node data
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, tags }
+        };
+      }
+      return node;
+    }));
+
+    // Auto-save the updated groups to database
+    if (selectedVersionId && currentUserId) {
+      try {
+        const viewport = getViewport();
+        const nodeData = nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          dimensions: {
+            width: node.measured?.width || node.width || node.style?.width,
+            height: node.measured?.height || node.height || node.style?.height
+          }
+        }));
+        const edgeData = edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+
+        const updatedGroups = groups.map(g =>
+          g.id === groupId ? { ...g, tags } : g
+        );
+
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          nodeData,
+          edgeData,
+          updatedGroups
+        );
+      } catch (error) {
+        console.error('Failed to auto-save group tags change:', error);
+      }
+    }
+  }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
+
+  // Assign current handlers to refs for use in effects
+  handleGroupTagsChangeRef.current = handleGroupTagsChange;
+  handleGroupRenameRef.current = handleGroupRename;
+  handleGroupDeleteRef.current = handleGroupDelete;
+  handleGroupColorChangeRef.current = handleGroupColorChange;
+  handleGroupStyleChangeRef.current = handleGroupStyleChange;
 
   // State for drag-over highlighting
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
@@ -1621,11 +1798,47 @@ const StudioContent = () => {
       // Restore nodes - need to reload classes and apply saved positions
       await reloadClasses(false);
 
-      // After classes are loaded, apply saved positions
+      // After classes are loaded, apply saved positions and create group nodes
       setTimeout(() => {
+        const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
+
+        // Create group nodes from loaded groups
+        const groupNodes: Node[] = [];
+        if (layout.groups && Array.isArray(layout.groups)) {
+          layout.groups.forEach((group: any) => {
+            const groupNode: Node = {
+              id: group.id,
+              type: 'groupNode',
+              position: group.position,
+              style: {
+                width: group.dimensions.width,
+                height: group.dimensions.height,
+                zIndex: -1
+              },
+              data: {
+                id: group.id,
+                name: group.name,
+                color: group.color,
+                nodeIds: group.nodeIds || [],
+                tags: group.tags || [],
+                styleOptions: group.styleOptions,
+                availableTags,
+                onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
+                onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
+                onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
+                onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
+                onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
+                isReadOnly
+              }
+            };
+            groupNodes.push(groupNode);
+          });
+        }
+
         if (layout.nodes && Array.isArray(layout.nodes)) {
           setNodes(prevNodes => {
-            return prevNodes.map(node => {
+            // Map existing nodes to update positions
+            const updatedNodes = prevNodes.map(node => {
               const savedNode = layout.nodes.find((n: any) => n.id === node.id);
               if (savedNode) {
                 return {
@@ -1642,7 +1855,13 @@ const StudioContent = () => {
               }
               return node;
             });
+
+            // Add group nodes at the beginning (behind other nodes due to zIndex: -1)
+            return [...groupNodes, ...updatedNodes];
           });
+        } else {
+          // If no saved nodes, just add group nodes
+          setNodes(prevNodes => [...groupNodes, ...prevNodes]);
         }
 
         setIsLoadingCanvas(false);
@@ -1660,7 +1879,7 @@ const StudioContent = () => {
       setLoadingMessage('');
       setLayoutDropdownOpen(false);
     }
-  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setCenter, alertDialog]);
+  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setCenter, alertDialog, projectTags, isReadOnly]);
 
   // ============================================================================
   // END LAYOUT SAVE/LOAD HANDLERS

@@ -10,6 +10,13 @@ export interface GroupStyleOptions {
   icon: string;
 }
 
+// Group tag definition
+export interface GroupTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 // Group definition for canvas grouping
 export interface CanvasGroup {
   id: string;
@@ -17,6 +24,7 @@ export interface CanvasGroup {
   description?: string;
   color: string;
   nodeIds: string[];
+  tags?: GroupTag[];
   position: { x: number; y: number };
   dimensions: { width: number; height: number };
   styleOptions?: GroupStyleOptions;
