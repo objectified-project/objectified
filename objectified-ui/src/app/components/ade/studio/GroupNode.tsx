@@ -2,8 +2,58 @@
 
 import React, { memo, useState, useCallback } from 'react';
 import { NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
-import { Folder, Edit2, Trash2, X, Check, Palette } from 'lucide-react';
+import {
+  Folder, Edit2, Trash2, X, Check, Palette, Settings,
+  Box, Layers, Database, Shield, Users, Zap, Globe, Lock,
+  FileText, Tag, Star, Heart, Flag, Bookmark, Archive, Package
+} from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
+
+// Available group icons
+export const GROUP_ICONS = [
+  { name: 'folder', icon: Folder, label: 'Folder' },
+  { name: 'box', icon: Box, label: 'Box' },
+  { name: 'layers', icon: Layers, label: 'Layers' },
+  { name: 'database', icon: Database, label: 'Database' },
+  { name: 'shield', icon: Shield, label: 'Shield' },
+  { name: 'users', icon: Users, label: 'Users' },
+  { name: 'zap', icon: Zap, label: 'Zap' },
+  { name: 'globe', icon: Globe, label: 'Globe' },
+  { name: 'lock', icon: Lock, label: 'Lock' },
+  { name: 'file', icon: FileText, label: 'File' },
+  { name: 'tag', icon: Tag, label: 'Tag' },
+  { name: 'star', icon: Star, label: 'Star' },
+  { name: 'heart', icon: Heart, label: 'Heart' },
+  { name: 'flag', icon: Flag, label: 'Flag' },
+  { name: 'bookmark', icon: Bookmark, label: 'Bookmark' },
+  { name: 'archive', icon: Archive, label: 'Archive' },
+  { name: 'package', icon: Package, label: 'Package' },
+];
+
+// Border style options
+export const BORDER_STYLES = [
+  { name: 'dashed', label: 'Dashed', class: 'border-dashed' },
+  { name: 'solid', label: 'Solid', class: 'border-solid' },
+  { name: 'dotted', label: 'Dotted', class: 'border-dotted' },
+];
+
+// Background opacity options
+export const OPACITY_OPTIONS = [
+  { value: 0.1, label: '10%' },
+  { value: 0.2, label: '20%' },
+  { value: 0.3, label: '30%' },
+  { value: 0.5, label: '50%' },
+  { value: 0.7, label: '70%' },
+  { value: 1, label: '100%' },
+];
+
+// Shadow options
+export const SHADOW_OPTIONS = [
+  { name: 'none', label: 'None', class: '' },
+  { name: 'sm', label: 'Small', class: 'shadow-sm' },
+  { name: 'md', label: 'Medium', class: 'shadow-md' },
+  { name: 'lg', label: 'Large', class: 'shadow-lg' },
+];
 
 // Predefined group colors with name, bg, border, and text colors
 export const GROUP_COLORS = [
@@ -25,15 +75,31 @@ export const GROUP_COLORS = [
   { name: 'gray', bg: 'bg-gray-50 dark:bg-gray-800/50', border: 'border-gray-300 dark:border-gray-600', text: 'text-gray-700 dark:text-gray-300', hex: '#6b7280' },
 ];
 
+export interface GroupStyleOptions {
+  borderStyle: 'dashed' | 'solid' | 'dotted';
+  opacity: number;
+  shadow: 'none' | 'sm' | 'md' | 'lg';
+  icon: string;
+}
+
+export const DEFAULT_STYLE_OPTIONS: GroupStyleOptions = {
+  borderStyle: 'dashed',
+  opacity: 1,
+  shadow: 'none',
+  icon: 'folder',
+};
+
 export interface GroupNodeData {
   id: string;
   name: string;
   description?: string;
   color: string; // Color name from GROUP_COLORS
   nodeIds: string[]; // IDs of nodes contained in this group
+  styleOptions?: GroupStyleOptions; // Visual styling options
   onRename?: (groupId: string, newName: string) => void;
   onDelete?: (groupId: string) => void;
   onColorChange?: (groupId: string, newColor: string) => void;
+  onStyleChange?: (groupId: string, styleOptions: GroupStyleOptions) => void;
   isReadOnly?: boolean;
 }
 
@@ -42,10 +108,23 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(groupData.name);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { getNodes } = useReactFlow();
 
   // Get color configuration
   const colorConfig = GROUP_COLORS.find(c => c.name === groupData.color) || GROUP_COLORS[0];
+
+  // Get style options with defaults
+  const styleOptions = { ...DEFAULT_STYLE_OPTIONS, ...groupData.styleOptions };
+
+  // Get the icon component
+  const IconComponent = GROUP_ICONS.find(i => i.name === styleOptions.icon)?.icon || Folder;
+
+  // Get border style class
+  const borderStyleClass = BORDER_STYLES.find(b => b.name === styleOptions.borderStyle)?.class || 'border-dashed';
+
+  // Get shadow class
+  const shadowClass = SHADOW_OPTIONS.find(s => s.name === styleOptions.shadow)?.class || '';
 
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -93,6 +172,13 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
     setColorPickerOpen(false);
   }, [groupData]);
 
+  // Handle style option changes
+  const handleStyleChange = useCallback((key: keyof GroupStyleOptions, value: any) => {
+    if (groupData.isReadOnly) return;
+    const newOptions = { ...styleOptions, [key]: value };
+    groupData.onStyleChange?.(groupData.id, newOptions);
+  }, [groupData, styleOptions]);
+
   // Count nodes in this group
   const nodeCount = groupData.nodeIds?.length || 0;
 
@@ -109,21 +195,28 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
 
       <div
         className={`
-          w-full h-full rounded-2xl border-2 border-dashed transition-all duration-200
-          ${colorConfig.bg} ${colorConfig.border}
+          w-full h-full rounded-2xl border-2 transition-all duration-200
+          ${borderStyleClass} ${colorConfig.border} ${shadowClass}
           ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900' : ''}
         `}
-        style={{ minWidth: 200, minHeight: 150 }}
+        style={{
+          minWidth: 200,
+          minHeight: 150,
+          backgroundColor: `${colorConfig.hex}${Math.round(styleOptions.opacity * 25.5).toString(16).padStart(2, '0')}`
+        }}
       >
         {/* Group Header */}
         <div
           className={`
-            absolute -top-3 left-4 px-3 py-1 rounded-lg border shadow-sm
-            ${colorConfig.bg} ${colorConfig.border} ${colorConfig.text}
+            absolute -top-3 left-4 px-3 py-1 rounded-lg border ${shadowClass || 'shadow-sm'}
+            ${colorConfig.border} ${colorConfig.text}
             flex items-center gap-2 cursor-move
           `}
+          style={{
+            backgroundColor: `${colorConfig.hex}${Math.round(Math.min(styleOptions.opacity + 0.3, 1) * 255).toString(16).padStart(2, '0')}`
+          }}
         >
-          <Folder className="h-4 w-4" />
+          <IconComponent className="h-4 w-4" />
 
           {isEditing ? (
             <div className="flex items-center gap-1">
@@ -163,12 +256,138 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           {/* Actions (visible when selected and not editing) */}
           {selected && !isEditing && !groupData.isReadOnly && (
             <div className="flex items-center gap-1 ml-2 pl-2 border-l border-current/20">
+              {/* Settings popover */}
+              <Popover.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <Popover.Trigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSettingsOpen(v => !v);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="p-1 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded transition-colors cursor-pointer"
+                    title="Style settings"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 w-96"
+                    sideOffset={5}
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Group Styling</h4>
+
+                    {/* Icon Selection */}
+                    <div className="mb-4">
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">Icon</label>
+                      <div className="grid grid-cols-6 gap-1.5">
+                        {GROUP_ICONS.map((iconOption) => {
+                          const Icon = iconOption.icon;
+                          return (
+                            <button
+                              key={iconOption.name}
+                              onClick={() => handleStyleChange('icon', iconOption.name)}
+                              className={`
+                                p-2 rounded-lg transition-all hover:bg-gray-100 dark:hover:bg-gray-700
+                                flex items-center justify-center
+                                ${styleOptions.icon === iconOption.name 
+                                  ? 'bg-indigo-100 dark:bg-indigo-900/50 ring-2 ring-indigo-500' 
+                                  : 'bg-gray-50 dark:bg-gray-700/50'}
+                              `}
+                              title={iconOption.label}
+                            >
+                              <Icon className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Border Style */}
+                    <div className="mb-4">
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">Border Style</label>
+                      <div className="flex gap-2">
+                        {BORDER_STYLES.map((style) => (
+                          <button
+                            key={style.name}
+                            onClick={() => handleStyleChange('borderStyle', style.name)}
+                            className={`
+                              flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all
+                              ${styleOptions.borderStyle === style.name
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}
+                            `}
+                          >
+                            {style.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Shadow */}
+                    <div className="mb-4">
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">Shadow</label>
+                      <div className="flex gap-2">
+                        {SHADOW_OPTIONS.map((shadow) => (
+                          <button
+                            key={shadow.name}
+                            onClick={() => handleStyleChange('shadow', shadow.name)}
+                            className={`
+                              flex-1 px-2 py-2 text-xs font-medium rounded-lg transition-all
+                              ${styleOptions.shadow === shadow.name
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}
+                            `}
+                          >
+                            {shadow.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Opacity Slider */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">Background Opacity</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={Math.round(styleOptions.opacity * 100)}
+                          onChange={(e) => handleStyleChange('opacity', parseInt(e.target.value) / 100)}
+                          className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                          style={{
+                            background: `linear-gradient(to right, rgb(99 102 241) 0%, rgb(99 102 241) ${styleOptions.opacity * 100}%, rgb(229 231 235) ${styleOptions.opacity * 100}%, rgb(229 231 235) 100%)`
+                          }}
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12 text-right">
+                          {Math.round(styleOptions.opacity * 100)}%
+                        </span>
+                      </div>
+                    </div>
+
+                    <Popover.Arrow className="fill-white dark:fill-gray-800" />
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+
               {/* Color picker */}
               <Popover.Root open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
                 <Popover.Trigger asChild>
                   <button
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-1 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded transition-colors"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setColorPickerOpen(v => !v);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="p-1 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded transition-colors cursor-pointer"
                     title="Change color"
                   >
                     <Palette className="h-3.5 w-3.5" />
@@ -176,8 +395,9 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 </Popover.Trigger>
                 <Popover.Portal>
                   <Popover.Content
-                    className="z-50 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3"
+                    className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3"
                     sideOffset={5}
+                    onOpenAutoFocus={(e) => e.preventDefault()}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="grid grid-cols-4 gap-2">
@@ -202,6 +422,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
               {/* Rename button */}
               <button
                 onClick={handleStartEdit}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="p-1 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded transition-colors"
                 title="Rename group"
               >
@@ -211,6 +433,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
               {/* Delete button */}
               <button
                 onClick={handleDelete}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors text-red-600 dark:text-red-400"
                 title="Delete group"
               >

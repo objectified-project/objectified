@@ -937,73 +937,6 @@ const StudioContent = () => {
     return `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }, []);
 
-  // Create a new group from selected nodes
-  const handleCreateGroup = useCallback(() => {
-    if (isReadOnly) return;
-
-    // Get viewport center position for new empty group
-    const viewport = getViewport();
-    const canvasWidth = window.innerWidth;
-    const canvasHeight = window.innerHeight;
-
-    // Calculate center position in the flow coordinate system
-    const centerX = (canvasWidth / 2 - viewport.x) / viewport.zoom;
-    const centerY = (canvasHeight / 2 - viewport.y) / viewport.zoom;
-
-    // Default group dimensions
-    const defaultWidth = 400;
-    const defaultHeight = 300;
-
-    // Position group at center minus half its size
-    const position = {
-      x: centerX - defaultWidth / 2,
-      y: centerY - defaultHeight / 2
-    };
-
-    // Create new empty group
-    const groupId = generateGroupId();
-    const newGroup = {
-      id: groupId,
-      name: `Group ${groups.length + 1}`,
-      color: GROUP_COLORS[groups.length % GROUP_COLORS.length].name,
-      nodeIds: [], // Empty group - no nodes initially
-      position: position,
-      dimensions: {
-        width: defaultWidth,
-        height: defaultHeight
-      }
-    };
-
-    // Add group to context
-    addGroup(newGroup);
-
-    // Create group node for ReactFlow
-    const groupNode: Node = {
-      id: groupId,
-      type: 'groupNode',
-      position: newGroup.position,
-      style: {
-        width: newGroup.dimensions.width,
-        height: newGroup.dimensions.height,
-        zIndex: -1 // Groups should be behind class nodes
-      },
-      data: {
-        id: groupId,
-        name: newGroup.name,
-        color: newGroup.color,
-        nodeIds: newGroup.nodeIds,
-        onRename: handleGroupRename,
-        onDelete: handleGroupDelete,
-        onColorChange: handleGroupColorChange,
-        isReadOnly: isReadOnly
-      }
-    };
-
-    // Add group node to canvas
-    setNodes(prevNodes => [groupNode, ...prevNodes]);
-
-  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport]);
-
   // Handle group rename
   const handleGroupRename = useCallback((groupId: string, newName: string) => {
     if (isReadOnly) return;
@@ -1061,6 +994,99 @@ const StudioContent = () => {
       return node;
     }));
   }, [isReadOnly, updateGroup, setNodes]);
+
+  // Handle group style change
+  const handleGroupStyleChange = useCallback((groupId: string, styleOptions: any) => {
+    if (isReadOnly) return;
+
+    updateGroup(groupId, { styleOptions });
+
+    // Update the node data
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, styleOptions }
+        };
+      }
+      return node;
+    }));
+  }, [isReadOnly, updateGroup, setNodes]);
+
+  // Create a new group (must be defined after handlers it references)
+  const handleCreateGroup = useCallback(() => {
+    if (isReadOnly) return;
+
+    // Get viewport center position for new empty group
+    const viewport = getViewport();
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
+
+    // Calculate center position in the flow coordinate system
+    const centerX = (canvasWidth / 2 - viewport.x) / viewport.zoom;
+    const centerY = (canvasHeight / 2 - viewport.y) / viewport.zoom;
+
+    // Default group dimensions
+    const defaultWidth = 400;
+    const defaultHeight = 300;
+
+    // Position group at center minus half its size
+    const position = {
+      x: centerX - defaultWidth / 2,
+      y: centerY - defaultHeight / 2
+    };
+
+    // Create new empty group
+    const groupId = generateGroupId();
+    const newGroup = {
+      id: groupId,
+      name: `Group ${groups.length + 1}`,
+      color: GROUP_COLORS[groups.length % GROUP_COLORS.length].name,
+      nodeIds: [], // Empty group - no nodes initially
+      position: position,
+      dimensions: {
+        width: defaultWidth,
+        height: defaultHeight
+      },
+      styleOptions: {
+        borderStyle: 'dashed' as const,
+        opacity: 1,
+        shadow: 'none' as const,
+        icon: 'folder'
+      }
+    };
+
+    // Add group to context
+    addGroup(newGroup);
+
+    // Create group node for ReactFlow
+    const groupNode: Node = {
+      id: groupId,
+      type: 'groupNode',
+      position: newGroup.position,
+      style: {
+        width: newGroup.dimensions.width,
+        height: newGroup.dimensions.height,
+        zIndex: -1 // Groups should be behind class nodes
+      },
+      data: {
+        id: groupId,
+        name: newGroup.name,
+        color: newGroup.color,
+        nodeIds: newGroup.nodeIds,
+        styleOptions: newGroup.styleOptions,
+        onRename: handleGroupRename,
+        onDelete: handleGroupDelete,
+        onColorChange: handleGroupColorChange,
+        onStyleChange: handleGroupStyleChange,
+        isReadOnly: isReadOnly
+      }
+    };
+
+    // Add group node to canvas
+    setNodes(prevNodes => [groupNode, ...prevNodes]);
+
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleGroupColorChange, handleGroupStyleChange]);
 
   // Update group dimensions when nodes move
   const handleGroupResize = useCallback((groupId: string, position: { x: number; y: number }, dimensions: { width: number; height: number }) => {

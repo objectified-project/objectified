@@ -2,6 +2,14 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+// Group style options
+export interface GroupStyleOptions {
+  borderStyle: 'dashed' | 'solid' | 'dotted';
+  opacity: number;
+  shadow: 'none' | 'sm' | 'md' | 'lg';
+  icon: string;
+}
+
 // Group definition for canvas grouping
 export interface CanvasGroup {
   id: string;
@@ -11,6 +19,7 @@ export interface CanvasGroup {
   nodeIds: string[];
   position: { x: number; y: number };
   dimensions: { width: number; height: number };
+  styleOptions?: GroupStyleOptions;
 }
 
 interface StudioContextType {

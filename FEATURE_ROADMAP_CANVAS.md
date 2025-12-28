@@ -36,7 +36,7 @@
 ### 1. Canvas Layout & Organization
 
 #### Save & Load Layouts 📋 PLANNED
-- 📋 Save current canvas arrangement with a custom name
+- ✅ Save current canvas arrangement
 - 📋 Multiple saved layouts per version:
     - "Development Layout" - organized for development work
     - "Presentation Layout" - clean arrangement for stakeholder demos
@@ -50,7 +50,6 @@
 
 | Ticket | Feature                                      |
 |--------|----------------------------------------------|
-| [#162] | Save current canvas arrangement              |
 | [#163] | Multiple saved layouts per version           |
 | [#164] | Auto-save layout changes (tuneable interval) |
 | [#165] | Version control for layouts                  |
@@ -164,9 +163,9 @@
 
 ### 3. Node Grouping & Organization
 
-#### Group Containers 📋 PLANNED
-- 📋 Create visual containers to group related classes together
-- 📋 Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services")
+#### Group Containers 📋 PARTIALLY IMPLEMENTED
+- ✅ Create visual containers to group related classes together
+- ✅ Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services")
 - 📋 Collapsible groups to reduce canvas clutter
     - Click to collapse: shows only group title and count
     - Expand/collapse all groups with keyboard shortcut
@@ -178,23 +177,20 @@
     - Export group as separate schema file
     - Duplicate entire group with all classes
     - Apply bulk property changes to all classes in group
-- 📋 Named groups with descriptions and metadata
-- 📋 Visual styling options:
-    - Rounded rectangle containers with subtle shadows
-    - Dashed or solid borders with custom colors
-    - Group headers with collapse/expand icons
-    - Background color/opacity customization
-    - Optional group icons from icon library
+- ✅ Named groups with descriptions and metadata
+- ✅ Visual styling options:
+    - ✅ Rounded rectangle containers with subtle shadows
+    - ✅ Dashed or solid borders with custom colors
+    - 📋 Group headers with collapse/expand icons
+    - ✅ Background color/opacity customization
+    - ✅ Optional group icons from icon library
 
 | Ticket | Feature                                                            |
 |--------|--------------------------------------------------------------------|
-| [#152] | Create visual containers to group related classes                  |
-| [#153] | Color-coded groups with custom names                               |
 | [#154] | Collapsible groups to reduce canvas clutter                        |
 | [#155] | Nested groups for hierarchical organization                        |
 | [#156] | Group-level operations: move, delete, export, duplicate, bulk edit |
-| [#157] | Named groups with descriptions and metadata                        |
-| [#158] | Visual styling options for group containers                        |
+| [#158] ✅ | Visual styling options for group containers                        |
 | [#197] | Group classes by dragging into canvas group                        |
 | [#284] | Drag and drop node to group to add it                              |
 | [#285] | Ungroup nodes by deleting the group                                |
