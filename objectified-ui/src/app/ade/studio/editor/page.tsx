@@ -216,6 +216,9 @@ const StudioContent = () => {
   // Layout saved state
   const [layoutSaved, setLayoutSaved] = useState(false);
 
+  // Track if initial layout has been applied for this version
+  const initialLayoutAppliedRef = useRef<string | null>(null);
+
   // Export dropdown state
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
@@ -3579,30 +3582,116 @@ const StudioContent = () => {
         // Create edges for both property $ref and composition relationships
         const newEdges = createAllEdges(classesWithProperties);
 
-        setLoadingMessage('Applying auto-layout...');
+        // Check if this is the initial load for this version and if saved layout exists
+        const isInitialLoad = initialLayoutAppliedRef.current !== selectedVersionId;
+        let savedLayout: any = null;
 
-        // Apply auto-layout if enabled
+        if (isInitialLoad && currentUserId) {
+          try {
+            setLoadingMessage('Checking for saved layout...');
+            const layoutResult = await getDefaultCanvasLayout(selectedVersionId, currentUserId);
+            const layoutResponse = JSON.parse(layoutResult);
+            if (layoutResponse.success && layoutResponse.layout) {
+              savedLayout = layoutResponse.layout;
+            }
+          } catch (e) {
+            console.log('No saved layout found, using default layout');
+          }
+        }
+
         let finalNodes: Node[];
-        if (autoLayoutEnabled) {
-          finalNodes = getLayoutedElements(newNodes, newEdges, {
-            direction: layoutDirection
+
+        if (savedLayout && isInitialLoad) {
+          setLoadingMessage('Applying saved layout...');
+
+          // Apply saved positions to nodes
+          finalNodes = newNodes.map(node => {
+            const savedNode = savedLayout.nodes?.find((n: any) => n.id === node.id);
+            if (savedNode) {
+              return {
+                ...node,
+                position: savedNode.position,
+                ...(savedNode.dimensions && {
+                  style: {
+                    ...node.style,
+                    width: savedNode.dimensions.width,
+                    height: savedNode.dimensions.height
+                  }
+                })
+              };
+            }
+            return node;
           });
+
+          // Restore groups if available
+          if (savedLayout.groups && Array.isArray(savedLayout.groups)) {
+            setGroups(savedLayout.groups);
+
+            // Create group nodes
+            const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
+            const groupNodes: Node[] = savedLayout.groups.map((group: any) => ({
+              id: group.id,
+              type: 'groupNode',
+              position: group.position,
+              style: {
+                width: group.dimensions.width,
+                height: group.dimensions.height,
+                zIndex: -1
+              },
+              data: {
+                id: group.id,
+                name: group.name,
+                color: group.color,
+                nodeIds: group.nodeIds || [],
+                tags: group.tags || [],
+                styleOptions: group.styleOptions,
+                availableTags,
+                onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
+                onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
+                onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
+                onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
+                onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
+                isReadOnly
+              }
+            }));
+
+            finalNodes = [...groupNodes, ...finalNodes];
+          }
+
+          // Mark this version as having initial layout applied
+          initialLayoutAppliedRef.current = selectedVersionId;
+
+          // Restore viewport if available
+          if (savedLayout.viewport) {
+            setTimeout(() => {
+              setCenter(savedLayout.viewport.x, savedLayout.viewport.y, { zoom: savedLayout.viewport.zoom, duration: 800 });
+            }, 100);
+          }
+
+          // Trigger sidebar refresh to update groups
+          triggerSidebarRefresh();
         } else {
-          finalNodes = newNodes;
+          setLoadingMessage('Applying auto-layout...');
+
+          // Apply auto-layout if enabled
+          if (autoLayoutEnabled) {
+            finalNodes = getLayoutedElements(newNodes, newEdges, {
+              direction: layoutDirection
+            });
+          } else {
+            finalNodes = newNodes;
+          }
+
+          // Fit view after a short delay to ensure nodes are rendered
+          setTimeout(() => {
+            fitView({ padding: 0.2, duration: 400 });
+          }, 50);
         }
 
         setNodes(finalNodes);
         setEdges(newEdges);
 
-
-        setLoadingMessage('Fitting view to canvas...');
-
-        // Fit view after a short delay to ensure nodes are rendered
-        setTimeout(() => {
-          fitView({ padding: 0.2, duration: 400 });
-        }, 50);
-
-        console.log('Loaded classes for version:', selectedVersionId, 'Classes:', classesWithProperties.length);
+        console.log('Loaded classes for version:', selectedVersionId, 'Classes:', classesWithProperties.length, savedLayout ? '(with saved layout)' : '');
       } catch (error) {
         console.error('Failed to load classes:', error);
         setNodes([]);
@@ -3614,7 +3703,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, autoLayoutEnabled, setNodes, setEdges, fitView, projects, versions]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, autoLayoutEnabled, setNodes, setEdges, fitView, projects, versions, currentUserId, setGroups, setCenter, projectTags, isReadOnly, triggerSidebarRefresh]);
 
   // Generate specs on-demand when switching views or when canvas changes
   useEffect(() => {

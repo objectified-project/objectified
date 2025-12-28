@@ -270,6 +270,18 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         await alertDialog({ message: 'Cannot delete groups in a published version.', variant: 'warning' });
         return;
       }
+
+      const group = groups.find(g => g.id === groupId);
+      const confirmed = await confirmDialog({
+        title: 'Delete Group',
+        message: `Are you sure you want to delete the group "${group?.name || 'this group'}"? The classes inside will not be deleted.`,
+        variant: 'warning',
+        confirmLabel: 'Delete Group',
+        cancelLabel: 'Cancel',
+      });
+
+      if (!confirmed) return;
+
       deleteGroup(groupId);
       triggerCanvasRefresh();
     },
