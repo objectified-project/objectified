@@ -37,6 +37,27 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   // Check if we're on the code view - hide sidebar for code view
   const isCodeView = pathname?.includes('/code');
 
+  // View transition loading state
+  const [isViewLoading, setIsViewLoading] = useState(false);
+  const previousPathRef = React.useRef(pathname);
+
+  // Detect view transitions and show loading, then clear after render
+  React.useEffect(() => {
+    if (pathname !== previousPathRef.current) {
+      setIsViewLoading(true);
+      previousPathRef.current = pathname;
+
+      // Use double requestAnimationFrame to ensure children have rendered
+      // First RAF waits for React to commit, second RAF waits for paint
+      const frameId = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsViewLoading(false);
+        });
+      });
+      return () => cancelAnimationFrame(frameId);
+    }
+  }, [pathname]);
+
   // State
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
@@ -124,20 +145,19 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     (window as any).__studioHandleClassEdit = handleClassEditRef.current;
   }, []);
 
+  // Permission check helpers
+  const checkVersionSelected = () => checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog);
+  const checkProjectSelected = () => checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog);
+  const checkNotReadOnly = (action: string) => checkPermissions(!isReadOnly, `Cannot ${action} in a published version. Please select an unpublished version to make changes.`, alertDialog);
+
   // Class handlers
   const handleClassAdd = async () => {
-    if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot add classes to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
-    // Open dialog with null class data (add mode)
+    if (!(await checkVersionSelected()) || !(await checkNotReadOnly('add classes'))) return;
     setClassDialog({ open: true, selectedClass: null });
   };
 
   const handleClassEdit = async (classItem: ClassItem) => {
-    if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot edit classes in a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
-    // Open dialog with class data (edit mode)
+    if (!(await checkVersionSelected()) || !(await checkNotReadOnly('edit classes'))) return;
     setClassDialog({ open: true, selectedClass: classItem });
   };
 
@@ -148,46 +168,33 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   }, [handleClassEdit]);
 
   const handleClassDelete = async (classId: string) => {
-    if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot delete classes from a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
+    if (!(await checkVersionSelected()) || !(await checkNotReadOnly('delete classes'))) return;
     setDeleteDialog({ open: true, target: { type: 'class', id: classId } });
   };
 
   const handleClassImport = async () => {
-    if (!(await checkPermissions(!!selectedVersionId, 'Please select a version from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot import classes to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
+    if (!(await checkVersionSelected()) || !(await checkNotReadOnly('import classes'))) return;
     setClassImportDialog({ open: true });
   };
 
-
   // Property handlers
   const handlePropertyAdd = async () => {
-    if (!(await checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot add properties to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
+    if (!(await checkProjectSelected()) || !(await checkNotReadOnly('add properties'))) return;
     setPropertyDialog({ open: true, mode: 'add', selectedProperty: null });
   };
 
   const handlePropertyTemplates = async () => {
-    if (!(await checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot add properties to a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
+    if (!(await checkProjectSelected()) || !(await checkNotReadOnly('add properties'))) return;
     setPropertyTemplateDialog({ open: true });
   };
 
   const handlePropertyEdit = async (propertyItem: PropertyItem) => {
-    if (!(await checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot edit properties in a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
+    if (!(await checkProjectSelected()) || !(await checkNotReadOnly('edit properties'))) return;
     setPropertyDialog({ open: true, mode: 'edit', selectedProperty: propertyItem });
   };
 
   const handlePropertyDelete = async (propertyId: string) => {
-    if (!(await checkPermissions(!!selectedProjectId, 'Please select a project from the canvas first', alertDialog))) return;
-    if (!(await checkPermissions(!isReadOnly, 'Cannot delete properties from a published version. Please select an unpublished version to make changes.', alertDialog))) return;
-
+    if (!(await checkProjectSelected()) || !(await checkNotReadOnly('delete properties'))) return;
     setDeleteDialog({ open: true, target: { type: 'property', id: propertyId } });
   };
 
@@ -278,6 +285,15 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         )}
 
         <main style={{ flex: 1, overflow: "hidden", position: "relative", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          {/* View transition loading indicator */}
+          {isViewLoading && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <div className="text-center">
+                <div className="w-10 h-10 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Please wait, loading...</p>
+              </div>
+            </div>
+          )}
           {children}
         </main>
       </div>
