@@ -35,8 +35,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, createGroupFn, clickToFocusEnabled, groups, deleteGroup } = useStudio();
 
-  // Check if we're on the code view - hide sidebar for code view
-  const isCodeView = pathname?.includes('/code');
+  // Check if we're on the code or paths view - hide sidebar for these views
+  const isCodeView = pathname?.includes('/code') || pathname?.includes('/paths');
 
   // View transition loading state
   const [isViewLoading, setIsViewLoading] = useState(false);
