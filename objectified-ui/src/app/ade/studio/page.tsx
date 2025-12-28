@@ -1013,6 +1013,272 @@ const StudioContent = () => {
     }));
   }, [isReadOnly, updateGroup, setNodes]);
 
+  // State for drag-over highlighting
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
+  const dragOverGroupIdRef = useRef<string | null>(null);
+
+  // Update group highlight state when dragging nodes over groups
+  useEffect(() => {
+    // Only update if the dragOverGroupId actually changed
+    if (dragOverGroupIdRef.current === dragOverGroupId) return;
+    dragOverGroupIdRef.current = dragOverGroupId;
+
+    setNodes((prev) =>
+      prev.map((node) => {
+        if (node.type === 'groupNode') {
+          return {
+            ...node,
+            data: {
+              ...(node.data as any),
+              isHighlighted: node.id === dragOverGroupId,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, [dragOverGroupId, setNodes]);
+
+  // Handle adding a node to a group via drag and drop
+  const handleAddNodeToGroup = useCallback((groupId: string, nodeId: string, nodePosition: { x: number; y: number }) => {
+    if (isReadOnly) return;
+
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    // Check if node is already in the group
+    if (group.nodeIds.includes(nodeId)) return;
+
+    // Add node to group's nodeIds
+    const updatedNodeIds = [...group.nodeIds, nodeId];
+    updateGroup(groupId, { nodeIds: updatedNodeIds });
+
+    // Update the group node data with the new nodeIds
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, nodeIds: updatedNodeIds }
+        };
+      }
+      return node;
+    }));
+  }, [isReadOnly, groups, updateGroup, setNodes]);
+
+  // Handle removing a node from a group - returns true if confirmed, false if cancelled
+  const handleRemoveNodeFromGroup = useCallback(async (groupId: string, nodeId: string): Promise<boolean> => {
+    if (isReadOnly) return false;
+
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return false;
+
+    // Confirm with user
+    const confirmed = await confirmDialog({
+      title: 'Remove from Group',
+      message: `Remove this class from "${group.name}"?`,
+      variant: 'warning',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return false;
+
+    // Remove node from group's nodeIds
+    const updatedNodeIds = group.nodeIds.filter(id => id !== nodeId);
+    updateGroup(groupId, { nodeIds: updatedNodeIds });
+
+    // Update the group node data
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, nodeIds: updatedNodeIds }
+        };
+      }
+      return node;
+    }));
+
+    return true;
+  }, [isReadOnly, groups, confirmDialog, updateGroup, setNodes]);
+
+  // Find which group a position is inside of
+  const findGroupAtPosition = useCallback((x: number, y: number, excludeGroupId?: string): string | null => {
+    const groupNodes = nodes.filter(n => n.type === 'groupNode' && n.id !== excludeGroupId);
+
+    for (const groupNode of groupNodes) {
+      const groupX = groupNode.position.x;
+      const groupY = groupNode.position.y;
+      // Use measured dimensions first (updated after resize), then style, then default
+      const groupWidth = (groupNode.measured?.width as number) || (groupNode.style?.width as number) || 400;
+      const groupHeight = (groupNode.measured?.height as number) || (groupNode.style?.height as number) || 300;
+
+      if (x >= groupX && x <= groupX + groupWidth && y >= groupY && y <= groupY + groupHeight) {
+        return groupNode.id;
+      }
+    }
+    return null;
+  }, [nodes]);
+
+  // Find which group a node currently belongs to
+  const findNodeGroup = useCallback((nodeId: string): string | null => {
+    for (const group of groups) {
+      if (group.nodeIds.includes(nodeId)) {
+        return group.id;
+      }
+    }
+    return null;
+  }, [groups]);
+
+  // Handle node drag - check if over a group for visual feedback
+  const handleNodeDrag = useCallback((event: React.MouseEvent, node: Node) => {
+    if (isReadOnly || node.type === 'groupNode') {
+      setDragOverGroupId(null);
+      return;
+    }
+
+    // Get node center
+    const nodeWidth = (node.measured?.width as number) || (node.width as number) || 260;
+    const nodeHeight = (node.measured?.height as number) || (node.height as number) || 200;
+    const nodeCenterX = node.position.x + nodeWidth / 2;
+    const nodeCenterY = node.position.y + nodeHeight / 2;
+
+    // Find if over any group
+    const overGroupId = findGroupAtPosition(nodeCenterX, nodeCenterY);
+    setDragOverGroupId(overGroupId);
+  }, [isReadOnly, findGroupAtPosition]);
+
+  // Check if a node is completely outside a group's bounds
+  const isNodeCompletelyOutsideGroup = useCallback((node: Node, groupId: string): boolean => {
+    const groupNode = nodes.find(n => n.id === groupId && n.type === 'groupNode');
+    if (!groupNode) return true;
+
+    const nodeWidth = (node.measured?.width as number) || (node.width as number) || 260;
+    const nodeHeight = (node.measured?.height as number) || (node.height as number) || 200;
+    const groupX = groupNode.position.x;
+    const groupY = groupNode.position.y;
+    // Use measured dimensions first (updated after resize), then style, then default
+    const groupWidth = (groupNode.measured?.width as number) || (groupNode.style?.width as number) || 400;
+    const groupHeight = (groupNode.measured?.height as number) || (groupNode.style?.height as number) || 300;
+
+    // Node bounds
+    const nodeLeft = node.position.x;
+    const nodeRight = node.position.x + nodeWidth;
+    const nodeTop = node.position.y;
+    const nodeBottom = node.position.y + nodeHeight;
+
+    // Group bounds
+    const groupLeft = groupX;
+    const groupRight = groupX + groupWidth;
+    const groupTop = groupY;
+    const groupBottom = groupY + groupHeight;
+
+    // Check if completely outside (no overlap at all)
+    return nodeRight < groupLeft || nodeLeft > groupRight || nodeBottom < groupTop || nodeTop > groupBottom;
+  }, [nodes]);
+
+  // Handle node drag stop - add to group or remove from group
+  const handleNodeDragStop = useCallback(async (event: React.MouseEvent, node: Node) => {
+    setDragOverGroupId(null);
+
+    if (isReadOnly || node.type === 'groupNode') return;
+
+    // Get node dimensions and center
+    const nodeWidth = (node.measured?.width as number) || (node.width as number) || 260;
+    const nodeHeight = (node.measured?.height as number) || (node.height as number) || 200;
+    const nodeCenterX = node.position.x + nodeWidth / 2;
+    const nodeCenterY = node.position.y + nodeHeight / 2;
+
+    // Find current group and target group (based on center position)
+    const currentGroupId = findNodeGroup(node.id);
+    const targetGroupId = findGroupAtPosition(nodeCenterX, nodeCenterY);
+
+    // Case 1: Node dropped into a new group (not currently in any group)
+    if (!currentGroupId && targetGroupId) {
+      handleAddNodeToGroup(targetGroupId, node.id, node.position);
+    }
+    // Case 2: Node moved from one group to another different group
+    else if (currentGroupId && targetGroupId && currentGroupId !== targetGroupId) {
+      // Check if completely outside the current group
+      if (isNodeCompletelyOutsideGroup(node, currentGroupId)) {
+        const group = groups.find(g => g.id === currentGroupId);
+        const confirmed = await confirmDialog({
+          title: 'Move to Different Group',
+          message: `Move this class from "${group?.name}" to a different group?`,
+          variant: 'warning',
+          confirmLabel: 'Move',
+          cancelLabel: 'Cancel',
+        });
+
+        if (confirmed) {
+          // Remove from old group
+          const oldGroup = groups.find(g => g.id === currentGroupId);
+          if (oldGroup) {
+            const updatedOldNodeIds = oldGroup.nodeIds.filter(id => id !== node.id);
+            updateGroup(currentGroupId, { nodeIds: updatedOldNodeIds });
+            setNodes(prevNodes => prevNodes.map(n => {
+              if (n.id === currentGroupId && n.type === 'groupNode') {
+                return { ...n, data: { ...n.data, nodeIds: updatedOldNodeIds } };
+              }
+              return n;
+            }));
+          }
+          // Add to new group
+          handleAddNodeToGroup(targetGroupId, node.id, node.position);
+        } else {
+          // Snap back to inside the group - move to center of current group
+          const currentGroup = groups.find(g => g.id === currentGroupId);
+          const groupNode = nodes.find(n => n.id === currentGroupId);
+          if (currentGroup && groupNode) {
+            const groupWidth = (groupNode.style?.width as number) || 400;
+            const groupHeight = (groupNode.style?.height as number) || 300;
+            setNodes(prevNodes => prevNodes.map(n => {
+              if (n.id === node.id) {
+                return {
+                  ...n,
+                  position: {
+                    x: groupNode.position.x + (groupWidth - nodeWidth) / 2,
+                    y: groupNode.position.y + (groupHeight - nodeHeight) / 2,
+                  },
+                };
+              }
+              return n;
+            }));
+          }
+        }
+      }
+      // If not completely outside, node stays in current group at new position
+    }
+    // Case 3: Node dragged completely out of its group (no target group)
+    else if (currentGroupId && !targetGroupId) {
+      // Only ask to ungroup if completely outside the group bounds
+      if (isNodeCompletelyOutsideGroup(node, currentGroupId)) {
+        const removed = await handleRemoveNodeFromGroup(currentGroupId, node.id);
+
+        // If cancelled, snap back to inside the group
+        if (!removed) {
+          const groupNode = nodes.find(n => n.id === currentGroupId);
+          if (groupNode) {
+            const groupWidth = (groupNode.measured?.width as number) || (groupNode.style?.width as number) || 400;
+            const groupHeight = (groupNode.measured?.height as number) || (groupNode.style?.height as number) || 300;
+            setNodes(prevNodes => prevNodes.map(n => {
+              if (n.id === node.id) {
+                return {
+                  ...n,
+                  position: {
+                    x: groupNode.position.x + (groupWidth - nodeWidth) / 2,
+                    y: groupNode.position.y + (groupHeight - nodeHeight) / 2,
+                  },
+                };
+              }
+              return n;
+            }));
+          }
+        }
+      }
+      // If still partially inside, node stays in group at current position
+    }
+  }, [isReadOnly, findNodeGroup, findGroupAtPosition, handleAddNodeToGroup, handleRemoveNodeFromGroup, groups, confirmDialog, updateGroup, setNodes, nodes, isNodeCompletelyOutsideGroup]);
+
   // Create a new group (must be defined after handlers it references)
   const handleCreateGroup = useCallback(() => {
     if (isReadOnly) return;
@@ -1093,28 +1359,149 @@ const StudioContent = () => {
     updateGroup(groupId, { position, dimensions });
   }, [updateGroup]);
 
-  // Custom onNodesChange that syncs group positions/dimensions
-  const handleNodesChange = useCallback((changes: any[]) => {
-    // First, apply the default changes
-    onNodesChange(changes);
+  // Track previous group positions for calculating deltas
+  const groupPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-    // Then, sync group state for any group node changes
+  // Custom onNodesChange that syncs group positions/dimensions, moves children, and constrains grouped nodes
+  const handleNodesChange = useCallback((changes: any[]) => {
+    // Track group position changes to move their child nodes
+    const groupDeltas: Map<string, { dx: number; dy: number }> = new Map();
+
+    // First pass: identify group position changes and process them
     changes.forEach((change: any) => {
-      if (change.type === 'position' && change.position) {
-        // Check if this is a group node
+      if (change.type === 'position' && change.position && change.dragging) {
         const node = nodes.find(n => n.id === change.id);
         if (node?.type === 'groupNode') {
+          const oldPos = groupPositionsRef.current.get(change.id);
+          if (oldPos) {
+            const dx = change.position.x - oldPos.x;
+            const dy = change.position.y - oldPos.y;
+            if (dx !== 0 || dy !== 0) {
+              groupDeltas.set(change.id, { dx, dy });
+            }
+          }
+          // Update stored position
+          groupPositionsRef.current.set(change.id, { x: change.position.x, y: change.position.y });
+          updateGroup(change.id, { position: change.position });
+        }
+      } else if (change.type === 'position' && change.position && !change.dragging) {
+        // Drag ended - update stored position
+        const node = nodes.find(n => n.id === change.id);
+        if (node?.type === 'groupNode') {
+          groupPositionsRef.current.set(change.id, { x: change.position.x, y: change.position.y });
           updateGroup(change.id, { position: change.position });
         }
       } else if (change.type === 'dimensions' && change.dimensions) {
-        // Check if this is a group node being resized
         const node = nodes.find(n => n.id === change.id);
         if (node?.type === 'groupNode') {
           updateGroup(change.id, { dimensions: change.dimensions });
+          // Also update the node's style so bounds checking works correctly
+          setNodes(prevNodes => prevNodes.map(n => {
+            if (n.id === change.id) {
+              return {
+                ...n,
+                style: {
+                  ...n.style,
+                  width: change.dimensions.width,
+                  height: change.dimensions.height,
+                },
+              };
+            }
+            return n;
+          }));
         }
       }
     });
-  }, [onNodesChange, nodes, updateGroup]);
+
+    // Second pass: constrain grouped nodes within their group bounds during and after dragging
+    const constrainedChanges = changes.map((change: any) => {
+      if (change.type === 'position' && change.position) {
+        const node = nodes.find(n => n.id === change.id);
+
+        // Skip group nodes - they can move freely
+        if (node?.type === 'groupNode') return change;
+
+        // Check if this node belongs to a group
+        const parentGroup = groups.find(g => g.nodeIds.includes(change.id));
+        if (parentGroup) {
+          const groupNode = nodes.find(n => n.id === parentGroup.id);
+          if (groupNode) {
+            const nodeWidth = (node?.measured?.width as number) || (node?.width as number) || 260;
+            const nodeHeight = (node?.measured?.height as number) || (node?.height as number) || 200;
+            const groupX = groupNode.position.x;
+            const groupY = groupNode.position.y;
+            // Use measured dimensions first (updated after resize), then style, then default
+            const groupWidth = (groupNode.measured?.width as number) || (groupNode.style?.width as number) || 400;
+            const groupHeight = (groupNode.measured?.height as number) || (groupNode.style?.height as number) || 300;
+
+            // Check if node is completely outside the group
+            const nodeLeft = change.position.x;
+            const nodeRight = change.position.x + nodeWidth;
+            const nodeTop = change.position.y;
+            const nodeBottom = change.position.y + nodeHeight;
+            const groupLeft = groupX;
+            const groupRight = groupX + groupWidth;
+            const groupTop = groupY;
+            const groupBottom = groupY + groupHeight;
+
+            const isCompletelyOutside = nodeRight < groupLeft || nodeLeft > groupRight ||
+                                         nodeBottom < groupTop || nodeTop > groupBottom;
+
+            // If completely outside during dragging, allow it (will trigger ungroup on drop)
+            // But if not dragging (drag ended), we need to handle this in handleNodeDragStop
+            if (isCompletelyOutside && change.dragging) {
+              return change;
+            }
+
+            // If completely outside and drag just ended, let handleNodeDragStop handle it
+            if (isCompletelyOutside && !change.dragging) {
+              return change;
+            }
+
+            // Otherwise, constrain the node within the group bounds
+            const constrainedX = Math.max(groupX, Math.min(change.position.x, groupX + groupWidth - nodeWidth));
+            const constrainedY = Math.max(groupY, Math.min(change.position.y, groupY + groupHeight - nodeHeight));
+
+            return {
+              ...change,
+              position: {
+                x: constrainedX,
+                y: constrainedY,
+              },
+            };
+          }
+        }
+      }
+      return change;
+    });
+
+    // Apply the constrained changes
+    onNodesChange(constrainedChanges);
+
+    // Move child nodes when their parent group moves
+    if (groupDeltas.size > 0) {
+      setNodes((prevNodes) => {
+        return prevNodes.map((node) => {
+          if (node.type === 'groupNode') return node;
+
+          // Check if this node is in any moved group
+          for (const [groupId, delta] of groupDeltas) {
+            const group = groups.find(g => g.id === groupId);
+            if (group && group.nodeIds.includes(node.id)) {
+              return {
+                ...node,
+                position: {
+                  x: node.position.x + delta.dx,
+                  y: node.position.y + delta.dy,
+                },
+              };
+            }
+          }
+          return node;
+        });
+      });
+    }
+  }, [onNodesChange, nodes, groups, updateGroup, setNodes]);
 
   // ============================================================================
   // END GROUP MANAGEMENT HANDLERS
@@ -3519,6 +3906,8 @@ const StudioContent = () => {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
+              onNodeDrag={handleNodeDrag}
+              onNodeDragStop={handleNodeDragStop}
               onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
               fitView
               attributionPosition="bottom-left"

@@ -166,13 +166,20 @@
 #### Group Containers 📋 PARTIALLY IMPLEMENTED
 - ✅ Create visual containers to group related classes together
 - ✅ Color-coded groups with custom names (e.g., "Authentication Models", "Payment Services")
+- ✅ Drag and drop classes into groups to join them
+- ✅ Visual highlight when dragging nodes over a group (green ring)
+- ✅ Confirmation dialog when removing a class from a group (only when completely outside group bounds)
+- ✅ Cancel ungroup snaps node back inside the group bounds
+- ✅ Moving a group moves all contained classes together
+- ✅ Nodes stay within group when partially overlapping - only ungroup when completely outside
+- ✅ Grouped nodes are locked to group bounds during dragging - cannot escape unless dragged completely outside
 - 📋 Collapsible groups to reduce canvas clutter
     - Click to collapse: shows only group title and count
     - Expand/collapse all groups with keyboard shortcut
     - Remember collapsed state per user
 - 📋 Nested groups for hierarchical organization (max 3 levels)
 - 📋 Group-level operations:
-    - Move entire group with one drag
+    - ✅ Move entire group with one drag
     - Delete all classes in a group
     - Export group as separate schema file
     - Duplicate entire group with all classes
@@ -190,9 +197,8 @@
 | [#154] | Collapsible groups to reduce canvas clutter                        |
 | [#155] | Nested groups for hierarchical organization                        |
 | [#156] | Group-level operations: move, delete, export, duplicate, bulk edit |
-| [#158] ✅ | Visual styling options for group containers                        |
-| [#197] | Group classes by dragging into canvas group                        |
-| [#284] | Drag and drop node to group to add it                              |
+| [#197] ✅ | Group classes by dragging into canvas group                      |
+| [#284] ✅ | Drag and drop node to group to add it                            |
 | [#285] | Ungroup nodes by deleting the group                                |
 
 #### Group Templates 📋 PLANNED

@@ -96,6 +96,7 @@ export interface GroupNodeData {
   color: string; // Color name from GROUP_COLORS
   nodeIds: string[]; // IDs of nodes contained in this group
   styleOptions?: GroupStyleOptions; // Visual styling options
+  isHighlighted?: boolean; // Visual highlight when node is dragged over
   onRename?: (groupId: string, newName: string) => void;
   onDelete?: (groupId: string) => void;
   onColorChange?: (groupId: string, newColor: string) => void;
@@ -198,6 +199,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           w-full h-full rounded-2xl border-2 transition-all duration-200
           ${borderStyleClass} ${colorConfig.border} ${shadowClass}
           ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900' : ''}
+          ${groupData.isHighlighted ? 'ring-4 ring-green-500 ring-offset-4 dark:ring-offset-gray-900 scale-[1.02] border-green-500 dark:border-green-400' : ''}
         `}
         style={{
           minWidth: 200,
