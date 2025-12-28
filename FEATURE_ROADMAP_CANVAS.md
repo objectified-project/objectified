@@ -249,7 +249,6 @@
 | Ticket | Feature                                               |
 |--------|-------------------------------------------------------|
 
-
 #### Edge/Relationship Styling 📋 PLANNED
 - 📋 Different line styles for relationship types:
     - Solid for direct references

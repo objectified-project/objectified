@@ -250,35 +250,6 @@
 
 ---
 
-### 2. Theme System ✅ PARTIALLY COMPLETE
-
-#### Planned Enhancements 📋
-- 📋 **Pre-built Canvas Themes**:
-  - Light mode (default) ✅
-  - Dark mode ✅
-  - High contrast
-  - Blueprint (blue grid on dark)
-  - Whiteboard (minimal)
-  - Solarized
-  - Nord
-  - Darcula
-- 📋 **Custom Theme Creator**:
-  - Canvas background color
-  - Grid color and opacity
-  - Node default colors
-  - Edge default colors
-  - Text/selection/hover colors
-- 📋 **Theme Management**:
-  - Save and share custom themes
-  - Import themes from files
-  - Theme marketplace
-  - Custom theme scheduling (dark at night)
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
----
-
 ### 3. Modern UX Features
 
 #### Command & Control 🔴 HIGH PRIORITY

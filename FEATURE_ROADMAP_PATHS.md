@@ -1,203 +1,825 @@
-# OBJECTIFIED UI
+# Objectified - API Paths Designer: Feature Roadmap
 
-## Feature Roadmap: API Paths Designer
-
-**Version 2.0 — Visual OpenAPI Path Definition & Testing**
-
----
-
-## Executive Summary
-
-This roadmap outlines the implementation of API Paths functionality within the Objectified UI Studio. The Paths Designer introduces a third tab in the Studio interface, enabling developers to visually design RESTful API endpoints using a drag-and-drop React Flow canvas. This feature bridges the gap between schema definition and API specification, providing a complete OpenAPI 3.1 design experience.
-
-The visual approach maintains consistency with the existing schema designer, where developers can drag path nodes, method nodes, and schema references onto a canvas to construct their API specifications. Path variables, query parameters, request bodies, and response definitions are configured through contextual panels rather than traditional form-based interfaces.
+> **Enterprise-grade Visual API Design Platform**  
+> React Flow-based path definition, operation design, and OpenAPI 3.1 specification management for software engineers
+> 
+> **Last Updated**: December 27, 2025  
+> **Version**: 2.0 - Visual OpenAPI Path Definition, Testing & Enterprise Integration  
+> **Target Audience**: Software Engineers, API Architects, Platform Engineers
 
 ---
 
-## 1. Core Architecture & Data Model
+## 🎯 Executive Summary
 
-### 1.1 React Flow Canvas Integration
+The **API Paths Designer** is an enterprise-level visual design tool for creating, managing, and documenting RESTful API endpoints within the Objectified platform. Built as a dedicated Studio tab with a React Flow canvas, it provides software engineers with an intuitive yet powerful interface for designing OpenAPI 3.1 specifications without sacrificing technical depth or control.
 
-#### Initial Implementation (Phase 1)
+Unlike form-based API designers, the Paths Designer embraces a **node-based visual paradigm** where paths, HTTP methods, request/response schemas, parameters, and security schemes are represented as interconnected nodes on an infinite canvas. This approach allows engineers to see the complete API architecture at a glance while maintaining granular control over every OpenAPI property.
 
-- [ ] Dedicated PathsDesigner component as third Studio tab with independent React Flow instance
-- [ ] PathNode: Represents URL path segments with configurable base path and inline variable extraction
-- [ ] MethodNode: HTTP verb containers (GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD) with color-coded visual distinction
-- [ ] SchemaRefNode: Draggable schema references from the existing schema library for request/response binding
-- [ ] ParameterNode: Query, header, cookie, and path parameter definitions with type inference
-- [ ] Edge connections between nodes representing parent-child and reference relationships
+### Key Design Principles
 
-#### Advanced Features (Phase 2)
+1. **Engineer-First Interface**: Optimized for keyboard navigation, command palette actions, and rapid specification authoring
+2. **Zero Abstraction**: Direct mapping to OpenAPI 3.1 specification - what you see is what you export
+3. **Schema Integration**: Seamless binding between schema definitions (from Schema tab) and API operations
+4. **Code-Level Precision**: Inline editors with syntax highlighting, validation, and autocompletion
+5. **Production-Ready Output**: Generate server stubs, client SDKs, and fully compliant OpenAPI JSON/YAML
 
-- [ ] OperationGroupNode: Logical grouping of related operations with tag-based organization
-- [ ] SecurityNode: Reusable security scheme references with scope configuration
-- [ ] CallbackNode: Webhook and callback URL definitions with payload schema binding
-- [ ] LinkNode: OpenAPI link objects for response-to-operation relationships
-- [ ] ServerNode: Per-path server override configurations
-- [ ] Mini-map navigation for large API specifications with 50+ paths
-- [ ] Canvas zoom controls with keyboard shortcuts (Cmd/Ctrl + scroll, +/- keys)
+### 🎯 High Priority - Q1 2026
 
-#### Enterprise Extensions (Phase 3)
+| Feature                        | Effort  | Impact      | Description                                      |
+|--------------------------------|---------|-------------|--------------------------------------------------|
+| React Flow Canvas Core         | 3 weeks | 🔴 Critical | Paths tab with node types and edge connections   |
+| Path Node Designer             | 2 weeks | 🔴 Critical | Visual path segment builder with variables       |
+| Method Node System             | 2 weeks | 🔴 Critical | HTTP verb operations with full configuration     |
+| Schema Binding Interface       | 2 weeks | 🔴 Critical | Drag-drop schema refs for request/response       |
+| Parameter Editor               | 2 weeks | 🔴 Critical | Query, path, header, cookie parameter design     |
+| OpenAPI Export                 | 1 week  | 🔴 Critical | Export complete OpenAPI 3.1 JSON/YAML           |
+| Request Body Configuration     | 2 weeks | 🟠 High     | Content types, examples, validation rules        |
+| Response Designer              | 2 weeks | 🟠 High     | Status codes, headers, schemas, links            |
+| Operation Tags & Grouping      | 1 week  | 🟠 High     | Visual tag-based organization                    |
+| Security Scheme Integration    | 2 weeks | 🟠 High     | OAuth2, API Key, JWT, Bearer token config        |
 
-- [ ] DeprecationNode: Visual deprecation markers with migration path suggestions
-- [ ] VersionNode: API versioning containers for multi-version specifications
-- [ ] GatewayNode: API gateway-specific extensions (rate limits, transformations)
-- [ ] DocumentationNode: Extended description blocks with markdown support
+### 📋 Planned Features - Medium Priority (Q2 2026)
 
-### 1.2 Node Type Specifications
+| Category            | Feature                              | Timeline |
+|---------------------|--------------------------------------|----------|
+| **Testing**         | Integrated API Tester                | Q2 2026  |
+| **Testing**         | Mock Server Generation               | Q2 2026  |
+| **Testing**         | Example Value Auto-Generation        | Q2 2026  |
+| **Code Gen**        | TypeScript Client SDK                | Q2 2026  |
+| **Code Gen**        | Python Client SDK (httpx)            | Q2 2026  |
+| **Code Gen**        | Server Stubs (Express, FastAPI)      | Q2 2026  |
+| **Validation**      | Real-time OpenAPI Validation         | Q2 2026  |
+| **Validation**      | Linting Rules & Style Guide          | Q2 2026  |
+| **Documentation**   | Interactive API Documentation        | Q2 2026  |
+| **Documentation**   | Markdown Description Editor          | Q2 2026  |
+| **Collaboration**   | Path Comments & Discussions          | Q2 2026  |
+| **Collaboration**   | Operation Review Workflows           | Q2 2026  |
+| **Version Control** | Path Change Tracking                 | Q2 2026  |
+| **Version Control** | Operation Diff Visualization         | Q2 2026  |
 
-| Node Type | Visual Representation | Configurable Properties |
-|-----------|----------------------|------------------------|
-| PathNode | Rounded rectangle, gray header | path, summary, description, servers[], deprecated |
-| MethodNode | Colored badge (verb-specific) | operationId, tags[], security[], externalDocs |
-| RequestBodyNode | Input icon, blue accent | content types, required, description, schema ref |
-| ResponseNode | Output icon, status-colored | statusCode, description, headers, content, links |
-| ParameterNode | Tag chip, location-coded | name, in (query/path/header/cookie), schema, required |
+### 🔮 Advanced Features - Long-Term (Q3-Q4 2026)
 
----
+| Feature                    | Description                                           |
+|----------------------------|-------------------------------------------------------|
+| GraphQL Path Integration   | Design GraphQL queries/mutations as path operations  |
+| AsyncAPI Support           | Event-driven API design with Kafka, RabbitMQ support |
+| gRPC Service Designer      | Protocol Buffer service definitions                   |
+| API Gateway Integration    | AWS API Gateway, Kong, Apigee connectors              |
+| Load Testing Integration   | k6, JMeter scenario generation from paths             |
+| Contract Testing           | Pact consumer/provider contract generation            |
+| API Observability          | Distributed tracing annotations (OpenTelemetry)       |
+| Multi-Protocol Export      | RAML, API Blueprint, Postman Collection export        |
 
-## 2. Path Definition Features
-
-### 2.1 Path Variable Configuration
-
-#### Core Features
-
-- [ ] Automatic path variable detection from curly brace syntax: `/users/{userId}/posts/{postId}`
-- [ ] Inline variable editor: click on `{variable}` segment to configure type, format, and constraints
-- [ ] Path variable schema binding: drag schema property onto variable for type inheritance
-- [ ] Variable validation rules: pattern (regex), minLength, maxLength, enum values
-- [ ] Required/optional path segment configuration (OpenAPI 3.1 style)
-- [ ] Path template preview with sample values for developer reference
-
-#### Advanced Features
-
-- [ ] Matrix parameter support: `/users{;id,name}` with explode configuration
-- [ ] Label parameter support: `/files{.extension}` for file type routing
-- [ ] Path variable documentation: inline help text visible on hover
-- [ ] Variable dependency graph: visualize relationships between path variables
-- [ ] Common pattern library: UUID, slug, numeric ID templates
-
-### 2.2 HTTP Method Configuration
-
-#### Core Features
-
-- [ ] Drag method badges onto path nodes to create operations
-- [ ] Color-coded method visualization: GET (green), POST (blue), PUT (orange), DELETE (red), PATCH (purple)
-- [ ] OperationId auto-generation from method + path pattern (e.g., `getUserById`)
-- [ ] Tag assignment panel for logical API grouping
-- [ ] Operation summary and description fields with markdown preview
-- [ ] Deprecated flag toggle with visual strikethrough indicator
-
-#### Advanced Features
-
-- [ ] Custom `x-*` extension fields for vendor-specific metadata
-- [ ] ExternalDocs linking for operation-level documentation
-- [ ] Operation-level server overrides for multi-environment support
-- [ ] Callback definitions with webhook URL patterns
-- [ ] Link objects for hypermedia-style API navigation
-
-### 2.3 Content Type Management
-
-#### Core Features
-
-- [ ] Default content types: `application/json`, `application/xml`, `multipart/form-data`
-- [ ] Per-operation content type configuration for request and response bodies
-- [ ] Schema binding per content type: same operation, different payload structures
-- [ ] Content negotiation preview: see all supported types at a glance
-- [ ] Encoding object configuration for multipart requests
-
-#### Advanced Features
-
-- [ ] Custom media type registration with vendor prefixes
-- [ ] Binary content handling: `application/octet-stream`, `image/*`, `audio/*`
-- [ ] Content type inheritance from global defaults
-- [ ] Accept header preview generation for client SDK hints
 
 ---
 
-## 3. Request & Response Design
+## 🏗️ Core Architecture & Implementation
 
-### 3.1 Request Body Configuration
+### 1. React Flow Canvas Foundation
 
-#### Core Features
+The Paths Designer is built on React Flow, providing an infinite canvas workspace optimized for complex API specifications. Engineers can design APIs with hundreds of endpoints while maintaining visual clarity through zoom, pan, and mini-map navigation.
 
-- [ ] Drag schema from library panel onto method node to bind request body
-- [ ] Inline schema preview: collapsed view shows property names, expanded shows full structure
-- [ ] Required toggle with visual indicator on request body node
-- [ ] Description field with markdown support for developer documentation
-- [ ] Multiple content type schemas: different structures for JSON vs form-data
-- [ ] Example value editor with JSON/YAML toggle
+#### Canvas Features ✅ PLANNED
 
-#### Advanced Features
+- **Dedicated Paths Tab**: Third Studio tab with independent React Flow instance
+- **Infinite Canvas**: Zoom from 10% to 500% with smooth panning
+- **Mini-Map Navigation**: Bird's-eye view for large API specs (50+ paths)
+- **Node Library Panel**: Draggable node types organized by category
+- **Keyboard Navigation**: Vim-style hjkl movement, arrow keys, space to pan
+- **Command Palette**: `Cmd/Ctrl+K` for quick actions (create path, add method, etc.)
+- **Grid Snapping**: Optional alignment grid with 10/20/50px spacing
+- **Selection Tools**: Multi-select with drag, `Shift+Click`, rubber band selection
+- **Undo/Redo**: Full action history with `Cmd/Ctrl+Z` and `Cmd/Ctrl+Shift+Z`
 
-- [ ] Polymorphic request body: oneOf/anyOf schema selector visualization
-- [ ] Discriminator configuration for union type payloads
-- [ ] Request body validation preview: see what the server will accept
-- [ ] File upload configuration with progress indicator hints
-- [ ] Encoding options for multipart: contentType, headers, style, explode
-
-### 3.2 Response Definition
-
-#### Core Features
-
-- [ ] Status code node library: 200, 201, 204, 400, 401, 403, 404, 500 with presets
-- [ ] Response schema binding via drag-and-drop from schema library
-- [ ] Response header configuration with type and description
-- [ ] Multiple response codes per operation with visual status code badges
-- [ ] Default response configuration for catch-all error handling
-- [ ] Response description with semantic status code suggestions
-
-#### Advanced Features
-
-- [ ] Response range patterns: 2XX, 4XX, 5XX wildcard definitions
-- [ ] Link objects for response-driven navigation (HATEOAS support)
-- [ ] Media type examples per response code
-- [ ] Response header templates for common patterns (pagination, rate limiting)
-- [ ] Content negotiation visualization showing all response variants
-
-### 3.3 Parameter Management
-
-#### Core Features
-
-- [ ] Query parameter nodes with name, type, and required configuration
-- [ ] Header parameter nodes for authentication and custom headers
-- [ ] Cookie parameter support with security considerations
-- [ ] Parameter schema binding from existing schema properties
-- [ ] Enum constraint visualization for fixed parameter values
-- [ ] Default value configuration with type-appropriate editors
-
-#### Advanced Features
-
-- [ ] Array parameter serialization: style (form, spaceDelimited, pipeDelimited) and explode
-- [ ] Object parameter deep serialization with deepObject style
-- [ ] Parameter deprecation with migration notices
-- [ ] Reusable parameter components: define once, reference everywhere
-- [ ] Parameter grouping for common patterns (pagination: page, limit, offset)
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
 
 ---
 
-## 4. Database Schema Improvements
+## 🎨 Visual Node System
 
-### 4.1 Paths Table Structure
+### 2. Node Types & Visual Design
 
-#### Core Tables
+Each OpenAPI concept is represented as a distinct node type with color-coded visual identity, making API structure immediately recognizable.
 
-- [ ] `obj_paths`: Primary path storage with path_pattern, summary, description, deprecated, servers[]
-- [ ] `obj_path_operations`: Method definitions linked to paths with operation_id, tags[], external_docs
-- [ ] `obj_path_parameters`: Reusable parameter definitions with in_location, schema_ref, required, style
-- [ ] `obj_request_bodies`: Request body definitions with content_type_map, required, description
-- [ ] `obj_responses`: Response definitions with status_code, description, headers[], content_map
-- [ ] `obj_path_security`: Per-operation security requirement assignments
+#### 2.1 Path Nodes 📋 PARTIALLY IMPLEMENTED
 
-#### Advanced Tables
+**Visual Design**: Rounded rectangle with URL path as header, gray-blue gradient background
 
-- [ ] `obj_callbacks`: Webhook callback definitions with expression patterns and operation refs
-- [ ] `obj_links`: Response link definitions with operationRef/operationId and parameter mapping
-- [ ] `obj_path_servers`: Per-path server override configurations
-- [ ] `obj_encoding`: Multipart encoding configurations per property
-- [ ] `obj_examples`: Reusable example objects with summary, description, value, externalValue
+**Configurable Properties**:
+- 📋 Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
+- 📋 Summary and description (markdown support)
+- 📋 Server overrides for multi-environment routing
+- 📋 Deprecated flag with visual strikethrough
+- 📋 Path tags for logical grouping
+- 📋 Common parameters inherited by all operations
+- 📋 External documentation links
 
-### 4.2 React Flow State Persistence
+**Features**:
+- Auto-detect path variables from curly brace syntax
+- Click on `{variable}` to open inline schema editor
+- Drag schema property onto variable for type binding
+- Visual validation: invalid paths show red border
+- Path template preview with sample values
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 2.2 Method Nodes (HTTP Operations) 📋 PLANNED
+
+**Visual Design**: Color-coded badges attached to path nodes
+
+| Method | Color  | Common Use Cases              |
+|--------|--------|-------------------------------|
+| GET    | Green  | Read, list, search operations |
+| POST   | Blue   | Create, submit, trigger       |
+| PUT    | Orange | Full resource replacement     |
+| PATCH  | Purple | Partial updates               |
+| DELETE | Red    | Resource deletion             |
+| HEAD   | Gray   | Metadata retrieval            |
+| OPTIONS| Gray   | CORS preflight                |
+
+**Configurable Properties**:
+- Operation ID (auto-generated from method + path)
+- Tags for API grouping
+- Summary and description
+- Request body schema binding
+- Response definitions (status codes + schemas)
+- Parameters (query, header, cookie)
+- Security requirements
+- Deprecated flag
+- External docs
+- Custom `x-*` extensions
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 2.3 Schema Reference Nodes 📋 PLANNED
+
+**Visual Design**: Compact card showing schema name, type, and property count
+
+**Purpose**: Create visual connections between schema definitions (from Schema tab) and API operations
+
+**Features**:
+- Drag schema from library panel onto canvas
+- Connect to method nodes for request/response binding
+- Hover to see schema preview (collapsed property tree)
+- Click to navigate to schema definition in Schema tab
+- Visual badge showing schema version compatibility
+- Inline schema override for operation-specific modifications
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 2.4 Parameter Nodes 📋 PLANNED
+
+**Visual Design**: Small chips/tags color-coded by parameter location
+
+| Location | Color | Icon       |
+|----------|-------|------------|
+| Query    | Blue  | ? icon     |
+| Path     | Green | {} icon    |
+| Header   | Purple| H icon     |
+| Cookie   | Orange| 🍪 icon    |
+
+**Configurable Properties**:
+- Parameter name (with auto-suggest from common patterns)
+- Location: query, path, header, cookie
+- Schema type (string, number, boolean, array, object)
+- Required flag
+- Default value
+- Description
+- Validation rules (min/max, pattern, enum)
+- Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
+- Explode flag for arrays/objects
+- Deprecated flag
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 2.5 Request Body Nodes 📋 PLANNED
+
+**Visual Design**: Input port icon with blue accent, shows content types
+
+**Configurable Properties**:
+- Content type map (application/json, multipart/form-data, etc.)
+- Schema binding per content type
+- Required flag
+- Description
+- Example values
+- Encoding options (for multipart)
+
+**Advanced Features**:
+- Multiple content types per operation (JSON vs XML vs form-data)
+- Polymorphic schemas with oneOf/anyOf/allOf visualization
+- Discriminator configuration for union types
+- File upload configuration with encoding options
+- Example value editor with JSON/YAML/XML toggle
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 2.6 Response Nodes 📋 PLANNED
+
+**Visual Design**: Output port icon, color-coded by status code family
+
+| Status Range | Color  | Common Codes                     |
+|--------------|--------|----------------------------------|
+| 2XX Success  | Green  | 200 OK, 201 Created, 204 No Content |
+| 3XX Redirect | Blue   | 301, 302, 304 Not Modified       |
+| 4XX Client   | Yellow | 400, 401, 403, 404, 422          |
+| 5XX Server   | Red    | 500, 502, 503, 504               |
+
+**Configurable Properties**:
+- Status code (100-599)
+- Description (semantic suggestions per status code)
+- Response headers (name, schema, description)
+- Content type map with schema bindings
+- Links (HATEOAS navigation)
+- Examples per content type
+
+**Advanced Features**:
+- Response range patterns: 2XX, 4XX, 5XX wildcards
+- Default response for catch-all error handling
+- Link objects for response-driven navigation
+- Header templates (pagination, rate limiting, CORS)
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+---
+
+## 🔧 Engineer-Focused Features
+
+### 3. Developer Experience Enhancements
+
+#### 3.1 Code-Level Editors 📋 PLANNED
+
+Software engineers need precision and control. The Paths Designer provides inline editors with IDE-quality features:
+
+**JSON Schema Editor**:
+- Syntax highlighting with theme support (light/dark)
+- Bracket matching and auto-closing
+- Real-time validation with inline error messages
+- Autocomplete for OpenAPI keywords and schema properties
+- Quick reference sidebar for OpenAPI 3.1 spec
+
+**Example Value Editor**:
+- Format toggle: JSON, YAML, XML, form-data
+- Syntax validation per content type
+- Auto-format with `Shift+Alt+F`
+- Copy example as cURL command
+- Import from file or paste from clipboard
+
+**Markdown Description Editor**:
+- Live preview split view
+- CommonMark + GitHub Flavored Markdown
+- Code block syntax highlighting
+- Link to schema definitions
+- Image upload for API documentation
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 3.2 Keyboard-First Navigation 📋 PLANNED
+
+Optimized for engineers who prefer keyboard over mouse:
+
+| Action                  | Shortcut           | Description                      |
+|-------------------------|--------------------|----------------------------------|
+| Open command palette    | `Cmd/Ctrl+K`       | Quick actions menu               |
+| Create new path         | `Cmd/Ctrl+N`       | Add path node at canvas center   |
+| Add GET method          | `G`                | Add GET to selected path         |
+| Add POST method         | `P`                | Add POST to selected path        |
+| Add parameter           | `Q` (query)        | Add query param to selected op   |
+| Toggle request body     | `B`                | Add/remove request body          |
+| Add 200 response        | `2`                | Add 200 OK response              |
+| Add 404 response        | `4`                | Add 404 Not Found response       |
+| Delete selected         | `Delete/Backspace` | Remove node with confirmation    |
+| Duplicate               | `Cmd/Ctrl+D`       | Clone selected node              |
+| Search/filter           | `/`                | Focus search box                 |
+| Navigate canvas         | `Arrow keys`       | Pan canvas (hold Shift to zoom)  |
+| Select all              | `Cmd/Ctrl+A`       | Select all nodes                 |
+| Copy                    | `Cmd/Ctrl+C`       | Copy selected nodes              |
+| Paste                   | `Cmd/Ctrl+V`       | Paste at cursor position         |
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 3.3 Real-Time Validation 📋 PLANNED
+
+Catch errors as you design, not during export:
+
+**Validation Rules**:
+- ✅ Unique operation IDs across all paths
+- ✅ Valid path variable syntax: `{var}` not `<var>` or `:var`
+- ✅ All path variables have corresponding parameter definitions
+- ✅ Required request body has at least one content type
+- ✅ Status codes are valid HTTP codes (100-599)
+- ✅ Schema references point to existing schemas
+- ✅ No circular dependencies in schema composition
+- ✅ Security schemes referenced in operations exist in global config
+- ✅ Example values conform to their schemas
+- ⚠️ Warning for missing operation descriptions
+- ⚠️ Warning for operations without tags
+- ⚠️ Warning for deprecated operations without migration docs
+
+**Visual Indicators**:
+- Red border on nodes with errors
+- Yellow border on nodes with warnings
+- Error/warning badge with count
+- Hover for detailed error message
+- Click to jump to fix location
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 3.4 OpenAPI Export & Import 📋 PLANNED
+
+**Export Formats**:
+- OpenAPI 3.1 JSON (prettified or minified)
+- OpenAPI 3.1 YAML (with proper indentation)
+- Swagger 2.0 (legacy compatibility)
+- Postman Collection v2.1
+- Insomnia Collection
+- API Blueprint (Markdown-based)
+- RAML 1.0
+
+**Export Options**:
+- Include/exclude examples
+- Include/exclude descriptions
+- Bundle schemas inline or use $ref links
+- Add custom `x-*` extensions
+- Resolve all $ref to embedded schemas (dereferencing)
+- Add server URLs for multiple environments
+
+**Import Support**:
+- OpenAPI 3.0/3.1 JSON/YAML
+- Swagger 2.0 JSON/YAML
+- Postman Collection v2.1
+- Insomnia Collection v4
+- HAR (HTTP Archive) files
+- cURL commands (converts to operation)
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+---
+
+## 🔐 Security & Authentication
+
+### 4. Security Scheme Integration 📋 PLANNED
+
+#### 4.1 Global Security Schemes
+
+Define security schemes once, apply to multiple operations:
+
+**Supported Schemes**:
+- **API Key**: Header, query, or cookie-based keys
+- **HTTP**: Basic, Bearer, or custom HTTP auth
+- **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
+- **OpenID Connect**: Discovery URL with scopes
+- **Mutual TLS**: Certificate-based authentication
+
+**Visual Design**:
+- Security scheme library panel
+- Drag scheme onto method node to apply
+- Visual badge showing active schemes on operations
+- Scope selector for OAuth2/OIDC
+
+#### 4.2 Operation-Level Security
+
+Each operation can override global defaults:
+
+- Apply multiple security schemes (AND/OR logic)
+- Configure required scopes per operation
+- Mark operation as unsecured (public endpoint)
+- Add security descriptions for documentation
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+---
+
+## 📊 Testing & Documentation
+
+### 5. Integrated API Testing 📋 PLANNED (Q2 2026)
+
+#### 5.1 Built-In API Tester
+
+Test operations directly from the canvas without leaving the Paths Designer:
+
+**Features**:
+- Click "Test" button on any method node
+- Auto-populate request from schema + examples
+- Edit request body, headers, query params
+- Select environment/server for testing
+- Send HTTP request and view response
+- Response inspector: body, headers, status, timing
+- Save as test case for regression testing
+- Generate cURL command from request
+
+**Advanced Testing**:
+- Request history with replay functionality
+- Environment variables for dynamic values
+- Pre-request scripts (JavaScript)
+- Post-response assertions (status code, JSON path, regex)
+- Collection runner for sequential operation testing
+- Mock responses when server not available
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 5.2 Mock Server Generation 📋 PLANNED (Q2 2026)
+
+Auto-generate mock APIs for frontend development before backend is ready:
+
+**Features**:
+- One-click mock server deployment per version
+- Serves example responses from operation definitions
+- Randomized data generation from schemas
+- Configurable response delays for latency simulation
+- Error response simulation (4XX, 5XX)
+- Request validation against schemas
+- Mock server URL for client integration
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 5.3 Interactive Documentation 📋 PLANNED (Q2 2026)
+
+Auto-generated API docs with "Try It Out" functionality:
+
+**Features**:
+- ReDoc/Swagger UI-style documentation
+- Generated from path definitions
+- Searchable operation catalog
+- Tag-based navigation
+- Try It Out for all operations
+- Code snippet generation (cURL, JavaScript, Python, etc.)
+- Download OpenAPI spec from docs page
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+---
+
+## 💻 Code Generation
+
+### 6. SDK & Server Stub Generation 📋 PLANNED (Q2 2026)
+
+#### 6.1 Client SDK Generation
+
+Generate type-safe client libraries from path definitions:
+
+**Supported Languages**:
+- **TypeScript/JavaScript**: fetch, axios, or custom HTTP client
+- **Python**: httpx, requests, or aiohttp
+- **Java**: OkHttp, RestTemplate, or WebClient
+- **C#**: HttpClient with strongly-typed models
+- **Go**: net/http with generated structs
+- **Rust**: reqwest with serde models
+
+**SDK Features**:
+- Type-safe request/response models
+- Automatic serialization/deserialization
+- Error handling with typed exceptions
+- Retry logic with exponential backoff
+- Authentication handling (API key, OAuth2, etc.)
+- Request/response interceptors
+- TypeScript IntelliSense support
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+#### 6.2 Server Stub Generation
+
+Generate backend API stubs with routing and validation:
+
+**Supported Frameworks**:
+- **Node.js**: Express, Fastify, NestJS
+- **Python**: FastAPI, Flask, Django REST
+- **Java**: Spring Boot, Quarkus
+- **Go**: Gin, Echo, Chi
+- **Rust**: Actix-web, Rocket
+
+**Generated Code Includes**:
+- Route definitions mapped to operations
+- Request validation middleware
+- Response serialization
+- OpenAPI documentation endpoint
+- Health check endpoint
+- Error handling middleware
+- Authentication middleware stubs
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
+---
+
+## 🗄️ Data Model & Persistence
+
+### 7. Database Schema 📋 PLANNED
+
+#### 7.1 Core Path Tables
+
+```sql
+-- Primary path storage
+CREATE TABLE obj_paths (
+  path_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version_id UUID NOT NULL REFERENCES obj_versions(version_id) ON DELETE CASCADE,
+  path_pattern TEXT NOT NULL, -- e.g., "/users/{userId}/posts"
+  summary TEXT,
+  description TEXT,
+  deprecated BOOLEAN DEFAULT false,
+  servers JSONB, -- Array of server objects
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(version_id, path_pattern)
+);
+
+-- HTTP operation definitions
+CREATE TABLE obj_path_operations (
+  operation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  path_id UUID NOT NULL REFERENCES obj_paths(path_id) ON DELETE CASCADE,
+  method TEXT NOT NULL CHECK (method IN ('GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE')),
+  operation_name TEXT, -- operationId
+  summary TEXT,
+  description TEXT,
+  tags TEXT[], -- Array of tag names
+  deprecated BOOLEAN DEFAULT false,
+  external_docs JSONB,
+  x_extensions JSONB, -- Custom x-* properties
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(path_id, method)
+);
+
+-- Reusable parameters
+CREATE TABLE obj_path_parameters (
+  parameter_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version_id UUID REFERENCES obj_versions(version_id) ON DELETE CASCADE,
+  operation_id UUID REFERENCES obj_path_operations(operation_id) ON DELETE CASCADE,
+  param_name TEXT NOT NULL,
+  in_location TEXT NOT NULL CHECK (in_location IN ('query', 'path', 'header', 'cookie')),
+  required BOOLEAN DEFAULT false,
+  deprecated BOOLEAN DEFAULT false,
+  description TEXT,
+  schema_json JSONB NOT NULL, -- Inline schema
+  style TEXT, -- Serialization style
+  explode BOOLEAN,
+  allow_reserved BOOLEAN,
+  example JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Request body definitions
+CREATE TABLE obj_request_bodies (
+  request_body_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  operation_id UUID NOT NULL REFERENCES obj_path_operations(operation_id) ON DELETE CASCADE,
+  required BOOLEAN DEFAULT false,
+  description TEXT,
+  content_map JSONB NOT NULL, -- Map of media type to schema
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(operation_id)
+);
+
+-- Response definitions
+CREATE TABLE obj_responses (
+  response_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  operation_id UUID NOT NULL REFERENCES obj_path_operations(operation_id) ON DELETE CASCADE,
+  status_code TEXT NOT NULL, -- "200", "404", "4XX", "default"
+  description TEXT NOT NULL,
+  headers JSONB, -- Map of header name to header object
+  content_map JSONB, -- Map of media type to schema
+  links JSONB, -- Link objects
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Security requirements per operation
+CREATE TABLE obj_operation_security (
+  operation_id UUID NOT NULL REFERENCES obj_path_operations(operation_id) ON DELETE CASCADE,
+  security_scheme_name TEXT NOT NULL,
+  scopes TEXT[], -- Required scopes for OAuth2/OIDC
+  PRIMARY KEY(operation_id, security_scheme_name)
+);
+```
+
+#### 7.2 React Flow State Persistence
+
+```sql
+-- Canvas layout for paths
+CREATE TABLE obj_path_canvas_layout (
+  layout_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  version_id UUID NOT NULL REFERENCES obj_versions(version_id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES obj_users(user_id) ON DELETE CASCADE,
+  viewport JSONB NOT NULL, -- {x, y, zoom}
+  nodes JSONB NOT NULL, -- ReactFlow nodes array
+  edges JSONB NOT NULL, -- ReactFlow edges array
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(version_id, user_id, is_default) WHERE is_default = true
+);
+```
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+| [#470] | Database schema migration scripts         |
+| [#471] | Path CRUD API endpoints                   |
+| [#472] | Canvas layout save/load functionality     |
+| [#473] | Data validation and constraints           |
+
+---
+
+## 🎯 Feature Differentiation
+
+### 8. Objectified Paths Designer vs. Competitors
+
+#### 8.1 Why Not Use Existing Tools?
+
+| Tool                  | Limitation                                         | Objectified Advantage                              |
+|-----------------------|----------------------------------------------------|----------------------------------------------------|
+| **Swagger Editor**    | Form-based, no visual design                       | Node-based visual canvas with instant feedback     |
+| **Postman**           | Testing-first, weak spec design                    | Design-first with integrated testing               |
+| **Stoplight Studio**  | Limited schema integration                         | Deep integration with Schema tab                   |
+| **Insomnia Designer** | No code generation                                 | Multi-language SDK and server stub generation      |
+| **ReDoc**             | Documentation only, no design                      | Design + docs + testing in one interface           |
+| **API Blueprint**     | Markdown-based, hard to visualize                  | Visual drag-drop with markdown where it makes sense|
+
+#### 8.2 Unique Selling Points
+
+1. **Unified Schema + Paths**: Seamless integration between schema definitions and API operations in one platform
+2. **Visual Node System**: React Flow canvas makes complex APIs easy to understand at a glance
+3. **Engineer-First UX**: Keyboard shortcuts, command palette, inline editors with syntax highlighting
+4. **Zero Lock-In**: Export to standard OpenAPI 3.1, import from any OpenAPI source
+5. **Code Generation**: One-click SDKs and server stubs for 10+ languages/frameworks
+6. **Built-In Testing**: Test operations without leaving the designer
+7. **Mock Servers**: Auto-generate mock APIs for frontend development
+8. **Version Control**: Built-in diff, change tracking, and rollback
+9. **Collaboration**: Real-time editing, comments, review workflows
+10. **Enterprise-Ready**: RBAC, audit logging, SAML SSO, multi-tenant isolation
+
+---
+
+## 🚀 Implementation Phases
+
+### Phase 1: Core Foundation (Q1 2026 - Weeks 1-6)
+
+**Week 1-2**: React Flow Canvas Setup
+- Paths tab with independent React Flow instance
+- Basic node types: PathNode, MethodNode
+- Drag-and-drop from node library panel
+- Canvas save/load functionality
+
+**Week 3-4**: Path & Method Configuration
+- Path variable detection and editing
+- HTTP method operations with full properties
+- Request body and response configuration
+- Parameter editor (query, path, header)
+
+**Week 5-6**: Schema Integration & Export
+- Schema reference nodes with drag-drop binding
+- Visual connections between schemas and operations
+- OpenAPI 3.1 JSON/YAML export
+- Import from existing OpenAPI specs
+
+**Deliverable**: Functional Paths Designer with core features ready for internal testing
+
+### Phase 2: Testing & Code Generation (Q2 2026 - Weeks 7-12)
+
+**Week 7-8**: Integrated Testing
+- Built-in API tester with request builder
+- Response inspector with formatting
+- Test case management
+- cURL command generation
+
+**Week 9-10**: Code Generation
+- TypeScript SDK generator
+- Python SDK generator  
+- Express server stub generator
+- FastAPI server stub generator
+
+**Week 11-12**: Documentation & Polish
+- Interactive API documentation
+- Real-time validation with visual feedback
+- Keyboard shortcuts and command palette
+- Performance optimization for large APIs
+
+**Deliverable**: Production-ready Paths Designer with testing and code gen
+
+### Phase 3: Enterprise Features (Q3 2026 - Weeks 13-18)
+
+**Week 13-14**: Advanced Operations
+- Callbacks and webhooks
+- Link objects for HATEOAS
+- Security scheme designer
+- Operation-level security configuration
+
+**Week 15-16**: Collaboration
+- Real-time multi-user editing
+- Comments and discussions on operations
+- Review workflows with approval gates
+- Change notifications
+
+**Week 17-18**: Integration & Analytics
+- API Gateway connectors (AWS, Kong)
+- Contract testing integration (Pact)
+- API usage analytics
+- Performance monitoring integration
+
+**Deliverable**: Enterprise-grade Paths Designer with team collaboration
+
+---
+
+## 📈 Success Metrics
+
+### Key Performance Indicators
+
+| Metric                          | Target (Q2 2026) | Measurement Method                  |
+|---------------------------------|------------------|-------------------------------------|
+| **API Paths Created**           | 10,000+ paths    | Total paths across all versions     |
+| **Operations Defined**          | 50,000+ ops      | Total HTTP operations created       |
+| **OpenAPI Exports**             | 2,000+ exports   | Monthly export count                |
+| **SDK Downloads**               | 5,000+ downloads | Generated SDK download count        |
+| **Mock Server Deployments**     | 1,000+ deploys   | Active mock servers running         |
+| **Average Design Time**         | < 5 min/path     | Time from create to first export    |
+| **User Satisfaction (NPS)**     | 70+              | Quarterly survey                    |
+| **Daily Active Users**          | 1,000+ users     | Users accessing Paths tab daily     |
+
+### Success Criteria
+
+- ✅ 90%+ of users prefer visual designer over manual YAML editing
+- ✅ 80%+ of exported OpenAPI specs pass validation without errors
+- ✅ 50%+ of users use generated SDKs in production projects
+- ✅ Average of 20+ operations designed per user per month
+- ✅ < 2% error rate in code generation
+- ✅ 95%+ uptime for mock server infrastructure
+
+---
+
+## 🛠️ Technical Requirements
+
+### Development Stack
+
+| Component              | Technology                           |
+|------------------------|--------------------------------------|
+| **Frontend Framework** | Next.js 15+ (React 19)               |
+| **Canvas Library**     | React Flow 11+                       |
+| **State Management**   | Zustand + React Context              |
+| **Code Editor**        | Monaco Editor (VS Code engine)       |
+| **Markdown Renderer**  | react-markdown + remark/rehype       |
+| **HTTP Client**        | Axios with interceptors              |
+| **Validation**         | Zod + ajv for JSON Schema            |
+| **Code Generation**    | Handlebars templates                 |
+| **Testing**            | Jest + React Testing Library         |
+
+### Infrastructure Requirements
+
+| Service                | Specification                        |
+|------------------------|--------------------------------------|
+| **Backend API**        | Python FastAPI with async/await      |
+| **Database**           | PostgreSQL 14+ with JSONB support    |
+| **Cache**              | Redis 7+ for real-time collaboration |
+| **Object Storage**     | S3-compatible for exported files     |
+| **Mock Server**        | Node.js Express with auto-scaling    |
+| **Code Gen Workers**   | Kubernetes jobs for SDK generation   |
+
+### Performance Targets
+
+| Metric                          | Target           |
+|---------------------------------|------------------|
+| **Canvas Load Time**            | < 2s for 100 nodes |
+| **Export OpenAPI**              | < 1s for 50 paths |
+| **Code Generation**             | < 10s for TypeScript SDK |
+| **Mock Server Start**           | < 5s deployment |
+| **Real-time Sync Latency**      | < 100ms |
+| **Canvas Frame Rate**           | 60 FPS during pan/zoom |
+
+---
+
+## 📚 Related Documentation
+
+- [FEATURE_ROADMAP.md](./FEATURE_ROADMAP.md) - Main platform roadmap
+- [FEATURE_ROADMAP_CANVAS.md](./FEATURE_ROADMAP_CANVAS.md) - Schema canvas features
+- [FEATURE_ROADMAP_SCHEMA_SHOWCASE.md](./FEATURE_ROADMAP_SCHEMA_SHOWCASE.md) - Schema showcase
+- OpenAPI 3.1 Specification: https://spec.openapis.org/oas/v3.1.0
+- React Flow Documentation: https://reactflow.dev/
+
+---
+
+## 🤝 Contributing
+
+This roadmap is a living document. Feedback and suggestions are welcome:
+
+1. **Feature Requests**: Open GitHub issue with `[Paths]` prefix
+2. **Priority Changes**: Discuss in #paths-designer Slack channel
+3. **Implementation Details**: Contribute to design docs in `/docs/paths/`
+4. **User Research**: Schedule interview with Product team
+
+**Last Updated**: December 27, 2025  
+**Next Review**: January 15, 2026  
+**Maintained By**: API Platform Team
 
 #### Core Features
 
