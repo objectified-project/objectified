@@ -75,11 +75,24 @@ export interface StudioSideNavCallbacks {
   onPropertyDelete?: (propertyId: string) => void;
   onPropertySelect?: (propertyItem: PropertyItem) => void;
   onPropertyTemplates?: () => void;
+
+  // Groups callbacks
+  onGroupAdd?: () => void;
+  onGroupSelect?: (groupId: string) => void;
+  onGroupDelete?: (groupId: string) => void;
+}
+
+export interface GroupItem {
+  id: string;
+  name: string;
+  color: string;
+  nodeIds: string[];
 }
 
 interface StudioSideNavProps {
   classes?: ClassItem[];
   properties?: PropertyItem[];
+  groups?: GroupItem[];
   callbacks?: StudioSideNavCallbacks;
   refreshKey?: number; // Used to trigger refresh from parent
   selectedProjectId?: string | null; // Currently selected project from canvas
@@ -92,6 +105,7 @@ interface StudioSideNavProps {
 const StudioSideNav: React.FC<StudioSideNavProps> = ({
   classes = [],
   properties = [],
+  groups = [],
   callbacks = {},
   refreshKey = 0,
   selectedProjectId = null,
@@ -101,9 +115,10 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   const { mode, systemMode } = useColorScheme();
   const isDark = mode === 'dark' || (mode === 'system' && systemMode === 'dark');
 
-  const [currentTab, setCurrentTab] = useState<'classes' | 'properties'>('classes');
+  const [currentTab, setCurrentTab] = useState<'classes' | 'properties' | 'groups'>('classes');
   const [classesSearchQuery, setClassesSearchQuery] = useState('');
   const [propertiesSearchQuery, setPropertiesSearchQuery] = useState('');
+  const [groupsSearchQuery, setGroupsSearchQuery] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [classWarnings, setClassWarnings] = useState<Record<string, boolean>>({});
@@ -202,7 +217,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     computeWarnings();
   }, [classes, selectedVersionId, refreshKey]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: 'classes' | 'properties') => {
+  const handleTabChange = (event: React.SyntheticEvent, newValue: 'classes' | 'properties' | 'groups') => {
     setCurrentTab(newValue);
   };
 
@@ -228,6 +243,11 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
 
     return nameMatch || typeMatch || descMatch;
   });
+
+  // Filter groups based on search query
+  const filteredGroups = groups.filter(group =>
+    group.name.toLowerCase().includes(groupsSearchQuery.toLowerCase())
+  );
 
   const handleClassSelect = (classItem: ClassItem) => {
     setSelectedClassId(classItem.id);
@@ -292,7 +312,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
           variant="fullWidth"
           sx={{
             borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            minHeight: 52,
+            minHeight: 44,
             '& .MuiTabs-indicator': {
               height: 3,
               borderRadius: '3px 3px 0 0',
@@ -304,9 +324,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             label="Classes"
             value="classes"
             sx={{
-              minHeight: 52,
+              minHeight: 44,
               fontWeight: currentTab === 'classes' ? 700 : 500,
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
               color: currentTab === 'classes'
                 ? '#6366f1'
                 : (isDark ? '#94a3b8' : '#64748b'),
@@ -321,10 +341,27 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             label="Properties"
             value="properties"
             sx={{
-              minHeight: 52,
+              minHeight: 44,
               fontWeight: currentTab === 'properties' ? 700 : 500,
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
               color: currentTab === 'properties'
+                ? '#6366f1'
+                : (isDark ? '#94a3b8' : '#64748b'),
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                color: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+              },
+            }}
+          />
+          <Tab
+            label="Groups"
+            value="groups"
+            sx={{
+              minHeight: 44,
+              fontWeight: currentTab === 'groups' ? 700 : 500,
+              fontSize: '0.75rem',
+              color: currentTab === 'groups'
                 ? '#6366f1'
                 : (isDark ? '#94a3b8' : '#64748b'),
               transition: 'all 0.2s ease',
@@ -338,7 +375,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
 
         {/* Tab Content */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {currentTab === 'classes' ? (
+          {currentTab === 'classes' && (
             // Classes View
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Search Bar */}
@@ -569,7 +606,8 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                 </Fab>
               </Box>
             </Box>
-          ) : (
+          )}
+          {currentTab === 'properties' && (
             // Properties View
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {/* Search Bar */}
@@ -1029,6 +1067,197 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   <Add />
                 </Fab>
               </Box>
+            </Box>
+          )}
+          {currentTab === 'groups' && (
+            // Groups View
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Search Bar */}
+              <Box sx={{ p: 2, pb: 1.5 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search groups..."
+                  value={groupsSearchQuery}
+                  onChange={(e) => setGroupsSearchQuery(e.target.value)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: isDark ? '#334155' : '#f8fafc',
+                      transition: 'all 0.2s ease',
+                      '& input': {
+                        color: isDark ? '#e2e8f0' : 'inherit',
+                      },
+                      '& input::placeholder': {
+                        color: isDark ? '#94a3b8' : 'inherit',
+                        opacity: 1,
+                      },
+                      '& fieldset': {
+                        borderColor: isDark ? '#475569' : 'rgba(0, 0, 0, 0.23)',
+                      },
+                      '&:hover': {
+                        backgroundColor: isDark ? '#475569' : '#f1f5f9',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                        boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
+                      },
+                    },
+                  }}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Search fontSize="small" sx={{ color: '#94a3b8' }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* Groups List */}
+              <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
+                {filteredGroups.length === 0 ? (
+                  <Box sx={{
+                    textAlign: 'center',
+                    mt: 6,
+                    px: 3,
+                  }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, mb: 0.5 }}
+                    >
+                      {groups.length === 0
+                        ? 'No groups yet'
+                        : 'No groups match your search'}
+                    </Typography>
+                    {groups.length === 0 && (
+                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8', display: 'block', mb: 2 }}>
+                        Select classes on the canvas and click "Group" to create one
+                      </Typography>
+                    )}
+                    {groups.length === 0 && !isReadOnly && (
+                      <Fab
+                        color="primary"
+                        size="small"
+                        onClick={() => callbacks.onGroupAdd?.()}
+                        disabled={!selectedVersionId || isReadOnly}
+                        aria-label="Add group"
+                        title={!selectedVersionId ? 'Select a version first' : 'Create group from selected classes'}
+                        sx={{
+                          background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                          boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)',
+                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                          '&:hover': {
+                            transform: 'translateY(-2px) scale(1.05)',
+                            boxShadow: '0 6px 20px rgba(139, 92, 246, 0.5)',
+                          },
+                          '&:disabled': {
+                            background: isDark ? '#475569' : '#e2e8f0',
+                            boxShadow: 'none',
+                          },
+                        }}
+                      >
+                        <Add />
+                      </Fab>
+                    )}
+                  </Box>
+                ) : (
+                  <List dense sx={{ py: 0.5 }}>
+                    {filteredGroups.map((group) => (
+                      <ListItem
+                        key={group.id}
+                        disablePadding
+                        sx={{ mb: 0.5 }}
+                        secondaryAction={
+                          !isReadOnly && (
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                callbacks.onGroupDelete?.(group.id);
+                              }}
+                              sx={{
+                                color: isDark ? '#94a3b8' : '#64748b',
+                                '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+                              }}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          )
+                        }
+                      >
+                        <ListItemButton
+                          onClick={() => callbacks.onGroupSelect?.(group.id)}
+                          sx={{
+                            borderRadius: 2,
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              backgroundColor: 'rgba(139, 92, 246, 0.05)',
+                            },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '3px',
+                              backgroundColor: group.color || '#8b5cf6',
+                              mr: 1.5,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <ListItemText
+                            primary={group.name}
+                            secondary={`${group.nodeIds?.length || 0} classes`}
+                            slotProps={{
+                              primary: {
+                                noWrap: true,
+                                sx: { fontWeight: 500, fontSize: '0.875rem' }
+                              },
+                              secondary: {
+                                noWrap: true,
+                                sx: { fontSize: '0.75rem' }
+                              },
+                            }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
+
+              {/* Add Group Button (when groups exist) */}
+              {groups.length > 0 && !isReadOnly && (
+                <Box sx={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 1 }}>
+                  <Fab
+                    color="primary"
+                    size="small"
+                    onClick={() => callbacks.onGroupAdd?.()}
+                    disabled={!selectedVersionId || isReadOnly}
+                    aria-label="Add group"
+                    title={!selectedVersionId ? 'Select a version first' : 'Create group from selected classes'}
+                    sx={{
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                      boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)',
+                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        transform: 'translateY(-2px) scale(1.05)',
+                        boxShadow: '0 6px 20px rgba(139, 92, 246, 0.5)',
+                      },
+                      '&:disabled': {
+                        background: isDark ? '#475569' : '#e2e8f0',
+                        boxShadow: 'none',
+                      },
+                    }}
+                  >
+                    <Add />
+                  </Fab>
+                </Box>
+              )}
             </Box>
           )}
         </Box>

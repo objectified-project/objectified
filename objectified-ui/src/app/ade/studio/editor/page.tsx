@@ -1871,6 +1871,9 @@ const StudioContent = () => {
           setNodes(prevNodes => [...groupNodes, ...prevNodes]);
         }
 
+        // Trigger sidebar refresh to update groups list
+        triggerSidebarRefresh();
+
         setIsLoadingCanvas(false);
         setLoadingMessage('');
         setLayoutDropdownOpen(false);
@@ -1886,7 +1889,7 @@ const StudioContent = () => {
       setLoadingMessage('');
       setLayoutDropdownOpen(false);
     }
-  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setCenter, alertDialog, projectTags, isReadOnly]);
+  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setCenter, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh]);
 
   // ============================================================================
   // END LAYOUT SAVE/LOAD HANDLERS

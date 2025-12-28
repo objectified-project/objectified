@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import { StudioProvider, useStudio } from './StudioContext';
 import { useDialog } from '../../components/providers/DialogProvider';
 import StudioHeader from './components/StudioHeader';
+import { GROUP_COLORS } from '@/app/components/ade/studio/GroupNode';
 
 import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '@/app/components/ade/studio/StudioSideNav';
 import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
@@ -32,7 +33,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, clickToFocusEnabled } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, clickToFocusEnabled, groups, deleteGroup } = useStudio();
 
   // Check if we're on the code view - hide sidebar for code view
   const isCodeView = pathname?.includes('/code');
@@ -252,7 +253,40 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     },
     onPropertyAdd: handlePropertyAdd, onPropertyEdit: handlePropertyEdit, onPropertyDelete: handlePropertyDelete, onPropertyTemplates: handlePropertyTemplates,
     onPropertySelect: (propertyItem) => console.log('Property selected:', propertyItem),
+    onGroupAdd: async () => {
+      await alertDialog({
+        message: 'To create a group, select one or more classes on the canvas and click the "Group" button in the canvas toolbar.',
+        variant: 'info'
+      });
+    },
+    onGroupSelect: (groupId) => {
+      // Zoom to the group node on the canvas
+      if (zoomToClassFn) {
+        zoomToClassFn(groupId);
+      }
+    },
+    onGroupDelete: async (groupId) => {
+      if (isReadOnly) {
+        await alertDialog({ message: 'Cannot delete groups in a published version.', variant: 'warning' });
+        return;
+      }
+      deleteGroup(groupId);
+      triggerCanvasRefresh();
+    },
   };
+
+  // Transform groups for sidebar display
+  const sidebarGroups = React.useMemo(() => {
+    return groups.map(group => {
+      const colorConfig = GROUP_COLORS.find(c => c.name === group.color) || GROUP_COLORS[0];
+      return {
+        id: group.id,
+        name: group.name,
+        color: colorConfig.hex,
+        nodeIds: group.nodeIds,
+      };
+    });
+  }, [groups, sidebarRefreshKey]);
 
   // Convert classes to nodes format expected by ClassEditDialog
   const classNodes = React.useMemo(() => {
@@ -280,7 +314,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       <div style={{ display: "flex", flex: 1, overflow: "hidden", marginTop: "48px" }}>
         {/* Only show sidebar for canvas/editor view, not for code view */}
         {!isCodeView && currentTenantId && selectedProjectId && selectedVersionId && (
-          <StudioSideNav classes={classes} properties={properties} callbacks={callbacks} refreshKey={refreshKey}
+          <StudioSideNav classes={classes} properties={properties} groups={sidebarGroups} callbacks={callbacks} refreshKey={refreshKey}
                          selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly} />
         )}
 
