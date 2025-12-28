@@ -4,14 +4,17 @@ import "../../globals.css";
 import * as React from 'react';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import { StudioProvider, useStudio } from './StudioContext';
 import { useDialog } from '../../components/providers/DialogProvider';
+import StudioHeader from './components/StudioHeader';
 
 import StudioSideNav, { ClassItem, PropertyItem, StudioSideNavCallbacks } from '@/app/components/ade/studio/StudioSideNav';
 import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
 import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
 import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
+import TagManager from '@/app/components/ade/studio/TagManager';
 import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
 
@@ -27,8 +30,12 @@ const checkPermissions = async (condition: boolean, message: string, alertDialog
 function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode }>) {
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
+  const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, clickToFocusEnabled } = useStudio();
+
+  // Check if we're on the code view - hide sidebar for code view
+  const isCodeView = pathname?.includes('/code');
 
   // State
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -43,6 +50,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
   const [propertyTemplateDialog, setPropertyTemplateDialog] = useState({ open: false });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null as { type: 'class' | 'property'; id: string } | null });
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
 
   // Load project tags
@@ -256,9 +264,15 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)" }}>
-      {/* Sidebar and main content area */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {currentTenantId && selectedProjectId && selectedVersionId && (
+      {/* Static Header with Project/Version selectors */}
+      <StudioHeader
+        onProjectTagsLoaded={(tags) => setProjectTags(tags)}
+      />
+
+      {/* Sidebar and main content area - with padding for fixed header */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", marginTop: "48px" }}>
+        {/* Only show sidebar for canvas/editor view, not for code view */}
+        {!isCodeView && currentTenantId && selectedProjectId && selectedVersionId && (
           <StudioSideNav classes={classes} properties={properties} callbacks={callbacks} refreshKey={refreshKey}
                          selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly} />
         )}
@@ -331,6 +345,22 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">Delete</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Tag Manager Dialog */}
+      <TagManager
+        open={tagManagerOpen}
+        onClose={() => setTagManagerOpen(false)}
+        projectId={selectedProjectId || ''}
+        tags={projectTags}
+        onTagsChanged={() => {
+          // Reload tags
+          if (selectedProjectId) {
+            getTagsForProject(selectedProjectId).then(result => {
+              setProjectTags(JSON.parse(result));
+            }).catch(console.error);
+          }
+        }}
+      />
     </div>
   );
 }

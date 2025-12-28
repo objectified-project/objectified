@@ -14,6 +14,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed unevaluatedProperties in comprehension section of schemas
   - Fixed if/then/else in comprehension section of schemas
   - Fixed additionalProperties in property editor to allow for types and schemas
+  - Fixed overall application layout to use less memory and split out sections into separate paths
 - Implemented a more advanced import system
 - Canvas improvements
   - Added ability to import from a file into classes (add a class from a file)
