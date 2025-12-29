@@ -220,3 +220,7 @@ This outlines the multi-tenancy features planned for Objectified.
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
+
+---
+
+# Completed

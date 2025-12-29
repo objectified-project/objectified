@@ -94,3 +94,7 @@ This covers the analytics dashboard for enterprise users in Objectified.
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+
+---
+
+# Completed

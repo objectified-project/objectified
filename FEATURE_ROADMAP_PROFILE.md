@@ -25,6 +25,9 @@ Current features for the profile include:
 - Bio / About me section
 - Social links (LinkedIn, GitHub, etc.)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Account Settings 📋 PLANNED
 - Change password
 - Email change with verification
@@ -34,6 +37,9 @@ Current features for the profile include:
 - Account deletion request
 - Data export (GDPR compliance)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Notification Preferences 📋 PLANNED
 - Email notification toggles (per event type)
 - In-app notification preferences
@@ -42,6 +48,9 @@ Current features for the profile include:
 - Mobile push notification settings
 - Slack/Teams integration preferences
 - Webhook notifications for account events
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Security Settings 📋 PLANNED
 - Two-factor authentication (TOTP, SMS, Email)
@@ -53,6 +62,9 @@ Current features for the profile include:
 - Security activity log
 - Suspicious activity alerts
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Personalization 📋 PLANNED
 - Theme preference (light/dark/system)
 - Default landing page after login
@@ -63,6 +75,9 @@ Current features for the profile include:
 - Custom date/time format
 - Number format preference (locale-based)
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### API & Developer Settings 📋 PLANNED
 - Personal API keys (user-scoped, not tenant)
 - Personal access tokens
@@ -70,6 +85,9 @@ Current features for the profile include:
 - Webhook endpoints (personal)
 - CLI/SDK authentication tokens
 - API usage statistics (personal)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -85,6 +103,9 @@ Current features for the profile include:
 - Federated identity across tenants
 - Group-based role assignment from IdP
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Enterprise Security 📋 PLANNED
 - Mandatory MFA enforcement (tenant-wide policy)
 - Hardware security key requirement
@@ -94,6 +115,9 @@ Current features for the profile include:
 - Certificate-based authentication
 - Conditional access policies (location, device, time)
 - Zero-trust network access (ZTNA) integration
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Compliance & Governance 📋 PLANNED
 - User access reviews / Recertification workflows
@@ -106,6 +130,9 @@ Current features for the profile include:
 - Audit trail for profile changes
 - eSignature for policy acceptance
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Enterprise Profile Management 📋 PLANNED
 - Centralized profile administration
 - Bulk user import/export (CSV, SCIM)
@@ -116,6 +143,9 @@ Current features for the profile include:
 - Profile field visibility controls (public/private/team)
 - Organizational hierarchy / Reporting structure
 
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Delegation & Proxy Access 📋 PLANNED
 - Delegate access to another user (vacation mode)
 - Impersonation for support (with audit trail)
@@ -123,6 +153,9 @@ Current features for the profile include:
 - Role switching (for users with multiple roles)
 - Acting on behalf of (with approval workflow)
 - Time-limited elevated privileges
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ### Enterprise Directory 📋 PLANNED
 - Organization-wide people directory
@@ -133,3 +166,10 @@ Current features for the profile include:
 - Skills and expertise tagging
 - User availability / Status indicators
 - Manager/direct reports relationships
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+---
+
+# Completed

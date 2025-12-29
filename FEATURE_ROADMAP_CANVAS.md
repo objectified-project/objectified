@@ -988,3 +988,7 @@
 - ✅ Constraint tooltips on hover
 - ✅ Constraint summary panel
 - ✅ Tags displayed on class nodes
+
+---
+
+# Completed
