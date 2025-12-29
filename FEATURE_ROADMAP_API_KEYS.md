@@ -15,24 +15,6 @@ This covers API Keys that are used to access Objectified external services.
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
-### Audit Logging 📋 PLANNED
-- Comprehensive audit trail:
-    - User login/logout
-    - Schema changes
-    - Permission changes
-    - API key usage
-    - Export/download events
-    - Settings changes
-- Audit log viewer with filters
-- Audit log search
-- Audit log export (for compliance)
-- Immutable audit logs
-- Audit log retention policies
-- Real-time audit alerts
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
 ### API Key Scopes & Permissions 📋 PLANNED
 - Fine-grained permission scopes (read, write, delete, admin)
 - Per-resource access control (projects, classes, properties, etc.)
@@ -53,19 +35,6 @@ This covers API Keys that are used to access Objectified external services.
 - Detect and alert on key exposure (GitHub secret scanning integration)
 - Key usage anomaly detection (unusual patterns, geolocations)
 - Emergency key revocation (revoke all keys for tenant)
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
-### API Key Analytics & Monitoring 📋 PLANNED
-- Usage statistics dashboard (requests per day/week/month)
-- Per-key usage breakdown
-- Endpoint popularity metrics
-- Error rate tracking per key
-- Response time percentiles per key
-- Usage trends and forecasting
-- Export usage data as CSV/JSON
-- Integration with external monitoring (Datadog, Prometheus, etc.)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

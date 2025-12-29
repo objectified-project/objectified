@@ -32,6 +32,37 @@ Objectified platform.
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
+### Audit Logging 📋 PLANNED
+- Comprehensive audit trail:
+  - User login/logout
+  - Schema changes
+  - Permission changes
+  - API key usage
+  - Export/download events
+  - Settings changes
+- Audit log viewer with filters
+- Audit log search
+- Audit log export (for compliance)
+- Immutable audit logs
+- Audit log retention policies
+- Real-time audit alerts
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### API Key Analytics & Monitoring 📋 PLANNED
+- Usage statistics dashboard (requests per day/week/month)
+- Per-key usage breakdown
+- Endpoint popularity metrics
+- Error rate tracking per key
+- Response time percentiles per key
+- Usage trends and forecasting
+- Export usage data as CSV/JSON
+- Integration with external monitoring (Datadog, Prometheus, etc.)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### Alerting
 - Custom alert rules
 - Email alerts
