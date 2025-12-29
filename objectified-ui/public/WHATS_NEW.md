@@ -16,8 +16,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed additionalProperties in property editor to allow for types and schemas
   - Fixed overall application layout to use less memory and split out sections into separate paths
 - Implemented a more advanced import system
+  - File imports
+  - URL imports with tokens and authentication
 - Canvas improvements
-  - Added ability to import from a file into classes (add a class from a file)
+  - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
   - Added creation of groups on the canvas
   - Added Save and Load buttons for manual layout management (only available when auto-layout is disabled)

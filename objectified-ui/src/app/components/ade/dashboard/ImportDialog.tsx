@@ -14,6 +14,7 @@ import { PreviewPanel, ImportOptions } from './PreviewPanel';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import ImportExecutionPanel from './ImportExecutionPanel';
 import ImportCompletePanel from './ImportCompletePanel';
+import UrlImportPanel from './UrlImportPanel';
 import { startImport, getImportStatus } from '../../../../../lib/db/import-actions';
 
 interface ImportDialogProps {
@@ -43,6 +44,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [jobId, setJobId] = useState<string | null>(null);
   const [importSucceeded, setImportSucceeded] = useState(false);
   const [importComplete, setImportComplete] = useState(false);
+  const [urlContent, setUrlContent] = useState<string | null>(null);
+  const [urlFilename, setUrlFilename] = useState<string | null>(null);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -66,6 +69,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setSelectedSource(null);
       setSelectedFile(null);
       setFileMetadata(null);
+      setUrlContent(null);
+      setUrlFilename(null);
     }
   };
 
@@ -85,18 +90,25 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setJobId(null);
     setImportSucceeded(false);
     setImportComplete(false);
+    setUrlContent(null);
+    setUrlFilename(null);
     onClose();
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile && !urlContent) return;
 
-    console.log('Starting analysis...', { selectedFile: selectedFile.name });
+    console.log('Starting analysis...', {
+      selectedFile: selectedFile?.name,
+      urlFilename,
+      hasUrlContent: !!urlContent
+    });
     setIsAnalyzing(true);
     try {
-      const content = await selectedFile.text();
-      console.log('File content loaded, length:', content.length);
-      const result = await analyzeSpecification(content, selectedFile.name);
+      const content = urlContent || await selectedFile!.text();
+      const filename = urlFilename || selectedFile?.name || 'openapi-spec.yaml';
+      console.log('Content loaded, length:', content.length);
+      const result = await analyzeSpecification(content, filename);
       console.log('Analysis complete:', result);
       setAnalysisResult(result);
       setCurrentStep('analysis');
@@ -104,6 +116,24 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     } catch (error) {
       console.error('Analysis error:', error);
       // TODO: Show error message
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleUrlSpecificationFetched = async (content: string, filename: string) => {
+    setUrlContent(content);
+    setUrlFilename(filename);
+
+    // Auto-analyze when URL content is fetched
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeSpecification(content, filename);
+      console.log('URL content analysis complete:', result);
+      setAnalysisResult(result);
+      setCurrentStep('analysis');
+    } catch (error) {
+      console.error('URL content analysis error:', error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -346,18 +376,27 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
                 {/* URL Import */}
                 <button
-                  disabled
-                  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"
-                  title="Coming soon"
+                  onClick={() => handleSourceClick('url')}
+                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedSource === 'url'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                  }`}
                 >
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                      selectedSource === 'url'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                    }`}>
                       <Link2 className="h-6 w-6" />
                     </div>
-                    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">
+                    <div className={`font-semibold mb-1 ${
+                      selectedSource === 'url' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                    }`}>
                       URL Import
                     </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
                       Fetch from URL or repository
                     </div>
                   </div>
@@ -735,11 +774,18 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               return jobId ? (
                 <ImportCompletePanel jobId={jobId} />
               ) : null;
+            } else if (currentStep === 'file-upload' && selectedSource === 'url') {
+              console.log('Rendering: URL import panel');
+              return (
+                <UrlImportPanel
+                  onSpecificationFetched={handleUrlSpecificationFetched}
+                />
+              );
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
               return (
             <>
-              {/* Placeholder for other source views (URL, Clipboard, etc.) */}
+              {/* Placeholder for other source views (Clipboard, etc.) */}
               <div className="text-center py-12">
                 <p className="text-gray-600 dark:text-gray-400">
                   {selectedSource} import view - Coming soon

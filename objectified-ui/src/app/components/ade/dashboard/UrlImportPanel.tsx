@@ -1,0 +1,487 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Link2, Eye, EyeOff, CheckCircle2, AlertTriangle, Loader2, FileCode, Globe } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
+import { fetchSpecificationFromUrl, validateImportUrl, UrlImportResult } from '../../../utils/url-import';
+import { extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
+
+interface UrlImportPanelProps {
+  onSpecificationFetched: (content: string, filename: string) => void;
+}
+
+type AuthType = 'none' | 'bearer' | 'apiKey' | 'basic';
+
+export const UrlImportPanel: React.FC<UrlImportPanelProps> = ({
+  onSpecificationFetched
+}) => {
+  // Form state
+  const [url, setUrl] = useState('');
+  const [authType, setAuthType] = useState<AuthType>('none');
+  const [token, setToken] = useState('');
+  const [apiKeyHeader, setApiKeyHeader] = useState('X-API-Key');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [followRedirects, setFollowRedirects] = useState(true);
+  const [resolveExternalRefs, setResolveExternalRefs] = useState(true);
+  const [saveCredentials, setSaveCredentials] = useState(false);
+
+  // UI state
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [fetchResult, setFetchResult] = useState<UrlImportResult | null>(null);
+  const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
+
+  // Validate URL on change
+  useEffect(() => {
+    if (!url) {
+      setUrlError(null);
+      return;
+    }
+
+    const validation = validateImportUrl(url);
+    if (!validation.valid) {
+      setUrlError(validation.error || 'Invalid URL');
+    } else {
+      setUrlError(null);
+    }
+  }, [url]);
+
+  // Build import options
+  const buildOptions = (): UrlImportOptions => ({
+    url: url.trim(),
+    authType,
+    authToken: authType === 'bearer' || authType === 'apiKey' ? token : undefined,
+    apiKeyHeader: authType === 'apiKey' ? apiKeyHeader : undefined,
+    username: authType === 'basic' ? username : undefined,
+    password: authType === 'basic' ? password : undefined,
+    followRedirects,
+    timeout: 30000
+  });
+
+  // Fetch specification
+  const handleFetchSpecification = async () => {
+    if (!url.trim() || urlError) return;
+
+    setIsFetching(true);
+    setFetchResult(null);
+    setFileMetadata(null);
+
+    try {
+      const result = await fetchSpecificationFromUrl(buildOptions());
+      setFetchResult(result);
+
+      if (result.success && result.content) {
+        // Extract metadata for preview
+        const metadata = extractFileMetadata(result.content);
+        setFileMetadata(metadata);
+
+        // Call the callback to proceed
+        onSpecificationFetched(result.content, result.filename || 'openapi-spec.yaml');
+      }
+    } catch (error) {
+      setFetchResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch specification'
+      });
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Source Tabs */}
+      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
+        >
+          📁 File
+        </button>
+        <button
+          className="px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400"
+        >
+          🔗 URL
+        </button>
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
+          title="Coming soon"
+        >
+          📋 Clipboard
+        </button>
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
+          title="Coming soon"
+        >
+          🐙 Git
+        </button>
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
+          title="Coming soon"
+        >
+          ☁️ SwaggerHub
+        </button>
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
+          title="Coming soon"
+        >
+          📦 Registry
+        </button>
+      </div>
+
+      {/* URL Input */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Specification URL
+        </label>
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Globe className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://api.example.com/openapi.yaml"
+            className={`block w-full pl-10 pr-4 py-3 text-sm rounded-lg border ${
+              urlError
+                ? 'border-red-500 dark:border-red-400 focus:ring-red-500 focus:border-red-500'
+                : 'border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500'
+            } bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500`}
+          />
+        </div>
+        {urlError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{urlError}</p>
+        )}
+      </div>
+
+      {/* Authentication Section */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <Link2 className="h-4 w-4" />
+          Authentication (optional)
+        </div>
+
+        {/* Auth Type Selection */}
+        <div className="flex flex-wrap gap-4">
+          {(['none', 'bearer', 'apiKey', 'basic'] as AuthType[]).map((type) => (
+            <label key={type} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="authType"
+                value={type}
+                checked={authType === type}
+                onChange={(e) => setAuthType(e.target.value as AuthType)}
+                className="text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {type === 'none' ? 'None' :
+                 type === 'bearer' ? 'Bearer Token' :
+                 type === 'apiKey' ? 'API Key' : 'Basic Auth'}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {/* Bearer Token Input */}
+        {authType === 'bearer' && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Token
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Enter your bearer token"
+                className="block w-full pr-10 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <Eye className="h-4 w-4 text-gray-400" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* API Key Input */}
+        {authType === 'apiKey' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Header Name
+              </label>
+              <input
+                type="text"
+                value={apiKeyHeader}
+                onChange={(e) => setApiKeyHeader(e.target.value)}
+                placeholder="X-API-Key"
+                className="block w-full py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                API Key
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="Enter your API key"
+                  className="block w-full pr-10 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Basic Auth Input */}
+        {authType === 'basic' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+                className="block w-full py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="block w-full pr-10 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Save credentials checkbox */}
+        {authType !== 'none' && (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={saveCredentials}
+              onChange={(e) => setSaveCredentials(e.target.checked)}
+              className="rounded text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Save credentials for future imports
+            </span>
+          </label>
+        )}
+      </div>
+
+      {/* URL Options */}
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          URL Options
+        </div>
+
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={followRedirects}
+              onChange={(e) => setFollowRedirects(e.target.checked)}
+              className="rounded text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Follow redirects
+            </span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={resolveExternalRefs}
+              onChange={(e) => setResolveExternalRefs(e.target.checked)}
+              className="rounded text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Resolve external $ref URLs
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Fetch Result */}
+      {fetchResult && !fetchResult.success && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-medium text-red-900 dark:text-red-200">
+                Failed to Fetch Specification
+              </div>
+              <div className="text-sm text-red-700 dark:text-red-300 mt-1">
+                {fetchResult.error}
+                {fetchResult.statusCode && ` (HTTP ${fetchResult.statusCode})`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fetched Metadata Preview */}
+      {fetchResult?.success && fileMetadata && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <FileCode className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            Specification Preview
+          </h3>
+
+          <div className="space-y-4">
+            {/* Metadata Grid */}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Format */}
+              <div className={`rounded-lg p-4 border ${
+                fileMetadata.formatSupported 
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                  : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {fileMetadata.formatSupported ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  )}
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Detected Format
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {fileMetadata.formatDisplayName}
+                </div>
+              </div>
+
+              {/* Version */}
+              <div className="rounded-lg p-4 border bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  Version
+                </div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {fileMetadata.specVersion || fileMetadata.version || 'N/A'}
+                </div>
+              </div>
+
+              {/* Syntax */}
+              <div className={`rounded-lg p-4 border ${
+                fileMetadata.syntaxValid 
+                  ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                  : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {fileMetadata.syntaxValid ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  )}
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Syntax
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {fileMetadata.syntaxValid ? `Valid ${fileMetadata.syntax.toUpperCase()}` : 'Invalid'}
+                </div>
+              </div>
+            </div>
+
+            {/* Title */}
+            {fileMetadata.title && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Title
+                </span>
+                <div className="text-base font-semibold text-gray-900 dark:text-white mt-1">
+                  {fileMetadata.title}
+                </div>
+              </div>
+            )}
+
+            {/* Description */}
+            {fileMetadata.description && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Description
+                </span>
+                <div className="text-sm text-gray-700 dark:text-gray-300 mt-1 leading-relaxed line-clamp-3">
+                  {fileMetadata.description}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <Button
+          onClick={handleFetchSpecification}
+          disabled={!url.trim() || !!urlError || isFetching}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          {isFetching ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Testing...
+            </>
+          ) : (
+            'Test URL'
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default UrlImportPanel;
+
