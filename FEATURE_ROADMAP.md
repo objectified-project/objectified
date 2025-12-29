@@ -686,44 +686,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 The import flow is designed as a multi-step wizard with clear visual progression, responsive feedback, and intuitive controls. The UI adapts to both light and dark modes using Radix UI components and Tailwind CSS.
 
-##### Step 1b: URL Import View
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Import Specification                                              [X Close]│
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ● Source  ━━━━  ○ Analyze  ━━━━  ○ Preview  ━━━━  ○ Import  ━━━━  ○ Done   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  [📁 File] [🔗 URL] [📋 Clipboard] [🐙 Git] [☁️ SwaggerHub] [📦 Registry]   │
-│            ────────                                                         │
-│                                                                             │
-│  Specification URL                                                          │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │ https://api.example.com/openapi.yaml                                │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  ┌─── Authentication (optional) ───────────────────────────────────────┐   │
-│  │                                                                     │   │
-│  │  Auth Type:  ( ) None  (●) Bearer Token  ( ) API Key  ( ) Basic    │   │
-│  │                                                                     │   │
-│  │  Token: ┌─────────────────────────────────────────────────────┐    │   │
-│  │         │ ••••••••••••••••••••••••••••••                      │    │   │
-│  │         └─────────────────────────────────────────────────────┘    │   │
-│  │                                                                     │   │
-│  │  ☑ Save credentials for future imports                             │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│  ┌─── URL Options ─────────────────────────────────────────────────────┐   │
-│  │  ☑ Follow redirects                                                 │   │
-│  │  ☑ Resolve external $ref URLs                                       │   │
-│  │  ☐ Cache fetched content                                            │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│                                    [← Back]  [Cancel]  [Test URL]  [Next →] │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
 ##### Step 1c: Git Repository Import View
 
 ```
