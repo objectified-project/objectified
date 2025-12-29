@@ -36,3 +36,61 @@ This covers the analytics dashboard for enterprise users in Objectified.
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+
+## Analytics & Insights (NEW)
+
+### Usage Analytics
+
+**Schema Analytics**
+- 📋 Most viewed schemas
+- 📋 Most frequently updated schemas
+- 📋 Schema complexity trends
+- 📋 Property usage statistics
+- 📋 Deprecated property tracking
+- 📋 Schema growth over time
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Team Analytics**
+- 📋 Active contributors
+- 📋 Contribution heatmaps
+- 📋 Review turnaround times
+- 📋 Approval bottlenecks
+- 📋 Team productivity metrics
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**API Analytics** 📋 PLANNED
+- 📋 API endpoint popularity
+- 📋 Error rate by endpoint
+- 📋 Response time percentiles
+- 📋 Consumer adoption tracking
+- 📋 Version adoption rates
+- 📋 Deprecation impact analysis
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### Reporting
+
+**Executive Reports**
+- 📋 API portfolio overview
+- 📋 Compliance status summary
+- 📋 Quality score trends
+- 📋 Breaking change frequency
+- 📋 Team velocity metrics
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Custom Reports**
+- 📋 Report builder with filters
+- 📋 Scheduled report delivery
+- 📋 Export to PDF/Excel
+- 📋 Embed reports in dashboards
+- 📋 API for report data
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|

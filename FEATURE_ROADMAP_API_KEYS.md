@@ -15,7 +15,7 @@ This covers API Keys that are used to access Objectified external services.
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
-### Audit Logging
+### Audit Logging 📋 PLANNED
 - Comprehensive audit trail:
     - User login/logout
     - Schema changes
@@ -29,6 +29,77 @@ This covers API Keys that are used to access Objectified external services.
 - Immutable audit logs
 - Audit log retention policies
 - Real-time audit alerts
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### API Key Scopes & Permissions 📋 PLANNED
+- Fine-grained permission scopes (read, write, delete, admin)
+- Per-resource access control (projects, classes, properties, etc.)
+- Scope templates for common use cases (read-only, full-access, etc.)
+- Scope validation on every API request
+- UI for managing key scopes with checkboxes
+- Scope inheritance from tenant-level defaults
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### API Key Security Enhancements 📋 PLANNED
+- IP address whitelisting per API key
+- Allowed origins/domains restriction (CORS-like)
+- Key rotation with grace period (old key valid for N hours)
+- Automatic key rotation reminders/notifications
+- Maximum key age policies (force rotation after X days)
+- Detect and alert on key exposure (GitHub secret scanning integration)
+- Key usage anomaly detection (unusual patterns, geolocations)
+- Emergency key revocation (revoke all keys for tenant)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### API Key Analytics & Monitoring 📋 PLANNED
+- Usage statistics dashboard (requests per day/week/month)
+- Per-key usage breakdown
+- Endpoint popularity metrics
+- Error rate tracking per key
+- Response time percentiles per key
+- Usage trends and forecasting
+- Export usage data as CSV/JSON
+- Integration with external monitoring (Datadog, Prometheus, etc.)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### API Key Lifecycle Management 📋 PLANNED
+- Key versioning (v1, v2, etc.)
+- Deprecation workflow with sunset dates
+- Scheduled key activation (future start date)
+- Key cloning (duplicate with new secret)
+- Bulk key management (enable/disable/delete multiple)
+- Key templates for quick creation
+- Key ownership transfer between users
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### Developer Experience 📋 PLANNED
+- API key quick-copy button with confirmation
+- Show key only once on creation (security)
+- Key description/notes field for documentation
+- Environment labels (production, staging, development)
+- Test mode keys with limited functionality
+- SDK generation with embedded key configuration
+- API key usage examples in multiple languages
+- Webhook notifications for key events (created, used, expired, revoked)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### Multi-Factor Authentication for Keys 📋 PLANNED
+- Optional MFA requirement for key creation
+- Signed requests with additional secret (HMAC)
+- Short-lived tokens generated from long-lived keys (JWT exchange)
+- OAuth 2.0 client credentials flow support
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
