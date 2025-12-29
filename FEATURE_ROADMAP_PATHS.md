@@ -61,8 +61,8 @@ Unlike form-based API designers, the Paths Designer embraces a **node-based visu
 
 | Feature                    | Description                                           |
 |----------------------------|-------------------------------------------------------|
-| GraphQL Path Integration   | Design GraphQL queries/mutations as path operations  |
-| AsyncAPI Support           | Event-driven API design with Kafka, RabbitMQ support |
+| GraphQL Path Integration   | Design GraphQL queries/mutations as path operations   |
+| AsyncAPI Support           | Event-driven API design with Kafka, RabbitMQ support  |
 | gRPC Service Designer      | Protocol Buffer service definitions                   |
 | API Gateway Integration    | AWS API Gateway, Kong, Apigee connectors              |
 | Load Testing Integration   | k6, JMeter scenario generation from paths             |
@@ -106,7 +106,7 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 
 **Visual Design**: Rounded rectangle with URL path as header, gray-blue gradient background
 
-**Configurable Properties**:
+**Configurable Properties**: 📋 PLANNED
 - 📋 Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
 - 📋 Summary and description (markdown support)
 - 📋 Server overrides for multi-environment routing
@@ -115,15 +115,26 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - 📋 Common parameters inherited by all operations
 - 📋 External documentation links
 
-**Features**:
-- Auto-detect path variables from curly brace syntax
+| Ticket | Feature                                                              |
+|--------|----------------------------------------------------------------------|
+| #352   | Adding a path to the path canvas                                     |
+| #353   | Paths should include a summary and description                       |
+| #354   | Add deprecated flag to support deprecation with visual strikethrough |
+| #355   | Add tags to paths for visual grouping                                |
+| #356   | Add external documentation links for paths                           |
+
+**Features**: 📋 PLANNED
 - Click on `{variable}` to open inline schema editor
 - Drag schema property onto variable for type binding
 - Visual validation: invalid paths show red border
 - Path template preview with sample values
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                                                  |
+|--------|--------------------------------------------------------------------------|
+| #357   | Click on '{variable}' in path to open inline schema editor               |
+| #358   | Add the ability to drag a schema property to a variable for type binding |
+| #359   | Add invalid paths with a red border                                      |
+| #360   | Add path template preview with sample values                             |
 
 #### 2.2 Method Nodes (HTTP Operations) 📋 PLANNED
 
@@ -148,11 +159,23 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - Parameters (query, header, cookie)
 - Security requirements
 - Deprecated flag
+- Private flag (unexposed endpoints)
 - External docs
 - Custom `x-*` extensions
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                                  |
+|--------|----------------------------------------------------------|
+| #361   | Add operationId auto-generation                          |
+| #362   | Add tags for API Grouping                                |
+| #363   | Add summary and description to HTTP Operation            |
+| #364   | Add request body schema binding                          |
+| #365   | Add response definitions to HTTP Operation               |
+| #366   | Add parameters (query, header, cookie) to HTTP Operation |
+| #367   | Add security requirements to HTTP Operation              |
+| #368   | Add deprecated flag to HTTP Operation                    |
+| #369   | Add private flag to HTTP Operation                       |
+| #370   | Add external docs to HTTP Operation                      |
+| #371   | Add custom x-* extensions to HTTP Operation              |
 
 #### 2.3 Schema Reference Nodes 📋 PLANNED
 
@@ -168,23 +191,28 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - Visual badge showing schema version compatibility
 - Inline schema override for operation-specific modifications
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                                                          |
+|--------|----------------------------------------------------------------------------------|
+| #372   | Add ability to drag schema from library panel onto canvas                        |
+| #373   | Add ability to connect schema nodes to method nodes for request/response binding |
+| #374   | Hover over a schema node to see a schema preview (collapsed property tree)       |
+| #375   | Click to edit schema (change views)                                              |
+| #376   | Inline schema override for operation-specific modifications                      |
 
 #### 2.4 Parameter Nodes 📋 PLANNED
 
 **Visual Design**: Small chips/tags color-coded by parameter location
 
-| Location | Color | Icon       |
-|----------|-------|------------|
-| Query    | Blue  | ? icon     |
-| Path     | Green | {} icon    |
-| Header   | Purple| H icon     |
-| Cookie   | Orange| 🍪 icon    |
+| Location | Color  | Icon       |
+|----------|--------|------------|
+| Query    | Blue   | ? icon     |
+| Path     | Green  | {} icon    |
+| Header   | Purple | H icon     |
+| Cookie   | Orange | 🍪 icon    |
 
 **Configurable Properties**:
 - Parameter name (with auto-suggest from common patterns)
-- Location: query, path, header, cookie
+- ✅ Location: query, path, header, cookie (fixed from dragged node)
 - Schema type (string, number, boolean, array, object)
 - Required flag
 - Default value
@@ -194,8 +222,17 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - Explode flag for arrays/objects
 - Deprecated flag
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                                |
+|--------|--------------------------------------------------------|
+| #377   | Parameter name with auto-suggest from common patterns  |
+| #378   | Schema type should be configurable                     |
+| #379   | Add required flag to parameters                        |
+| #380   | Add default value to parameters                        |
+| #381   | Add description to parameters                          |
+| #382   | Add validation rules to parameters                     |
+| #383   | Add serialization style to parameters (default "form") |
+| #384   | Add explode flag to parameters                         |
+| #385   | Add deprecated flag to parameters                      |
 
 #### 2.5 Request Body Nodes 📋 PLANNED
 
@@ -218,6 +255,12 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 
 | Ticket | Feature                                   |
 |--------|-------------------------------------------|
+| #386   | Content type map (application/json, multipart/form-data, etc.) |
+| #387   | Schema binding per content type           |
+| #388   | Add required flag to request body      |
+| #389   | Add description to request body          |
+| #390   | Add examples to request body node |
+| #391   | Add encoding options for multipart       |
 
 #### 2.6 Response Nodes 📋 PLANNED
 
@@ -244,8 +287,18 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - Link objects for response-driven navigation
 - Header templates (pagination, rate limiting, CORS)
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                                |
+|--------|--------------------------------------------------------|
+| #392   | Status code (100-599)                                  |
+| #393   | Add description to response                            |
+| #394   | Add response headers (name, schema, description)       |
+| #395   | Add content type map with schema bindings              |
+| #396   | Add links (HATEOAS navigation)                         |
+| #397   | Add content-type examples to response node             |
+| #398   | Add response range patterns to response nodes          |
+| #399   | Add default response to HTTP Operation                 |
+| #400   | Add link objects for response-driven navigation        |
+| #401   | Add header templates (pagination, rate limiting, CORS) |
 
 ---
 
@@ -361,8 +414,32 @@ Catch errors as you design, not during export:
 - HAR (HTTP Archive) files
 - cURL commands (converts to operation)
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                       |
+|--------|-----------------------------------------------|
+| #425   | Improve OpenAPI Specification import handling |
+
+### 3.5 OpenAPI Specification Output 📋 PLANNED
+
+**Full Spec Generation** ✅ PARTIALLY IMPLEMENTED
+- **Specification Components**:
+    - ✅ `info` (title, version, description, contact, license, termsOfService)
+    - `servers` (multiple environments with variables)
+    - `paths` (all operations with full configuration)
+    - `components/schemas` (existing schema support)
+    - `components/parameters` (reusable parameters)
+    - `components/requestBodies` (reusable request bodies)
+    - `components/responses` (reusable responses)
+    - `components/headers` (reusable headers)
+    - `components/securitySchemes` (auth definitions)
+    - `components/links` (HATEOAS links)
+    - `components/callbacks` (webhooks)
+    - `security` (global security requirements)
+    - `tags` (tag definitions with descriptions)
+    - `externalDocs` (external documentation)
+
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| #424   | Update OpenAPI Generator to include missing fields |
 
 ---
 
@@ -380,6 +457,16 @@ Define security schemes once, apply to multiple operations:
 - **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
 - **OpenID Connect**: Discovery URL with scopes
 - **Mutual TLS**: Certificate-based authentication
+- **Custom security schemes**
+
+| Ticket | Feature Description                 |
+|--------|-------------------------------------|
+| #410   | Add API Keys                        |
+| #411   | Add HTTP Authentication Schemes     |
+| #412   | OAuth2 Security Schemes             |
+| #413   | Add OpenID Connect Security Schemes |
+| #414   | Add Mutual TLS Security Schemes     |
+| #415   | Add Custom Security Schemes         |
 
 **Visual Design**:
 - Security scheme library panel
@@ -387,7 +474,14 @@ Define security schemes once, apply to multiple operations:
 - Visual badge showing active schemes on operations
 - Scope selector for OAuth2/OIDC
 
-#### 4.2 Operation-Level Security
+| Ticket | Feature                                               |
+|--------|-------------------------------------------------------|
+| #416   | Security scheme library panel                         |
+| #417   | Drag scheme onto method node to apply                 |
+| #418   | Add visual badge to show active schemes on operations |
+| #419   | Scope selector for OAuth2/OIDC                        |
+
+#### 4.2 Operation-Level Security 📋 PLANNED
 
 Each operation can override global defaults:
 
@@ -396,8 +490,24 @@ Each operation can override global defaults:
 - Mark operation as unsecured (public endpoint)
 - Add security descriptions for documentation
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                         |
+|--------|-------------------------------------------------|
+| #420   | Apply multiple security schemes to an operation |
+| #421   | Configure required scopes per operation         |
+| #422   | Mark operation as unsafe/public                 |
+| #423   | Add security descriptions for documentation     |
+
+#### 4.3 Server Definitions 📋 PLANNED
+
+**Server Configuration** ✅ PARTIALLY IMPLEMENTED
+- ✅ Multiple server definitions
+- Server variables with enum values
+- Environment-specific servers (dev, staging, prod)
+- Server descriptions
+- Relative server paths
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 

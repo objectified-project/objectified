@@ -55,7 +55,7 @@ export default function LibraryPanel() {
   };
 
   return (
-    <div className="w-60 h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col">
+    <div className="w-[280px] shrink-0 h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_24px_rgba(0,0,0,0.4)] z-20 relative">
       {/* Search */}
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="relative">

@@ -9,35 +9,14 @@
 
 ---
 
-### Quick Reference - Canvas Feature Status
-
-| Category                    | Implemented  | Partial  | Planned  |
-|-----------------------------|--------------|----------|----------|
-| Layout & Organization       | 2            | 0        | 6        |
-| Navigation & Controls       | 4            | 0        | 8        |
-| Node Grouping               | 0            | 0        | 10       |
-| Visual Customization        | 1            | 0        | 15       |
-| Annotations                 | 0            | 0        | 12       |
-| Undo/Redo                   | 0            | 0        | 8        |
-| Performance                 | 6            | 0        | 4        |
-| Export                      | 9            | 0        | 6        |
-| Collaboration               | 0            | 0        | 5        |
-| **Enterprise (NEW)**        |              |          |          |
-| Schema Visualization        | 0            | 0        | 11       |
-| Developer Productivity      | 0            | 0        | 15       |
-| Governance & Compliance     | 0            | 0        | 11       |
-| Large Schema Optimization   | 0            | 0        | 12       |
-| Integration & Extensibility | 0            | 0        | 13       |
-| Accessibility & i18n        | 0            | 0        | 10       |
-| **TOTAL**                   | **22**       | **0**    | **146**  |
-
----
-
 ### 1. Canvas Layout & Organization
 
 #### Save & Load Layouts ✅ IMPLEMENTED (Basic), 📋 PLANNED (Advanced)
 - ✅ Save current canvas arrangement
 - ✅ Save and load groups with layouts
+- ✅ **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
+- ✅ **Layout Controls**: Compact button with dropdown menu
+- ✅ **Database Table**: Create a database table to store layouts
 - 📋 Multiple saved layouts per version:
     - "Development Layout" - organized for development work
     - "Presentation Layout" - clean arrangement for stakeholder demos
@@ -51,11 +30,14 @@
 
 | Ticket | Feature                                      |
 |--------|----------------------------------------------|
-| [#163] | Multiple saved layouts per version           |
-| [#164] | Auto-save layout changes (tuneable interval) |
-| [#165] | Version control for layouts                  |
-| [#166] | Default layout setting per user or per team  |
-| [#167] | Export/import layouts as JSON                |
+| #163   | Multiple saved layouts per version           |
+| #164   | Auto-save layout changes (tuneable interval) |
+| #165   | Version control for layouts                  |
+| #166   | Default layout setting per user or per team  |
+| #167   | Export/import layouts as JSON                |
+| #314   | Canvas snapshots                             |
+| #315   | Canvas auto-save of layout                   |
+| #316   | Export/import canvas layouts                 |
 
 #### Layout Snapshots 📋 PLANNED
 - 📋 Take quick snapshots of current layout
@@ -68,12 +50,12 @@
 
 | Ticket | Feature                                           |
 |--------|---------------------------------------------------|
-| [#168] | Take quick snapshots of current layout            |
-| [#169] | Thumbnail preview of each snapshot                |
-| [#170] | Restore any snapshot with one click               |
-| [#171] | Compare two snapshots side-by-side                |
-| [#172] | Snapshot gallery view with search/filter          |
-| [#173] | Snapshot metadata: timestamp, author, description |
+| #168   | Take quick snapshots of current layout            |
+| #169   | Thumbnail preview of each snapshot                |
+| #170   | Restore any snapshot with one click               |
+| #171   | Compare two snapshots side-by-side                |
+| #172   | Snapshot gallery view with search/filter          |
+| #173   | Snapshot metadata: timestamp, author, description |
 
 #### Layout Sharing 📋 PLANNED
 - 📋 Share layout configurations with team members
@@ -84,11 +66,27 @@
 
 | Ticket | Feature                                       |
 |--------|-----------------------------------------------|
-| [#174] | Share layout configurations with team members |
-| [#175] | "Pin" layout as team default                  |
-| [#176] | Layout permissions (view, edit, delete)       |
-| [#177] | Layout comments and annotations               |
-| [#178] | Layout versioning with diff viewer            |
+| #174   | Share layout configurations with team members |
+| #175   | "Pin" layout as team default                  |
+| #176   | Layout permissions (view, edit, delete)       |
+| #177   | Layout comments and annotations               |
+| #178   | Layout versioning with diff viewer            |
+
+#### Navigation & Controls ✅ PARTIALLY COMPLETE
+- ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
+- ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)
+- ✅ **Pan & Drag**: Middle-click or space+drag, smooth panning
+- 📋 **Global Search** (Cmd+F): Find classes with highlighting
+- 📋 **Search Focus Mode**: Dim everything except search results
+- 📋 **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
+- 📋 **Canvas Layers**: Background, Node, Edge, Annotation, UI layers with toggle/lock
+- 📋 **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
+- 📋 **Focus Mode**: Isolate selected classes and relationships, blur non-focused
+
+| Ticket | Feature Description                                          |
+|--------|--------------------------------------------------------------|
+| #317   | Add the ability to search for classes inside the canvas view |
+| #318   | Canvas search focus mode                                     |
 
 ---
 
@@ -106,12 +104,12 @@
 
 | Ticket | Feature                                              |
 |--------|------------------------------------------------------|
-| [#186] | Clicking a class in the sidebar focuses it on canvas |
-| [#187] | Regex search support                                 |
-| [#188] | Search within property names/descriptions            |
-| [#194] | Search highlighting on canvas                        |
-| [#195] | Focus mode - dim non-matching results                |
-| [#196] | Search history with clear option                     |
+| #186   | Clicking a class in the sidebar focuses it on canvas |
+| #187   | Regex search support                                 |
+| #188   | Search within property names/descriptions            |
+| #194   | Search highlighting on canvas                        |
+| #195   | Focus mode - dim non-matching results                |
+| #196   | Search history with clear option                     |
 
 #### Canvas Bookmarks 📋 PLANNED
 - 📋 Bookmark important canvas areas with names
@@ -160,6 +158,20 @@
 - 📋 Focus on group (show only group members)
 - 📋 Exit focus mode with Esc key
 
+#### Presentation Mode 📋 PLANNED
+- Full-screen canvas mode
+- Hide all toolbars and UI
+- Slide-show of bookmarked areas
+- Presentation notes (speaker view)
+- Timer and slide counter
+- Presenter controls (keyboard shortcuts)
+- Laser pointer mode
+- Recording mode (capture presentation as video)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+
 ---
 
 ### 3. Node Grouping & Organization
@@ -195,10 +207,10 @@
 
 | Ticket | Feature                                                            |
 |--------|--------------------------------------------------------------------|
-| [#154] | Collapsible groups to reduce canvas clutter                        |
-| [#155] | Nested groups for hierarchical organization                        |
-| [#156] | Group-level operations: move, delete, export, duplicate, bulk edit |
-| [#285] | Ungroup nodes by deleting the group                                |
+| #154   | Collapsible groups to reduce canvas clutter                        |
+| #155   | Nested groups for hierarchical organization                        |
+| #156   | Group-level operations: move, delete, export, duplicate, bulk edit |
+| #285   | Ungroup nodes by deleting the group                                |
 
 #### Group Templates 📋 PLANNED
 - 📋 Pre-defined group structures for common patterns:
@@ -211,9 +223,9 @@
 
 | Ticket | Feature                                         |
 |--------|-------------------------------------------------|
-| [#159] | Pre-defined group templates for common patterns |
-| [#160] | Save and share custom group templates           |
-| [#161] | Share group templates across projects/tenants   |
+| #159   | Pre-defined group templates for common patterns |
+| #160   | Save and share custom group templates           |
+| #161   | Share group templates across projects/tenants   |
 
 ---
 
@@ -246,8 +258,13 @@
     - Border style (solid, dashed, dotted)
     - Shadow effects (drop shadow, inner shadow)
 
-| Ticket | Feature                                               |
-|--------|-------------------------------------------------------|
+| Ticket | Feature Description               |
+|--------|-----------------------------------|
+| #339   | Add custom coloring for nodes     |
+| #340   | Add custom node icons for styling |
+| #341   | Custom node sizing                |
+| #342   | Add node border configuration     |
+| #343   | Add custom node label styling     |
 
 #### Edge/Relationship Styling 📋 PLANNED
 - 📋 Different line styles for relationship types:
@@ -266,6 +283,30 @@
 - 📋 Arrow styles: Standard, Diamond, Circle, Open arrow
 - 📋 Animated edges (flowing dots for data flow)
 
+| Ticket | Feature Description                   |
+|--------|---------------------------------------|
+| #344   | Adds edge styling                     |
+| #345   | Adds edge color and thickness styling |
+| #346   | Adds edge routing styles              |
+| #347   | Adds edge arrow styles                |
+| #348   | Adds animation to edges               |
+| #349   | Adds edge hover effects               |
+
+**Grid & Alignment:** 📋 PLANNED
+- 📋 Grid snapping (adjustable size: 10px, 20px, 50px)
+- 📋 Grid style (dots, lines, crosses)
+- 📋 Smart guides on drag
+- 📋 Horizontal/vertical rulers
+- 📋 Equal spacing tools
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+| #324   | Canvas grid snapping settings                    |
+| #325   | Add grid styling to the canvas                   |
+| #326   | Add smart guides when dragging nodes             |
+| #327   | Add Horizontal and Vertical rulers to the canvas |
+| #328   | Equal Spacing tools for the canvas               |
+
 #### Canvas Themes 📋 PLANNED
 - 📋 Pre-built themes:
   - 📋 Light mode (default)
@@ -283,19 +324,93 @@
 | Ticket | Feature                                                            |
 |--------|--------------------------------------------------------------------|
 | #309   | Custom color themes to choose from                                 |
-| [#185] | Custom Colors: Per-class color picker, color by group, stereotypes |
-
-#### Grid & Alignment 📋 PLANNED
-- 📋 **Grid Snapping**: Snap nodes to grid, adjustable grid size
-- 📋 **Alignment Tools**: Align edges, centers, distribute evenly
-- 📋 **Smart Guides**: Show alignment guides during drag
-- 📋 **Rulers**: Horizontal/vertical ruler bars with custom guide lines
+| #185   | Custom Colors: Per-class color picker, color by group, stereotypes |
 
 #### Canvas Background 📋 PLANNED
-- 📋 Solid color, Grid pattern, Custom image upload
-- 📋 Gradient backgrounds, Texture patterns
+- 📋 Background options (solid color, grid pattern, custom image, gradient, textures)
 - 📋 Background opacity and blur
-- 📋 Infinite canvas scrolling
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+| #329   | Add background options to the canvas |
+| #330   | Add background opacity and blur      |
+
+---
+
+### 4.1 Smart Canvas Features
+
+**Intelligent Layout Suggestions** ✅ IMPLEMENTED
+- AI-powered layout recommendations:
+  - ✅ Analyze schema structure and suggest best layout type
+  - ✅ Detect strongly connected components
+  - ✅ Suggest groupings based on relationships
+  - ✅ Identify central/hub classes
+  - ✅ Recommend hierarchy roots
+- ✅ "Auto-organize" button with multiple suggestions (8 layout algorithms)
+- ✅ Preview suggestions before applying
+- 📋 Rating system for suggestions (thumbs up/down to improve)
+- 📋 Machine learning from user preferences
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Canvas Analysis** ✅ PARTIALLY IMPLEMENTED
+- **Schema Metrics**:
+  - ✅ Total classes, properties, relationships
+  - ✅ Average properties per class
+  - ✅ Most connected classes (hubs)
+  - ✅ Isolated classes (no relationships)
+  - 📋 Deepest dependency chains
+  - 📋 Circular dependencies count
+- **Layout Quality Score**:
+  - 📋 Edge crossing count (lower is better)
+  - 📋 Node spacing uniformity
+  - 📋 Layout symmetry
+  - 📋 Visual balance
+- **Suggestions**:
+  - 📋 "Reduce edge crossings by switching to hierarchical layout"
+  - 📋 "Group these 5 classes - they're all related"
+  - 📋 "Class X is isolated - consider adding relationships"
+  - 📋 "Large clusters detected - consider splitting into groups"
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Canvas Performance Optimizations** ✅ IMPLEMENTED
+- **Virtual Rendering**:
+  - ✅ Render only visible nodes (viewport culling)
+  - ✅ Node pooling and recycling
+  - ✅ Progressive rendering for large schemas (1000+ nodes)
+  - 📋 Canvas split into chunks/tiles
+- **Level of Detail (LOD)**: ✅ IMPLEMENTED
+  - ✅ When zoomed out >200%, show simplified nodes
+  - ✅ At high zoom, hide property details, show only class names
+  - ✅ Dynamic detail based on zoom level
+  - ✅ Fade transitions between LOD levels
+  - 📋 Show canvas node detail for properties that reference others even when collapsed
+- **Caching**:
+  - ✅ Cache rendered node SVG/Canvas elements
+  - ✅ Cache layout calculations
+  - ✅ Cache relationship paths
+  - ✅ Invalidate cache only on changes
+- **Web Workers**:
+  - 📋 Layout calculations in background thread
+  - 📋 Node rendering in worker (OffscreenCanvas)
+  - 📋 Relationship path calculations async
+  - 📋 Non-blocking canvas operations
+- **Request Animation Frame**:
+  - ✅ Smooth 60fps animations
+  - ✅ Batch DOM updates
+  - ✅ Throttle mouse move events
+- **Memory Management**:
+  - Lazy load node properties
+  - Unload off-screen nodes
+  - Garbage collect unused elements
+  - Memory profiling tools
+
+| Ticket | Feature Description                                          |
+|--------|--------------------------------------------------------------|
+| [#199] | Show property references even when class nodes are collapsed |
 
 ---
 
@@ -312,16 +427,25 @@
 - 📋 Note search across canvas
 - 📋 Convert notes to tasks
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Arrows & Shapes 📋 PLANNED
 - 📋 Draw arrows between any points
 - 📋 Shapes: Rectangles, Circles, Lines, Polygons, Freehand
 - 📋 Shape styling: Fill, border, shadows
 - 📋 Use cases: Highlight regions, swim lanes, visual separators
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Text Labels 📋 PLANNED
 - 📋 Free-form text anywhere on canvas
 - 📋 Rich text formatting, rotation
 - 📋 Link text to URLs
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
 
 #### Presentation Mode 📋 PLANNED
 - 📋 Full-screen canvas mode with hidden UI
@@ -330,6 +454,9 @@
 - 📋 Timer and slide counter
 - 📋 Laser pointer mode
 - 📋 Recording mode (capture as video)
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
 
 ---
 
@@ -347,10 +474,16 @@
     - Visual: Color, size, style modifications
     - Annotations: Notes, shapes, labels
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Undo/Redo UI 📋 PLANNED
 - 📋 Keyboard shortcuts: `Cmd+Z` (Undo), `Cmd+Shift+Z` (Redo)
 - 📋 Toolbar buttons with dropdown showing last 10 actions
 - 📋 Click any action to undo/redo to that point
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
 
 #### History Panel 📋 PLANNED
 - 📋 Dedicated history panel (toggle with `Cmd+H`)
@@ -359,11 +492,17 @@
 - 📋 Before/after previews for each action
 - 📋 Jump to any point in history
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Advanced Features 📋 PLANNED
 - 📋 Selective undo: Undo specific actions without undoing everything
 - 📋 Branch history for collaborative editing
 - 📋 Persistent history across browser sessions
 - 📋 Server-side backup and sync across devices
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
 
 ---
 
@@ -385,15 +524,63 @@
 - 📋 Node rendering in worker (OffscreenCanvas)
 - 📋 Non-blocking canvas operations
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 ---
 
 ### 8. Canvas Export
 
 #### Export Options 📋 PLANNED
-- 📋 High-resolution: 1x, 2x, 4x, 8x with customizable DPI
-- 📋 Selective export: Selected nodes, viewport, specific groups, entire canvas
-- 📋 Include/exclude: UI elements, grid, annotations, hidden nodes
-- 📋 Background color/transparency, watermark, timestamp
+
+**Canvas Export Options**
+- **Export Formats**:
+  - ✅ PNG (raster image)
+  - ✅ JPG (photo quality)
+  - ✅ SVG (vector, scalable)
+  - ✅ PDF (document format)
+  - ✅ Mermaid diagram code
+  - ✅ PlantUML code
+  - ✅ GraphML (for yEd, Gephi)
+  - ✅ DOT (Graphviz)
+  - ✅ JSON (raw data)
+- **High-Resolution Export**:
+  - 📋 1x (default), 2x, 4x, 8x resolution
+  - 📋 Customizable DPI (72, 150, 300, 600)
+  - 📋 Export dimensions in pixels or cm/inches
+- **Selective Export**:
+  - Export only selected nodes
+  - 📋 Export current viewport
+  - 📋 Export specific groups
+  - 📋 Export entire canvas
+- **Export Options**:
+  - 📋 Include/exclude UI elements
+  - 📋 Include/exclude grid
+  - Include/exclude annotations
+  - Include/exclude hidden nodes
+  - Background color/transparency
+  - 📋 Add watermark
+  - 📋 Add timestamp and metadata
+- **Batch Export**:
+  - Export all groups separately
+  - Export each layout snapshot
+  - Export multiple formats at once
+- **Animated Export**:
+  - Export layout transitions as animated GIF
+  - Export canvas walkthrough as video (WebM, MP4)
+  - Adjustable frame rate and duration
+  - Add narration (audio recording)
+
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| #402   | Adds resolution specifications for exports |
+| #403   | Export the current viewport                |
+| #404   | Export specific groups                     |
+| #405   | Export entire canvas                       |
+| #406   | Include/exclude UI elements            |
+| #407   | Include/exclude grid |
+| #408   | Export option to add watermark |
+| #409   | Add timestamp and metadata |
 
 #### Batch & Animated Export 📋 PLANNED
 - 📋 Export all groups separately
@@ -414,25 +601,40 @@
 - 📋 Cursor follows as they move
 - 📋 Hide/show cursors toggle
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Live Edits 📋 PLANNED
 - 📋 See changes as teammates make them
 - 📋 Smooth animations for remote changes
 - 📋 Change indicators (flash highlight)
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
 
 #### Locked Nodes 📋 PLANNED
 - 📋 Lock icon on nodes being edited by others
 - 📋 "Being edited by [Name]" tooltip
 - 📋 Auto-lock/unlock mechanisms
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Conflict Resolution 📋 PLANNED
 - 📋 Operational Transform for concurrent edits
 - 📋 Conflict warnings before saving
 - 📋 "Yours vs Theirs" comparison UI
 
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+
 #### Chat Overlay 📋 PLANNED
 - 📋 Quick chat widget without leaving canvas
 - 📋 @mention teammates with canvas link
 - 📋 Emoji reactions, message history
+
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
 
 ---
 
@@ -736,7 +938,7 @@
 
 ---
 
-### Enterprise Feature Summary
+# Enterprise Feature Summary
 
 | Category | Features | Priority | Timeline |
 |----------|----------|----------|----------|
@@ -747,3 +949,18 @@
 | Integration | External tools, API/SDK, Documentation | 🟠 Medium | Q3 2026 |
 | Accessibility | Keyboard nav, Screen readers, i18n | 🟡 Low | Q4 2026 |
 
+---
+
+# Implemented features summary
+
+**Constraint Visualization** ✅ IMPLEMENTED
+- Visual indicators for constraints on canvas:
+  - ✅ Required (bold border)
+  - ✅ Optional (dashed border)
+  - ✅ Deprecated (strikethrough with badge)
+  - ✅ Validated (checkmark badge)
+  - ✅ Enum indicator badge
+  - ✅ Edge cardinality visualization
+- ✅ Constraint tooltips on hover
+- ✅ Constraint summary panel
+- ✅ Tags displayed on class nodes

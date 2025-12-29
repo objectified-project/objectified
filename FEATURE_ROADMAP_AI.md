@@ -1,0 +1,370 @@
+# AI Features Roadmap
+
+This outlines the AI features that are planned for the Objectified platform.
+
+
+## 🤖 AI Assistant & Ollama Integration (NEW)
+
+> **Section Status**: 📋 Planned - AI-powered features using self-hosted Ollama cluster
+>
+> **Infrastructure**: Self-hosted Ollama cluster with Qwen 2.5 and Llama 3.2 models
+
+### Preparation
+
+- Install Ollama Cluster
+- Set up Mac Mini cluster using MLX
+- Deploy Ollama with Qwen 2.5 and Llama 3.2 models
+- Configure network access and security
+- Test Ollama API connectivity from Objectified backend
+- Benchmark response times and resource usage
+- Establish monitoring and alerting for Ollama cluster health
+- Document Ollama setup and maintenance procedures
+- Set up networking so that the cluster is only accessible using the 10.1.2.xx subnet
+- Set up licensing table to track Ollama usage per tenant
+- Set up monitoring of all conversations for auditing purposes
+
+| Ticket | Feature Description              |
+|--------|----------------------------------|
+
+### Studio AI Chatbot
+
+**Chatbot Panel** 📋 PLANNED
+- 📋 **Panel Location**:
+    - 📋 Slide-out panel from right side of Studio
+    - 📋 Floating chat bubble option
+    - 📋 Full-screen chat mode for complex conversations
+    - 📋 Keyboard shortcut to toggle (`Cmd+Shift+A`)
+    - 📋 Bottom right-hand corner of the canvas opens the AI Chatbot
+- 📋 **Chat Interface**:
+    - 📋 Modern chat UI with message bubbles
+    - 📋 User messages vs AI responses clearly distinguished
+    - 📋 Typing indicators while AI processes
+    - 📋 Markdown rendering in responses
+    - 📋 Code blocks with syntax highlighting
+    - 📋 Copy button for code snippets
+    - 📋 Regenerate response button
+    - 📋 Thumbs up/down for feedback
+    - 📋 OpenAPI Specifications are parsed using ```json``` markers, click button to view/accept import
+
+| Ticket | Feature Description              |
+|--------|----------------------------------|
+| #257   | AI Chatbot Placement             |
+| #258   | AI Chatbot Guidelines for design |
+
+**Conversation Features** 📋 PLANNED
+- 📋 **Conversation History**:
+    - 📋 Persist conversations per project/version
+    - 📋 Browse past conversations
+    - 📋 Search conversation history
+    - 📋 Export conversations as markdown
+    - 📋 Clear conversation option
+- 📋 **Context Awareness**:
+    - 📋 AI knows current project, version, classes
+    - 📋 AI can reference existing schemas in responses
+    - 📋 AI understands selected items on canvas
+    - 📋 AI can see property definitions
+    - 📋 Automatic context injection into prompts
+- 📋 **Multi-Turn Conversations**:
+    - 📋 Follow-up questions with context
+    - 📋 Clarification requests
+    - 📋 Iterative refinement of schemas
+    - 📋 "Make it more like X" type instructions
+- Add guardrails to prevent sensitive data exposure
+- Add guardrails to prevent malicious code generation
+
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| #259   | AI Chat Context Awareness                          |
+| #260   | AI Multi-Turn Conversation with History            |
+| #261   | AI Conversation history actions                    |
+| #262   | Install guardrails.ai server                       |
+| #263   | Add guardrails to prevent sensitive data exposure  |
+| #264   | Add guardrails to prevent further sensitive issues |
+
+**Quick Actions from Chat** 📋 PLANNED
+- AI responses include action buttons:
+    - "Create this class" → One-click class creation
+    - "Add these properties" → Batch property addition
+    - "Apply to current class" → Modify selected class
+    - "Generate path for this" → Create CRUD endpoints
+    - "Copy to clipboard" → Copy generated JSON/YAML
+- Preview changes before applying
+- Undo AI-generated changes
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### Ollama Integration
+
+**Ollama Connection** 📋 PLANNED
+- **Configuration**:
+    - Ollama server URL configuration (cluster support)
+    - Multiple server endpoints for load balancing
+    - Health check and failover
+    - Connection timeout settings
+    - Retry policies
+- 📋 **Model Selection**:
+    - 📋 Choose from available models:
+        - 📋 Qwen 2.5
+        - 📋 Llama 3.2
+        - 📋 CodeLlama for code-specific tasks
+        - 📋 Custom fine-tuned models
+    - Model switching per task type
+    - Model performance comparison
+    - 📋 Default model per tenant/project
+- **Resource Management**:
+    - GPU memory monitoring
+    - Request queuing for high load
+    - Priority queues for different users
+    - Rate limiting per user/tenant
+    - Usage tracking and quotas
+
+| Ticket | Feature Description                     |
+|--------|-----------------------------------------|
+| #265   | Ollama model selection                  |
+| #266   | Ollama default model per tenant/project |
+
+**Ollama API Integration** 📋 PLANNED
+- **Streaming Responses**:
+    - Server-Sent Events (SSE) for streaming
+    - Token-by-token display
+    - Cancel generation mid-stream
+    - Progress indication
+- **Caching**:
+    - Cache common queries
+    - Semantic similarity matching
+    - Cache invalidation on schema changes
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### Natural Language to Schema
+
+**Schema Generation from Description** 📋 PLANNED
+- 📋 **Input Methods**:
+    - 📋 Free-form text description
+    - 📋 Structured prompts with templates
+    - 📋 Voice input (speech-to-text)
+    - 📋 Paste requirements document
+- 📋 **Example Prompts**:
+    - 📋 "Create a User class with email, password hash, created date, and roles array"
+    - 📋 "I need an e-commerce order with line items, shipping address, and payment info"
+    - 📋 "Generate a blog post schema with author reference, tags, and comments"
+    - 📋 "Create a REST API for managing a todo list application"
+- **Generation Output**:
+    - Preview generated schema before creation
+    - JSON Schema format display
+    - Property list with types
+    - Relationship suggestions
+    - Edit before applying
+- **Iterative Refinement**:
+    - "Add a phone number field"
+    - "Make email required"
+    - "Add validation for password length"
+    - "Include timestamps for audit"
+
+| Ticket | Feature Description                                      |
+|--------|----------------------------------------------------------|
+| #267   | Adds the ability to generate a schema from a description |
+| #268   | Adds example prompts                                     |
+
+**Scenario-Based API Generation** 📋 PLANNED
+- **User Story Input**:
+    - "As a user, I want to register, login, and manage my profile"
+    - "As an admin, I want to manage products, categories, and inventory"
+    - "As a customer, I want to browse products, add to cart, and checkout"
+- **Generated Output**:
+    - Complete schema set for scenario
+    - CRUD endpoints for each resource
+    - Request/response bodies
+    - Authentication requirements
+    - Error responses
+- **Domain Templates**:
+    - E-commerce (products, orders, customers)
+    - SaaS (users, subscriptions, billing)
+    - Social (posts, comments, likes, follows)
+    - Healthcare (patients, appointments, records)
+    - Education (courses, students, enrollments)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### AI-Powered Property Suggestions
+
+**Smart Property Recommendations** 📋 PLANNED
+- 📋 **Trigger Conditions**:
+    - 📋 When creating a new class
+    - 📋 When class name is entered
+    - 📋 On-demand via chat or button
+    - 📋 After adding first few properties
+- 📋 **Suggestion Types**:
+    - 📋 Common properties for class type (e.g., "User" → email, password, name)
+    - 📋 Missing standard properties (e.g., id, createdAt, updatedAt)
+    - 📋 Related properties based on existing ones
+    - 📋 Industry-standard properties (FHIR for healthcare, etc.)
+- 📋 **Suggestion UI**:
+    - 📋 Property suggestion dropdown
+    - 📋 Bulk accept/reject
+    - 📋 Customize before adding
+    - 📋 "Add all suggested" button
+    - 📋 Explanation for each suggestion
+
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| #269   | Adds the ability to suggest properties based on AI |
+| #270   | Adds a property suggestion dropdown                |
+| #271   | Adds bulk accept/reject for property suggestions   |
+| #272   | Adds customization before adding                   |
+| #273   | Adds explanations for each suggestion              |
+| #274   | Adds "Add all suggested" button                    |
+| #275   | Adds trigger conditions for the Suggestion UI      |
+| #276   | Adds analyze button for properties analysis        |
+
+**Type and Constraint Inference** 📋 PLANNED
+- 📋 Suggest type based on property name:
+    - 📋 `email` → string with email format
+    - 📋 `createdAt` → string with date-time format
+    - 📋 `age` → integer with minimum 0
+    - 📋 `price` → number with minimum 0
+    - 📋 `isActive` → boolean
+- 📋 Suggest constraints:
+    - 📋 String length limits
+    - 📋 Numeric ranges
+    - 📋 Pattern validation
+    - 📋 Required vs optional
+
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| #277   | Adds type inference based on property name |
+| #278   | Adds constraint suggestions for properties |
+
+### AI Schema Review & Improvement
+
+**Schema Quality Analysis** 📋 PLANNED
+- **Review Triggers**:
+    - On-demand via chat command
+    - Before version publish
+    - Scheduled periodic reviews
+    - On significant changes
+- **Review Categories**:
+    - **Naming Conventions**: Consistent naming (camelCase, PascalCase)
+    - **Documentation**: Missing descriptions, examples
+    - **Validation**: Missing constraints, weak validation
+    - **Relationships**: Orphaned schemas, missing references
+    - **Best Practices**: OpenAPI best practices compliance
+    - **Security**: Sensitive data exposure, PII handling
+- **Review Output**:
+    - Severity levels (error, warning, info)
+    - Specific recommendations
+    - One-click fixes
+    - Explanation of why each issue matters
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Improvement Suggestions** 📋 PLANNED
+- "Consider adding pagination to this list endpoint"
+- "This schema could benefit from inheritance using allOf"
+- "Add a discriminator for this polymorphic type"
+- "Consider breaking this large schema into smaller components"
+- "Add error responses for common failure scenarios"
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### AI Documentation Generation
+
+**Auto-Generate Descriptions** 📋 PLANNED
+- Generate property descriptions from names and types
+- Generate class descriptions from properties
+- Generate operation summaries from path and method
+- Generate example values that make sense
+- Support multiple languages (i18n)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**API Usage Examples** 📋 PLANNED
+- Generate curl commands for each operation
+- Generate code snippets in multiple languages:
+    - JavaScript/TypeScript (fetch, axios)
+    - Python (requests, httpx)
+    - Java (OkHttp, HttpClient)
+    - Go (net/http)
+- Generate realistic example payloads
+- Generate test scenarios
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Integration Guides** 📋 PLANNED
+- Generate getting started guide
+- Generate authentication guide
+- Generate error handling guide
+- Generate migration guides between versions
+- Generate SDK usage examples
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### AI Learning & Personalization
+
+**Learn from Usage** 📋 PLANNED
+- Track accepted vs rejected suggestions
+- Learn project-specific naming conventions
+- Learn team's preferred patterns
+- Improve suggestions over time
+- Per-tenant model fine-tuning (future)
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Custom Prompts & Templates** 📋 PLANNED
+- Save custom prompt templates
+- Share prompts across team
+- Prompt library with categories
+- Import prompts from community
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+### AI Configuration
+
+**Admin Settings** 📋 PLANNED
+- **Ollama Cluster Configuration**:
+    - Primary server URL
+    - Failover server URLs
+    - Load balancing strategy (round-robin, least-connections)
+    - Health check interval
+    - Connection pool size
+- **Model Configuration**:
+    - Default model for chat
+    - Default model for generation
+    - Default model for review
+    - Model temperature settings
+    - Max tokens per request
+    - Context window size
+- **Usage Limits**:
+    - Requests per user per hour
+    - Requests per tenant per day
+    - Token budget per request
+    - Queue depth limits
+- **Feature Toggles**:
+    - Enable/disable AI features per tenant
+    - Enable/disable specific AI capabilities
+    - Beta feature flags
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Security & Privacy** 📋 PLANNED
+- All AI processing on self-hosted Ollama
+- No data sent to external services
+- Conversation encryption at rest
+- Audit logging of AI interactions
+- PII detection and redaction in prompts
+- Role-based access to AI features
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
