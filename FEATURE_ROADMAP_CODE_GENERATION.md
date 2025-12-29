@@ -165,17 +165,17 @@
 
 | Ticket | Feature Description     |
 |--------|-------------------------|
-| [#221] | Export to GraphQL SDL   |
-| [#222] | Export to AsyncAPI      |
-| [#223] | Export to TypeScript    |
-| [#224] | Export to Python models |
-| [#225] | Export to Java          |
-| [#226] | Export to C#            |
-| [#227] | Export to Golang        |
-| [#228] | Export to SQL           |
-| [#229] | Export to Markdown      |
-| [#230] | Export to Excel         |
-| [#231] | Export to PDF           |
+| #221   | Export to GraphQL SDL   |
+| #222   | Export to AsyncAPI      |
+| #223   | Export to TypeScript    |
+| #224   | Export to Python models |
+| #225   | Export to Java          |
+| #226   | Export to C#            |
+| #227   | Export to Golang        |
+| #228   | Export to SQL           |
+| #229   | Export to Markdown      |
+| #230   | Export to Excel         |
+| #231   | Export to PDF           |
 
 ---
 
