@@ -82,6 +82,37 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
+##### Schema Import/Export
+
+**Import From** 📋 PLANNED
+- 📋 Arazzo
+- 📋 OpenAPI 2.0 (Swagger)
+- 📋 OpenAPI 3.0/3.1
+- 📋 JSON Schema
+- Postman Collections
+- 📋 GraphQL SDL
+- 📋 AsyncAPI
+- 📋 RAML
+- API Blueprint
+- 📋 Protobuf
+- 📋 Avro
+- 📋 Thrift
+- Excel/CSV (data definitions)
+- Database (reverse engineer from DB)
+
+| Ticket | Feature Description         |
+|--------|-----------------------------|
+| #232   | Import from OpenAPI 2.0     |
+| #233   | Import from OpenAPI 3.0/3.1 |
+| #234   | Import from JSON Schema     |
+| #235   | Import from GraphQL SDL     |
+| #236   | Import from AsyncAPI        |
+| #237   | Import from RAML            |
+| #238   | Import from Protobuf        |
+| #239   | Import from Avro            |
+| #240   | Import from Thrift          |
+| #299   | Import from Arazzo          |
+
 #### 4.3 Pre-Import Analysis 📋 PLANNED
 
 ##### Format Detection & Validation 📋 PARTIALLY IMPLEMENTED

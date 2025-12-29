@@ -75,7 +75,12 @@
 #### Navigation & Controls ✅ PARTIALLY COMPLETE
 - ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
 - ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)
+  - Zoom to selection (fit selected nodes)
+  - Zoom presets: 25%, 50%, 100%, 150%, 200%
+  - Zoom slider in toolbar
 - ✅ **Pan & Drag**: Middle-click or space+drag, smooth panning
+  - Pan with middle mouse button or space+drag
+  - Pan to edges on node drag
 - 📋 **Global Search** (Cmd+F): Find classes with highlighting
 - 📋 **Search Focus Mode**: Dim everything except search results
 - 📋 **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
@@ -97,6 +102,12 @@
 - 📋 Search as you type with highlighting
 - 📋 Click result to focus and zoom to class on canvas
 - 📋 "Focus Mode": Dim everything except search results
+  - Isolate selected classes and immediate relationships
+  - Blur/dim non-focused nodes
+  - Show only 1st-degree connections (or 2nd, 3rd degree)
+  - Expand focus incrementally
+  - Focus on group (show only group members)
+  - Exit focus mode (Esc key)
 - 📋 Search history (recent searches)
 - 📋 Search filters: by type, group, properties
 - 📋 Regex search support
@@ -129,6 +140,8 @@
     - **Node Layer**: Class nodes
     - **Edge Layer**: Relationships/references
     - **Annotation Layer**: Sticky notes, labels (drawer on right side like Lucidchart)
+      - Notes are per-session on the Project and Version, so these should appear as notes like Lucidcharts on the right-hand side
+      - The right-hand side shelf should be a drawer that can open/close
     - **UI Layer**: Selection boxes, handles
 - 📋 Toggle layers on/off
 - 📋 Lock layers to prevent editing
@@ -158,6 +171,15 @@
 - 📋 Focus on group (show only group members)
 - 📋 Exit focus mode with Esc key
 
+#### Visual Feedback
+- 📋 **Dropzone highlighting**: Visual cues for valid drop targets
+- 📋 **Ghost preview**: Show preview while dragging
+- 📋 **Invalid drop indicator**: Clear feedback for invalid drops
+- 📋 **Snap indicators**: Show snap points during drag
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 #### Presentation Mode 📋 PLANNED
 - Full-screen canvas mode
 - Hide all toolbars and UI
@@ -171,6 +193,27 @@
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
+#### Current Sidebars ✅ PARTIALLY COMPLETE
+- ✅ **Classes sidebar**: List of all classes with search
+- ✅ **Properties panel**: Edit class properties
+- 📋 **Annotations drawer**: Right-side notes (Lucidchart style)
+- 📋 **History panel**: Undo/redo history with preview
+- 📋 **Layers panel**: Toggle visibility of canvas layers
+- 📋 **Bookmarks panel**: Quick navigation to saved views
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+#### Panel Behaviors 📋 PLANNED
+- 📋 **Resizable panels**: Drag to resize
+- 📋 **Collapsible panels**: Minimize to edge
+- 📋 **Pinned panels**: Keep panel always visible
+- 📋 **Floating panels**: Detach to separate window
+- 📋 **Panel tabs**: Stack multiple panels with tabs
+- 📋 **Panel positions**: Left, right, top, bottom
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 
@@ -211,21 +254,6 @@
 | #155   | Nested groups for hierarchical organization                        |
 | #156   | Group-level operations: move, delete, export, duplicate, bulk edit |
 | #285   | Ungroup nodes by deleting the group                                |
-
-#### Group Templates 📋 PLANNED
-- 📋 Pre-defined group structures for common patterns:
-    - REST Resource Group (Create, Read, Update, Delete classes)
-    - Authentication Group (User, Token, Session, Role)
-    - E-commerce Group (Product, Cart, Order, Payment)
-    - Audit Group (Event, Log, History)
-- 📋 Save custom groups as reusable templates
-- 📋 Share group templates across projects/tenants
-
-| Ticket | Feature                                         |
-|--------|-------------------------------------------------|
-| #159   | Pre-defined group templates for common patterns |
-| #160   | Save and share custom group templates           |
-| #161   | Share group templates across projects/tenants   |
 
 ---
 
@@ -457,6 +485,17 @@
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
+
+#### Charts & Metrics ✅ PARTIALLY COMPLETE
+- ✅ **Quality score gauge**: Visual score indicator (0-100)
+- ✅ **Complexity charts**: Schema complexity visualization
+- 📋 **Relationship graphs**: Visual dependency maps
+- 📋 **Timeline views**: Schema evolution over time
+
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| #322   | Display the relationship graph for a schema  |
+| #323   | Timeline view of schema changes over time    |
 
 ---
 
@@ -736,21 +775,6 @@
 - 📋 Contextual actions based on selection
 - 📋 Custom action shortcuts configuration
 - 📋 Action categories: Navigate, Edit, View, Export, Layout
-
-| Ticket | Feature |
-|--------|---------|
-
-#### Schema Templates & Snippets 📋 PLANNED
-- 📋 Drag-and-drop schema templates onto canvas:
-  - CRUD Resource (Create, Read, Update, Delete, List)
-  - Authentication Set (User, Session, Token, Role, Permission)
-  - Pagination Response (items, total, page, pageSize, hasMore)
-  - Error Response (code, message, details, timestamp)
-  - Audit Trail (id, action, actor, timestamp, changes)
-- 📋 Custom template creation from selected classes
-- 📋 Template variables with auto-fill prompts
-- 📋 Template marketplace integration
-- 📋 Team-shared template library
 
 | Ticket | Feature |
 |--------|---------|

@@ -812,7 +812,7 @@ This roadmap is a living document. Feedback and suggestions are welcome:
 3. **Implementation Details**: Contribute to design docs in `/docs/paths/`
 4. **User Research**: Schedule interview with Product team
 
-**Last Updated**: December 27, 2025  
+**Last Updated**: December 29, 2025  
 **Next Review**: January 15, 2026  
 **Maintained By**: API Platform Team
 
@@ -846,6 +846,24 @@ This roadmap is a living document. Feedback and suggestions are welcome:
 - [ ] Merge conflict resolution UI for path definition conflicts
 - [ ] Change diff visualization between versions
 - [ ] Audit log for compliance: who changed what, when
+
+
+### OpenAPI 3.1 / JSON Schema 2020-12 Feature Coverage
+
+**Not Yet Implemented** 📋 PLANNED (Low Priority)
+- 📋 `$id`: Schema identifier for referencing
+- 📋 `$schema`: JSON Schema version declaration
+- 📋 `$ref`: Schema references (currently handled via class references)
+- 📋 `$defs`: Reusable schema definitions
+- 📋 `$anchor`: Named anchors for deep linking
+- 📋 `$dynamicRef`/`$dynamicAnchor`: Dynamic references (advanced)
+- 📋 `$vocabulary`: Custom vocabulary definitions
+- 📋 `contentMediaType`: Media type for string content
+- 📋 `contentEncoding`: Content encoding (base64, etc.)
+- 📋 `contentSchema`: Schema for decoded content
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
 
 ---
 

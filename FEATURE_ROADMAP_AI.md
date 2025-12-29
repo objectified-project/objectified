@@ -22,6 +22,7 @@ This outlines the AI features that are planned for the Objectified platform.
 - Set up networking so that the cluster is only accessible using the 10.1.2.xx subnet
 - Set up licensing table to track Ollama usage per tenant
 - Set up monitoring of all conversations for auditing purposes
+- Set up Guardrails.ai application for guardrails enforcement across the entire platform's AI features
 
 | Ticket | Feature Description              |
 |--------|----------------------------------|
@@ -268,6 +269,47 @@ This outlines the AI features that are planned for the Objectified platform.
 - "Add a discriminator for this polymorphic type"
 - "Consider breaking this large schema into smaller components"
 - "Add error responses for common failure scenarios"
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Actionable Recommendations** 📋 PLANNED
+- 📋 AI-powered suggestions for improvement:
+  - 📋 "Add descriptions to 12 classes to improve docs score"
+  - 📋 "Rename 5 properties to follow camelCase convention"
+  - 📋 "Split 'User' class - it has 28 properties (recommended max: 15)"
+  - 📋 "Add pagination to 'GET /users' endpoint"
+- 📋 Prioritized action items (quick wins first)
+- 📋 Estimated score impact for each fix
+- 📋 Bulk apply recommendations
+
+| Ticket | Feature Description                    |
+|--------|----------------------------------------|
+| #253   | AI powered suggestions for improvement |
+| #254   | Prioritized action items               |
+| #255   | Estimated score impact for each fix    |
+| #256   | Add bulk apply recommendations         |
+
+### AI Schema Health Insights
+
+**Schema Complexity Analysis**
+- Cognitive complexity score per class
+- Dependency graph complexity
+- Cyclomatic complexity for conditional schemas
+- Maintainability index
+- Technical debt metrics
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
+**Best Practice Suggestions**
+- Context-aware tips based on schema type:
+  - E-commerce: "Consider adding inventory tracking"
+  - Authentication: "Implement refresh token pattern"
+  - Multi-tenant: "Add tenant isolation fields"
+- Industry-specific patterns
+- Security hardening suggestions
+- Performance optimization tips
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

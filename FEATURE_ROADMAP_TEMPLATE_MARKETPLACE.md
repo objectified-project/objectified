@@ -47,8 +47,8 @@ cases.
 
 | Ticket | Feature Description                                         |
 |--------|-------------------------------------------------------------|
-| [#242] | Add industry-specific schema categories                     |
-| [#243] | Add domain specific schema categories                        |
+| #242   | Add industry-specific schema categories                     |
+| #243   | Add domain specific schema categories                       |
 
 **Template Structure**
 - Each template includes:
@@ -115,7 +115,7 @@ cases.
 
 | Ticket | Feature Description                        |
 |--------|--------------------------------------------|
-| [#220] | Improve import using a wizard with guides  |
+| #220   | Improve import using a wizard with guides  |
 
 **Template Customization**
 - Customize before import:
