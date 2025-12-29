@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ } from 'lucide-react';
+import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, Link2 } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
 import { Button } from '../../ui/Button';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/db/class-import-actions';
+import UrlImportPanel from '../dashboard/UrlImportPanel';
 
 interface ClassImportDialogProps {
   open: boolean;
@@ -77,6 +78,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   existingClassNames,
 }) => {
   const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'select' | 'importing' | 'done'>('source');
+  const [selectedSource, setSelectedSource] = useState<'file' | 'url' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
@@ -89,10 +91,13 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportClassesResult | null>(null);
+  const [urlContent, setUrlContent] = useState<string | null>(null);
+  const [urlFilename, setUrlFilename] = useState<string | null>(null);
 
   const existingNamesSet = new Set(existingClassNames.map(n => n.toLowerCase()));
 
-  const handleSourceClick = () => {
+  const handleSourceClick = (source: 'file' | 'url') => {
+    setSelectedSource(source);
     setCurrentStep('file-upload');
   };
 
@@ -107,8 +112,11 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       setSchemas([]);
     } else if (currentStep === 'file-upload') {
       setCurrentStep('source');
+      setSelectedSource(null);
       setSelectedFile(null);
       setFileMetadata(null);
+      setUrlContent(null);
+      setUrlFilename(null);
     }
   };
 
@@ -118,6 +126,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     }
     // Reset all state
     setCurrentStep('source');
+    setSelectedSource(null);
     setSelectedFile(null);
     setFileMetadata(null);
     setAnalysisResult(null);
@@ -125,16 +134,19 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setSearchFilter('');
     setSelectedSchemaName(null);
     setImportResult(null);
+    setUrlContent(null);
+    setUrlFilename(null);
     onClose();
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile && !urlContent) return;
 
     setIsAnalyzing(true);
     try {
-      const content = await selectedFile.text();
-      const result = await analyzeSpecification(content, selectedFile.name);
+      const content = urlContent || await selectedFile!.text();
+      const filename = urlFilename || selectedFile?.name || 'openapi-spec.yaml';
+      const result = await analyzeSpecification(content, filename);
       setAnalysisResult(result);
 
       // Initialize schemas list with conflict detection
@@ -152,6 +164,36 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       setCurrentStep('select');
     } catch (error) {
       console.error('Analysis error:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleUrlSpecificationFetched = async (content: string, filename: string) => {
+    setUrlContent(content);
+    setUrlFilename(filename);
+
+    // Auto-analyze when URL content is fetched
+    setIsAnalyzing(true);
+    try {
+      const result = await analyzeSpecification(content, filename);
+      setAnalysisResult(result);
+
+      // Initialize schemas list with conflict detection
+      const schemaObj = result.document?.components?.schemas || result.document?.definitions || {};
+      const schemaList: SchemaInfo[] = Object.keys(schemaObj).map(name => {
+        const exists = existingNamesSet.has(name.toLowerCase());
+        return {
+          name,
+          properties: countSchemaProperties(schemaObj[name]),
+          selected: !exists,
+          exists,
+        };
+      });
+      setSchemas(schemaList);
+      setCurrentStep('select');
+    } catch (error) {
+      console.error('URL content analysis error:', error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -371,20 +413,59 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">
                   Choose Import Source
                 </h2>
-                <div className="flex justify-center">
+                <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                  {/* File Upload */}
                   <button
-                    onClick={handleSourceClick}
-                    className="group relative p-6 rounded-lg border-2 transition-all duration-200 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md max-w-xs"
+                    onClick={() => handleSourceClick('file')}
+                    className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                      selectedSource === 'file'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                    }`}
                   >
                     <div className="flex flex-col items-center text-center">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                        selectedSource === 'file'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                      }`}>
                         <Upload className="h-6 w-6" />
                       </div>
-                      <div className="font-semibold mb-1 text-gray-900 dark:text-white">
+                      <div className={`font-semibold mb-1 ${
+                        selectedSource === 'file' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                      }`}>
                         File Upload
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
                         Upload OpenAPI/Swagger specification
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* URL Import */}
+                  <button
+                    onClick={() => handleSourceClick('url')}
+                    className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                      selectedSource === 'url'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center text-center">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                        selectedSource === 'url'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                      }`}>
+                        <Link2 className="h-6 w-6" />
+                      </div>
+                      <div className={`font-semibold mb-1 ${
+                        selectedSource === 'url' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                      }`}>
+                        URL Import
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Fetch from URL with authentication
                       </div>
                     </div>
                   </button>
@@ -393,7 +474,13 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
             </div>
           )}
 
-          {currentStep === 'file-upload' && (
+          {currentStep === 'file-upload' && selectedSource === 'url' && (
+            <UrlImportPanel
+              onSpecificationFetched={handleUrlSpecificationFetched}
+            />
+          )}
+
+          {currentStep === 'file-upload' && selectedSource === 'file' && (
             <>
               {/* Drop Zone */}
               <div className="mb-6">

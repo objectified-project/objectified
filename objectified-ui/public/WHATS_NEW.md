@@ -18,6 +18,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
+  - Class import now supports both file and URL import sources
 - Canvas improvements
   - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
@@ -41,5 +42,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: December 27, 2025*
+*Last updated: December 28, 2025*
 
