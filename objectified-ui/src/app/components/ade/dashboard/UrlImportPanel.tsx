@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Link2, Eye, EyeOff, CheckCircle2, AlertTriangle, Loader2, FileCode, Globe } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { fetchSpecificationFromUrl, validateImportUrl, UrlImportResult } from '../../../utils/url-import';
+import { fetchSpecificationFromUrl, validateImportUrl, UrlImportOptions, UrlImportResult } from '../../../utils/url-import';
 import { extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 
 interface UrlImportPanelProps {

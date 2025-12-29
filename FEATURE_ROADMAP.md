@@ -303,8 +303,8 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 |--------|--------------------------------------------------|
 
 ##### URL Import 📋 PLANNED
-- 📋 **Direct URL Import**: Fetch spec from public URL
-- 📋 **Authenticated URL**: Support for Bearer, API Key, Basic Auth
+- ✅ **Direct URL Import**: Fetch spec from public URL
+- ✅ **Authenticated URL**: Support for Bearer, API Key, Basic Auth
 - 📋 **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket
 - 📋 **Branch/Tag Selection**: Import specific versions from git
 - 📋 **Private Repository Support**: OAuth integration for private repos
@@ -313,7 +313,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description                     |
 |--------|-----------------------------------------|
-| #311   | Ability to import a URL                 |
 | #332   | Ability to import SwaggerHub            |
 | #333   | Ability to import Postman Collection    |
 
