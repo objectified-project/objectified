@@ -324,8 +324,8 @@
   - 📋 Nord
   - 📋 Darcula
 - 📋 Custom theme creator with full color control
-- 📋 Save and share custom themes
-- 📋 Theme marketplace
+- Save and share custom themes
+- Theme marketplace
 
 | Ticket | Feature                                                            |
 |--------|--------------------------------------------------------------------|
