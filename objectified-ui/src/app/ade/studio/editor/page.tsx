@@ -325,7 +325,7 @@ const StudioContent = () => {
     // Zoom to 1.5x if currently zoomed out, otherwise keep current zoom
     const targetZoom = currentZoom < 1 ? 1.5 : currentZoom;
 
-    setCenter(x, y, { zoom: targetZoom, duration: 800 });
+    setCenter(x, y, { zoom: targetZoom, duration: 250 });
   }, [nodes, setNodes, setCenter, getViewport]);
 
   // Register zoomToClass function in context on mount
@@ -1740,7 +1740,7 @@ const StudioContent = () => {
 
       // Restore viewport using setViewport for accurate restoration
       if (layout.viewport) {
-        setViewport({ x: layout.viewport.x, y: layout.viewport.y, zoom: layout.viewport.zoom }, { duration: 800 });
+        setViewport({ x: layout.viewport.x, y: layout.viewport.y, zoom: layout.viewport.zoom }, { duration: 250 });
       }
 
       // Load groups from dedicated table
@@ -3675,7 +3675,7 @@ const StudioContent = () => {
           // Restore viewport if available using setViewport for accurate restoration
           if (savedLayout.viewport) {
             setTimeout(() => {
-              setViewport({ x: savedLayout.viewport.x, y: savedLayout.viewport.y, zoom: savedLayout.viewport.zoom }, { duration: 800 });
+              setViewport({ x: savedLayout.viewport.x, y: savedLayout.viewport.y, zoom: savedLayout.viewport.zoom }, { duration: 250 });
             }, 100);
           }
 
@@ -3762,7 +3762,7 @@ const StudioContent = () => {
 
           // Fit view after a short delay to ensure nodes are rendered
           setTimeout(() => {
-            fitView({ padding: 0.2, duration: 400 });
+            fitView({ padding: 0.2, duration: 250 });
           }, 50);
         }
 
