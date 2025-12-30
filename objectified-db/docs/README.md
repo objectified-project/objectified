@@ -116,6 +116,9 @@ The database uses PostgreSQL with the `odb` schema. Key tables:
 - **classes**: Data object definitions
 - **properties**: Reusable property definitions
 - **class_properties**: Junction table linking classes to properties (supports nesting via parent_id)
+- **groups**: Visual groupings of classes on the canvas with positional metadata
+- **group_classes**: Junction table linking groups to their member classes
+- **canvas_layouts**: Canvas layout state (positions, viewport, edges) per version
 - **api_keys**: External API access keys
 - **signup**: User signup requests
 
