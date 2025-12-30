@@ -60,10 +60,10 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 | #356   | Add external documentation links for paths                           |
 
 **Features**: 📋 PLANNED
-- Click on `{variable}` to open inline schema editor
-- Drag schema property onto variable for type binding
-- Visual validation: invalid paths show red border
-- Path template preview with sample values
+- 📋 Click on `{variable}` to open inline schema editor
+- 📋 Drag schema property onto variable for type binding
+- 📋 Visual validation: invalid paths show red border
+- 📋 Path template preview with sample values
 
 | Ticket | Feature                                                                  |
 |--------|--------------------------------------------------------------------------|
@@ -87,17 +87,17 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 | OPTIONS| Gray   | CORS preflight                |
 
 **Configurable Properties**:
-- Operation ID (auto-generated from method + path)
-- Tags for API grouping
-- Summary and description
-- Request body schema binding
-- Response definitions (status codes + schemas)
-- Parameters (query, header, cookie)
-- Security requirements
-- Deprecated flag
-- Private flag (unexposed endpoints)
-- External docs
-- Custom `x-*` extensions
+- 📋 Operation ID (auto-generated from method + path)
+- 📋 Tags for API grouping
+- 📋 Summary and description
+- 📋 Request body schema binding
+- 📋 Response definitions (status codes + schemas)
+- 📋 Parameters (query, header, cookie)
+- 📋 Security requirements
+- 📋 Deprecated flag
+- 📋 Private flag (unexposed endpoints)
+- 📋 External docs
+- 📋 Custom `x-*` extensions
 
 | Ticket | Feature                                                  |
 |--------|----------------------------------------------------------|
@@ -120,12 +120,12 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 **Purpose**: Create visual connections between schema definitions (from Schema tab) and API operations
 
 **Features**:
-- Drag schema from library panel onto canvas
-- Connect to method nodes for request/response binding
-- Hover to see schema preview (collapsed property tree)
-- Click to navigate to schema definition in Schema tab
+- 📋 Drag schema from library panel onto canvas
+- 📋 Connect to method nodes for request/response binding
+- 📋 Hover to see schema preview (collapsed property tree)
+- 📋 Click to navigate to schema definition in Schema tab
 - Visual badge showing schema version compatibility
-- Inline schema override for operation-specific modifications
+- 📋 Inline schema override for operation-specific modifications
 
 | Ticket | Feature                                                                          |
 |--------|----------------------------------------------------------------------------------|
@@ -147,16 +147,16 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 | Cookie   | Orange | 🍪 icon    |
 
 **Configurable Properties**:
-- Parameter name (with auto-suggest from common patterns)
+- 📋 Parameter name (with auto-suggest from common patterns)
 - ✅ Location: query, path, header, cookie (fixed from dragged node)
-- Schema type (string, number, boolean, array, object)
-- Required flag
-- Default value
-- Description
-- Validation rules (min/max, pattern, enum)
-- Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
-- Explode flag for arrays/objects
-- Deprecated flag
+- 📋 Schema type (string, number, boolean, array, object)
+- 📋 Required flag
+- 📋 Default value
+- 📋 Description
+- 📋 Validation rules (min/max, pattern, enum)
+- 📋 Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
+- 📋 Explode flag for arrays/objects
+- 📋 Deprecated flag
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
@@ -175,12 +175,12 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 **Visual Design**: Input port icon with blue accent, shows content types
 
 **Configurable Properties**:
-- Content type map (application/json, multipart/form-data, etc.)
-- Schema binding per content type
-- Required flag
-- Description
-- Example values
-- Encoding options (for multipart)
+- 📋 Content type map (application/json, multipart/form-data, etc.)
+- 📋 Schema binding per content type
+- 📋 Required flag
+- 📋 Description
+- 📋 Example values
+- 📋 Encoding options (for multipart)
 
 **Advanced Features**:
 - Multiple content types per operation (JSON vs XML vs form-data)
@@ -210,18 +210,18 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 | 5XX Server   | Red    | 500, 502, 503, 504               |
 
 **Configurable Properties**:
-- Status code (100-599)
-- Description (semantic suggestions per status code)
-- Response headers (name, schema, description)
-- Content type map with schema bindings
-- Links (HATEOAS navigation)
-- Examples per content type
+- 📋 Status code (100-599)
+- 📋 Description (semantic suggestions per status code)
+- 📋 Response headers (name, schema, description)
+- 📋 Content type map with schema bindings
+- 📋 Links (HATEOAS navigation)
+- 📋 Examples per content type
 
 **Advanced Features**:
-- Response range patterns: 2XX, 4XX, 5XX wildcards
-- Default response for catch-all error handling
-- Link objects for response-driven navigation
-- Header templates (pagination, rate limiting, CORS)
+- 📋 Response range patterns: 2XX, 4XX, 5XX wildcards
+- 📋 Default response for catch-all error handling
+- 📋 Link objects for response-driven navigation
+- 📋 Header templates (pagination, rate limiting, CORS)
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
@@ -388,12 +388,12 @@ Catch errors as you design, not during export:
 Define security schemes once, apply to multiple operations:
 
 **Supported Schemes**:
-- **API Key**: Header, query, or cookie-based keys
-- **HTTP**: Basic, Bearer, or custom HTTP auth
-- **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
-- **OpenID Connect**: Discovery URL with scopes
-- **Mutual TLS**: Certificate-based authentication
-- **Custom security schemes**
+- 📋 **API Key**: Header, query, or cookie-based keys
+- 📋 **HTTP**: Basic, Bearer, or custom HTTP auth
+- 📋 **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
+- 📋 **OpenID Connect**: Discovery URL with scopes
+- 📋 **Mutual TLS**: Certificate-based authentication
+- 📋 **Custom security schemes**
 
 | Ticket | Feature Description                 |
 |--------|-------------------------------------|
@@ -405,10 +405,10 @@ Define security schemes once, apply to multiple operations:
 | #415   | Add Custom Security Schemes         |
 
 **Visual Design**:
-- Security scheme library panel
-- Drag scheme onto method node to apply
-- Visual badge showing active schemes on operations
-- Scope selector for OAuth2/OIDC
+- 📋 Security scheme library panel
+- 📋 Drag scheme onto method node to apply
+- 📋 Visual badge showing active schemes on operations
+- 📋 Scope selector for OAuth2/OIDC
 
 | Ticket | Feature                                               |
 |--------|-------------------------------------------------------|
@@ -421,10 +421,10 @@ Define security schemes once, apply to multiple operations:
 
 Each operation can override global defaults:
 
-- Apply multiple security schemes (AND/OR logic)
-- Configure required scopes per operation
-- Mark operation as unsecured (public endpoint)
-- Add security descriptions for documentation
+- 📋 Apply multiple security schemes (AND/OR logic)
+- 📋 Configure required scopes per operation
+- 📋 Mark operation as unsecured (public endpoint)
+- 📋 Add security descriptions for documentation
 
 | Ticket | Feature                                         |
 |--------|-------------------------------------------------|

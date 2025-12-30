@@ -8,29 +8,30 @@ permissions.
 > **Section Status**: ✅ Mostly Implemented (API keys, SSO, audit logging complete)
 
 ### Advanced Security ✅ PARTIALLY IMPLEMENTED
-- 📋 Two-Factor Authentication (2FA)
-  - 📋 Security via Authy
-  - 📋 Google Authenticator
-  - 📋 SMS-based 2FA
+- Two-Factor Authentication (2FA)
+  - Security via Authy
+  - Google Authenticator
+  - SMS-based 2FA
 - Single Sign-On (SSO) ✅ IMPLEMENTED:
   - ✅ GitHub OAuth
   - ✅ GitLab OAuth
   - 📋 Okta
-  - 📋 Auth0
+  - Auth0
+  - 📋 Amazon AWS
   - 📋 Azure AD
-  - 📋 LDAP
-  - 📋 SAML 2.0
+  - LDAP
+  - SAML 2.0
 - ✅ Account Linking (link multiple SSO providers to one account)
 - ✅ External Authentication Providers management
-- 📋 API key rotation policies
-- 📋 IP whitelisting per tenant
+- API key rotation policies
+- IP whitelisting per tenant
 - ✅ JWT token expiration and refresh
-- 📋 Security headers (CSP, HSTS, etc.)
-- 📋 Secrets management (Vault integration)
+- Security headers (CSP, HSTS, etc.)
+- Secrets management (Vault integration)
 - ✅ Encryption at rest and in transit
-- 📋 SOC 2 compliance
-- 📋 GDPR compliance tools
-- 📋 Penetration testing reports
+- SOC 2 compliance
+- GDPR compliance tools
+- Penetration testing reports
 
 | Ticket | Feature Description |
 |--------|---------------------|

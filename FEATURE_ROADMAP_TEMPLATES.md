@@ -22,16 +22,16 @@ This contains feature sets for property and schema templates, both system-define
 ### Schema Templates
 
 #### Schema Templates & Snippets 📋 PLANNED
-- 📋 Drag-and-drop schema templates onto canvas:
+- Drag-and-drop schema templates onto canvas:
     - CRUD Resource (Create, Read, Update, Delete, List)
     - Authentication Set (User, Session, Token, Role, Permission)
     - Pagination Response (items, total, page, pageSize, hasMore)
     - Error Response (code, message, details, timestamp)
     - Audit Trail (id, action, actor, timestamp, changes)
-- 📋 Custom template creation from selected classes
-- 📋 Template variables with auto-fill prompts
-- 📋 Template marketplace integration
-- 📋 Team-shared template library
+- Custom template creation from selected classes
+- Template variables with auto-fill prompts
+- Template marketplace integration
+- Team-shared template library
 
 | Ticket | Feature |
 |--------|---------|

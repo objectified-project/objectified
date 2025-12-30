@@ -264,14 +264,15 @@ This outlines the AI features that are planned for the Objectified platform.
 |--------|--------------------------------------------------|
 
 **Improvement Suggestions** 📋 PLANNED
-- "Consider adding pagination to this list endpoint"
-- "This schema could benefit from inheritance using allOf"
-- "Add a discriminator for this polymorphic type"
-- "Consider breaking this large schema into smaller components"
-- "Add error responses for common failure scenarios"
+- 📋 "Consider adding pagination to this list endpoint"
+- 📋 "This schema could benefit from inheritance using allOf"
+- 📋 "Add a discriminator for this polymorphic type"
+- 📋 "Consider breaking this large schema into smaller components"
+- 📋 "Add error responses for common failure scenarios"
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description             |
+|--------|---------------------------------|
+| #495   | Adds AI improvement suggestions |
 
 **Actionable Recommendations** 📋 PLANNED
 - 📋 AI-powered suggestions for improvement:
