@@ -39,39 +39,40 @@ This outlines the multi-tenancy features planned for Objectified.
 
 ### Industry Classification 📋 PLANNED
 - **Standard Industry Categories**:
-    - Financial Services (Banking, FinTech, Insurance, Investments)
-    - Healthcare (Hospitals, Pharma, Medical Devices, Health Tech)
-    - E-commerce (Retail, Marketplace, B2C, D2C)
-    - SaaS/B2B (Enterprise Software, DevTools, Productivity)
-    - Government & Public Sector (Federal, State, Local, Defense)
-    - Education (EdTech, Universities, K-12, Training)
-    - Manufacturing (Industrial, Automotive, Consumer Goods)
-    - Technology (Hardware, Software, Telecommunications)
-    - Real Estate (PropTech, Commercial, Residential)
-    - Logistics & Transportation (Supply Chain, Shipping, Travel)
-    - Media & Entertainment (Streaming, Gaming, Publishing)
-    - Energy & Utilities (Oil & Gas, Renewable Energy, Water)
-    - Professional Services (Consulting, Legal, Accounting)
-    - Non-Profit & NGO (Charity, Advocacy, Social Impact)
-    - Other/Multi-Industry
+  - Financial Services (Banking, FinTech, Insurance, Investments)
+  - Healthcare (Hospitals, Pharma, Medical Devices, Health Tech)
+  - E-commerce (Retail, Marketplace, B2C, D2C)
+  - SaaS/B2B (Enterprise Software, DevTools, Productivity)
+  - Government & Public Sector (Federal, State, Local, Defense)
+  - Education (EdTech, Universities, K-12, Training)
+  - Manufacturing (Industrial, Automotive, Consumer Goods)
+  - Technology (Hardware, Software, Telecommunications)
+  - Real Estate (PropTech, Commercial, Residential)
+  - Logistics & Transportation (Supply Chain, Shipping, Travel)
+  - Media & Entertainment (Streaming, Gaming, Publishing)
+  - Energy & Utilities (Oil & Gas, Renewable Energy, Water)
+  - Professional Services (Consulting, Legal, Accounting)
+  - Non-Profit & NGO (Charity, Advocacy, Social Impact)
+  - Other/Multi-Industry
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description            |
+|--------|--------------------------------|
+| #499   | Adds category tags for tenants |
 
 - **Multi-Industry Support**:
-    - Select multiple industry tags per tenant
-    - Primary industry designation
-    - Industry weight/relevance scoring
-    - Industry history tracking (industry changes over time)
+  - Select multiple industry tags per tenant
+  - Primary industry designation
+  - Industry weight/relevance scoring
+  - Industry history tracking (industry changes over time)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Custom Industry Categories**:
-    - Enterprise customers can define custom industries
-    - Industry hierarchies (parent-child relationships)
-    - Industry-specific metadata fields
-    - Localized industry names (internationalization)
+  - Enterprise customers can define custom industries
+  - Industry hierarchies (parent-child relationships)
+  - Industry-specific metadata fields
+  - Localized industry names (internationalization)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

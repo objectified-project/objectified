@@ -154,28 +154,29 @@
   - 📋 **GraphQL**: SDL schema definitions
   - 📋 **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
 - Customizable generation templates
-- Code generation settings per language:
-  - Naming conventions (camelCase, snake_case, PascalCase)
-  - Nullable vs Optional handling
-  - Validation annotations
-  - Documentation comments
-- Preview generated code before download
+- 📋 Code generation settings per language:
+  - 📋 Naming conventions (camelCase, snake_case, PascalCase)
+  - 📋 Nullable vs Optional handling
+  - 📋 Validation annotations
+  - 📋 Documentation comments
+- ✅ Preview generated code before download
 - Download as single file or project structure
 - Generate with tests/mocks included
 
-| Ticket | Feature Description     |
-|--------|-------------------------|
-| #221   | Export to GraphQL SDL   |
-| #222   | Export to AsyncAPI      |
-| #223   | Export to TypeScript    |
-| #224   | Export to Python models |
-| #225   | Export to Java          |
-| #226   | Export to C#            |
-| #227   | Export to Golang        |
-| #228   | Export to SQL           |
-| #229   | Export to Markdown      |
-| #230   | Export to Excel         |
-| #231   | Export to PDF           |
+| Ticket | Feature Description                       |
+|--------|-------------------------------------------|
+| #221   | Export to GraphQL SDL                     |
+| #222   | Export to AsyncAPI                        |
+| #223   | Export to TypeScript                      |
+| #224   | Export to Python models                   |
+| #225   | Export to Java                            |
+| #226   | Export to C#                              |
+| #227   | Export to Golang                          |
+| #228   | Export to SQL                             |
+| #229   | Export to Markdown                        |
+| #230   | Export to Excel                           |
+| #231   | Export to PDF                             |
+| #509   | Add code generation settings per language |
 
 ---
 
@@ -236,11 +237,11 @@
 |--------|--------------------------------------------------|
 
 - **CRUD Operation Templates**:
-    - **Create (POST /resources)**:
-        - Request body: Full schema
-        - Response: 201 Created with created resource
-        - Validation: Required fields, constraints
-        - Error responses: 400 (validation), 409 (conflict)
+  - **Create (POST /resources)**:
+    - Request body: Full schema
+    - Response: 201 Created with created resource
+    - Validation: Required fields, constraints
+    - Error responses: 400 (validation), 409 (conflict)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

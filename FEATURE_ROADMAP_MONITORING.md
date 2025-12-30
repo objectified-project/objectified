@@ -92,21 +92,21 @@ Objectified platform.
 
 **API Log Aggregation** 📋 PLANNED
 - **Log Sources**:
-    - API Gateway logs
-    - Application logs
-    - Infrastructure logs
-    - SDK client logs (opt-in)
+  - API Gateway logs
+  - Application logs
+  - Infrastructure logs
+  - SDK client logs (opt-in)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Log Features**:
-    - Full-text log search
-    - Structured log parsing
-    - Log correlation with traces
-    - Log-based alerting
-    - Log retention policies
-    - Log export to SIEM
+  - Full-text log search
+  - Structured log parsing
+  - Log correlation with traces
+  - Log-based alerting
+  - Log retention policies
+  - Log export to SIEM
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -125,22 +125,22 @@ Objectified platform.
 
 **Alert Configuration** 📋 PLANNED
 - **Alert Types**:
-    - Threshold-based alerts
-    - Anomaly-based alerts
-    - Composite alerts (multiple conditions)
-    - Heartbeat/synthetic monitoring
-    - SLO-based alerts
+  - Threshold-based alerts
+  - Anomaly-based alerts
+  - Composite alerts (multiple conditions)
+  - Heartbeat/synthetic monitoring
+  - SLO-based alerts
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Alert Channels**:
-    - Email notifications
-    - Slack/Teams integration
-    - PagerDuty integration
-    - OpsGenie integration
-    - Custom webhooks
-    - SMS (via Twilio)
+  - Email notifications
+  - Slack/Teams integration
+  - PagerDuty integration
+  - OpsGenie integration
+  - Custom webhooks
+  - SMS (via Twilio)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

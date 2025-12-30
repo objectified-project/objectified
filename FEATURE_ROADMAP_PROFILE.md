@@ -16,10 +16,11 @@ Current features for the profile include:
 
 ### Profile Information 📋 PLANNED
 - Profile avatar/photo upload
-- Display name (separate from full name)
+- ✅ Display name (separate from full name)
+- ✅ E-Mail Address
 - Job title / Role description
 - Department / Team
-- Phone number (with country code)
+- Phone number (with country code) for SMS 2FA
 - Timezone preference
 - Language / Locale preference
 - Bio / About me section
@@ -29,7 +30,7 @@ Current features for the profile include:
 |--------|--------------------------------------------------|
 
 ### Account Settings 📋 PLANNED
-- Change password
+- ✅ Change password
 - Email change with verification
 - Connected accounts (OAuth providers)
 - Session management (view/revoke active sessions)

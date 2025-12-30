@@ -14,24 +14,25 @@ community needs.
 
 **Registry Features** 📋 PLANNED
 - **Schema Storage**:
-    - Centralized schema repository
-    - Schema versioning with full history
-    - Schema namespacing (org/team/project)
-    - Schema metadata and annotations
-    - Schema search and discovery
-    - Schema dependency tracking
+  - Centralized schema repository
+  - Schema versioning with full history
+  - Schema namespacing (org/team/project)
+  - Schema metadata and annotations
+  - Schema search and discovery
+  - Schema dependency tracking
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Schema Formats**:
-    - OpenAPI 3.0/3.1
-    - JSON Schema
-    - GraphQL SDL
-    - AsyncAPI
-    - Avro
-    - Protocol Buffers
-    - Thrift
+  - OpenAPI 3.0/3.1
+  - Arazzo
+  - JSON Schema
+  - GraphQL SDL
+  - AsyncAPI
+  - Avro
+  - Protocol Buffers
+  - Thrift
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -51,28 +52,28 @@ community needs.
 
 **Governance Policies** 📋 PLANNED
 - **Naming Conventions**:
-    - Enforce schema naming patterns
-    - Property naming rules (camelCase, snake_case)
-    - Path naming conventions
-    - Consistent pluralization rules
+  - Enforce schema naming patterns
+  - Property naming rules (camelCase, snake_case)
+  - Path naming conventions
+  - Consistent pluralization rules
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Documentation Requirements**:
-    - Required descriptions for all schemas
-    - Required examples for properties
-    - Minimum documentation coverage
-    - External docs requirements
+  - Required descriptions for all schemas
+  - Required examples for properties
+  - Minimum documentation coverage
+  - External docs requirements
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Security Policies**:
-    - PII field detection and tagging
-    - Required authentication for all paths
-    - Forbidden property patterns (SSN, credit card)
-    - Required encryption annotations
+  - PII field detection and tagging
+  - Required authentication for all paths
+  - Forbidden property patterns (SSN, credit card)
+  - Required encryption annotations
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -92,18 +93,18 @@ community needs.
 
 **Lifecycle States** 📋 PLANNED
 - **States**:
-    - Draft → Review → Approved → Published → Deprecated → Retired
-    - State transition rules and permissions
-    - Automatic state transitions (e.g., auto-deprecate after sunset date)
+  - Draft → Review → Approved → Published → Deprecated → Retired
+  - State transition rules and permissions
+  - Automatic state transitions (e.g., auto-deprecate after sunset date)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Lifecycle Automation**:
-    - Scheduled deprecation
-    - Sunset date enforcement
-    - Consumer notification on state changes
-    - Migration period enforcement
+  - Scheduled deprecation
+  - Sunset date enforcement
+  - Consumer notification on state changes
+  - Migration period enforcement
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -122,21 +123,21 @@ community needs.
 
 **Change Detection** 📋 PLANNED
 - **Breaking Change Types**:
-    - Removed endpoints
-    - Removed properties
-    - Type changes
-    - Required field additions
-    - Enum value removals
-    - Response format changes
+  - Removed endpoints
+  - Removed properties
+  - Type changes
+  - Required field additions
+  - Enum value removals
+  - Response format changes
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Non-Breaking Changes**:
-    - New optional properties
-    - New endpoints
-    - New optional parameters
-    - Documentation updates
+  - New optional properties
+  - New endpoints
+  - New optional parameters
+  - Documentation updates
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -156,20 +157,20 @@ community needs.
 
 **Compliance Frameworks** 📋 PLANNED
 - **Industry Standards**:
-    - FHIR (Healthcare APIs)
-    - Open Banking (Financial APIs)
-    - ACORD (Insurance APIs)
-    - OTA (Travel APIs)
-    - Custom industry standards
+  - FHIR (Healthcare APIs)
+  - Open Banking (Financial APIs)
+  - ACORD (Insurance APIs)
+  - OTA (Travel APIs)
+  - Custom industry standards
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Regulatory Compliance**:
-    - GDPR data annotations
-    - HIPAA PHI markers
-    - PCI-DSS payment data flags
-    - CCPA personal data indicators
+  - GDPR data annotations
+  - HIPAA PHI markers
+  - PCI-DSS payment data flags
+  - CCPA personal data indicators
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

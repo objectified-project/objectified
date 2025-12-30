@@ -32,21 +32,22 @@ This covers dashboard improvements for all users.
 - Default dashboard selection
 - Dashboard reset to default option
 - Full-screen dashboard mode
+- 📋 Last Login info display
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #514   | Implements last login info display               |
 
 ### Activity & Recent Work
-- Recently viewed projects
-- Recently edited classes/schemas
-- Recent activity feed (personal actions)
-- Quick resume work (jump back to last edit)
-- Work in progress items
-- Draft/unsaved changes reminders
-- Activity heatmap (contribution calendar)
+- 📋 Recently viewed projects
+- 📋 Recently edited classes/schemas
+- 📋 Activity heatmap (contribution calendar)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+| #510   | Adds recently viewed projects        |
+| #511   | Adds recently edited classes/schemas |
+| #512   | Contribution heatmap                 |
 
 ### Personal Metrics & Statistics
 - Personal contribution stats (classes created, edits made)
@@ -61,15 +62,16 @@ This covers dashboard improvements for all users.
 |--------|--------------------------------------------------|
 
 ### Favorites & Bookmarks
-- Pin favorite projects to dashboard
+- 📋 Pin favorite projects to dashboard
 - Bookmark specific classes/schemas
 - Quick access shortcuts
 - Custom link widgets
 - Saved searches/filters
 - Tag-based organization
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description           |
+|--------|-------------------------------|
+| #513   | Adds favorite projects widget |
 
 ### Notifications Center
 - Unified notification inbox widget
@@ -141,7 +143,7 @@ This covers dashboard improvements for all users.
 
 ---
 
-## Enterprise Dashboard Features 🏢 PLANNED
+## Enterprise Dashboard Features 📋 PLANNED
 
 ### Executive Summary Dashboard
 - Organization-wide health score
