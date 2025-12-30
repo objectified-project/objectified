@@ -14,7 +14,7 @@
 #### Save & Load Layouts ✅ IMPLEMENTED (Basic), 📋 PLANNED (Advanced)
 - ✅ Save current canvas arrangement
 - ✅ Save and load groups with layouts
-- ✅ **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
+- 📋 **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
 - ✅ **Layout Controls**: Compact button with dropdown menu
 - ✅ **Database Table**: Create a database table to store layouts
 - 📋 Multiple saved layouts per version:
@@ -30,6 +30,7 @@
 
 | Ticket | Feature                                      |
 |--------|----------------------------------------------|
+| #564   | Re-introduce canvas auto-layout algorithms   |
 | #163   | Multiple saved layouts per version           |
 | #164   | Auto-save layout changes (tuneable interval) |
 | #165   | Version control for layouts                  |
@@ -583,48 +584,65 @@
 
 ### 10. Schema Visualization & Analytics
 
-#### Dependency Visualization
-- Interactive dependency graph overlay on canvas
-- Highlight circular dependencies with warning indicators
-- Show dependency depth levels (1st, 2nd, 3rd degree)
-- "Impact Analysis" mode: Show all affected classes when changing one
-- Upstream/downstream dependency toggles
-- Dependency path highlighting (click to trace full chain)
-- Dependency metrics per class (in-degree, out-degree, betweenness)
+#### Dependency Visualization 📋 PLANNED
+- 📋 Interactive dependency graph overlay on canvas
+- 📋 Highlight circular dependencies with warning indicators
+- 📋 Show dependency depth levels (1st, 2nd, 3rd degree)
+- 📋 "Impact Analysis" mode: Show all affected classes when changing one
+- 📋 Upstream/downstream dependency toggles
+- 📋 Dependency path highlighting (click to trace full chain)
+- 📋 Dependency metrics per class (in-degree, out-degree, betweenness)
 
-| Ticket | Feature |
-|--------|---------|
+| Ticket | Feature                                                             |
+|--------|---------------------------------------------------------------------|
+| #547   | Interactive dependency graph overlay on canvas                      |
+| #548   | Highlight circular dependencies with warning indicators             |
+| #549   | Show dependency depth levels (1st, 2nd, 3rd degree)                 |
+| #550   | "Impact Analysis" mode: Show all affected classes when changing one |
+| #551   | Upstream/downstream dependency toggles                              |
+| #552   | Dependency path highlighting (click to trace full chain)            |
+| #553   | Dependency metrics per class (in-degree, out-degree, betweenness)   |
 
-#### Schema Metrics Dashboard
-- Real-time metrics overlay on canvas:
-  - Total classes, properties, relationships count
-  - Schema complexity score
-  - Documentation coverage percentage
-  - Naming convention compliance
-- Per-node metrics badges (property count, relationship count)
-- Heatmap visualization:
-  - By complexity (more complex = warmer color)
-  - By change frequency (recently modified = highlighted)
-  - By usage/reference count
-  - By documentation completeness
-- Trend indicators (improving/declining metrics)
+#### Schema Metrics Dashboard 📋 PLANNED
+- 📋 Real-time metrics overlay on canvas:
+  - 📋 Total classes, properties, relationships count
+  - 📋 Schema complexity score
+  - 📋 Documentation coverage percentage
+  - 📋 Naming convention compliance
+- 📋 Per-node metrics badges (property count, relationship count)
+- 📋 Heatmap visualization:
+  - 📋 By complexity (more complex = warmer color)
+  - 📋 By change frequency (recently modified = highlighted)
+  - 📋 By usage/reference count
+  - 📋 By documentation completeness
+- 📋 Trend indicators (improving/declining metrics)
 
-| Ticket | Feature |
-|--------|---------|
+| Ticket | Feature                                        |
+|--------|------------------------------------------------|
+| #554   | Real-time metrics overlay on canvas            |
+| #555   | Total classes, properties, relationships count |
+| #556   | Schema complexity score                        |
+| #557   | Documentation coverage percentage              |
+| #558   | Naming convention compliance                   |
+| #559   | Per-node metrics badges                        |
+| #560   | Heatmap visualization to version dashboard     |
+| #561   | Trend indicators (improving/declining metrics) |
 
-#### Version Comparison View
-- Side-by-side canvas comparison of two versions
-- Diff highlighting:
-  - Green for added classes/properties
-  - Red for removed classes/properties
-  - Yellow for modified classes/properties
+#### Version Comparison View ✅ PARTIALLY COMPLETE
+- ✅ Side-by-side canvas comparison of two versions
+- ✅ Diff highlighting:
+  - 📋 Green for added classes/properties
+  - 📋 Red for removed classes/properties
+  - 📋 Yellow for modified classes/properties
 - Animated transition between versions
 - "Time travel" slider to scrub through version history
 - Change summary panel with statistics
-- Filter diff by change type
+- 📋 Filter diff by change type
 
-| Ticket | Feature |
-|--------|---------|
+| Ticket | Feature                    |
+|--------|----------------------------|
+| #562   | Diff highlighting updates  |
+| #563   | Filter diff by change type |
 
 ---
 
