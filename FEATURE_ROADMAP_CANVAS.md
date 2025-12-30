@@ -122,18 +122,6 @@
 | #195   | Focus mode - dim non-matching results                |
 | #196   | Search history with clear option                     |
 
-#### Canvas Bookmarks 📋 PLANNED
-- 📋 Bookmark important canvas areas with names
-- 📋 Named bookmarks (e.g., "Core Models", "New Features")
-- 📋 Bookmarks sidebar with quick navigation
-- 📋 Keyboard shortcuts for bookmarks (`Cmd+1-9`)
-- 📋 Share bookmarks with team
-- 📋 Bookmark thumbnails
-- 📋 Organize bookmarks in folders
-
-| Ticket | Feature                                       |
-|--------|-----------------------------------------------|
-
 #### Canvas Layers 📋 PLANNED
 - 📋 Separate visual layers for different content:
     - **Background Layer**: Grid (dots vs. lines), shapes
@@ -616,10 +604,10 @@
 | #403   | Export the current viewport                |
 | #404   | Export specific groups                     |
 | #405   | Export entire canvas                       |
-| #406   | Include/exclude UI elements            |
-| #407   | Include/exclude grid |
-| #408   | Export option to add watermark |
-| #409   | Add timestamp and metadata |
+| #406   | Include/exclude UI elements                |
+| #407   | Include/exclude grid                       |
+| #408   | Export option to add watermark             |
+| #409   | Add timestamp and metadata                 |
 
 #### Batch & Animated Export 📋 PLANNED
 - 📋 Export all groups separately

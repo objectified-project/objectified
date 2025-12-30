@@ -6,8 +6,9 @@ These are the tasks remaining for Nginx to button down the support and security.
 
 - Implement https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                            |
+|--------|------------------------------------------------|
+| #426   | Implement NGINX bad bot blocker                |
 
 ## AI Suggested fixes
 
@@ -22,6 +23,7 @@ These are the tasks remaining for Nginx to button down the support and security.
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #427   | Install torblock to block Tor exit nodes         |
 
 ### SSL/TLS Hardening
 - Configure strong cipher suites (prefer ECDHE and CHACHA20-POLY1305)
@@ -29,10 +31,15 @@ These are the tasks remaining for Nginx to button down the support and security.
 - Enable HSTS (HTTP Strict Transport Security) with long max-age
 - Implement OCSP stapling for faster certificate validation
 - Configure SSL session caching for performance
-- Set up automatic certificate renewal with Let's Encrypt/Certbot
+- ✅ Set up automatic certificate renewal with Let's Encrypt/Certbot
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description              |
+|--------|----------------------------------|
+| #428   | Harden SSL/TLS settings in NGINX |
+| #429   | Implement TLS 1.2/1.3            |
+| #430   | Enable HSTS with long max-age    |
+| #431   | Implement OCSP stapling          |
+| #432   | Set up SSL session caching       |
 
 ### Security Headers
 - Add `X-Frame-Options: SAMEORIGIN` to prevent clickjacking
@@ -43,8 +50,15 @@ These are the tasks remaining for Nginx to button down the support and security.
 - Add `Permissions-Policy` to control browser features
 - Remove `Server` header or set to generic value to hide NGINX version
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                             |
+|--------|-------------------------------------------------|
+| #433   | Add X-Frame-Options to prevent clickjacking     |
+| #434   | Add X-Content-Type-Options nosniff              |
+| #435   | Add X-XSS-Protection headers                    |
+| #436   | Implement Content-Security-Policy (CSP) headers |
+| #437   | Add Referrer-Policy header                      |
+| #438   | Add Permissions-Policy header                   |
+| #439   | Remove or modify Server header                  |
 
 ### Request Filtering & Limits
 - Limit request body size (`client_max_body_size`)
@@ -55,50 +69,63 @@ These are the tasks remaining for Nginx to button down the support and security.
 - Block requests to sensitive file extensions (.git, .env, .sql, etc.)
 - Limit HTTP methods (allow only GET, POST, PUT, DELETE, PATCH, OPTIONS)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                         |
+|--------|---------------------------------------------|
+| #440   | Limit request body size                     |
+| #441   | Set connection timeouts                     |
+| #442   | Limit concurrent connections per IP         |
+| #443   | Configure request rate limiting             |
+| #444   | Block suspicious user agents                |
+| #445   | Block requests to sensitive file extensions |
+| #446   | Limit allowed HTTP methods                  |
 
 ### DDoS Protection
-- Configure `limit_conn` to prevent connection flooding
-- Set up `limit_req` with burst handling for request flooding
 - Enable `proxy_buffering` for upstream protection
 - Configure `keepalive_timeout` to release idle connections
-- Consider integrating with Cloudflare or AWS WAF for edge protection
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                     |
+|--------|---------------------------------------------------------|
+| #447   | Enable proxy_buffering for upstream protection          |
+| #448   | Configure keepalive_timeout to release idle connections |
 
 ### Access Control
 - Restrict access to admin endpoints by IP whitelist
 - Block access to hidden files and directories (dotfiles)
 - Disable directory listing (`autoindex off`)
-- Implement HTTP Basic Auth for sensitive admin areas
 - Block access from known malicious IP ranges (use GeoIP module)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| #449   | Restrict access to admin endpoints by IP whitelist |
+| #450   | Block access to hidden files and directories       |
+| #451   | Disable directory listing                          |
+| #452   | Block access from known malicious IP ranges        |
 
 ### Logging & Monitoring
 - Enable detailed access logging with custom log format
-- Configure error logging with appropriate log levels
 - Set up log rotation to prevent disk exhaustion
-- Integrate with centralized logging (ELK, Grafana Loki, etc.)
-- Configure real-time monitoring alerts for suspicious patterns
 - Log rate-limited and blocked requests separately
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #453   | Enable detailed access logging                   |
+| #454   | Set up log rotation to prevent disk exhaustion   |
+| #455   | Log rate-limited and blocked requests separately |
 
 ### Performance & Reliability
 - Enable gzip compression for text-based responses
 - Configure browser caching headers for static assets
-- Set up upstream health checks for backend services
 - Configure connection pooling for proxy_pass backends
 - Enable HTTP/2 for improved performance
 - Consider enabling HTTP/3 (QUIC) support
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                        |
+|--------|------------------------------------------------------------|
+| #456   | Enable gzip and other compression for text-based responses |
+| #457   | Configure browser caching headers for static assets        |
+| #458   | Configure connection pooling for proxy_pass backends       |
+| #459   | Enable HTTP/2 for improved performance                     |
+| #460   | Consider enabling HTTP/3 (QUIC) support                    |
 
 ### Infrastructure Security
 - Run NGINX as non-root user
@@ -106,32 +133,29 @@ These are the tasks remaining for Nginx to button down the support and security.
 - Restrict file permissions on NGINX config files
 - Disable unnecessary NGINX modules
 - Keep NGINX updated to latest stable version
-- Consider running NGINX in a container with minimal privileges
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                             |
+|--------|-------------------------------------------------|
+| #461   | Run NGINX as non-root user                      |
+| #462   | Use separate user for worker processes          |
+| #463   | Restrict file permissions on NGINX config files |
+| #464   | Disable unnecessary NGINX modules               |
+| #465   | Keep NGINX updated to latest stable version     |
 
 ### fail2ban Integration
 - Create custom jail for repeated 401/403 responses
 - Create jail for excessive 404 requests (scanner detection)
 - Create jail for rate-limited requests
 - Configure ban duration escalation for repeat offenders
-- Set up email notifications for bans
 - Whitelist trusted IPs (monitoring, CI/CD, etc.)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
-### API-Specific Hardening
-- Validate `Content-Type` headers on POST/PUT requests
-- Implement request size limits per endpoint
-- Add API versioning at the NGINX level
-- Configure CORS headers appropriately
-- Rate limit authentication endpoints more aggressively
-- Block requests without valid API keys at NGINX level (if applicable)
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                    |
+|--------|--------------------------------------------------------|
+| #466   | Create custom jail for repeated 401/403 responses      |
+| #467   | Create jail for excessive 404 requests                 |
+| #468   | Create jail for rate-limited requests                  |
+| #469   | Configure ban duration escalation for repeat offenders |
+| #470   | Whitelist trusted IPs                                  |
 
 ---
 
