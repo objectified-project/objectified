@@ -19,12 +19,12 @@ This covers the feature sets for linting capabilities in the Objectified project
 
 #### Schema Linting 📋 PLANNED
 - Configurable linting rules:
-    - Naming conventions (camelCase, PascalCase, etc.)
-    - Required descriptions
-    - Forbidden property names
-    - Deprecated patterns
-    - Complexity limits
-    - Circular dependency detection
+  - Naming conventions (camelCase, PascalCase, etc.)
+  - Required descriptions
+  - Forbidden property names
+  - Deprecated patterns
+  - Complexity limits
+  - Circular dependency detection
 - Real-time linting as you type
 - Lint errors/warnings in sidebar
 - Auto-fix for common issues
@@ -51,11 +51,11 @@ This covers the feature sets for linting capabilities in the Objectified project
 - 📋 Real-time score updates as schema is modified
 - 📋 Historical score tracking with trend chart
 - 📋 Score breakdown by category:
-    - 📋 **Design Quality** (30 points): Naming conventions, consistency, reusability
-    - 📋 **Documentation** (20 points): Descriptions, examples, external docs
-    - 📋 **API Best Practices** (25 points): RESTful patterns, proper HTTP methods, status codes
-    - 📋 **Security** (15 points): Authentication, authorization, input validation
-    - 📋 **Performance** (10 points): Pagination, filtering, caching headers
+  - 📋 **Design Quality** (30 points): Naming conventions, consistency, reusability
+  - 📋 **Documentation** (20 points): Descriptions, examples, external docs
+  - 📋 **API Best Practices** (25 points): RESTful patterns, proper HTTP methods, status codes
+  - 📋 **Security** (15 points): Authentication, authorization, input validation
+  - 📋 **Performance** (10 points): Pagination, filtering, caching headers
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -66,10 +66,10 @@ This covers the feature sets for linting capabilities in the Objectified project
 
 **Score Visualization** 📋 PLANNED
 - 📋 Color-coded score indicator:
-    - 📋 🟢 Green (90-100): Excellent - Production ready
-    - 📋 🟡 Yellow (70-89): Good - Minor improvements needed
-    - 📋 🟠 Orange (50-69): Fair - Significant improvements recommended
-    - 📋 🔴 Red (0-49): Poor - Major issues must be addressed
+  - 📋 🟢 Green (90-100): Excellent - Production ready
+  - 📋 🟡 Yellow (70-89): Good - Minor improvements needed
+  - 📋 🟠 Orange (50-69): Fair - Significant improvements recommended
+  - 📋 🔴 Red (0-49): Poor - Major issues must be addressed
 - 📋 Animated score gauge with smooth transitions
 - 📋 Score comparison across versions
 - Team average score for benchmarking

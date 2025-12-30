@@ -83,42 +83,44 @@ This outlines the AI features that are planned for the Objectified platform.
 | #264   | Add guardrails to prevent further sensitive issues |
 
 **Quick Actions from Chat** 📋 PLANNED
-- AI responses include action buttons:
-    - "Create this class" → One-click class creation
-    - "Add these properties" → Batch property addition
-    - "Apply to current class" → Modify selected class
-    - "Generate path for this" → Create CRUD endpoints
-    - "Copy to clipboard" → Copy generated JSON/YAML
-- Preview changes before applying
+- 📋 AI responses include action buttons:
+  - 📋 "Create this class" → One-click class creation
+  - 📋 "Add these properties" → Batch property addition
+  - 📋 "Apply to current class" → Modify selected class
+  - "Generate path for this" → Create CRUD endpoints
+  - 📋 "Copy to clipboard" → Copy generated JSON/YAML
+- 📋 Preview changes before applying
 - Undo AI-generated changes
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description             |
+|--------|---------------------------------|
+| #518   | Quick Actions from Chat         |
+| #519   | Preview changes before applying |
 
 ### Ollama Integration
 
 **Ollama Connection** 📋 PLANNED
 - **Configuration**:
-    - Ollama server URL configuration (cluster support)
-    - Multiple server endpoints for load balancing
-    - Health check and failover
-    - Connection timeout settings
-    - Retry policies
+  - Ollama server URL configuration (cluster support)
+  - Multiple server endpoints for load balancing
+  - Health check and failover
+  - Connection timeout settings
+  - Retry policies
 - 📋 **Model Selection**:
-    - 📋 Choose from available models:
-        - 📋 Qwen 2.5
-        - 📋 Llama 3.2
-        - 📋 CodeLlama for code-specific tasks
-        - 📋 Custom fine-tuned models
-    - Model switching per task type
-    - Model performance comparison
-    - 📋 Default model per tenant/project
+  - 📋 Choose from available models:
+    - 📋 Qwen 2.5
+    - 📋 Llama 3.2
+    - 📋 CodeLlama for code-specific tasks
+    - 📋 Custom fine-tuned models
+  - Model switching per task type
+  - Model performance comparison
+  - 📋 Default model per tenant/project
 - **Resource Management**:
-    - GPU memory monitoring
-    - Request queuing for high load
-    - Priority queues for different users
-    - Rate limiting per user/tenant
-    - Usage tracking and quotas
+  - GPU memory monitoring
+  - Request queuing for high load
+  - Priority queues for different users
+  - Rate limiting per user/tenant
+  - Usage tracking and quotas
 
 | Ticket | Feature Description                     |
 |--------|-----------------------------------------|
@@ -126,66 +128,83 @@ This outlines the AI features that are planned for the Objectified platform.
 | #266   | Ollama default model per tenant/project |
 
 **Ollama API Integration** 📋 PLANNED
-- **Streaming Responses**:
-    - Server-Sent Events (SSE) for streaming
-    - Token-by-token display
-    - Cancel generation mid-stream
-    - Progress indication
-- **Caching**:
-    - Cache common queries
-    - Semantic similarity matching
-    - Cache invalidation on schema changes
+- 📋 **Streaming Responses**:
+  - 📋 Server-Sent Events (SSE) for streaming
+  - 📋 Token-by-token display
+  - 📋 Cancel generation mid-stream
+  - 📋 Progress indication
+- 📋 **Caching**:
+  - 📋 Cache common queries
+  - 📋 Semantic similarity matching
+  - 📋 Cache invalidation on schema changes
+- 📋 **Guardrails**:
+  - 📋 Prompt filtering for sensitive content
+  - 📋 Response filtering for PII
+  - 📋 Rate limiting enforcement
+  - 📋Logging and audit trails
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                 |
+|--------|-----------------------------------------------------|
+| #520   | Streaming responses from Ollama                     |
+| #521   | Token-by-token usage display                        |
+| #522   | Cancel generation mid-stream                        |
+| #523   | Show progress indication during generation          |
+| #524   | Cache common queries to Ollama                      |
+| #525   | Semantic similarity matching for cache              |
+| #526   | Cache invalidation on schema changes                |
+| #527   | Implementation of Guardrails for prompts/responses  |
 
 ### Natural Language to Schema
 
 **Schema Generation from Description** 📋 PLANNED
 - 📋 **Input Methods**:
-    - 📋 Free-form text description
-    - 📋 Structured prompts with templates
-    - 📋 Voice input (speech-to-text)
-    - 📋 Paste requirements document
+  - 📋 Free-form text description
+  - 📋 Structured prompts with templates
+  - 📋 Voice input (speech-to-text)
+  - 📋 Paste requirements document
 - 📋 **Example Prompts**:
-    - 📋 "Create a User class with email, password hash, created date, and roles array"
-    - 📋 "I need an e-commerce order with line items, shipping address, and payment info"
-    - 📋 "Generate a blog post schema with author reference, tags, and comments"
-    - 📋 "Create a REST API for managing a todo list application"
-- **Generation Output**:
-    - Preview generated schema before creation
-    - JSON Schema format display
-    - Property list with types
-    - Relationship suggestions
-    - Edit before applying
-- **Iterative Refinement**:
-    - "Add a phone number field"
-    - "Make email required"
-    - "Add validation for password length"
-    - "Include timestamps for audit"
+  - 📋 "Create a User class with email, password hash, created date, and roles array"
+  - 📋 "I need an e-commerce order with line items, shipping address, and payment info"
+  - 📋 "Generate a blog post schema with author reference, tags, and comments"
+  - 📋 "Create a REST API for managing a todo list application"
+- 📋 **Generation Output**:
+    - 📋 Preview generated schema before creation
+    - 📋 JSON Schema format display
+    - 📋 Property list with types
+    - 📋 Relationship suggestions
+- 📋 **Iterative Refinement**:
+    - 📋 "Add a phone number field"
+    - 📋 "Make email required"
+    - 📋 "Add validation for password length"
+    - 📋 "Include timestamps for audit"
 
 | Ticket | Feature Description                                      |
 |--------|----------------------------------------------------------|
 | #267   | Adds the ability to generate a schema from a description |
 | #268   | Adds example prompts                                     |
+| #528   | Preview generated schema before creation                 |
+| #529   | JSON Schema format display on preview                    |
+| #530   | Property list with types on preview                      |
+| #531   | Relationship suggestions on preview                      |
+| #532   | Iterative refinement of generated schemas                |
 
 **Scenario-Based API Generation** 📋 PLANNED
 - **User Story Input**:
-    - "As a user, I want to register, login, and manage my profile"
-    - "As an admin, I want to manage products, categories, and inventory"
-    - "As a customer, I want to browse products, add to cart, and checkout"
+  - "As a user, I want to register, login, and manage my profile"
+  - "As an admin, I want to manage products, categories, and inventory"
+  - "As a customer, I want to browse products, add to cart, and checkout"
 - **Generated Output**:
-    - Complete schema set for scenario
-    - CRUD endpoints for each resource
-    - Request/response bodies
-    - Authentication requirements
-    - Error responses
+  - Complete schema set for scenario
+  - CRUD endpoints for each resource
+  - Request/response bodies
+  - Authentication requirements
+  - Error responses
 - **Domain Templates**:
-    - E-commerce (products, orders, customers)
-    - SaaS (users, subscriptions, billing)
-    - Social (posts, comments, likes, follows)
-    - Healthcare (patients, appointments, records)
-    - Education (courses, students, enrollments)
+  - E-commerce (products, orders, customers)
+  - SaaS (users, subscriptions, billing)
+  - Social (posts, comments, likes, follows)
+  - Healthcare (patients, appointments, records)
+  - Education (courses, students, enrollments)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -243,22 +262,22 @@ This outlines the AI features that are planned for the Objectified platform.
 
 **Schema Quality Analysis** 📋 PLANNED
 - **Review Triggers**:
-    - On-demand via chat command
-    - Before version publish
-    - Scheduled periodic reviews
-    - On significant changes
+  - On-demand via chat command
+  - Before version publish
+  - Scheduled periodic reviews
+  - On significant changes
 - **Review Categories**:
-    - **Naming Conventions**: Consistent naming (camelCase, PascalCase)
-    - **Documentation**: Missing descriptions, examples
-    - **Validation**: Missing constraints, weak validation
-    - **Relationships**: Orphaned schemas, missing references
-    - **Best Practices**: OpenAPI best practices compliance
-    - **Security**: Sensitive data exposure, PII handling
+  - **Naming Conventions**: Consistent naming (camelCase, PascalCase)
+  - **Documentation**: Missing descriptions, examples
+  - **Validation**: Missing constraints, weak validation
+  - **Relationships**: Orphaned schemas, missing references
+  - **Best Practices**: OpenAPI best practices compliance
+  - **Security**: Sensitive data exposure, PII handling
 - **Review Output**:
-    - Severity levels (error, warning, info)
-    - Specific recommendations
-    - One-click fixes
-    - Explanation of why each issue matters
+  - Severity levels (error, warning, info)
+  - Specific recommendations
+  - One-click fixes
+  - Explanation of why each issue matters
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -330,10 +349,10 @@ This outlines the AI features that are planned for the Objectified platform.
 **API Usage Examples** 📋 PLANNED
 - Generate curl commands for each operation
 - Generate code snippets in multiple languages:
-    - JavaScript/TypeScript (fetch, axios)
-    - Python (requests, httpx)
-    - Java (OkHttp, HttpClient)
-    - Go (net/http)
+  - JavaScript/TypeScript (fetch, axios)
+  - Python (requests, httpx)
+  - Java (OkHttp, HttpClient)
+  - Go (net/http)
 - Generate realistic example payloads
 - Generate test scenarios
 
@@ -388,27 +407,27 @@ This outlines the AI features that are planned for the Objectified platform.
 
 **Admin Settings** 📋 PLANNED
 - **Ollama Cluster Configuration**:
-    - Primary server URL
-    - Failover server URLs
-    - Load balancing strategy (round-robin, least-connections)
-    - Health check interval
-    - Connection pool size
+  - Primary server URL
+  - Failover server URLs
+  - Load balancing strategy (round-robin, least-connections)
+  - Health check interval
+  - Connection pool size
 - **Model Configuration**:
-    - Default model for chat
-    - Default model for generation
-    - Default model for review
-    - Model temperature settings
-    - Max tokens per request
-    - Context window size
+  - Default model for chat
+  - Default model for generation
+  - Default model for review
+  - Model temperature settings
+  - Max tokens per request
+  - Context window size
 - **Usage Limits**:
-    - Requests per user per hour
-    - Requests per tenant per day
-    - Token budget per request
-    - Queue depth limits
+  - Requests per user per hour
+  - Requests per tenant per day
+  - Token budget per request
+  - Queue depth limits
 - **Feature Toggles**:
-    - Enable/disable AI features per tenant
-    - Enable/disable specific AI capabilities
-    - Beta feature flags
+  - Enable/disable AI features per tenant
+  - Enable/disable specific AI capabilities
+  - Beta feature flags
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

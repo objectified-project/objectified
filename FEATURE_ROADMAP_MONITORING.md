@@ -16,6 +16,7 @@ Objectified platform.
 - Memory and CPU usage
 - ✅ Active users/sessions
 - ✅ Canvas rendering performance
+- Downdetector integration
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

@@ -43,18 +43,18 @@ permissions.
 
 **Role-Based Access Control (RBAC)** 📋 PLANNED
 - **Built-in Roles**:
-    - **Super Admin**: Full system access, manage all tenants
-    - **Tenant Owner**: Full tenant access, billing, delete tenant
-    - **Tenant Admin**: Manage tenant users, projects, settings (no billing/delete)
-    - **Project Admin**: Full project access, manage project members
-    - **Editor**: Create/edit schemas, paths, versions (no project settings)
-    - **Reviewer**: Comment, approve/reject, read-only schema access
-    - **Viewer**: Read-only access to schemas and documentation
-    - **API Consumer**: API key access only, no UI access
+  - **Super Admin**: Full system access, manage all tenants
+  - **Tenant Owner**: Full tenant access, billing, delete tenant
+  - **Tenant Admin**: Manage tenant users, projects, settings (no billing/delete)
+  - **Project Admin**: Full project access, manage project members
+  - **Editor**: Create/edit schemas, paths, versions (no project settings)
+  - **Reviewer**: Comment, approve/reject, read-only schema access
+  - **Viewer**: Read-only access to schemas and documentation
+  - **API Consumer**: API key access only, no UI access
 - **Role Hierarchy**:
-    - Higher roles inherit permissions from lower roles
-    - Clear role comparison matrix
-    - Role descriptions in UI
+  - Higher roles inherit permissions from lower roles
+  - Clear role comparison matrix
+  - Role descriptions in UI
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

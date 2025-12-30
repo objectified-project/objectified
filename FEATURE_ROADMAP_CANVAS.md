@@ -214,10 +214,7 @@
 - 📋 Nested groups for hierarchical organization (max 3 levels)
 - 📋 Group-level operations:
     - ✅ Move entire group with one drag
-    - Delete all classes in a group
-    - Export group as separate schema file
-    - Duplicate entire group with all classes
-    - Apply bulk property changes to all classes in group
+    - 📋 Delete all classes in a group
 - ✅ Named groups with descriptions and metadata
 - ✅ Visual styling options:
     - ✅ Rounded rectangle containers with subtle shadows
@@ -232,6 +229,8 @@
 | #155   | Nested groups for hierarchical organization                        |
 | #156   | Group-level operations: move, delete, export, duplicate, bulk edit |
 | #285   | Ungroup nodes by deleting the group                                |
+| #515   | Delete all classes in a group                                      |
+| #516   | Group headers with collapse/expand icons                           |
 
 ---
 
@@ -422,54 +421,17 @@
 
 ### 5. Annotations & Documentation
 
-#### Sticky Notes 📋 PLANNED
-- 📋 Add sticky notes anywhere on canvas
-- 📋 Color-coded notes (yellow, blue, green, pink, orange)
-- 📋 Markdown support in notes
-- 📋 Resize notes, pin to nodes (move with node)
-- 📋 Note templates (TODO, QUESTION, IMPORTANT, REVIEW)
-- 📋 Note threading (reply to notes)
-- 📋 @mention team members in notes
-- 📋 Note search across canvas
-- 📋 Convert notes to tasks
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
-#### Arrows & Shapes 📋 PLANNED
-- 📋 Draw arrows between any points
-- 📋 Shapes: Rectangles, Circles, Lines, Polygons, Freehand
-- 📋 Shape styling: Fill, border, shadows
-- 📋 Use cases: Highlight regions, swim lanes, visual separators
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
-#### Text Labels 📋 PLANNED
-- 📋 Free-form text anywhere on canvas
-- 📋 Rich text formatting, rotation
-- 📋 Link text to URLs
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
 #### Presentation Mode 📋 PLANNED
 - 📋 Full-screen canvas mode with hidden UI
-  - Hide all toolbars and UI
-  - Slide-show of bookmarked areas
-  - Presentation notes (speaker view)
-  - Timer and slide counter
-  - Presenter controls (keyboard shortcuts)
-  - Laser pointer mode
-  - Recording mode (capture presentation as video)
-- 📋 Slide-show of bookmarked areas
-- 📋 Presentation notes (speaker view)
-- 📋 Timer and slide counter
-- 📋 Laser pointer mode
-- 📋 Recording mode (capture as video)
+  - 📋 Hide all toolbars and UI
+  - 📋 Slide-show of bookmarked areas
+  - 📋 Presentation notes (speaker view)
+  - 📋 Timer and slide counter
+  - 📋 Presenter controls (keyboard shortcuts)
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
+| #517   | Full-screen presentation mode        |
 
 #### Charts & Metrics ✅ PARTIALLY COMPLETE
 - ✅ **Quality score gauge**: Visual score indicator (0-100)
@@ -487,16 +449,16 @@
 ### 6. Undo/Redo System
 
 #### Comprehensive Undo Buffer 📋 PLANNED
-- 📋 Track all canvas and schema modifications
-- 📋 Configurable history depth (default 50, max 500)
-- 📋 Actions tracked:
-    - Class: Create, delete, rename, move, resize
-    - Property: Add, edit, delete, reorder
-    - Relationship: Create, delete, modify
-    - Canvas Layout: Node positioning, group changes
-    - Group: Create, delete, rename, collapse/expand
-    - Visual: Color, size, style modifications
-    - Annotations: Notes, shapes, labels
+- Track all canvas and schema modifications
+- Configurable history depth (default 50, max 500)
+- Actions tracked:
+  - Class: Create, delete, rename, move, resize
+  - Property: Add, edit, delete, reorder
+  - Relationship: Create, delete, modify
+  - Canvas Layout: Node positioning, group changes
+  - Group: Create, delete, rename, collapse/expand
+  - Visual: Color, size, style modifications
+  - Annotations: Notes, shapes, labels
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
@@ -542,14 +504,6 @@
 | Ticket | Feature                                                      |
 |--------|--------------------------------------------------------------|
 | #199   | Show property references even when class nodes are collapsed |
-
-#### Web Workers 📋 PLANNED
-- Layout calculations in background thread
-- Node rendering in worker (OffscreenCanvas)
-- Non-blocking canvas operations
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
 
 ---
 
@@ -605,16 +559,6 @@
 | #407   | Include/exclude grid                       |
 | #408   | Export option to add watermark             |
 | #409   | Add timestamp and metadata                 |
-
-#### Batch & Animated Export
-- Export all groups separately
-- Export each layout snapshot
-- Export multiple formats at once
-- Animated GIF of layout transitions
-- Video export (WebM, MP4) with narration
-
-| Ticket | Feature                                      |
-|--------|----------------------------------------------|
 
 ---
 

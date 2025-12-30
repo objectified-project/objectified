@@ -186,37 +186,37 @@ community needs.
 |--------|--------------------------------------------------|
 
 **Data Governance**
-- 📋 Data classification tags (PII, PHI, Confidential)
-- 📋 Automatic PII detection in schemas
-- 📋 Data retention policies per schema
-- 📋 Right to erasure (GDPR Article 17) tools
-- 📋 Data lineage tracking
-- 📋 Schema ownership and stewardship
-- 📋 Data quality rules and validation
+- Data classification tags (PII, PHI, Confidential)
+- Automatic PII detection in schemas
+- Data retention policies per schema
+- Right to erasure (GDPR Article 17) tools
+- Data lineage tracking
+- Schema ownership and stewardship
+- Data quality rules and validation
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 **Regulatory Compliance**
-- 📋 SOC 2 Type II compliance
-- 📋 HIPAA compliance mode
-- 📋 GDPR compliance dashboard
-- 📋 ISO 27001 controls mapping
-- 📋 PCI DSS compliance for payment schemas
-- 📋 Compliance audit reports
-- 📋 Evidence collection automation
+- SOC 2 Type II compliance
+- HIPAA compliance mode
+- GDPR compliance dashboard
+- ISO 27001 controls mapping
+- PCI DSS compliance for payment schemas
+- Compliance audit reports
+- Evidence collection automation
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 **Schema Governance**
-- 📋 Schema approval workflows with escalation
-- 📋 Breaking change policies (block/warn/allow)
-- 📋 Mandatory review for production schemas
-- 📋 Schema naming conventions enforcement
-- 📋 Required documentation policies
-- 📋 Schema quality gates
-- 📋 Governance dashboard with compliance scores
+- Schema approval workflows with escalation
+- Breaking change policies (block/warn/allow)
+- Mandatory review for production schemas
+- Schema naming conventions enforcement
+- Required documentation policies
+- Schema quality gates
+- Governance dashboard with compliance scores
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

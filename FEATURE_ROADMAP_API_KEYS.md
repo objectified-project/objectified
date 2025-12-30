@@ -75,7 +75,7 @@ This covers API Keys that are used to access Objectified external services.
 
 ---
 
-# Implemented features summary
+# Completed
 
 ### API Key Management ✅ IMPLEMENTED
 - ✅ Create and manage API keys per tenant
@@ -85,7 +85,3 @@ This covers API Keys that are used to access Objectified external services.
 - ✅ Track last usage timestamp
 - ✅ Soft delete capability
 - ✅ Full UI for key management
-
----
-
-# Completed
