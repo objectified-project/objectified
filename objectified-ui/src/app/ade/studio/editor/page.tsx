@@ -54,8 +54,6 @@ import {
 } from '../../../../../lib/db/helper';
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
-import { getLayoutedElements, type LayoutDirection, applyAutoLayout, type LayoutAlgorithm } from '../layoutUtils';
-import { getLayoutAlgorithmName } from '../autoLayoutAlgorithms';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -178,9 +176,6 @@ const StudioContent = () => {
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('TB');
-  const [layoutAlgorithm, setLayoutAlgorithm] = useState<LayoutAlgorithm>('hierarchical-tb');
-  const [autoLayoutEnabled, setAutoLayoutEnabled] = useState<boolean>(false);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const { fitView, setCenter, getViewport, setViewport } = useReactFlow();
 
@@ -358,28 +353,19 @@ const StudioContent = () => {
 
       setLoadingMessage('Updating nodes and edges...');
 
-      let finalNodes: Node[];
-      if (applyLayout && autoLayoutEnabled) {
-        // Apply auto-layout for class add/delete
-        const newNodes = await classesToNodes(classesWithProperties);
-        const newEdges = createAllEdges(classesWithProperties);
-        finalNodes = getLayoutedElements(newNodes, newEdges, { direction: layoutDirection });
-        setEdges(newEdges);
-      } else {
-        // Preserve existing node positions when reloading (no auto-layout)
-        const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
-        const newNodes = await classesToNodes(classesWithProperties);
-        // Restore positions from existing nodes
-        newNodes.forEach(node => {
-          const existingPos = existingPositions.get(node.id);
-          if (existingPos) {
-            node.position = existingPos;
-          }
-        });
-        finalNodes = newNodes;
-        const newEdges = createAllEdges(classesWithProperties);
-        setEdges(newEdges);
-      }
+      // Preserve existing node positions when reloading
+      const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
+      const newNodes = await classesToNodes(classesWithProperties);
+      // Restore positions from existing nodes
+      newNodes.forEach(node => {
+        const existingPos = existingPositions.get(node.id);
+        if (existingPos) {
+          node.position = existingPos;
+        }
+      });
+      const finalNodes = newNodes;
+      const newEdges = createAllEdges(classesWithProperties);
+      setEdges(newEdges);
       setNodes(finalNodes);
     } catch (error) {
       console.error('Failed to reload classes:', error);
@@ -387,130 +373,7 @@ const StudioContent = () => {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
     }
-  }, [selectedVersionId, layoutDirection, autoLayoutEnabled, setNodes, setEdges, projects, versions, nodes]);
-
-  // Apply auto-layout to current nodes and edges with animation
-  const onLayout = useCallback((direction: LayoutDirection) => {
-    if (!autoLayoutEnabled) {
-      // Just update the direction without applying layout
-      setLayoutDirection(direction);
-      return;
-    }
-
-    setIsLoadingCanvas(true);
-    setLoadingMessage('Applying layout...');
-    setIsAnimating(true); // Enable CSS transitions
-
-    // First, add transition styles to all existing nodes
-    const nodesWithTransition = nodes.map(node => ({
-      ...node,
-      style: {
-        ...node.style,
-        transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }));
-    setNodes(nodesWithTransition);
-
-    // Use setTimeout to allow the transition styles to be applied
-    setTimeout(() => {
-      const layoutedNodes = getLayoutedElements(nodes, edges, { direction });
-
-      // Apply new positions while keeping transition styles
-      const animatedNodes = layoutedNodes.map(node => ({
-        ...node,
-        style: {
-          ...node.style,
-          transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-        },
-      }));
-
-      setNodes(animatedNodes);
-      setLayoutDirection(direction);
-
-      // Fit view after animation completes
-      setTimeout(() => {
-        fitView({ padding: 0.2, duration: 400 });
-        setIsLoadingCanvas(false);
-        setLoadingMessage('');
-
-        // Remove transition styles using functional update
-        setTimeout(() => {
-          setNodes((currentNodes) =>
-            currentNodes.map(node => {
-              const { transition, ...restStyle } = node.style || {};
-              return {
-                ...node,
-                style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
-              };
-            })
-          );
-          setIsAnimating(false);
-        }, 400);
-      }, 650);
-    }, 50);
-  }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
-
-  // Apply layout algorithm with animation
-  const onLayoutAlgorithm = useCallback((algorithm: LayoutAlgorithm) => {
-    // Always apply the layout when a button is clicked
-    setIsLoadingCanvas(true);
-    setLoadingMessage(`Applying ${getLayoutAlgorithmName(algorithm)} layout...`);
-    setIsAnimating(true); // Enable CSS transitions
-
-    // First, add transition styles to all existing nodes
-    const nodesWithTransition = nodes.map(node => ({
-      ...node,
-      style: {
-        ...node.style,
-        transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-      },
-    }));
-    setNodes(nodesWithTransition);
-
-    // Use setTimeout to allow the transition styles to be applied
-    setTimeout(() => {
-      const layoutedNodes = applyAutoLayout(nodes, edges, { algorithm });
-
-      // Apply new positions while keeping transition styles
-      const animatedNodes = layoutedNodes.map(node => ({
-        ...node,
-        style: {
-          ...node.style,
-          transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-        },
-      }));
-
-      setNodes(animatedNodes);
-      setLayoutAlgorithm(algorithm);
-
-      // Update direction if it's a hierarchical layout
-      if (algorithm.startsWith('hierarchical-')) {
-        const dir = algorithm.split('-')[1].toUpperCase() as LayoutDirection;
-        setLayoutDirection(dir);
-      }
-
-      // Fit view after animation completes (600ms animation + small delay)
-      setTimeout(() => {
-        fitView({ padding: 0.2, duration: 400 });
-        setIsLoadingCanvas(false);
-        setLoadingMessage('');
-
-        // Remove transition styles to avoid interfering with manual dragging
-        setTimeout(() => {
-          setNodes((currentNodes) =>
-            currentNodes.map(node => {
-              const { transition, ...restStyle } = node.style || {};
-              return {
-                ...node,
-                style: Object.keys(restStyle).length > 0 ? restStyle : undefined,
-              };
-            })
-          );
-          setIsAnimating(false);
-        }, 400);
-      }, 650);
-    }, 50);
-  }, [nodes, edges, setNodes, fitView, autoLayoutEnabled]);
+  }, [selectedVersionId, setNodes, setEdges, projects, versions, nodes]);
 
 // Helper function to extract inline properties from a property schema
   const extractInlineProperties = (propData: any): { name: string; data: any; description?: string }[] => {
@@ -3883,54 +3746,18 @@ const StudioContent = () => {
               }));
 
               // Apply auto-layout if enabled, but only to ungrouped nodes
-              if (autoLayoutEnabled) {
-                // Get grouped node IDs
-                const groupedNodeIds = new Set<string>();
-                canvasGroups.forEach((g: any) => {
-                  (g.nodeIds || []).forEach((nodeId: string) => groupedNodeIds.add(nodeId));
-                });
-
-                // Separate grouped and ungrouped nodes
-                const groupedClassNodes = newNodes.filter(n => groupedNodeIds.has(n.id));
-                const ungroupedNodes = newNodes.filter(n => !groupedNodeIds.has(n.id));
-
-                // Only layout ungrouped class nodes
-                const ungroupedNodeIds = new Set(ungroupedNodes.map(n => n.id));
-                const ungroupedEdges = newEdges.filter(e =>
-                  ungroupedNodeIds.has(e.source) && ungroupedNodeIds.has(e.target)
-                );
-
-                const layoutedUngroupedNodes = ungroupedNodes.length > 0
-                  ? getLayoutedElements(ungroupedNodes, ungroupedEdges, { direction: layoutDirection })
-                  : [];
-
-                finalNodes = [...groupNodes, ...groupedClassNodes, ...layoutedUngroupedNodes];
-              } else {
-                finalNodes = [...groupNodes, ...newNodes];
-              }
+              finalNodes = [...groupNodes, ...newNodes];
 
               // Trigger sidebar refresh to update groups
               triggerSidebarRefresh();
             } else {
-              // No groups - just apply auto-layout if enabled
-              if (autoLayoutEnabled) {
-                finalNodes = getLayoutedElements(newNodes, newEdges, {
-                  direction: layoutDirection
-                });
-              } else {
-                finalNodes = newNodes;
-              }
+              // No groups - just use nodes as-is
+              finalNodes = newNodes;
             }
           } catch (error) {
             console.error('Error loading groups:', error);
-            // Fall back to auto-layout
-            if (autoLayoutEnabled) {
-              finalNodes = getLayoutedElements(newNodes, newEdges, {
-                direction: layoutDirection
-              });
-            } else {
-              finalNodes = newNodes;
-            }
+            // Fall back to nodes without layout
+            finalNodes = newNodes;
           }
 
           // Fit view after a short delay to ensure nodes are rendered
@@ -3954,7 +3781,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, layoutDirection, autoLayoutEnabled, setNodes, setEdges, fitView, projects, versions, currentUserId, setGroups, setViewport, projectTags, isReadOnly, triggerSidebarRefresh]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, setNodes, setEdges, fitView, projects, versions, currentUserId, setGroups, setViewport, projectTags, isReadOnly, triggerSidebarRefresh]);
 
   // Generate specs on-demand when switching views or when canvas changes
   useEffect(() => {
@@ -4620,48 +4447,27 @@ const StudioContent = () => {
 
                 {/* Dropdown Menu */}
                 {layoutDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[1002]">
-                    <div className="py-1">
-                      {/* Auto Layout Toggle */}
-                      <div className="px-4 py-3 mb-1 border-b border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                            </svg>
-                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                              Auto Layout
-                            </span>
-                          </div>
-                          <Switch.Root
-                            checked={autoLayoutEnabled}
-                            onCheckedChange={setAutoLayoutEnabled}
-                            className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors cursor-pointer"
-                          >
-                            <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
-                          </Switch.Root>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-                          Automatically arrange nodes when adding or removing classes
-                        </p>
-                      </div>
-
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[1002]">
+                    <div className="py-2">
                       {/* Save/Load Layout Buttons */}
-                      <div className="px-4 py-3 mb-1 border-b border-gray-100 dark:border-gray-700">
+                      <div className="px-4 py-3">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                          Canvas Layout
+                        </h4>
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={handleSaveLayout}
-                            disabled={autoLayoutEnabled || isReadOnly || layoutSaved}
+                            disabled={isReadOnly || layoutSaved}
                             className={`
                               px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2
                               ${layoutSaved
                                 ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700'
-                                : !autoLayoutEnabled && !isReadOnly
+                                : !isReadOnly
                                 ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-700'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-200 dark:border-gray-600'
                               }
                             `}
-                            title={layoutSaved ? 'Layout saved!' : autoLayoutEnabled ? 'Disable auto-layout to save' : isReadOnly ? 'Cannot save in read-only mode' : 'Save current layout'}
+                            title={layoutSaved ? 'Layout saved!' : isReadOnly ? 'Cannot save in read-only mode' : 'Save current layout'}
                           >
                             {layoutSaved ? (
                               <>
@@ -4681,15 +4487,8 @@ const StudioContent = () => {
                           </button>
                           <button
                             onClick={handleLoadLayout}
-                            disabled={autoLayoutEnabled}
-                            className={`
-                              px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2
-                              ${!autoLayoutEnabled
-                                ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-200 dark:border-gray-600'
-                              }
-                            `}
-                            title={autoLayoutEnabled ? 'Disable auto-layout to load' : 'Load saved layout'}
+                            className="px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700"
+                            title="Load saved layout"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -4698,130 +4497,8 @@ const StudioContent = () => {
                           </button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                          {autoLayoutEnabled
-                            ? 'Turn off auto-layout to save or load custom layouts'
-                            : 'Save or load your canvas layout per version'
-                          }
+                          Save or load your canvas layout per version
                         </p>
-                      </div>
-
-                      {/* Layout Algorithms Header */}
-                      <div className="px-4 pt-2 pb-1">
-                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Layout Algorithms
-                        </h4>
-                      </div>
-
-                      {/* Hierarchical Layouts */}
-                      <div className="px-3 py-1">
-                        <div className="px-2 py-1.5">
-                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Hierarchical</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('hierarchical-tb');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-tb' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">↓</span>
-                              <div className="font-medium text-xs">Top to Bottom</div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('hierarchical-lr');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-lr' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">→</span>
-                              <div className="font-medium text-xs">Left to Right</div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('hierarchical-bt');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-bt' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">↑</span>
-                              <div className="font-medium text-xs">Bottom to Top</div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('hierarchical-rl');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'hierarchical-rl' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">←</span>
-                              <div className="font-medium text-xs">Right to Left</div>
-                            </div>
-                          </button>
-                        </div>
-
-                        {/* Other Layouts */}
-                        <div className="px-2 py-1.5 mt-2">
-                          <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Other</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('force-directed');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'force-directed' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">🔄</span>
-                              <div className="font-medium text-xs">Force-Directed</div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('circular');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'circular' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">⭕</span>
-                              <div className="font-medium text-xs">Circular</div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('grid');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'grid' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">⊞</span>
-                              <div className="font-medium text-xs">Grid</div>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLayoutAlgorithm('layered');
-                              setLayoutDropdownOpen(false);
-                            }}
-                            className={`text-left px-3 py-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 ${layoutAlgorithm === 'layered' ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                          >
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <span className="text-2xl">📚</span>
-                              <div className="font-medium text-xs">Layered</div>
-                            </div>
-                          </button>
-                        </div>
                       </div>
                     </div>
                   </div>
