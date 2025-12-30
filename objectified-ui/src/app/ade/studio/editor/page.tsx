@@ -1029,6 +1029,9 @@ const StudioContent = () => {
     // Remove from context
     deleteGroupFromContext(groupId);
 
+    // Clean up group position tracking
+    groupPositionsRef.current.delete(groupId);
+
     // Remove group node from canvas
     setNodes(prevNodes => prevNodes.filter(node => node.id !== groupId));
 
@@ -1545,6 +1548,9 @@ const StudioContent = () => {
     // Add group to context
     addGroup(newGroup);
 
+    // Initialize group position ref for delta tracking during drag
+    groupPositionsRef.current.set(groupId, { x: position.x, y: position.y });
+
     // Create group node for ReactFlow
     const groupNode: Node = {
       id: groupId,
@@ -1900,6 +1906,11 @@ const StudioContent = () => {
           }));
           setGroups(canvasGroups);
           loadedGroups = canvasGroups;
+
+          // Initialize group positions ref for delta tracking during drag
+          canvasGroups.forEach((group: any) => {
+            groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
+          });
         }
       } catch (error) {
         console.error('Error loading groups:', error);
@@ -3751,6 +3762,11 @@ const StudioContent = () => {
 
               setGroups(canvasGroups);
 
+              // Initialize group positions ref for delta tracking during drag
+              canvasGroups.forEach((group: any) => {
+                groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
+              });
+
               // Create group nodes
               const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
               const groupNodes: Node[] = canvasGroups.map((group: any) => ({
@@ -3830,6 +3846,11 @@ const StudioContent = () => {
               }));
 
               setGroups(canvasGroups);
+
+              // Initialize group positions ref for delta tracking during drag
+              canvasGroups.forEach((group: any) => {
+                groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
+              });
 
               // Create group nodes
               const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
