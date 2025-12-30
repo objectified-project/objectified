@@ -12,11 +12,12 @@ import { getTenantsForUser } from '../../../../lib/db/helper';
 // Import version from package.json
 const APP_VERSION = '02-2026';
 
-type NavItem = { label: string; href: string };
+type NavItem = { label: string; href: string; enabled?: boolean };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/ade/dashboard" },
   { label: "Studio", href: "/ade/studio" },
+  { label: "Database", href: "/ade/database", enabled: false },
 ];
 
 const TopHeader = () => {
@@ -142,19 +143,33 @@ const TopHeader = () => {
 
             return (
               <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors ${
-                    isActive ? 'underline bg-gray-200 dark:bg-gray-600' : ''
-                  }`}
-                  style={{
-                    padding: "4px 6px",
-                    borderRadius: 6,
-                    fontSize: 13,
-                  }}
-                >
-                  {item.label}
-                </Link>
+                {item.enabled === false ? (
+                  <span
+                    className="text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                    style={{
+                      padding: "4px 6px",
+                      borderRadius: 6,
+                      fontSize: 13,
+                    }}
+                    title="Coming soon"
+                  >
+                    {item.label}
+                  </span>
+                ) : (
+                  <Link
+                    href={item.href}
+                    className={`text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-500 transition-colors ${
+                      isActive ? 'underline bg-gray-200 dark:bg-gray-600' : ''
+                    }`}
+                    style={{
+                      padding: "4px 6px",
+                      borderRadius: 6,
+                      fontSize: 13,
+                    }}
+                  >
+                    {item.label}
+                  </Link>
+                )}
               </li>
             );
           })}
