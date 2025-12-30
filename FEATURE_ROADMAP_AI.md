@@ -370,6 +370,19 @@ This outlines the AI features that are planned for the Objectified platform.
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
+### AI Layout Suggestions
+
+**Intelligent Layout Suggestions** 📋 PLANNED
+- AI-powered layout recommendations:
+  - 📋 Analyze schema structure and suggest best layout type
+  - 📋 Detect strongly connected components
+  - 📋 Suggest groupings based on relationships
+  - 📋 Identify central/hub classes
+  - 📋 Recommend hierarchy roots
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+
 ### AI Configuration
 
 **Admin Settings** 📋 PLANNED

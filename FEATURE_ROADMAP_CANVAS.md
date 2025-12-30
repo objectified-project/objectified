@@ -122,23 +122,6 @@
 | #195   | Focus mode - dim non-matching results                |
 | #196   | Search history with clear option                     |
 
-#### Canvas Layers 📋 PLANNED
-- 📋 Separate visual layers for different content:
-    - **Background Layer**: Grid (dots vs. lines), shapes
-    - **Node Layer**: Class nodes
-    - **Edge Layer**: Relationships/references
-    - **Annotation Layer**: Sticky notes, labels (drawer on right side like Lucidchart)
-      - Notes are per-session on the Project and Version, so these should appear as notes like Lucidcharts on the right-hand side
-      - The right-hand side shelf should be a drawer that can open/close
-    - **UI Layer**: Selection boxes, handles
-- 📋 Toggle layers on/off
-- 📋 Lock layers to prevent editing
-- 📋 Reorder layer z-index
-- 📋 Per-layer opacity control
-
-| Ticket | Feature                                       |
-|--------|-----------------------------------------------|
-
 #### Node Visibility Controls 📋 PLANNED
 - 📋 Hide/show individual nodes
 - 📋 Hide all nodes except selected
@@ -149,7 +132,14 @@
     - Hide by group membership
 - 📋 "Ghosts mode": Show hidden nodes as semi-transparent
 - 📋 Quick restore hidden nodes
-- 📋 Visibility history
+
+| Ticket | Feature Description                              |
+|--------|--------------------------------------------------|
+| #481   | Hide/show individual nodes |
+| #482   | Hide all nodes except selected                   |
+| #483   | Hide by criteria                                 |
+| #484   | "Ghosts mode" for hidden nodes                   |
+| #485   | Quick restore hidden nodes                       |
 
 #### Focus Mode 📋 PLANNED
 - 📋 Isolate selected classes and immediate relationships
@@ -159,6 +149,15 @@
 - 📋 Focus on group (show only group members)
 - 📋 Exit focus mode with Esc key
 
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| #486   | Isolate selected classes and relationships |
+| #487   | Blur/dim non-focused nodes                 |
+| #488   | Show only Nth-degree connections           |
+| #489   | Expand focus incrementally                 |
+| #490   | Focus on group members                     |
+| #491   | Exit focus mode with Esc key               |
+
 #### Visual Feedback
 - 📋 **Dropzone highlighting**: Visual cues for valid drop targets
 - 📋 **Ghost preview**: Show preview while dragging
@@ -167,38 +166,29 @@
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-
-#### Presentation Mode 📋 PLANNED
-- Full-screen canvas mode
-- Hide all toolbars and UI
-- Slide-show of bookmarked areas
-- Presentation notes (speaker view)
-- Timer and slide counter
-- Presenter controls (keyboard shortcuts)
-- Laser pointer mode
-- Recording mode (capture presentation as video)
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| #477   | Add dropzone highlighting when dragging nodes    |
+| #478   | Show ghost preview of node while dragging        |
+| #479   | Invalid drop indicator                           |
+| #480   | Snap indicators when dragging nodes              |
 
 #### Current Sidebars ✅ PARTIALLY COMPLETE
 - ✅ **Classes sidebar**: List of all classes with search
 - ✅ **Properties panel**: Edit class properties
-- 📋 **Annotations drawer**: Right-side notes (Lucidchart style)
-- 📋 **History panel**: Undo/redo history with preview
-- 📋 **Layers panel**: Toggle visibility of canvas layers
-- 📋 **Bookmarks panel**: Quick navigation to saved views
+- **Annotations drawer**: Right-side notes (Lucidchart style)
+- **History panel**: Undo/redo history with preview
+- **Layers panel**: Toggle visibility of canvas layers
+- **Bookmarks panel**: Quick navigation to saved views
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Panel Behaviors 📋 PLANNED
-- 📋 **Resizable panels**: Drag to resize
-- 📋 **Collapsible panels**: Minimize to edge
-- 📋 **Pinned panels**: Keep panel always visible
-- 📋 **Floating panels**: Detach to separate window
-- 📋 **Panel tabs**: Stack multiple panels with tabs
-- 📋 **Panel positions**: Left, right, top, bottom
+- **Resizable panels**: Drag to resize
+- **Collapsible panels**: Minimize to edge
+- **Pinned panels**: Keep panel always visible
+- **Floating panels**: Detach to separate window
+- **Panel tabs**: Stack multiple panels with tabs
+- **Panel positions**: Left, right, top, bottom
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -355,27 +345,22 @@
 
 ### 4.1 Smart Canvas Features
 
-**Intelligent Layout Suggestions** ✅ IMPLEMENTED
-- AI-powered layout recommendations:
-  - ✅ Analyze schema structure and suggest best layout type
-  - ✅ Detect strongly connected components
-  - ✅ Suggest groupings based on relationships
-  - ✅ Identify central/hub classes
-  - ✅ Recommend hierarchy roots
+**Intelligent Layout Suggestions** ✅ PARTIALLY IMPLEMENTED
 - ✅ "Auto-organize" button with multiple suggestions (8 layout algorithms)
-- ✅ Preview suggestions before applying
-- 📋 Rating system for suggestions (thumbs up/down to improve)
-- 📋 Machine learning from user preferences
+- 📋 Preview suggestions before applying
+- Rating system for suggestions (thumbs up/down to improve)
+- Machine learning from user preferences
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #471   | Preview layout suggestions before applying       |
 
 **Canvas Analysis** ✅ PARTIALLY IMPLEMENTED
 - **Schema Metrics**:
   - ✅ Total classes, properties, relationships
-  - ✅ Average properties per class
-  - ✅ Most connected classes (hubs)
-  - ✅ Isolated classes (no relationships)
+  - 📋 Average properties per class
+  - 📋 Most connected classes (hubs)
+  - 📋 Isolated classes (no relationships)
   - 📋 Deepest dependency chains
   - 📋 Circular dependencies count
 - **Layout Quality Score**:
@@ -389,44 +374,49 @@
   - 📋 "Class X is isolated - consider adding relationships"
   - 📋 "Large clusters detected - consider splitting into groups"
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                    |
+|--------|----------------------------------------|
+| #472   | Add Schema Metrics view to the canvas  |
+| #473   | Layout Quality Score calculation       |
+| #474   | Canvas improvement suggestions         |
 
-**Canvas Performance Optimizations** ✅ IMPLEMENTED
+**Canvas Performance Optimizations** 📋 PARTIALLY IMPLEMENTED
 - **Virtual Rendering**:
   - ✅ Render only visible nodes (viewport culling)
   - ✅ Node pooling and recycling
   - ✅ Progressive rendering for large schemas (1000+ nodes)
-  - 📋 Canvas split into chunks/tiles
+  - Canvas split into chunks/tiles
 - **Level of Detail (LOD)**: ✅ IMPLEMENTED
   - ✅ When zoomed out >200%, show simplified nodes
   - ✅ At high zoom, hide property details, show only class names
   - ✅ Dynamic detail based on zoom level
   - ✅ Fade transitions between LOD levels
-  - 📋 Show canvas node detail for properties that reference others even when collapsed
+  - Show canvas node detail for properties that reference others even when collapsed
 - **Caching**:
   - ✅ Cache rendered node SVG/Canvas elements
   - ✅ Cache layout calculations
   - ✅ Cache relationship paths
   - ✅ Invalidate cache only on changes
 - **Web Workers**:
-  - 📋 Layout calculations in background thread
-  - 📋 Node rendering in worker (OffscreenCanvas)
-  - 📋 Relationship path calculations async
-  - 📋 Non-blocking canvas operations
+  - Layout calculations in background thread
+  - Node rendering in worker (OffscreenCanvas)
+  - Relationship path calculations async
+  - Non-blocking canvas operations
 - **Request Animation Frame**:
   - ✅ Smooth 60fps animations
   - ✅ Batch DOM updates
   - ✅ Throttle mouse move events
 - **Memory Management**:
-  - Lazy load node properties
+  - 📋 Lazy load node properties
   - Unload off-screen nodes
   - Garbage collect unused elements
-  - Memory profiling tools
+  - 📋 Memory profiling tools
 
 | Ticket | Feature Description                                          |
 |--------|--------------------------------------------------------------|
-| [#199] | Show property references even when class nodes are collapsed |
+| #199   | Show property references even when class nodes are collapsed |
+| #475   | Lazy loading of node properties                              |
+| #476   | Memory profiling tooling                                     |
 
 ---
 
@@ -465,6 +455,13 @@
 
 #### Presentation Mode 📋 PLANNED
 - 📋 Full-screen canvas mode with hidden UI
+  - Hide all toolbars and UI
+  - Slide-show of bookmarked areas
+  - Presentation notes (speaker view)
+  - Timer and slide counter
+  - Presenter controls (keyboard shortcuts)
+  - Laser pointer mode
+  - Recording mode (capture presentation as video)
 - 📋 Slide-show of bookmarked areas
 - 📋 Presentation notes (speaker view)
 - 📋 Timer and slide counter
@@ -505,28 +502,28 @@
 |--------|--------------------------------------|
 
 #### Undo/Redo UI 📋 PLANNED
-- 📋 Keyboard shortcuts: `Cmd+Z` (Undo), `Cmd+Shift+Z` (Redo)
-- 📋 Toolbar buttons with dropdown showing last 10 actions
-- 📋 Click any action to undo/redo to that point
+- Keyboard shortcuts: `Cmd+Z` (Undo), `Cmd+Shift+Z` (Redo)
+- Toolbar buttons with dropdown showing last 10 actions
+- Click any action to undo/redo to that point
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
 
 #### History Panel 📋 PLANNED
-- 📋 Dedicated history panel (toggle with `Cmd+H`)
-- 📋 Chronological list with visual timeline view
-- 📋 Filter by action type, search history
-- 📋 Before/after previews for each action
-- 📋 Jump to any point in history
+- Dedicated history panel (toggle with `Cmd+H`)
+- Chronological list with visual timeline view
+- Filter by action type, search history
+- Before/after previews for each action
+- Jump to any point in history
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
 
 #### Advanced Features 📋 PLANNED
-- 📋 Selective undo: Undo specific actions without undoing everything
-- 📋 Branch history for collaborative editing
-- 📋 Persistent history across browser sessions
-- 📋 Server-side backup and sync across devices
+- Selective undo: Undo specific actions without undoing everything
+- Branch history for collaborative editing
+- Persistent history across browser sessions
+- Server-side backup and sync across devices
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
@@ -535,7 +532,7 @@
 
 ### 7. Canvas Performance
 
-#### Level of Detail (LOD) ✅ IMPLEMENTED
+#### Level of Detail (LOD) 📋 PARTIALLY IMPLEMENTED
 - ✅ Simplified nodes when zoomed out >200%
 - ✅ Hide property details at high zoom, show only class names
 - ✅ Dynamic detail based on zoom level
@@ -544,12 +541,12 @@
 
 | Ticket | Feature                                                      |
 |--------|--------------------------------------------------------------|
-| [#199] | Show property references even when class nodes are collapsed |
+| #199   | Show property references even when class nodes are collapsed |
 
 #### Web Workers 📋 PLANNED
-- 📋 Layout calculations in background thread
-- 📋 Node rendering in worker (OffscreenCanvas)
-- 📋 Non-blocking canvas operations
+- Layout calculations in background thread
+- Node rendering in worker (OffscreenCanvas)
+- Non-blocking canvas operations
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
@@ -609,59 +606,15 @@
 | #408   | Export option to add watermark             |
 | #409   | Add timestamp and metadata                 |
 
-#### Batch & Animated Export 📋 PLANNED
-- 📋 Export all groups separately
-- 📋 Export each layout snapshot
-- 📋 Export multiple formats at once
-- 📋 Animated GIF of layout transitions
-- 📋 Video export (WebM, MP4) with narration
+#### Batch & Animated Export
+- Export all groups separately
+- Export each layout snapshot
+- Export multiple formats at once
+- Animated GIF of layout transitions
+- Video export (WebM, MP4) with narration
 
 | Ticket | Feature                                      |
 |--------|----------------------------------------------|
-
----
-
-### 9. Canvas Collaboration (Real-Time)
-
-#### Real-Time Cursors 📋 PLANNED
-- 📋 See teammates' cursors with names and colors
-- 📋 Cursor follows as they move
-- 📋 Hide/show cursors toggle
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
-#### Live Edits 📋 PLANNED
-- 📋 See changes as teammates make them
-- 📋 Smooth animations for remote changes
-- 📋 Change indicators (flash highlight)
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
-#### Locked Nodes 📋 PLANNED
-- 📋 Lock icon on nodes being edited by others
-- 📋 "Being edited by [Name]" tooltip
-- 📋 Auto-lock/unlock mechanisms
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
-#### Conflict Resolution 📋 PLANNED
-- 📋 Operational Transform for concurrent edits
-- 📋 Conflict warnings before saving
-- 📋 "Yours vs Theirs" comparison UI
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-
-#### Chat Overlay 📋 PLANNED
-- 📋 Quick chat widget without leaving canvas
-- 📋 @mention teammates with canvas link
-- 📋 Emoji reactions, message history
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
 
 ---
 
@@ -684,59 +637,47 @@
 
 ---
 
-## Implemented Features Summary
-
----
-
-## 🏢 Enterprise Canvas Features (NEW)
-
-> **Purpose**: Enterprise-grade canvas capabilities for large teams and complex schemas
-> **Priority**: 🔴 High - Critical for enterprise adoption
-> **Timeline**: Q2-Q3 2026
-
----
-
 ### 10. Schema Visualization & Analytics
 
-#### Dependency Visualization 📋 PLANNED
-- 📋 Interactive dependency graph overlay on canvas
-- 📋 Highlight circular dependencies with warning indicators
-- 📋 Show dependency depth levels (1st, 2nd, 3rd degree)
-- 📋 "Impact Analysis" mode: Show all affected classes when changing one
-- 📋 Upstream/downstream dependency toggles
-- 📋 Dependency path highlighting (click to trace full chain)
-- 📋 Dependency metrics per class (in-degree, out-degree, betweenness)
+#### Dependency Visualization
+- Interactive dependency graph overlay on canvas
+- Highlight circular dependencies with warning indicators
+- Show dependency depth levels (1st, 2nd, 3rd degree)
+- "Impact Analysis" mode: Show all affected classes when changing one
+- Upstream/downstream dependency toggles
+- Dependency path highlighting (click to trace full chain)
+- Dependency metrics per class (in-degree, out-degree, betweenness)
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Schema Metrics Dashboard 📋 PLANNED
-- 📋 Real-time metrics overlay on canvas:
+#### Schema Metrics Dashboard
+- Real-time metrics overlay on canvas:
   - Total classes, properties, relationships count
   - Schema complexity score
   - Documentation coverage percentage
   - Naming convention compliance
-- 📋 Per-node metrics badges (property count, relationship count)
-- 📋 Heatmap visualization:
+- Per-node metrics badges (property count, relationship count)
+- Heatmap visualization:
   - By complexity (more complex = warmer color)
   - By change frequency (recently modified = highlighted)
   - By usage/reference count
   - By documentation completeness
-- 📋 Trend indicators (improving/declining metrics)
+- Trend indicators (improving/declining metrics)
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Version Comparison View 📋 PLANNED
-- 📋 Side-by-side canvas comparison of two versions
-- 📋 Diff highlighting:
+#### Version Comparison View
+- Side-by-side canvas comparison of two versions
+- Diff highlighting:
   - Green for added classes/properties
   - Red for removed classes/properties
   - Yellow for modified classes/properties
-- 📋 Animated transition between versions
-- 📋 "Time travel" slider to scrub through version history
-- 📋 Change summary panel with statistics
-- 📋 Filter diff by change type
+- Animated transition between versions
+- "Time travel" slider to scrub through version history
+- Change summary panel with statistics
+- Filter diff by change type
 
 | Ticket | Feature |
 |--------|---------|
@@ -745,35 +686,35 @@
 
 ### 11. Developer Productivity Features
 
-#### Code Preview Integration 📋 PLANNED
-- 📋 Hover over class to preview generated code (TypeScript, Python, Java, etc.)
-- 📋 Split view: Canvas + Code side by side
-- 📋 Real-time code generation as schema changes
-- 📋 Code syntax highlighting with language selector
-- 📋 Copy code snippets directly from preview
-- 📋 Jump to relevant code section from class property
+#### Code Preview Integration
+- Hover over class to preview generated code (TypeScript, Python, Java, etc.)
+- Split view: Canvas + Code side by side
+- Real-time code generation as schema changes
+- Code syntax highlighting with language selector
+- Copy code snippets directly from preview
+- Jump to relevant code section from class property
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Quick Actions & Command Palette 📋 PLANNED
-- 📋 `Cmd+K` / `Ctrl+K` command palette for all canvas actions
-- 📋 Fuzzy search for classes, properties, actions
-- 📋 Recent actions history in palette
-- 📋 Contextual actions based on selection
-- 📋 Custom action shortcuts configuration
-- 📋 Action categories: Navigate, Edit, View, Export, Layout
+#### Quick Actions & Command Palette
+- `Cmd+K` / `Ctrl+K` command palette for all canvas actions
+- Fuzzy search for classes, properties, actions
+- Recent actions history in palette
+- Contextual actions based on selection
+- Custom action shortcuts configuration
+- Action categories: Navigate, Edit, View, Export, Layout
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Inline Documentation 📋 PLANNED
-- 📋 Rich markdown editor in property tooltips
-- 📋 Code examples in documentation with syntax highlighting
-- 📋 Documentation templates per property type
-- 📋 Auto-generate documentation from property schema
-- 📋 Documentation coverage indicators on nodes
-- 📋 Bulk documentation editing mode
+#### Inline Documentation
+- Rich markdown editor in property tooltips
+- Code examples in documentation with syntax highlighting
+- Documentation templates per property type
+- Auto-generate documentation from property schema
+- Documentation coverage indicators on nodes
+- Bulk documentation editing mode
 
 | Ticket | Feature |
 |--------|---------|
@@ -782,39 +723,39 @@
 
 ### 12. Enterprise Governance & Compliance
 
-#### Access Control Visualization 📋 PLANNED
-- 📋 Visual indicators for permission levels:
+#### Access Control Visualization
+- Visual indicators for permission levels:
   - 🔓 Open (full access)
   - 🔒 Read-only (view only)
   - 🚫 Restricted (no access, greyed out)
   - ⚠️ Pending approval
-- 📋 Owner badges on classes/groups
-- 📋 Team assignment visualization
-- 📋 Permission inheritance from groups to classes
+- Owner badges on classes/groups
+- Team assignment visualization
+- Permission inheritance from groups to classes
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Audit Trail Overlay 📋 PLANNED
-- 📋 "History mode" showing change timeline on canvas
-- 📋 Click class to see full change history
-- 📋 Filter by author, date range, change type
-- 📋 Animated replay of schema evolution
-- 📋 Compliance annotations (who approved, when)
-- 📋 Export audit reports for compliance
+#### Audit Trail Overlay
+- "History mode" showing change timeline on canvas
+- Click class to see full change history
+- Filter by author, date range, change type
+- Animated replay of schema evolution
+- Compliance annotations (who approved, when)
+- Export audit reports for compliance
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Schema Standards Enforcement 📋 PLANNED
-- 📋 Real-time validation indicators on canvas:
+#### Schema Standards Enforcement
+- Real-time validation indicators on canvas:
   - ✅ Compliant (green checkmark)
   - ⚠️ Warning (yellow triangle)
   - ❌ Violation (red X)
-- 📋 Click indicator to see violation details and fix suggestions
-- 📋 Configurable rule sets (company standards, industry standards)
-- 📋 Auto-fix suggestions with one-click apply
-- 📋 Standards compliance score per class and overall
+- Click indicator to see violation details and fix suggestions
+- Configurable rule sets (company standards, industry standards)
+- Auto-fix suggestions with one-click apply
+- Standards compliance score per class and overall
 
 | Ticket | Feature |
 |--------|---------|
@@ -823,35 +764,35 @@
 
 ### 13. Large Schema Optimization
 
-#### Smart Clustering 📋 PLANNED
-- 📋 Automatic detection of related class clusters
-- 📋 One-click collapse clusters to single node
-- 📋 Cluster summary (class count, relationship count)
-- 📋 Expand cluster in-place or in separate view
-- 📋 Cross-cluster relationship visualization
-- 📋 Machine learning-based clustering suggestions
+#### Smart Clustering
+- Automatic detection of related class clusters
+- One-click collapse clusters to single node
+- Cluster summary (class count, relationship count)
+- Expand cluster in-place or in separate view
+- Cross-cluster relationship visualization
+- Machine learning-based clustering suggestions
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Multi-Canvas Views 📋 PLANNED
-- 📋 Open multiple canvas tabs for same schema
-- 📋 Different views: Overview, Detail, Relationships, Dependencies
-- 📋 Synchronized selection across views
-- 📋 Split canvas: Two views side by side
-- 📋 Pin important classes to sidebar for quick access
-- 📋 Recent classes list for quick navigation
+#### Multi-Canvas Views
+- Open multiple canvas tabs for same schema
+- Different views: Overview, Detail, Relationships, Dependencies
+- Synchronized selection across views
+- Split canvas: Two views side by side
+- Pin important classes to sidebar for quick access
+- Recent classes list for quick navigation
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Progressive Loading 📋 PLANNED
-- 📋 Load visible area first, then expand
-- 📋 Skeleton placeholders for loading nodes
-- 📋 Priority loading based on importance/connections
-- 📋 Lazy load property details on demand
-- 📋 Background loading with progress indicator
-- 📋 Cancel loading for navigated-away areas
+#### Progressive Loading
+- Load visible area first, then expand
+- Skeleton placeholders for loading nodes
+- Priority loading based on importance/connections
+- Lazy load property details on demand
+- Background loading with progress indicator
+- Cancel loading for navigated-away areas
 
 | Ticket | Feature |
 |--------|---------|
@@ -860,35 +801,35 @@
 
 ### 14. Integration & Extensibility
 
-#### External Tool Integration 📋 PLANNED
-- 📋 Embed canvas in Confluence/Notion pages
-- 📋 Slack integration for canvas snapshots
-- 📋 JIRA integration: Link classes to tickets
-- 📋 GitHub/GitLab: Canvas diff in PR reviews
-- 📋 IDE plugins: Jump from code to canvas class
-- 📋 Webhook triggers on canvas changes
+#### External Tool Integration
+- Embed canvas in Confluence/Notion pages
+- Slack integration for canvas snapshots
+- JIRA integration: Link classes to tickets
+- GitHub/GitLab: Canvas diff in PR reviews
+- IDE plugins: Jump from code to canvas class
+- Webhook triggers on canvas changes
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Canvas API & SDK 📋 PLANNED
-- 📋 Programmatic canvas manipulation API
-- 📋 Custom node renderers via plugins
-- 📋 Event hooks (onNodeClick, onLayoutChange, etc.)
-- 📋 Batch operations API for automation
-- 📋 Canvas state serialization/deserialization
-- 📋 Third-party visualization library integration
+#### Canvas API & SDK
+- Programmatic canvas manipulation API
+- Custom node renderers via plugins
+- Event hooks (onNodeClick, onLayoutChange, etc.)
+- Batch operations API for automation
+- Canvas state serialization/deserialization
+- Third-party visualization library integration
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Print & Documentation Generation 📋 PLANNED
-- 📋 Print-optimized canvas layout
-- 📋 Multi-page PDF with table of contents
-- 📋 Auto-generated schema documentation site
-- 📋 Include canvas diagrams in OpenAPI export
-- 📋 Confluence/Wiki page auto-generation
-- 📋 Custom branding/watermarks for exports
+#### Print & Documentation Generation
+- Print-optimized canvas layout
+- Multi-page PDF with table of contents
+- Auto-generated schema documentation site
+- Include canvas diagrams in OpenAPI export
+- Confluence/Wiki page auto-generation
+- Custom branding/watermarks for exports
 
 | Ticket | Feature |
 |--------|---------|
@@ -897,24 +838,24 @@
 
 ### 15. Accessibility & Internationalization
 
-#### Accessibility (a11y) 📋 PLANNED
-- 📋 Full keyboard navigation for all canvas operations
-- 📋 Screen reader support with ARIA labels
-- 📋 High contrast mode with configurable colors
-- 📋 Focus indicators for all interactive elements
-- 📋 Reduced motion mode (respect OS preference)
-- 📋 Voice control integration (basic commands)
-- 📋 Tab order optimization for logical flow
+#### Accessibility (a11y)
+- Full keyboard navigation for all canvas operations
+- Screen reader support with ARIA labels
+- High contrast mode with configurable colors
+- Focus indicators for all interactive elements
+- Reduced motion mode (respect OS preference)
+- Voice control integration (basic commands)
+- Tab order optimization for logical flow
 
 | Ticket | Feature |
 |--------|---------|
 
-#### Internationalization (i18n) 📋 PLANNED
-- 📋 RTL (Right-to-Left) layout support
-- 📋 Localized UI elements and tooltips
-- 📋 Unicode class/property name support
-- 📋 Locale-aware date/time formatting
-- 📋 Translated keyboard shortcut hints
+#### Internationalization (i18n)
+- RTL (Right-to-Left) layout support
+- Localized UI elements and tooltips
+- Unicode class/property name support
+- Locale-aware date/time formatting
+- Translated keyboard shortcut hints
 
 | Ticket | Feature |
 |--------|---------|
@@ -950,20 +891,7 @@
 
 ---
 
-# Enterprise Feature Summary
-
-| Category | Features | Priority | Timeline |
-|----------|----------|----------|----------|
-| Schema Visualization | Dependency graphs, Metrics, Version comparison | 🔴 High | Q2 2026 |
-| Developer Productivity | Code preview, Command palette, Templates | 🔴 High | Q2 2026 |
-| Governance & Compliance | Access control, Audit trail, Standards | 🔴 High | Q2 2026 |
-| Large Schema Support | Smart clustering, Multi-view, Progressive loading | 🟠 Medium | Q3 2026 |
-| Integration | External tools, API/SDK, Documentation | 🟠 Medium | Q3 2026 |
-| Accessibility | Keyboard nav, Screen readers, i18n | 🟡 Low | Q4 2026 |
-
----
-
-# Implemented features summary
+# Completed
 
 **Constraint Visualization** ✅ IMPLEMENTED
 - Visual indicators for constraints on canvas:
@@ -976,7 +904,3 @@
 - ✅ Constraint tooltips on hover
 - ✅ Constraint summary panel
 - ✅ Tags displayed on class nodes
-
----
-
-# Completed
