@@ -4,10 +4,10 @@ This contains feature sets for property and schema templates, both system-define
 
 #### Group Templates 📋 PLANNED
 - 📋 Pre-defined group structures for common patterns:
-    - REST Resource Group (Create, Read, Update, Delete classes)
-    - Authentication Group (User, Token, Session, Role)
-    - E-commerce Group (Product, Cart, Order, Payment)
-    - Audit Group (Event, Log, History)
+  - REST Resource Group (Create, Read, Update, Delete classes)
+  - Authentication Group (User, Token, Session, Role)
+  - E-commerce Group (Product, Cart, Order, Payment)
+  - Audit Group (Event, Log, History)
 - 📋 Save custom groups as reusable templates
 - 📋 Share group templates across projects/tenants
 
@@ -23,11 +23,11 @@ This contains feature sets for property and schema templates, both system-define
 
 #### Schema Templates & Snippets 📋 PLANNED
 - Drag-and-drop schema templates onto canvas:
-    - CRUD Resource (Create, Read, Update, Delete, List)
-    - Authentication Set (User, Session, Token, Role, Permission)
-    - Pagination Response (items, total, page, pageSize, hasMore)
-    - Error Response (code, message, details, timestamp)
-    - Audit Trail (id, action, actor, timestamp, changes)
+  - CRUD Resource (Create, Read, Update, Delete, List)
+  - Authentication Set (User, Session, Token, Role, Permission)
+  - Pagination Response (items, total, page, pageSize, hasMore)
+  - Error Response (code, message, details, timestamp)
+  - Audit Trail (id, action, actor, timestamp, changes)
 - Custom template creation from selected classes
 - Template variables with auto-fill prompts
 - Template marketplace integration
@@ -57,14 +57,14 @@ This contains feature sets for property and schema templates, both system-define
 
 #### Template Library 📋 PLANNED
 - Pre-built schema templates:
-    - REST API (CRUD operations)
-    - E-commerce (Product, Cart, Order)
-    - Authentication (User, Role, Permission)
-    - Blog (Post, Comment, Author)
-    - CRM (Contact, Lead, Opportunity)
-    - Inventory (Product, Stock, Location)
-    - Healthcare (Patient, Appointment, Record)
-    - Education (Course, Student, Enrollment)
+  - REST API (CRUD operations)
+  - E-commerce (Product, Cart, Order)
+  - Authentication (User, Role, Permission)
+  - Blog (Post, Comment, Author)
+  - CRM (Contact, Lead, Opportunity)
+  - Inventory (Product, Stock, Location)
+  - Healthcare (Patient, Appointment, Record)
+  - Education (Course, Student, Enrollment)
 - Community template marketplace
 - Import templates from GitHub
 - Template versioning

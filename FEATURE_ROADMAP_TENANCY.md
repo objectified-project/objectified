@@ -20,12 +20,12 @@ This outlines the multi-tenancy features planned for Objectified.
 - ✅ Tenant CRUD operations
 - ✅ Tenant slug management with validation
 - Tenant industry tagging
-    - Industry classification tags (Financial Services, Healthcare, E-commerce, SaaS, etc.)
-    - Multi-industry support (select multiple industries)
-    - Industry-specific compliance recommendations
-    - Industry-based schema showcase filtering
-    - Industry benchmarking and analytics
-    - Custom industry categories for enterprise
+  - Industry classification tags (Financial Services, Healthcare, E-commerce, SaaS, etc.)
+  - Multi-industry support (select multiple industries)
+  - Industry-specific compliance recommendations
+  - Industry-based schema showcase filtering
+  - Industry benchmarking and analytics
+  - Custom industry categories for enterprise
 - Tenant resource quotas
 - Tenant billing and usage tracking
 - Tenant data isolation verification
@@ -79,135 +79,135 @@ This outlines the multi-tenancy features planned for Objectified.
 
 **Industry-Specific Features** 📋 PLANNED
 - **Compliance Recommendations**:
-    - Auto-suggest compliance frameworks based on industry
-    - Healthcare → HIPAA, FHIR compliance
-    - Financial → PCI DSS, SOX, Open Banking
-    - Government → FedRAMP, NIST 800-53
-    - Display relevant regulations in dashboard
-    - Compliance checklist per industry
+  - Auto-suggest compliance frameworks based on industry
+  - Healthcare → HIPAA, FHIR compliance
+  - Financial → PCI DSS, SOX, Open Banking
+  - Government → FedRAMP, NIST 800-53
+  - Display relevant regulations in dashboard
+  - Compliance checklist per industry
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Template Marketplace Integration**:
-    - Filter templates by industry
-    - "Recommended for your industry" section
-    - Industry-specific property templates
-    - Common patterns for specific industries
-    - Showcase schemas from same industry
+  - Filter templates by industry
+  - "Recommended for your industry" section
+  - Industry-specific property templates
+  - Common patterns for specific industries
+  - Showcase schemas from same industry
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Schema Showcase Integration**:
-    - Filter showcase by industry
-    - "Schemas from [Industry]" collections
-    - Industry leaderboards
-    - Cross-industry inspiration section
-    - Industry-specific awards/recognition
+  - Filter showcase by industry
+  - "Schemas from [Industry]" collections
+  - Industry leaderboards
+  - Cross-industry inspiration section
+  - Industry-specific awards/recognition
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Benchmarking & Analytics**:
-    - Compare quality scores within industry
-    - Industry average metrics (classes, properties, complexity)
-    - Time-to-production by industry
-    - API complexity trends per industry
-    - Industry best practices reports
+  - Compare quality scores within industry
+  - Industry average metrics (classes, properties, complexity)
+  - Time-to-production by industry
+  - API complexity trends per industry
+  - Industry best practices reports
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Industry-Specific Validation Rules**:
-    - Healthcare: PHI field validation
-    - Financial: PCI compliance field checks
-    - E-commerce: Product schema standards
-    - Configurable rule sets per industry
-    - Industry working groups for standards
+  - Healthcare: PHI field validation
+  - Financial: PCI compliance field checks
+  - E-commerce: Product schema standards
+  - Configurable rule sets per industry
+  - Industry working groups for standards
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 **Tenant Profile Enhancement** 📋 PLANNED
 - **Public Profile**:
-    - Display industry tags on tenant profile
-    - Industry badges/icons
-    - "Serving [Industry]" section
-    - Industry expertise indicators
-    - Cross-reference with showcase
+  - Display industry tags on tenant profile
+  - Industry badges/icons
+  - "Serving [Industry]" section
+  - Industry expertise indicators
+  - Cross-reference with showcase
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Private Dashboard**:
-    - Industry-specific tips and guidance
-    - Regulatory updates for industry
-    - Industry news and trends
-    - Peer comparisons within industry
-    - Industry events and webinars
+  - Industry-specific tips and guidance
+  - Regulatory updates for industry
+  - Industry news and trends
+  - Peer comparisons within industry
+  - Industry events and webinars
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 **Search & Discovery** 📋 PLANNED
 - **Global Search**:
-    - Filter schemas by industry
-    - "Find schemas in [Industry]"
-    - Industry-based recommendations
-    - Cross-industry pattern matching
+  - Filter schemas by industry
+  - "Find schemas in [Industry]"
+  - Industry-based recommendations
+  - Cross-industry pattern matching
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Browse Page**:
-    - Industry facets in sidebar
-    - Industry tag cloud
-    - Popular industries this month
-    - Emerging industries
+  - Industry facets in sidebar
+  - Industry tag cloud
+  - Popular industries this month
+  - Emerging industries
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 **Admin Features** 📋 PLANNED
 - **Super Admin Dashboard**:
-    - View all tenants by industry
-    - Industry distribution analytics
-    - Growth trends by industry
-    - Industry engagement metrics
-    - Manage industry taxonomy
+  - View all tenants by industry
+  - Industry distribution analytics
+  - Growth trends by industry
+  - Industry engagement metrics
+  - Manage industry taxonomy
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Industry Management**:
-    - Add/edit/archive industries
-    - Merge industry categories
-    - Set industry aliases
-    - Define compliance mappings
-    - Industry hierarchy editor
+  - Add/edit/archive industries
+  - Merge industry categories
+  - Set industry aliases
+  - Define compliance mappings
+  - Industry hierarchy editor
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 **Reporting & Analytics** 📋 PLANNED
 - **Industry Reports**:
-    - Schemas per industry breakdown
-    - Quality score by industry
-    - Active users by industry
-    - API complexity by industry
-    - Adoption trends by industry
-    - Industry market share
+  - Schemas per industry breakdown
+  - Quality score by industry
+  - Active users by industry
+  - API complexity by industry
+  - Adoption trends by industry
+  - Industry market share
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 - **Business Intelligence**:
-    - Industry segmentation for marketing
-    - Cross-sell opportunities by industry
-    - Churn analysis by industry
-    - Feature adoption by industry
-    - Support ticket trends by industry
+  - Industry segmentation for marketing
+  - Cross-sell opportunities by industry
+  - Churn analysis by industry
+  - Feature adoption by industry
+  - Support ticket trends by industry
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

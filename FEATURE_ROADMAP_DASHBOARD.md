@@ -50,9 +50,9 @@ This covers dashboard improvements for all users.
 | #512   | Contribution heatmap                 |
 
 ### Personal Metrics & Statistics
-- Personal contribution stats (classes created, edits made)
-- Time spent per project breakdown
-- Weekly/monthly productivity trends
+- 📋 Personal contribution stats (classes created, edits made)
+- 📋 Time spent per project breakdown
+- 📋 Weekly/monthly productivity trends
 - Personal validation score improvements
 - Tasks completed vs assigned
 - Personal API usage metrics
@@ -60,6 +60,10 @@ This covers dashboard improvements for all users.
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #543   | Personal contribution statistics widget         |
+| #544   | Time spent per project breakdown widget         |
+| #545   | Weekly/monthly productivity trends widget       |
+
 
 ### Favorites & Bookmarks
 - 📋 Pin favorite projects to dashboard

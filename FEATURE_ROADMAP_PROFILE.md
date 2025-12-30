@@ -18,28 +18,32 @@ Current features for the profile include:
 - Profile avatar/photo upload
 - ✅ Display name (separate from full name)
 - ✅ E-Mail Address
-- Job title / Role description
-- Department / Team
-- Phone number (with country code) for SMS 2FA
-- Timezone preference
-- Language / Locale preference
-- Bio / About me section
-- Social links (LinkedIn, GitHub, etc.)
+- 📋 Job title / Role description
+- 📋 Department / Team
+- 📋 Phone number (with country code) for SMS 2FA
+- 📋 Timezone preference
+- 📋 Language / Locale preference
+- 📋 Bio / About me section
+- 📋 Social links (LinkedIn, GitHub, etc.)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description           |
+|--------|-------------------------------|
+| #533   | Additional fields for profile |
 
 ### Account Settings 📋 PLANNED
 - ✅ Change password
 - Email change with verification
-- Connected accounts (OAuth providers)
+- ✅ Connected accounts (OAuth providers)
 - Session management (view/revoke active sessions)
-- Login history (date, IP, device, location)
-- Account deletion request
-- Data export (GDPR compliance)
+- 📋 Login history (date, IP, device, location)
+- 📋 Account deletion request
+- 📋 Data export (GDPR compliance)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                |
+|--------|------------------------------------|
+| #534   | Login success/failure history      |
+| #535   | Account deletion request           |
+| #536   | Data export functionality for GDPR |
 
 ### Notification Preferences 📋 PLANNED
 - Email notification toggles (per event type)
@@ -58,26 +62,29 @@ Current features for the profile include:
 - Backup/recovery codes
 - Security keys (WebAuthn/FIDO2)
 - Trusted devices management
-- Password strength indicator
+- 📋 Password strength indicator
 - Password expiration policy display
-- Security activity log
-- Suspicious activity alerts
+- 📋 Security activity log
+- 📋 Suspicious activity alerts
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description         |
+|--------|-----------------------------|
+| #537   | Password strength indicator |
+| #538   | Security activity log       |
+| #539   | Suspicious activity alerts  |
 
 ### Personalization 📋 PLANNED
-- Theme preference (light/dark/system)
-- Default landing page after login
+- 📋 Theme preference (light/dark/system)
+- 📋 Default landing page after login
 - Keyboard shortcuts customization
 - Dashboard widget arrangement
-- Favorite projects / Quick access list
-- Recently accessed items
-- Custom date/time format
-- Number format preference (locale-based)
+- 📋 Favorite projects / Quick access list
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                      |
+|--------|------------------------------------------|
+| #540   | Theme preference setting                 |
+| #541   | Default landing page configuration       |
+| #542   | Add favorite projects/quick access list  |
 
 ### API & Developer Settings 📋 PLANNED
 - Personal API keys (user-scoped, not tenant)

@@ -180,6 +180,10 @@
 
 ---
 
+# After pathing is completely implemented:
+
+---
+
 ### Code Generation for Paths
 
 **API Client Generation** 📋 PLANNED
