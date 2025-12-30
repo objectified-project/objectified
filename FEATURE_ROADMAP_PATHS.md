@@ -574,21 +574,21 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] `obj_path_canvas`: Store React Flow node positions, viewport state, and zoom level per project version
-- [ ] `obj_path_edges`: Edge connections between nodes with source/target handles and edge types
-- [ ] `obj_path_node_data`: Serialized node configuration data with type-specific properties
-- [ ] Optimistic updates with debounced persistence (300ms delay) for smooth canvas interaction
-- [ ] Undo/redo history stack with configurable depth (default: 50 operations)
+- `obj_path_canvas`: Store React Flow node positions, viewport state, and zoom level per project version
+- `obj_path_edges`: Edge connections between nodes with source/target handles and edge types
+- `obj_path_node_data`: Serialized node configuration data with type-specific properties
+- Optimistic updates with debounced persistence (300ms delay) for smooth canvas interaction
+- Undo/redo history stack with configurable depth (default: 50 operations)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Canvas snapshots for version comparison and rollback
-- [ ] Collaborative editing state with real-time sync markers
-- [ ] Layout algorithm persistence for auto-arrange preferences
-- [ ] Node grouping and folder structures for complex APIs
+- Canvas snapshots for version comparison and rollback
+- Collaborative editing state with real-time sync markers
+- Layout algorithm persistence for auto-arrange preferences
+- Node grouping and folder structures for complex APIs
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -597,20 +597,20 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Path definitions linked to project versions via `obj_project_versions` FK
-- [ ] Change tracking: created_at, updated_at, created_by, updated_by on all path tables
-- [ ] Soft delete with deleted_at for path recovery
-- [ ] Version promotion: copy paths between versions with conflict detection
+- Path definitions linked to project versions via `obj_project_versions` FK
+- Change tracking: created_at, updated_at, created_by, updated_by on all path tables
+- Soft delete with deleted_at for path recovery
+- Version promotion: copy paths between versions with conflict detection
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Branching support: fork paths for experimental changes
-- [ ] Merge conflict resolution UI for path definition conflicts
-- [ ] Change diff visualization between versions
-- [ ] Audit log for compliance: who changed what, when
+- Branching support: fork paths for experimental changes
+- Merge conflict resolution UI for path definition conflicts
+- Change diff visualization between versions
+- Audit log for compliance: who changed what, when
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -618,16 +618,16 @@ Generate backend API stubs with routing and validation:
 ### OpenAPI 3.1 / JSON Schema 2020-12 Feature Coverage
 
 **Not Yet Implemented** 📋 PLANNED (Low Priority)
-- 📋 `$id`: Schema identifier for referencing
-- 📋 `$schema`: JSON Schema version declaration
-- 📋 `$ref`: Schema references (currently handled via class references)
-- 📋 `$defs`: Reusable schema definitions
-- 📋 `$anchor`: Named anchors for deep linking
-- 📋 `$dynamicRef`/`$dynamicAnchor`: Dynamic references (advanced)
-- 📋 `$vocabulary`: Custom vocabulary definitions
-- 📋 `contentMediaType`: Media type for string content
-- 📋 `contentEncoding`: Content encoding (base64, etc.)
-- 📋 `contentSchema`: Schema for decoded content
+- `$id`: Schema identifier for referencing
+- `$schema`: JSON Schema version declaration
+- `$ref`: Schema references (currently handled via class references)
+- `$defs`: Reusable schema definitions
+- `$anchor`: Named anchors for deep linking
+- `$dynamicRef`/`$dynamicAnchor`: Dynamic references (advanced)
+- `$vocabulary`: Custom vocabulary definitions
+- `contentMediaType`: Media type for string content
+- `contentEncoding`: Content encoding (base64, etc.)
+- `contentSchema`: Schema for decoded content
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -640,22 +640,22 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Security scheme library: OAuth2, API Key, HTTP Basic/Bearer, OpenID Connect
-- [ ] Drag security nodes onto operations to apply authentication requirements
-- [ ] Scope selector for OAuth2 flows with visual scope hierarchy
-- [ ] Multiple security requirements with AND/OR logic visualization
-- [ ] Global security defaults with per-operation override capability
+- Security scheme library: OAuth2, API Key, HTTP Basic/Bearer, OpenID Connect
+- Drag security nodes onto operations to apply authentication requirements
+- Scope selector for OAuth2 flows with visual scope hierarchy
+- Multiple security requirements with AND/OR logic visualization
+- Global security defaults with per-operation override capability
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Custom security scheme extensions for proprietary auth systems
-- [ ] Security requirement inheritance from parent paths
-- [ ] Role-based access preview: see which roles can access which endpoints
-- [ ] Security audit report generation for compliance review
-- [ ] JWT claim mapping visualization for token-based auth
+- Custom security scheme extensions for proprietary auth systems
+- Security requirement inheritance from parent paths
+- Role-based access preview: see which roles can access which endpoints
+- Security audit report generation for compliance review
+- JWT claim mapping visualization for token-based auth
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -664,22 +664,22 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Organization-scoped path libraries for shared endpoint patterns
-- [ ] Team-level path templates: CRUD generators, pagination patterns
-- [ ] Path ownership assignment with edit/view permissions
-- [ ] Comment threads on paths and operations for design review
-- [ ] Real-time collaboration indicators: see who's editing which path
+- Organization-scoped path libraries for shared endpoint patterns
+- Team-level path templates: CRUD generators, pagination patterns
+- Path ownership assignment with edit/view permissions
+- Comment threads on paths and operations for design review
+- Real-time collaboration indicators: see who's editing which path
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Path approval workflows for production API changes
-- [ ] Change request system with diff preview and approver assignment
-- [ ] API governance policies: naming conventions, security requirements
-- [ ] Cross-project path sharing for microservice coordination
-- [ ] Conflict resolution for concurrent edits with merge tools
+- Path approval workflows for production API changes
+- Change request system with diff preview and approver assignment
+- API governance policies: naming conventions, security requirements
+- Cross-project path sharing for microservice coordination
+- Conflict resolution for concurrent edits with merge tools
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -688,21 +688,21 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Rate limiting configuration per operation with `x-rateLimit` extensions
-- [ ] Request/response transformation rules attached to operations
-- [ ] Caching policy configuration with TTL and invalidation rules
-- [ ] CORS configuration at path and operation level
+- Rate limiting configuration per operation with `x-rateLimit` extensions
+- Request/response transformation rules attached to operations
+- Caching policy configuration with TTL and invalidation rules
+- CORS configuration at path and operation level
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Kong, AWS API Gateway, Azure APIM extension export
-- [ ] Circuit breaker configuration for resilience patterns
-- [ ] Request validation enforcement toggles
-- [ ] Backend service binding for gateway proxy configuration
-- [ ] Traffic policy rules: canary, blue-green, A/B testing metadata
+- Kong, AWS API Gateway, Azure APIM extension export
+- Circuit breaker configuration for resilience patterns
+- Request validation enforcement toggles
+- Backend service binding for gateway proxy configuration
+- Traffic policy rules: canary, blue-green, A/B testing metadata
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -715,23 +715,23 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Embedded Swagger UI panel within Studio for live API testing
-- [ ] Real-time spec sync: changes in visual designer reflect immediately in Swagger
-- [ ] Try It Out functionality with configurable base URL and auth headers
-- [ ] Request/response logging with copy-to-curl capability
-- [ ] Environment variable support for dynamic base URLs and auth tokens
-- [ ] Response validation against defined schemas with error highlighting
+- Embedded Swagger UI panel within Studio for live API testing
+- Real-time spec sync: changes in visual designer reflect immediately in Swagger
+- Try It Out functionality with configurable base URL and auth headers
+- Request/response logging with copy-to-curl capability
+- Environment variable support for dynamic base URLs and auth tokens
+- Response validation against defined schemas with error highlighting
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Mock server generation from OpenAPI spec for frontend development
-- [ ] Request history with replay capability
-- [ ] Response diff comparison between expected and actual
-- [ ] Performance metrics: response time, payload size tracking
-- [ ] Collection runner for sequential endpoint testing
+- Mock server generation from OpenAPI spec for frontend development
+- Request history with replay capability
+- Response diff comparison between expected and actual
+- Performance metrics: response time, payload size tracking
+- Collection runner for sequential endpoint testing
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -740,22 +740,22 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Real-time OpenAPI 3.1 compliance validation with inline error markers
-- [ ] Missing operationId detection with auto-generation suggestions
-- [ ] Unused schema detection: identify orphaned schema definitions
-- [ ] Circular reference detection in schema hierarchies
-- [ ] Security requirement validation: ensure all operations have security
+- Real-time OpenAPI 3.1 compliance validation with inline error markers
+- Missing operationId detection with auto-generation suggestions
+- Unused schema detection: identify orphaned schema definitions
+- Circular reference detection in schema hierarchies
+- Security requirement validation: ensure all operations have security
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Custom lint rules for organization-specific conventions
-- [ ] Spectral integration for industry-standard API linting
-- [ ] Breaking change detection between versions
-- [ ] Completeness scoring: documentation coverage percentage
-- [ ] Best practices advisor: suggest improvements based on API design patterns
+- Custom lint rules for organization-specific conventions
+- Spectral integration for industry-standard API linting
+- Breaking change detection between versions
+- Completeness scoring: documentation coverage percentage
+- Best practices advisor: suggest improvements based on API design patterns
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -764,20 +764,20 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Example-based request generation for each operation
-- [ ] Response schema validation with detailed mismatch reporting
-- [ ] Status code coverage tracking per operation
-- [ ] Export test cases to Postman, Insomnia formats
+- Example-based request generation for each operation
+- Response schema validation with detailed mismatch reporting
+- Status code coverage tracking per operation
+- Export test cases to Postman, Insomnia formats
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Pact contract generation for consumer-driven testing
-- [ ] Dredd test generation for automated contract validation
-- [ ] CI/CD integration hooks for automated testing pipelines
-- [ ] Test coverage reports with gap analysis
+- Pact contract generation for consumer-driven testing
+- Dredd test generation for automated contract validation
+- CI/CD integration hooks for automated testing pipelines
+- Test coverage reports with gap analysis
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -790,24 +790,24 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Right-click schema → Generate CRUD Endpoints: creates GET, POST, PUT, DELETE paths
-- [ ] Configurable path pattern: `/resources`, `/resources/{id}`, `/resources/{id}/subresources`
-- [ ] Automatic request body binding to schema for POST/PUT operations
-- [ ] Response schema inference: wrap in array for list endpoints, single for detail
-- [ ] Standard error response generation: 400, 401, 403, 404, 500 templates
-- [ ] OperationId generation following RESTful conventions: `listUsers`, `getUser`, `createUser`
+- Right-click schema → Generate CRUD Endpoints: creates GET, POST, PUT, DELETE paths
+- Configurable path pattern: `/resources`, `/resources/{id}`, `/resources/{id}/subresources`
+- Automatic request body binding to schema for POST/PUT operations
+- Response schema inference: wrap in array for list endpoints, single for detail
+- Standard error response generation: 400, 401, 403, 404, 500 templates
+- OperationId generation following RESTful conventions: `listUsers`, `getUser`, `createUser`
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Nested resource generation: `/users/{userId}/posts` creates related endpoints
-- [ ] Custom generation templates: define your own CRUD patterns
-- [ ] Bulk operation generation: `POST /resources/bulk`, `DELETE /resources/bulk`
-- [ ] Search endpoint generation with query parameter inference from schema
-- [ ] Action endpoint generation: `POST /resources/{id}/actions/activate`
-- [ ] Soft delete vs hard delete pattern selection
+- Nested resource generation: `/users/{userId}/posts` creates related endpoints
+- Custom generation templates: define your own CRUD patterns
+- Bulk operation generation: `POST /resources/bulk`, `DELETE /resources/bulk`
+- Search endpoint generation with query parameter inference from schema
+- Action endpoint generation: `POST /resources/{id}/actions/activate`
+- Soft delete vs hard delete pattern selection
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -816,21 +816,21 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Pagination pattern: page/limit, cursor-based, or offset-based with response envelope
-- [ ] Filtering pattern: query parameter generation from schema filterable fields
-- [ ] Sorting pattern: sort, order query parameters with field validation
-- [ ] Error response pattern: RFC 7807 Problem Details or custom format
-- [ ] Authentication patterns: Bearer token, API key, OAuth2 scope requirements
+- Pagination pattern: page/limit, cursor-based, or offset-based with response envelope
+- Filtering pattern: query parameter generation from schema filterable fields
+- Sorting pattern: sort, order query parameters with field validation
+- Error response pattern: RFC 7807 Problem Details or custom format
+- Authentication patterns: Bearer token, API key, OAuth2 scope requirements
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Custom pattern creation and sharing within organization
-- [ ] Industry-specific patterns: healthcare (FHIR), finance (Open Banking)
-- [ ] Pattern composition: combine multiple patterns for complex operations
-- [ ] Pattern versioning: track changes to organizational standards
+- Custom pattern creation and sharing within organization
+- Industry-specific patterns: healthcare (FHIR), finance (Open Banking)
+- Pattern composition: combine multiple patterns for complex operations
+- Pattern versioning: track changes to organizational standards
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -839,20 +839,20 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] OpenAPI Generator integration for client SDK generation
-- [ ] Server stub generation: Express, FastAPI, Spring Boot templates
-- [ ] TypeScript type generation from OpenAPI spec
-- [ ] One-click download of generated code artifacts
+- OpenAPI Generator integration for client SDK generation
+- Server stub generation: Express, FastAPI, Spring Boot templates
+- TypeScript type generation from OpenAPI spec
+- One-click download of generated code artifacts
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Custom generator templates for proprietary frameworks
-- [ ] Git integration: push generated code to repository
-- [ ] Incremental generation: update only changed endpoints
-- [ ] Multi-language generation in single workflow
+- Custom generator templates for proprietary frameworks
+- Git integration: push generated code to repository
+- Incremental generation: update only changed endpoints
+- Multi-language generation in single workflow
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -865,22 +865,22 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Consistent node styling with schema designer: same color palette, typography, shadows
-- [ ] HTTP method color coding: GET (#48BB78), POST (#4299E1), PUT (#ED8936), DELETE (#F56565), PATCH (#9F7AEA)
-- [ ] Status code color bands: 2XX (green), 3XX (blue), 4XX (yellow), 5XX (red)
-- [ ] Iconography for node types: path (route), method (HTTP verb), schema (brackets)
-- [ ] Dark mode support with accessible contrast ratios (WCAG AA)
-- [ ] Responsive canvas with touch support for tablet use
+- Consistent node styling with schema designer: same color palette, typography, shadows
+- HTTP method color coding: GET (#48BB78), POST (#4299E1), PUT (#ED8936), DELETE (#F56565), PATCH (#9F7AEA)
+- Status code color bands: 2XX (green), 3XX (blue), 4XX (yellow), 5XX (red)
+- Iconography for node types: path (route), method (HTTP verb), schema (brackets)
+- Dark mode support with accessible contrast ratios (WCAG AA)
+- Responsive canvas with touch support for tablet use
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Customizable color themes for organization branding
-- [ ] High contrast mode for accessibility
-- [ ] Print-optimized layout for documentation export
-- [ ] Presentation mode: hide toolbars for demos and reviews
+- Customizable color themes for organization branding
+- High contrast mode for accessibility
+- Print-optimized layout for documentation export
+- Presentation mode: hide toolbars for demos and reviews
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -889,24 +889,24 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Drag from library panel to canvas to create nodes
-- [ ] Double-click node to open configuration panel (slide-in drawer)
-- [ ] Edge drawing: drag from output handle to input handle to connect
-- [ ] Multi-select with Shift+click or rectangle selection
-- [ ] Keyboard shortcuts: Delete (remove), Cmd+D (duplicate), Cmd+Z (undo), Cmd+G (group)
-- [ ] Context menu on right-click with relevant actions
-- [ ] Snap-to-grid alignment with optional grid visibility
+- Drag from library panel to canvas to create nodes
+- Double-click node to open configuration panel (slide-in drawer)
+- Edge drawing: drag from output handle to input handle to connect
+- Multi-select with Shift+click or rectangle selection
+- Keyboard shortcuts: Delete (remove), Cmd+D (duplicate), Cmd+Z (undo), Cmd+G (group)
+- Context menu on right-click with relevant actions
+- Snap-to-grid alignment with optional grid visibility
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Auto-layout algorithms: hierarchical, force-directed, orthogonal
-- [ ] Smart guides for manual alignment
-- [ ] Copy/paste across browser tabs with serialization
-- [ ] Gesture support: pinch-to-zoom, two-finger pan
-- [ ] Command palette (Cmd+K) for quick actions
+- Auto-layout algorithms: hierarchical, force-directed, orthogonal
+- Smart guides for manual alignment
+- Copy/paste across browser tabs with serialization
+- Gesture support: pinch-to-zoom, two-finger pan
+- Command palette (Cmd+K) for quick actions
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -915,23 +915,23 @@ Generate backend API stubs with routing and validation:
 
 #### Core Features
 
-- [ ] Custom node components with TypeScript type safety
-- [ ] Node resize handles for adjustable container sizes
-- [ ] Connection validation: prevent invalid edge connections (e.g., response to path)
-- [ ] Smooth edge rendering with bezier curves and step lines
-- [ ] Node grouping with collapsible containers
-- [ ] Performance optimization: virtualization for 100+ nodes
+- Custom node components with TypeScript type safety
+- Node resize handles for adjustable container sizes
+- Connection validation: prevent invalid edge connections (e.g., response to path)
+- Smooth edge rendering with bezier curves and step lines
+- Node grouping with collapsible containers
+- Performance optimization: virtualization for 100+ nodes
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Features
 
-- [ ] Custom edge types: labeled, animated, conditional
-- [ ] Sub-flow navigation: drill into complex operations
-- [ ] Background patterns: dots, lines, cross-hatch
-- [ ] Fit-to-view controls with animation
-- [ ] Export canvas as PNG/SVG for documentation
+- Custom edge types: labeled, animated, conditional
+- Sub-flow navigation: drill into complex operations
+- Background patterns: dots, lines, cross-hatch
+- Fit-to-view controls with animation
+- Export canvas as PNG/SVG for documentation
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -1477,32 +1477,32 @@ DROP TARGET STATE:
 
 #### Core Visual Tasks
 
-- [ ] Implement three-panel Studio layout with collapsible side panels
-- [ ] Create Library Panel with collapsible sections and drag handles
-- [ ] Design PathNode component with header, body, and footer zones
-- [ ] Design MethodNode components with HTTP verb color coding
-- [ ] Design SchemaRefNode with property preview and modifier toggles
-- [ ] Design ParameterNode chips for query, header, cookie, path types
-- [ ] Design ResponseNode with status code color bands
-- [ ] Implement Properties Panel with contextual forms per node type
-- [ ] Create edge styles for different relationship types
-- [ ] Implement canvas controls (zoom, pan, fit, minimap)
+- Implement three-panel Studio layout with collapsible side panels
+- Create Library Panel with collapsible sections and drag handles
+- Design PathNode component with header, body, and footer zones
+- Design MethodNode components with HTTP verb color coding
+- Design SchemaRefNode with property preview and modifier toggles
+- Design ParameterNode chips for query, header, cookie, path types
+- Design ResponseNode with status code color bands
+- Implement Properties Panel with contextual forms per node type
+- Create edge styles for different relationship types
+- Implement canvas controls (zoom, pan, fit, minimap)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
 #### Advanced Visual Tasks
 
-- [ ] Add node resize handles with minimum size constraints
-- [ ] Implement multi-select visual feedback (selection rectangle)
-- [ ] Create context menus for all node types
-- [ ] Design visual states: default, hover, selected, error, deprecated
-- [ ] Implement drop zone highlighting during drag operations
-- [ ] Add keyboard shortcut overlay (triggered by `?` key)
-- [ ] Create loading/saving state indicators
-- [ ] Design validation error tooltips with inline positioning
-- [ ] Implement dark mode color scheme for all node types
-- [ ] Add animation for edge connections and node transitions
+- Add node resize handles with minimum size constraints
+- Implement multi-select visual feedback (selection rectangle)
+- Create context menus for all node types
+- Design visual states: default, hover, selected, error, deprecated
+- Implement drop zone highlighting during drag operations
+- Add keyboard shortcut overlay (triggered by `?` key)
+- Create loading/saving state indicators
+- Design validation error tooltips with inline positioning
+- Implement dark mode color scheme for all node types
+- Add animation for edge connections and node transitions
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -1515,13 +1515,13 @@ DROP TARGET STATE:
 
 Establish the core infrastructure for path design with essential node types and basic canvas functionality.
 
-- [ ] Create PathsDesigner component with React Flow integration
-- [ ] Implement PathNode, MethodNode, and SchemaRefNode components
-- [ ] Build database tables: `obj_paths`, `obj_path_operations`, `obj_path_parameters`
-- [ ] Create node library panel with drag-and-drop functionality
-- [ ] Implement basic path variable detection and configuration
-- [ ] Add canvas state persistence (positions, viewport)
-- [ ] Integrate with existing project version system
+- Create PathsDesigner component with React Flow integration
+- Implement PathNode, MethodNode, and SchemaRefNode components
+- Build database tables: `obj_paths`, `obj_path_operations`, `obj_path_parameters`
+- Create node library panel with drag-and-drop functionality
+- Implement basic path variable detection and configuration
+- Add canvas state persistence (positions, viewport)
+- Integrate with existing project version system
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -1530,13 +1530,13 @@ Establish the core infrastructure for path design with essential node types and 
 
 Complete the request/response design capabilities with full parameter and content type support.
 
-- [ ] Implement RequestBodyNode and ResponseNode components
-- [ ] Build ParameterNode for query, header, cookie, and path parameters
-- [ ] Create content type management with schema binding
-- [ ] Add response status code library with presets
-- [ ] Implement configuration panels for all node types
-- [ ] Add undo/redo functionality with history stack
-- [ ] Build OpenAPI export with paths integration
+- Implement RequestBodyNode and ResponseNode components
+- Build ParameterNode for query, header, cookie, and path parameters
+- Create content type management with schema binding
+- Add response status code library with presets
+- Implement configuration panels for all node types
+- Add undo/redo functionality with history stack
+- Build OpenAPI export with paths integration
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -1545,13 +1545,13 @@ Complete the request/response design capabilities with full parameter and conten
 
 Integrate testing capabilities and specification validation for developer productivity.
 
-- [ ] Embed Swagger UI panel with real-time spec sync
-- [ ] Implement OpenAPI 3.1 validation with inline error markers
-- [ ] Add Try It Out functionality with environment support
-- [ ] Create auto-generation from schemas (CRUD endpoints)
-- [ ] Build security scheme library and assignment
-- [ ] Add request/response logging with history
-- [ ] Implement pattern libraries for common API patterns
+- Embed Swagger UI panel with real-time spec sync
+- Implement OpenAPI 3.1 validation with inline error markers
+- Add Try It Out functionality with environment support
+- Create auto-generation from schemas (CRUD endpoints)
+- Build security scheme library and assignment
+- Add request/response logging with history
+- Implement pattern libraries for common API patterns
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|

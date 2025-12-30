@@ -5,13 +5,13 @@ This outlines the multi-tenancy features planned for Objectified.
 ## Multi-Tenancy & Organizations
 
 ### Organization Management
-- 📋 Hierarchical organization structure (Company → Teams → Projects)
-- 📋 Organization-wide settings and policies
-- 📋 Cross-team schema sharing and discovery
-- 📋 Organization admin dashboard
-- 📋 Bulk user provisioning via SCIM
-- 📋 Organization-level audit logs
-- 📋 Custom branding per organization
+- Hierarchical organization structure (Company → Teams → Projects)
+- Organization-wide settings and policies
+- Cross-team schema sharing and discovery
+- Organization admin dashboard
+- Bulk user provisioning via SCIM
+- Organization-level audit logs
+- Custom branding per organization
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
@@ -19,17 +19,17 @@ This outlines the multi-tenancy features planned for Objectified.
 ### Advanced Tenant Management ✅ PARTIALLY IMPLEMENTED
 - ✅ Tenant CRUD operations
 - ✅ Tenant slug management with validation
-- 📋 Tenant industry tagging
+- Tenant industry tagging
     - Industry classification tags (Financial Services, Healthcare, E-commerce, SaaS, etc.)
     - Multi-industry support (select multiple industries)
     - Industry-specific compliance recommendations
     - Industry-based schema showcase filtering
     - Industry benchmarking and analytics
     - Custom industry categories for enterprise
-- 📋 Tenant resource quotas
-- 📋 Tenant billing and usage tracking
-- 📋 Tenant data isolation verification
-- 📋 Cross-tenant schema sharing (controlled)
+- Tenant resource quotas
+- Tenant billing and usage tracking
+- Tenant data isolation verification
+- Cross-tenant schema sharing (controlled)
 - ✅ Super Admin portal for tenant oversight
 
 | Ticket | Feature Description                              |

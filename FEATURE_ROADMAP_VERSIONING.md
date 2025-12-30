@@ -50,28 +50,28 @@ This represents the different versions of the Objectified specification and thei
 - **Version Merging**: 📋 Merge branches with conflict resolution
 - **Version Tags**: ✅ Label versions (stable, beta, deprecated, archived)
 - **Version Comparison**:
-    - 📋 Side-by-side diff view
-    - 📋 Highlight added/removed/changed classes
-    - 📋 Property-level changes
-    - 📋 Visual canvas comparison
+    - Side-by-side diff view
+    - Highlight added/removed/changed classes
+    - Property-level changes
+    - Visual canvas comparison
 - **Version History Graph**:
-    - 📋 Visual tree of version history
-    - 📋 Show branches and merges
-    - 📋 Click to switch versions
-    - 📋 Time travel debugging
+    - Visual tree of version history
+    - Show branches and merges
+    - Click to switch versions
+    - Time travel debugging
 - **Version Rollback**:
-    - 📋 Rollback to any previous version
-    - 📋 Create new version from old version
-    - 📋 Undo version publish
+    - Rollback to any previous version
+    - Create new version from old version
+    - Undo version publish
 - **Version Notes**: ✅ IMPLEMENTED
     - ✅ Release notes per version
     - ✅ What's new highlights
-    - 📋 Breaking changes documentation
-    - 📋 Migration guide
+    - Breaking changes documentation
+    - Migration guide
 - **Version Deprecation**: ✅ IMPLEMENTED
     - ✅ Mark versions as deprecated
-    - 📋 Set sunset dates
-    - 📋 Redirect to newer versions
+    - Set sunset dates
+    - Redirect to newer versions
     - ✅ Deprecation warnings in API
 - **Version Copy**: ✅ IMPLEMENTED
     - ✅ Copy classes and properties from existing version
