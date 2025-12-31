@@ -634,6 +634,17 @@ describe('Database Helper - API Paths Management', () => {
   // ============================================================================
 
   describe('Error Handling', () => {
+    let consoleErrorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // Suppress console.error during error handling tests
+      consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
     test('should handle database errors in getApiPathsForVersion', async () => {
       const { getApiPathsForVersion } = await import('../lib/db/helper-paths');
 
