@@ -648,16 +648,18 @@
 
 ### 11. Developer Productivity Features
 
-#### Code Preview Integration
+#### Code Preview Integration 📋 PLANNED
 - Hover over class to preview generated code (TypeScript, Python, Java, etc.)
-- Split view: Canvas + Code side by side
-- Real-time code generation as schema changes
+- 📋 Split view: Canvas + Code side by side
+- 📋 Real-time code generation as schema changes
 - Code syntax highlighting with language selector
 - Copy code snippets directly from preview
 - Jump to relevant code section from class property
 
-| Ticket | Feature |
-|--------|---------|
+| Ticket | Feature                                     |
+|--------|---------------------------------------------|
+| #599   | Add side-by-side canvas and code view       |
+| #600   | Real-time code generation as schema changes |
 
 #### Quick Actions & Command Palette
 - `Cmd+K` / `Ctrl+K` command palette for all canvas actions
