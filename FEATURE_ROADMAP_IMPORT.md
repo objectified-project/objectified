@@ -667,3 +667,12 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Paste JSON/YAML**: Direct paste into import dialog
 - ✅ **Syntax Highlighting**: Live preview of pasted content
 - ✅ **Format Auto-Detection**: Automatically detect JSON vs YAML
+
+##### Import Sanity Checks ✅ IMPLEMENTED
+- ✅ **Basic Validation**: Check for well-formed syntax
+- ✅ **Schema Presence**: Ensure at least one schema defined
+- ✅ **Version Detection**: Identify OpenAPI/JSON Schema version
+- ✅ Validation check:
+  - ✅ Generates OpenAPI from JSON Schema on import
+  - ✅ Validates OpenAPI spec on import
+  - ✅ Displays validation errors/warnings before import
