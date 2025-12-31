@@ -34,15 +34,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #332   | Ability to import SwaggerHub            |
 | #333   | Ability to import Postman Collection    |
 
-##### Clipboard Import ✅ IMPLEMENTED
-- ✅ **Paste JSON/YAML**: Direct paste into import dialog
-- ✅ **Syntax Highlighting**: Live preview of pasted content
-- ✅ **Format Auto-Detection**: Automatically detect JSON vs YAML
-
-| Ticket | Feature Description                                 |
-|--------|-----------------------------------------------------|
-| #331   | Add color syntax highlighting to pasted import page |
-
 ##### Integration Import 📋 PLANNED
 - 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong
 - **CI/CD Pipeline Integration**: Import from build artifacts
@@ -671,3 +662,8 @@ The import flow is designed as a multi-step wizard with clear visual progression
 ---
 
 # Completed
+
+##### Clipboard Import ✅ IMPLEMENTED
+- ✅ **Paste JSON/YAML**: Direct paste into import dialog
+- ✅ **Syntax Highlighting**: Live preview of pasted content
+- ✅ **Format Auto-Detection**: Automatically detect JSON vs YAML
