@@ -18,6 +18,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
+  - Clipboard-based copy/paste editor
   - Class import now supports both file and URL import sources
 - Canvas improvements
   - Added the ability to import a class directly using the same import system 

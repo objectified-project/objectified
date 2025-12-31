@@ -17,7 +17,7 @@ The Paths Designer is built on React Flow, providing an infinite canvas workspac
 
 #### Canvas Features ✅ PLANNED
 
-- **Dedicated Paths Tab**: Third Studio tab with independent React Flow instance
+- ✅ **Dedicated Paths Tab**: Third Studio tab with independent React Flow instance
 - **Infinite Canvas**: Zoom from 10% to 500% with smooth panning
 - **Mini-Map Navigation**: Bird's-eye view for large API specs (50+ paths)
 - **Node Library Panel**: Draggable node types organized by category
@@ -350,9 +350,10 @@ Catch errors as you design, not during export:
 - HAR (HTTP Archive) files
 - cURL commands (converts to operation)
 
-| Ticket | Feature                                       |
-|--------|-----------------------------------------------|
-| #425   | Improve OpenAPI Specification import handling |
+| Ticket | Feature                                             |
+|--------|-----------------------------------------------------|
+| #425   | Improve OpenAPI Specification import handling       |
+| #566   | Add OpenAPI importing to capture and generate paths |
 
 ### 3.5 OpenAPI Specification Output 📋 PLANNED
 

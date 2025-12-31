@@ -15,6 +15,7 @@ import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadata
 import ImportExecutionPanel from './ImportExecutionPanel';
 import ImportCompletePanel from './ImportCompletePanel';
 import UrlImportPanel from './UrlImportPanel';
+import ClipboardImportPanel from './ClipboardImportPanel';
 import { startImport, getImportStatus } from '../../../../../lib/db/import-actions';
 
 interface ImportDialogProps {
@@ -46,6 +47,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [importComplete, setImportComplete] = useState(false);
   const [urlContent, setUrlContent] = useState<string | null>(null);
   const [urlFilename, setUrlFilename] = useState<string | null>(null);
+  const [clipboardContent, setClipboardContent] = useState<string | null>(null);
+  const [clipboardFilename, setClipboardFilename] = useState<string | null>(null);
 
   const handleSourceClick = (source: string) => {
     setSelectedSource(source);
@@ -71,6 +74,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setFileMetadata(null);
       setUrlContent(null);
       setUrlFilename(null);
+      setClipboardContent(null);
+      setClipboardFilename(null);
     }
   };
 
@@ -92,21 +97,25 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setImportComplete(false);
     setUrlContent(null);
     setUrlFilename(null);
+    setClipboardContent(null);
+    setClipboardFilename(null);
     onClose();
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile && !urlContent) return;
+    if (!selectedFile && !urlContent && !clipboardContent) return;
 
     console.log('Starting analysis...', {
       selectedFile: selectedFile?.name,
       urlFilename,
-      hasUrlContent: !!urlContent
+      clipboardFilename,
+      hasUrlContent: !!urlContent,
+      hasClipboardContent: !!clipboardContent
     });
     setIsAnalyzing(true);
     try {
-      const content = urlContent || await selectedFile!.text();
-      const filename = urlFilename || selectedFile?.name || 'openapi-spec.yaml';
+      const content = urlContent || clipboardContent || await selectedFile!.text();
+      const filename = urlFilename || clipboardFilename || selectedFile?.name || 'openapi-spec.yaml';
       console.log('Content loaded, length:', content.length);
       const result = await analyzeSpecification(content, filename);
       console.log('Analysis complete:', result);
@@ -137,6 +146,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleClipboardSpecificationReady = (content: string, filename: string) => {
+    setClipboardContent(content);
+    setClipboardFilename(filename);
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -404,18 +418,27 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
                 {/* Clipboard */}
                 <button
-                  disabled
-                  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"
-                  title="Coming soon"
+                  onClick={() => handleSourceClick('clipboard')}
+                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedSource === 'clipboard'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                  }`}
                 >
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                      selectedSource === 'clipboard'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                    }`}>
                       <FileText className="h-6 w-6" />
                     </div>
-                    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">
+                    <div className={`font-semibold mb-1 ${
+                      selectedSource === 'clipboard' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                    }`}>
                       Clipboard Paste
                     </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
                       Paste JSON or YAML content
                     </div>
                   </div>
@@ -781,6 +804,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   onSpecificationFetched={handleUrlSpecificationFetched}
                 />
               );
+            } else if (currentStep === 'file-upload' && selectedSource === 'clipboard') {
+              console.log('Rendering: Clipboard import panel');
+              return (
+                <ClipboardImportPanel
+                  onSpecificationReady={handleClipboardSpecificationReady}
+                />
+              );
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
               return (
@@ -842,10 +872,19 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                 <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
-                {currentStep === 'file-upload' && (
+                {currentStep === 'file-upload' && selectedSource === 'file' && (
                   <Button
                     onClick={handleAnalyze}
                     disabled={!selectedFile || isAnalyzing || (fileMetadata !== null && !fileMetadata.formatSupported)}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
+                  </Button>
+                )}
+                {currentStep === 'file-upload' && selectedSource === 'clipboard' && (
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!clipboardContent || isAnalyzing}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze →'}

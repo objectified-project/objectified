@@ -34,14 +34,13 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #332   | Ability to import SwaggerHub            |
 | #333   | Ability to import Postman Collection    |
 
-##### Clipboard Import 📋 PLANNED
-- 📋 **Paste JSON/YAML**: Direct paste into import dialog
-- 📋 **Syntax Highlighting**: Live preview of pasted content
-- 📋 **Format Auto-Detection**: Automatically detect JSON vs YAML
+##### Clipboard Import ✅ IMPLEMENTED
+- ✅ **Paste JSON/YAML**: Direct paste into import dialog
+- ✅ **Syntax Highlighting**: Live preview of pasted content
+- ✅ **Format Auto-Detection**: Automatically detect JSON vs YAML
 
 | Ticket | Feature Description                                 |
 |--------|-----------------------------------------------------|
-| #312   | Import from clipboard functionality                 |
 | #331   | Add color syntax highlighting to pasted import page |
 
 ##### Integration Import 📋 PLANNED
