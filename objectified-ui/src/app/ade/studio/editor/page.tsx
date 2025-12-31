@@ -133,6 +133,7 @@ const StudioContent = () => {
     setIsReadOnly,
     setZoomToClassFn,
     setCreateGroupFn,
+    setCreateGroupAtPositionFn,
     setClickToFocusEnabled: setContextClickToFocusEnabled,
     groups,
     setGroups,
@@ -1365,6 +1366,12 @@ const StudioContent = () => {
     }
   }, [isReadOnly, findNodeGroup, findGroupAtPosition, handleAddNodeToGroup, handleRemoveNodeFromGroup, groups, confirmDialog, updateGroup, setNodes, nodes, isNodeCompletelyOutsideGroup]);
 
+  // Handle canvas drag over - allow dropping groups
+  const handleCanvasDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
   // Create a new group (must be defined after handlers it references)
   const handleCreateGroup = useCallback(async () => {
     if (isReadOnly) return;
@@ -1483,6 +1490,149 @@ const StudioContent = () => {
     setCreateGroupFn(() => handleCreateGroup);
     return () => setCreateGroupFn(null);
   }, [handleCreateGroup, setCreateGroupFn]);
+
+  // Create a new group at a specific position (for drag-and-drop)
+  const handleCreateGroupAtPosition = useCallback(async (dropPosition: { x: number; y: number }) => {
+    if (isReadOnly) return;
+
+    // Default group dimensions
+    const defaultWidth = 400;
+    const defaultHeight = 300;
+
+    // Position group centered at the drop position
+    const position = {
+      x: dropPosition.x - defaultWidth / 2,
+      y: dropPosition.y - defaultHeight / 2
+    };
+
+    // Create new empty group
+    const groupId = generateGroupId();
+    const newGroup = {
+      id: groupId,
+      name: `Group ${groups.length + 1}`,
+      color: GROUP_COLORS[groups.length % GROUP_COLORS.length].name,
+      nodeIds: [], // Empty group - no nodes initially
+      position: position,
+      dimensions: {
+        width: defaultWidth,
+        height: defaultHeight
+      },
+      styleOptions: {
+        borderStyle: 'dashed' as const,
+        opacity: 1,
+        shadow: 'none' as const,
+        icon: 'folder'
+      }
+    };
+
+    // Add group to context
+    addGroup(newGroup);
+
+    // Initialize group position ref for delta tracking during drag
+    groupPositionsRef.current.set(groupId, { x: position.x, y: position.y });
+
+    // Create group node for ReactFlow
+    const groupNode: Node = {
+      id: groupId,
+      type: 'groupNode',
+      position: newGroup.position,
+      width: newGroup.dimensions.width,
+      height: newGroup.dimensions.height,
+      style: {
+        width: newGroup.dimensions.width,
+        height: newGroup.dimensions.height,
+        zIndex: -1 // Groups should be behind class nodes
+      },
+      data: {
+        id: groupId,
+        name: newGroup.name,
+        color: newGroup.color,
+        nodeIds: newGroup.nodeIds,
+        styleOptions: newGroup.styleOptions,
+        onRename: handleGroupRename,
+        onDelete: handleGroupDelete,
+        onColorChange: handleGroupColorChange,
+        onStyleChange: handleGroupStyleChange,
+        isReadOnly: isReadOnly
+      }
+    };
+
+    // Add group node to canvas
+    setNodes(prevNodes => [groupNode, ...prevNodes]);
+
+    // Auto-save to database
+    const viewport = getViewport();
+    if (selectedVersionId && currentUserId) {
+      try {
+        // Prepare node data for saving
+        const nodeData = nodes.filter(n => n.type !== 'groupNode').map(node => ({
+          id: node.id,
+          position: node.position,
+          dimensions: node.style ? { width: node.style.width, height: node.style.height } : undefined
+        }));
+
+        // Prepare edge data for saving
+        const edgeData = edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+
+        // Include the new group in the groups array
+        const updatedGroups = [...groups, newGroup];
+
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          nodeData,
+          edgeData,
+          updatedGroups
+        );
+      } catch (error) {
+        console.error('Failed to auto-save group creation:', error);
+      }
+    }
+
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
+
+  // Register handleCreateGroupAtPosition function in context for drag-and-drop access
+  useEffect(() => {
+    setCreateGroupAtPositionFn(() => handleCreateGroupAtPosition);
+    return () => setCreateGroupAtPositionFn(null);
+  }, [handleCreateGroupAtPosition, setCreateGroupAtPositionFn]);
+
+  // Handle canvas drop - create group at drop position
+  const handleCanvasDrop = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+
+    if (isReadOnly) return;
+
+    try {
+      const data = event.dataTransfer.getData('application/json');
+      if (!data) return;
+
+      const dropData = JSON.parse(data);
+
+      // Only handle new-group drops on the canvas itself
+      if (dropData.type === 'new-group') {
+        // Get the drop position relative to the canvas
+        const viewport = getViewport();
+        const bounds = (event.target as HTMLElement).closest('.react-flow')?.getBoundingClientRect();
+
+        if (bounds) {
+          // Convert screen coordinates to flow coordinates
+          const x = (event.clientX - bounds.left - viewport.x) / viewport.zoom;
+          const y = (event.clientY - bounds.top - viewport.y) / viewport.zoom;
+
+          // Create group at the drop position
+          handleCreateGroupAtPosition({ x, y });
+        }
+      }
+    } catch (error) {
+      console.error('Error handling canvas drop:', error);
+    }
+  }, [isReadOnly, getViewport, handleCreateGroupAtPosition]);
 
   // Update group dimensions when nodes move
   const handleGroupResize = useCallback((groupId: string, position: { x: number; y: number }, dimensions: { width: number; height: number }) => {
@@ -4295,6 +4445,8 @@ const StudioContent = () => {
               onEdgeClick={onEdgeClick}
               onNodeDrag={handleNodeDrag}
               onNodeDragStop={handleNodeDragStop}
+              onDragOver={handleCanvasDragOver}
+              onDrop={handleCanvasDrop}
               onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
               fitView
               attributionPosition="bottom-left"
@@ -4386,19 +4538,6 @@ const StudioContent = () => {
                   </svg>
                   <span>Collapse</span>
                 </button>
-                {/* Group Selected Button */}
-                {!isReadOnly && (
-                  <button
-                    onClick={handleCreateGroup}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-1.5 border border-transparent hover:border-purple-200 dark:hover:border-purple-700"
-                    title="Group selected classes"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <span>Group</span>
-                  </button>
-                )}
                 {/* Manage Tags Button */}
                 {!isReadOnly && (
                   <button

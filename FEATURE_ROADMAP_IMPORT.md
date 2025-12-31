@@ -23,7 +23,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### URL Import 📋 PLANNED
 - ✅ **Direct URL Import**: Fetch spec from public URL
 - ✅ **Authenticated URL**: Support for Bearer, API Key, Basic Auth
-- 📋 **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket
+- ✅ **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket
 - **Branch/Tag Selection**: Import specific versions from git
 - **Private Repository Support**: OAuth integration for private repos
 - 📋 **Swagger Hub Integration**: Direct import from SwaggerHub
@@ -33,7 +33,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 |--------|----------------------------------------------------|
 | #332   | Ability to import SwaggerHub                       |
 | #333   | Ability to import Postman Collection               |
-| #569   | Reuse PAT in Linked Accounts for repository import |
 
 ##### Integration Import 📋 PLANNED
 - 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong

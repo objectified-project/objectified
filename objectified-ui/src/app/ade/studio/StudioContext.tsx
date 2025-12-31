@@ -45,6 +45,8 @@ interface StudioContextType {
   setZoomToClassFn: (fn: ((classId: string) => void) | null) => void;
   createGroupFn: (() => void) | null;
   setCreateGroupFn: (fn: (() => void) | null) => void;
+  createGroupAtPositionFn: ((position: { x: number; y: number }) => void) | null;
+  setCreateGroupAtPositionFn: (fn: ((position: { x: number; y: number }) => void) | null) => void;
   clickToFocusEnabled: boolean;
   setClickToFocusEnabled: (value: boolean) => void;
   // Group management
@@ -67,6 +69,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [zoomToClassFn, setZoomToClassFn] = useState<((classId: string) => void) | null>(null);
   const [createGroupFn, setCreateGroupFn] = useState<(() => void) | null>(null);
+  const [createGroupAtPositionFn, setCreateGroupAtPositionFn] = useState<((position: { x: number; y: number }) => void) | null>(null);
   const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(true);
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
@@ -126,6 +129,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setZoomToClassFn,
       createGroupFn,
       setCreateGroupFn,
+      createGroupAtPositionFn,
+      setCreateGroupAtPositionFn,
       clickToFocusEnabled,
       setClickToFocusEnabled,
       groups,

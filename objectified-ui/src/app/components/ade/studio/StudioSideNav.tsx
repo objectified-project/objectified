@@ -1116,12 +1116,53 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                 />
               </Box>
 
+              {/* New Group draggable */}
+              {!isReadOnly && selectedVersionId && (
+                <Box sx={{ px: 2, pb: 1.5 }}>
+                  <Box
+                    role="button"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'copy';
+                      e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-group' }));
+                    }}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: 2,
+                      border: '2px dashed',
+                      borderColor: 'rgba(139, 92, 246, 0.4)',
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%)',
+                      cursor: 'grab',
+                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        borderColor: '#8b5cf6',
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(99, 102, 241, 0.08) 100%)',
+                        transform: 'translateY(-1px)',
+                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)',
+                      },
+                      '&:active': {
+                        cursor: 'grabbing',
+                        transform: 'scale(0.98)',
+                      },
+                    }}
+                    title="Drag to create a new group on the canvas"
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#8b5cf6' }}>+ New Group</Typography>
+                    <Typography variant="caption" sx={{ color: '#a78bfa', fontSize: '0.7rem' }}>drag to canvas</Typography>
+                  </Box>
+                </Box>
+              )}
+
               {/* Groups List */}
               <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
                 {filteredGroups.length === 0 ? (
                   <Box sx={{
                     textAlign: 'center',
-                    mt: 6,
+                    mt: 4,
                     px: 3,
                   }}>
                     <Typography
@@ -1133,34 +1174,9 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                         : 'No groups match your search'}
                     </Typography>
                     {groups.length === 0 && (
-                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8', display: 'block', mb: 2 }}>
-                        Select classes on the canvas and click "Group" to create one
+                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8', display: 'block' }}>
+                        Drag &quot;+ New Group&quot; above onto the canvas to create one
                       </Typography>
-                    )}
-                    {groups.length === 0 && !isReadOnly && (
-                      <Fab
-                        color="primary"
-                        size="small"
-                        onClick={() => callbacks.onGroupAdd?.()}
-                        disabled={!selectedVersionId || isReadOnly}
-                        aria-label="Add group"
-                        title={!selectedVersionId ? 'Select a version first' : 'Create group from selected classes'}
-                        sx={{
-                          background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                          boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)',
-                          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                          '&:hover': {
-                            transform: 'translateY(-2px) scale(1.05)',
-                            boxShadow: '0 6px 20px rgba(139, 92, 246, 0.5)',
-                          },
-                          '&:disabled': {
-                            background: isDark ? '#475569' : '#e2e8f0',
-                            boxShadow: 'none',
-                          },
-                        }}
-                      >
-                        <Add />
-                      </Fab>
                     )}
                   </Box>
                 ) : (
@@ -1229,35 +1245,6 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   </List>
                 )}
               </Box>
-
-              {/* Add Group Button (when groups exist) */}
-              {groups.length > 0 && !isReadOnly && (
-                <Box sx={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 1 }}>
-                  <Fab
-                    color="primary"
-                    size="small"
-                    onClick={() => callbacks.onGroupAdd?.()}
-                    disabled={!selectedVersionId || isReadOnly}
-                    aria-label="Add group"
-                    title={!selectedVersionId ? 'Select a version first' : 'Create group from selected classes'}
-                    sx={{
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                      boxShadow: '0 4px 14px rgba(139, 92, 246, 0.4)',
-                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                      '&:hover': {
-                        transform: 'translateY(-2px) scale(1.05)',
-                        boxShadow: '0 6px 20px rgba(139, 92, 246, 0.5)',
-                      },
-                      '&:disabled': {
-                        background: isDark ? '#475569' : '#e2e8f0',
-                        boxShadow: 'none',
-                      },
-                    }}
-                  >
-                    <Add />
-                  </Fab>
-                </Box>
-              )}
             </Box>
           )}
         </Box>

@@ -3144,7 +3144,8 @@ export async function saveDefaultCanvasLayout(
     const existingResult = await connectionPool.query(existingQuery, existingParams);
 
     // Sync groups to the dedicated table if provided
-    if (groups && Array.isArray(groups) && groups.length > 0) {
+    // Note: We sync even if groups array is empty to handle deletion of all groups
+    if (groups && Array.isArray(groups)) {
       await syncGroupsForVersion(versionId, groups);
     }
 

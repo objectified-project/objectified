@@ -201,17 +201,16 @@
   - 📋 Group headers with collapse/expand icons
   - ✅ Background color/opacity customization
   - ✅ Optional group icons from icon library
-- 📋 Group object should be drag-and-drop object itself
+- ✅ Group object is drag-and-drop to the canvas
 
-| Ticket | Feature                                                            |
-|--------|--------------------------------------------------------------------|
-| #154   | Collapsible groups to reduce canvas clutter                        |
-| #155   | Nested groups for hierarchical organization                        |
-| #156   | Group-level operations: move, delete, export, duplicate, bulk edit |
-| #285   | Ungroup nodes by deleting the group                                |
-| #515   | Delete all classes in a group                                      |
-| #516   | Group headers with collapse/expand icons                           |
-| #601   | Add group to the canvas should be drag-and-drop                    |
+| Ticket | Feature                                                             |
+|--------|---------------------------------------------------------------------|
+| #154   | Collapsible groups to reduce canvas clutter                         |
+| #155   | Nested groups for hierarchical organization                         |
+| #156   | Group-level operations: move, delete, export, duplicate, bulk edit  |
+| #285   | Ungroup nodes by deleting the group                                 |
+| #515   | Delete all classes in a group                                       |
+| #516   | Group headers with collapse/expand icons                            |
 
 ---
 
