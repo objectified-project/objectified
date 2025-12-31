@@ -21,6 +21,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Clipboard-based copy/paste editor
   - Class import now supports file, URL, and clipboard import sources
   - Import performs a sanity check to make sure all class imports are valid
+  - Adds Commit/Rollback system to allow users to apply or discard changes made during an import session
 - Canvas improvements
   - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
