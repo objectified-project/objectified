@@ -127,20 +127,20 @@
 - 📋 Hide/show individual nodes
 - 📋 Hide all nodes except selected
 - 📋 Hide by criteria:
-    - Hide all empty classes (no properties)
-    - Hide all classes without relationships
-    - Hide deprecated classes
-    - Hide by group membership
+  - Hide all empty classes (no properties)
+  - Hide all classes without relationships
+  - Hide deprecated classes
+  - Hide by group membership
 - 📋 "Ghosts mode": Show hidden nodes as semi-transparent
 - 📋 Quick restore hidden nodes
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #481   | Hide/show individual nodes |
-| #482   | Hide all nodes except selected                   |
-| #483   | Hide by criteria                                 |
-| #484   | "Ghosts mode" for hidden nodes                   |
-| #485   | Quick restore hidden nodes                       |
+| Ticket | Feature Description            |
+|--------|--------------------------------|
+| #481   | Hide/show individual nodes     |
+| #482   | Hide all nodes except selected |
+| #483   | Hide by criteria               |
+| #484   | "Ghosts mode" for hidden nodes |
+| #485   | Quick restore hidden nodes     |
 
 #### Focus Mode 📋 PLANNED
 - 📋 Isolate selected classes and immediate relationships
@@ -172,28 +172,6 @@
 | #479   | Invalid drop indicator                           |
 | #480   | Snap indicators when dragging nodes              |
 
-#### Current Sidebars ✅ PARTIALLY COMPLETE
-- ✅ **Classes sidebar**: List of all classes with search
-- ✅ **Properties panel**: Edit class properties
-- **Annotations drawer**: Right-side notes (Lucidchart style)
-- **History panel**: Undo/redo history with preview
-- **Layers panel**: Toggle visibility of canvas layers
-- **Bookmarks panel**: Quick navigation to saved views
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
-#### Panel Behaviors 📋 PLANNED
-- **Resizable panels**: Drag to resize
-- **Collapsible panels**: Minimize to edge
-- **Pinned panels**: Keep panel always visible
-- **Floating panels**: Detach to separate window
-- **Panel tabs**: Stack multiple panels with tabs
-- **Panel positions**: Left, right, top, bottom
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
 ---
 
 ### 3. Node Grouping & Organization
@@ -209,20 +187,21 @@
 - ✅ Nodes stay within group when partially overlapping - only ungroup when completely outside
 - ✅ Grouped nodes are locked to group bounds during dragging - cannot escape unless dragged completely outside
 - 📋 Collapsible groups to reduce canvas clutter
-    - Click to collapse: shows only group title and count
-    - Expand/collapse all groups with keyboard shortcut
-    - Remember collapsed state per user
+  - Click to collapse: shows only group title and count
+  - Expand/collapse all groups with keyboard shortcut
+  - Remember collapsed state per user
 - 📋 Nested groups for hierarchical organization (max 3 levels)
 - 📋 Group-level operations:
-    - ✅ Move entire group with one drag
-    - 📋 Delete all classes in a group
+  - ✅ Move entire group with one drag
+  - 📋 Delete all classes in a group
 - ✅ Named groups with descriptions and metadata
 - ✅ Visual styling options:
-    - ✅ Rounded rectangle containers with subtle shadows
-    - ✅ Dashed or solid borders with custom colors
-    - 📋 Group headers with collapse/expand icons
-    - ✅ Background color/opacity customization
-    - ✅ Optional group icons from icon library
+  - ✅ Rounded rectangle containers with subtle shadows
+  - ✅ Dashed or solid borders with custom colors
+  - 📋 Group headers with collapse/expand icons
+  - ✅ Background color/opacity customization
+  - ✅ Optional group icons from icon library
+- 📋 Group object should be drag-and-drop object itself
 
 | Ticket | Feature                                                            |
 |--------|--------------------------------------------------------------------|
@@ -232,6 +211,7 @@
 | #285   | Ungroup nodes by deleting the group                                |
 | #515   | Delete all classes in a group                                      |
 | #516   | Group headers with collapse/expand icons                           |
+| #601   | Add group to the canvas should be drag-and-drop                    |
 
 ---
 
@@ -239,30 +219,30 @@
 
 #### Node Styling 📋 PLANNED
 - 📋 **Custom Colors**:
-    - Per-class color picker
-    - Color by group
-    - Color by stereotype (entity, service, DTO)
-    - Color gradients for nodes
-    - Color themes (Material, Pastel, Corporate)
+  - Per-class color picker
+  - Color by group
+  - Color by stereotype (entity, service, DTO)
+  - Color gradients for nodes
+  - Color themes (Material, Pastel, Corporate)
 - 📋 **Node Icons**:
-    - Built-in icon library (1000+ icons)
-    - Custom icon upload
-    - Icons from icon packs (Font Awesome, Material Icons)
-    - Icon position (left, center, badge)
+  - Built-in icon library (1000+ icons)
+  - Custom icon upload
+  - Icons from icon packs (Font Awesome, Material Icons)
+  - Icon position (left, center, badge)
 - 📋 **Node Sizing**:
-    - Auto-size based on content
-    - Fixed size (small, medium, large, extra-large)
-    - Custom width and height
-    - Size by property count
-    - Compact mode (show only class name)
+  - Auto-size based on content
+  - Fixed size (small, medium, large, extra-large)
+  - Custom width and height
+  - Size by property count
+  - Compact mode (show only class name)
 - 📋 **Node Shapes**:
-    - Rectangle (default), Rounded rectangle
-    - Circle/ellipse, Hexagon, Diamond
-    - Custom SVG shapes
+  - Rectangle (default), Rounded rectangle
+  - Circle/ellipse, Hexagon, Diamond
+  - Custom SVG shapes
 - 📋 **Node Borders**:
-    - Border thickness (1-5px)
-    - Border style (solid, dashed, dotted)
-    - Shadow effects (drop shadow, inner shadow)
+  - Border thickness (1-5px)
+  - Border style (solid, dashed, dotted)
+  - Shadow effects (drop shadow, inner shadow)
 
 | Ticket | Feature Description               |
 |--------|-----------------------------------|
@@ -274,18 +254,18 @@
 
 #### Edge/Relationship Styling 📋 PLANNED
 - 📋 Different line styles for relationship types:
-    - Solid for direct references
-    - Dashed for optional references
-    - Dotted for weak references
-    - Double lines for bidirectional
+  - Solid for direct references
+  - Dashed for optional references
+  - Dotted for weak references
+  - Double lines for bidirectional
 - 📋 Edge colors customizable
 - 📋 Edge thickness (1-5px)
 - 📋 Edge labels (show property name on relationship)
 - 📋 Edge routing options:
-    - Straight lines
-    - Curved (Bezier)
-    - Orthogonal (right angles)
-    - Smart routing (avoid node overlap)
+  - Straight lines
+  - Curved (Bezier)
+  - Orthogonal (right angles)
+  - Smart routing (avoid node overlap)
 - 📋 Arrow styles: Standard, Diamond, Circle, Open arrow
 - 📋 Animated edges (flowing dots for data flow)
 

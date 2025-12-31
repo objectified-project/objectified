@@ -3,7 +3,7 @@
 > **Enterprise-grade Visual API Design Platform**  
 > React Flow-based path definition, operation design, and OpenAPI 3.1 specification management for software engineers
 > 
-> **Last Updated**: December 29, 2025  
+> **Last Updated**: December 30, 2025  
 > **Version**: 2.0 - Visual OpenAPI Path Definition, Testing & Enterprise Integration  
 > **Target Audience**: Software Engineers, API Architects, Platform Engineers
 
@@ -13,19 +13,18 @@
 
 ### 1. React Flow Canvas Foundation
 
-The Paths Designer is built on React Flow, providing an infinite canvas workspace optimized for complex API specifications. Engineers can design APIs with hundreds of endpoints while maintaining visual clarity through zoom, pan, and mini-map navigation.
+The Paths Designer is built on React Flow, providing an infinite canvas workspace optimized for complex API
+specifications. Engineers can design APIs with hundreds of endpoints while maintaining visual clarity through
+zoom, pan, and mini-map navigation.
 
-#### Canvas Features ✅ PLANNED
+#### Canvas Features ✅ PARTIALLY IMPLEMENTED
 
 - ✅ **Dedicated Paths Tab**: Third Studio tab with independent React Flow instance
-- **Infinite Canvas**: Zoom from 10% to 500% with smooth panning
-- **Mini-Map Navigation**: Bird's-eye view for large API specs (50+ paths)
+- ✅ **Infinite Canvas**: Zoom from 10% to 500% with smooth panning
+- ✅ **Mini-Map Navigation**: Bird's-eye view for large API specs (50+ paths)
 - **Node Library Panel**: Draggable node types organized by category
-- **Keyboard Navigation**: Vim-style hjkl movement, arrow keys, space to pan
-- **Command Palette**: `Cmd/Ctrl+K` for quick actions (create path, add method, etc.)
 - **Grid Snapping**: Optional alignment grid with 10/20/50px spacing
 - **Selection Tools**: Multi-select with drag, `Shift+Click`, rubber band selection
-- **Undo/Redo**: Full action history with `Cmd/Ctrl+Z` and `Cmd/Ctrl+Shift+Z`
 
 | Ticket | Feature                                   |
 |--------|-------------------------------------------|
@@ -36,7 +35,8 @@ The Paths Designer is built on React Flow, providing an infinite canvas workspac
 
 ### 2. Node Types & Visual Design
 
-Each OpenAPI concept is represented as a distinct node type with color-coded visual identity, making API structure immediately recognizable.
+Each OpenAPI concept is represented as a distinct node type with color-coded visual identity, making API 
+structure immediately recognizable.
 
 #### 2.1 Path Nodes 📋 PARTIALLY IMPLEMENTED
 
@@ -76,15 +76,15 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 
 **Visual Design**: Color-coded badges attached to path nodes
 
-| Method | Color  | Common Use Cases              |
-|--------|--------|-------------------------------|
-| GET    | Green  | Read, list, search operations |
-| POST   | Blue   | Create, submit, trigger       |
-| PUT    | Orange | Full resource replacement     |
-| PATCH  | Purple | Partial updates               |
-| DELETE | Red    | Resource deletion             |
-| HEAD   | Gray   | Metadata retrieval            |
-| OPTIONS| Gray   | CORS preflight                |
+| Method   | Color  | Common Use Cases              |
+|----------|--------|-------------------------------|
+| GET      | Green  | Read, list, search operations |
+| POST     | Blue   | Create, submit, trigger       |
+| PUT      | Orange | Full resource replacement     |
+| PATCH    | Purple | Partial updates               |
+| DELETE   | Red    | Resource deletion             |
+| HEAD     | Gray   | Metadata retrieval            |
+| OPTIONS  | Gray   | CORS preflight                |
 
 **Configurable Properties**:
 - 📋 Operation ID (auto-generated from method + path)
@@ -189,25 +189,25 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - File upload configuration with encoding options
 - Example value editor with JSON/YAML/XML toggle
 
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
+| Ticket | Feature                                                        |
+|--------|----------------------------------------------------------------|
 | #386   | Content type map (application/json, multipart/form-data, etc.) |
-| #387   | Schema binding per content type           |
-| #388   | Add required flag to request body      |
-| #389   | Add description to request body          |
-| #390   | Add examples to request body node |
-| #391   | Add encoding options for multipart       |
+| #387   | Schema binding per content type                                |
+| #388   | Add required flag to request body                              |
+| #389   | Add description to request body                                |
+| #390   | Add examples to request body node                              |
+| #391   | Add encoding options for multipart                             |
 
 #### 2.6 Response Nodes 📋 PLANNED
 
 **Visual Design**: Output port icon, color-coded by status code family
 
-| Status Range | Color  | Common Codes                     |
-|--------------|--------|----------------------------------|
+| Status Range | Color  | Common Codes                        |
+|--------------|--------|-------------------------------------|
 | 2XX Success  | Green  | 200 OK, 201 Created, 204 No Content |
-| 3XX Redirect | Blue   | 301, 302, 304 Not Modified       |
-| 4XX Client   | Yellow | 400, 401, 403, 404, 422          |
-| 5XX Server   | Red    | 500, 502, 503, 504               |
+| 3XX Redirect | Blue   | 301, 302, 304 Not Modified          |
+| 4XX Client   | Yellow | 400, 401, 403, 404, 422             |
+| 5XX Server   | Red    | 500, 502, 503, 504                  |
 
 **Configurable Properties**:
 - 📋 Status code (100-599)
@@ -217,12 +217,6 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 - 📋 Links (HATEOAS navigation)
 - 📋 Examples per content type
 
-**Advanced Features**:
-- 📋 Response range patterns: 2XX, 4XX, 5XX wildcards
-- 📋 Default response for catch-all error handling
-- 📋 Link objects for response-driven navigation
-- 📋 Header templates (pagination, rate limiting, CORS)
-
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
 | #392   | Status code (100-599)                                  |
@@ -231,6 +225,15 @@ Each OpenAPI concept is represented as a distinct node type with color-coded vis
 | #395   | Add content type map with schema bindings              |
 | #396   | Add links (HATEOAS navigation)                         |
 | #397   | Add content-type examples to response node             |
+
+**Advanced Features**:
+- 📋 Response range patterns: 2XX, 4XX, 5XX wildcards
+- 📋 Default response for catch-all error handling
+- 📋 Link objects for response-driven navigation
+- 📋 Header templates (pagination, rate limiting, CORS)
+
+| Ticket | Feature                                                |
+|--------|--------------------------------------------------------|
 | #398   | Add response range patterns to response nodes          |
 | #399   | Add default response to HTTP Operation                 |
 | #400   | Add link objects for response-driven navigation        |
@@ -253,12 +256,18 @@ Software engineers need precision and control. The Paths Designer provides inlin
 - Autocomplete for OpenAPI keywords and schema properties
 - Quick reference sidebar for OpenAPI 3.1 spec
 
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
 **Example Value Editor**:
 - Format toggle: JSON, YAML, XML, form-data
 - Syntax validation per content type
 - Auto-format with `Shift+Alt+F`
 - Copy example as cURL command
 - Import from file or paste from clipboard
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
 
 **Markdown Description Editor**:
 - Live preview split view
@@ -334,6 +343,9 @@ Catch errors as you design, not during export:
 - API Blueprint (Markdown-based)
 - RAML 1.0
 
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
+
 **Export Options**:
 - Include/exclude examples
 - Include/exclude descriptions
@@ -341,6 +353,9 @@ Catch errors as you design, not during export:
 - Add custom `x-*` extensions
 - Resolve all $ref to embedded schemas (dereferencing)
 - Add server URLs for multiple environments
+
+| Ticket | Feature                                   |
+|--------|-------------------------------------------|
 
 **Import Support**:
 - OpenAPI 3.0/3.1 JSON/YAML
@@ -954,7 +969,7 @@ The PathNode serves as the top-level container for an API endpoint:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ ○ PATH                                           ⋮ ≡       │  ← Header with drag handle
+│ ○ PATH                                           ⋮ ≡        │  ← Header with drag handle
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   /api/v1/users/{userId}/orders                             │  ← Path pattern (editable)
@@ -970,7 +985,7 @@ The PathNode serves as the top-level container for an API endpoint:
 │   └───────────────────────────────────────────────────────┘ │
 │                                                             │
 ├─────────────────────────────────────────────────────────────┤
-│  Tags: orders, users          │  ⚠️ deprecated             │  ← Footer metadata
+│  Tags: orders, users          │  ⚠️ deprecated              │  ← Footer metadata
 └─────────────────────────────────────────────────────────────┘
      │
      ○ ← Output handle for edge connections
@@ -983,7 +998,7 @@ MethodNodes are color-coded and nest inside PathNodes:
 ```
 GET (Green #48BB78)                    POST (Blue #4299E1)
 ┌────────────────────────────┐         ┌────────────────────────────┐
-│ ●━━ GET ━━━━━━━━━━━━━━━━━ │         │ ●━━ POST ━━━━━━━━━━━━━━━━ │
+│ ●━━ GET ━━━━━━━━━━━━━━━━━  │         │ ●━━ POST ━━━━━━━━━━━━━━━━  │
 ├────────────────────────────┤         ├────────────────────────────┤
 │ operationId: listUserOrders│         │ operationId: createOrder   │
 │                            │         │                            │
@@ -997,13 +1012,13 @@ GET (Green #48BB78)                    POST (Blue #4299E1)
 │ │ 404 ○ ErrorResponse    │ │         │ │ 400 ○ ValidationError  │ │
 │ └────────────────────────┘ │         │ │ 401 ○ ErrorResponse    │ │
 │                            │         │ └────────────────────────┘ │
-│ 🔐 bearerAuth             │         │                            │
-└────────────────────────────┘         │ 🔐 bearerAuth             │
+│ 🔐 bearerAuth              │         │                            │
+└────────────────────────────┘         │ 🔐 bearerAuth              │
                                        └────────────────────────────┘
 
 PUT (Orange #ED8936)                   DELETE (Red #F56565)
 ┌────────────────────────────┐         ┌────────────────────────────┐
-│ ●━━ PUT ━━━━━━━━━━━━━━━━━ │         │ ●━━ DELETE ━━━━━━━━━━━━━━ │
+│ ●━━ PUT ━━━━━━━━━━━━━━━━━  │         │ ●━━ DELETE ━━━━━━━━━━━━━━  │
 ├────────────────────────────┤         ├────────────────────────────┤
 │ operationId: updateOrder   │         │ operationId: deleteOrder   │
 │ ...                        │         │ ...                        │
@@ -1011,7 +1026,7 @@ PUT (Orange #ED8936)                   DELETE (Red #F56565)
 
 PATCH (Purple #9F7AEA)                 OPTIONS/HEAD (Gray #718096)
 ┌────────────────────────────┐         ┌────────────────────────────┐
-│ ●━━ PATCH ━━━━━━━━━━━━━━━ │         │ ●━━ OPTIONS ━━━━━━━━━━━━━ │
+│ ●━━ PATCH ━━━━━━━━━━━━━━━  │         │ ●━━ OPTIONS ━━━━━━━━━━━━━  │
 ├────────────────────────────┤         ├────────────────────────────┤
 │ operationId: patchOrder    │         │ operationId: orderOptions  │
 │ ...                        │         │ ...                        │
@@ -1092,9 +1107,9 @@ Here's how a complete API endpoint design might appear on the canvas:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    REACT FLOW CANVAS                                     │
-│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
-│                                                                                          │
+│                                    REACT FLOW CANVAS                                    │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐ │
+│                                                                                         │
 │  │ ┌───────────────────────────────────────────────────────────────────────────────┐ │  │
 │    │ ○ PATH                                                                    ⋮ ≡ │    │
 │  │ ├───────────────────────────────────────────────────────────────────────────────┤ │  │
@@ -1104,7 +1119,7 @@ Here's how a complete API endpoint design might appear on the canvas:
 │  │ │   ┌─────────────────────────────────────────────────────────────────────────┐ │ │  │
 │    │   │                                                                         │ │    │
 │  │ │   │  ┌────────────────────────┐    ┌────────────────────────┐               │ │ │  │
-│    │   │  │ ●━━ GET ━━━━━━━━━━━━━ │    │ ●━━ PUT ━━━━━━━━━━━━━━ │               │ │    │
+│    │   │  │ ●━━ GET ━━━━━━━━━━━━━  │    │ ●━━ PUT ━━━━━━━━━━━━━━ │               │ │    │
 │  │ │   │  ├────────────────────────┤    ├────────────────────────┤               │ │ │  │
 │    │   │  │ operationId: getUser   │    │ operationId: updateUser│               │ │    │
 │  │ │   │  │                        │    │                        │               │ │ │  │
@@ -1317,9 +1332,9 @@ STEP 1: Locate schema in Library Panel
 
 STEP 2: Drag schema onto canvas or directly into drop zone
                                     ┌─────────────────────────┐
-         ╭─ ─ ─ ─ ─ ─ ─ ─ ╮        │ ●━━ POST ━━━━━━━━━━━━━ │
-         ┆  { } User      ┆ ───▶   ├─────────────────────────┤
-         ╰─ ─ ─ ─ ─ ─ ─ ─ ╯        │ ┌─ Request ───────────┐ │
+         ╭─ ─ ─ ─ ─ ─ ─ ─ ╮         │ ●━━ POST ━━━━━━━━━━━━━  │
+         ┆  { } User      ┆ ───▶    ├─────────────────────────┤
+         ╰─ ─ ─ ─ ─ ─ ─ ─ ╯         │ ┌─ Request ───────────┐ │
                dragging             │ │ ┌─────────────────┐ │ │
                                     │ │ │  DROP SCHEMA    │ │ │ ← Drop zone highlights
                                     │ │ │  HERE           │ │ │   when schema hovers
@@ -1328,7 +1343,7 @@ STEP 2: Drag schema onto canvas or directly into drop zone
 
 STEP 3: Schema reference created with edge connection
 ┌─────────────────────────┐         ┌─────────────────────────┐
-│ { } User            ↗️  │         │ ●━━ POST ━━━━━━━━━━━━━ │
+│ { } User            ↗️  │         │ ●━━ POST ━━━━━━━━━━━━━  │
 ├─────────────────────────┤         ├─────────────────────────┤
 │ id: string              │         │ ┌─ Request ───────────┐ │
 │ email: string           │────────▶│ │ ○ User              │ │
@@ -1354,7 +1369,7 @@ Request Body Binding (solid blue line):
 
 Optional Reference (dashed line):
 ┌───────────┐                    ┌─────────────┐
-│ { } Opts  │┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄▶│ Query Param │
+│ { } Opts  │┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄▶ │ Query Param │
 └───────────┘   (optional)       └─────────────┘
 
 Array Wrapper (line with brackets):
@@ -1378,7 +1393,7 @@ Polymorphic (branching lines):
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                 │
 │  ┌─────────┐                                              ┌─────────────────┐  │
-│  │ ◀ ▶ ▲ ▼ │  Pan controls                               │   MINI-MAP      │  │
+│  │ ◀ ▶ ▲ ▼ │  Pan controls                                │   MINI-MAP      │  │
 │  └─────────┘                                              │  ┌───────────┐  │  │
 │                                                           │  │  ▪   ▪    │  │  │
 │  ┌─────────────────────────────┐                          │  │    ▪      │  │  │
@@ -1409,31 +1424,31 @@ Right-click context menus provide quick actions:
 ```
 On PathNode:                        On MethodNode:
 ┌─────────────────────────┐        ┌─────────────────────────┐
-│ ✏️  Edit Path            │        │ ✏️  Edit Operation       │
-│ 📋 Duplicate             │        │ 📋 Duplicate             │
+│ ✏️  Edit Path           │        │ ✏️  Edit Operation      │
+│ 📋 Duplicate            │        │ 📋 Duplicate            │
 ├─────────────────────────┤        ├─────────────────────────┤
-│ ➕ Add GET               │        │ ➕ Add Response          │
-│ ➕ Add POST              │        │ ➕ Add Parameter         │
-│ ➕ Add PUT               │        │ 🔐 Add Security          │
-│ ➕ Add DELETE            │        ├─────────────────────────┤
-├─────────────────────────┤        │ 🧪 Test in Swagger       │
-│ 📦 Generate All CRUD    │        │ 📄 Copy as cURL          │
+│ ➕ Add GET              │        │ ➕ Add Response         │
+│ ➕ Add POST             │        │ ➕ Add Parameter        │
+│ ➕ Add PUT              │        │ 🔐 Add Security         │
+│ ➕ Add DELETE           │        ├─────────────────────────┤
+├─────────────────────────┤        │ 🧪 Test in Swagger      │
+│ 📦 Generate All CRUD    │        │ 📄 Copy as cURL         │
 ├─────────────────────────┤        ├─────────────────────────┤
-│ ⚠️  Mark Deprecated      │        │ ⚠️  Mark Deprecated      │
-│ 🗑️  Delete               │        │ 🗑️  Delete               │
+│ ⚠️  Mark Deprecated     │        │ ⚠️  Mark Deprecated     │
+│ 🗑️  Delete              │        │ 🗑️  Delete              │
 └─────────────────────────┘        └─────────────────────────┘
 
 On SchemaRefNode:                   On Canvas (empty area):
 ┌─────────────────────────┐        ┌─────────────────────────┐
-│ ↗️  Open in Schema Editor│        │ ➕ Add Path              │
-│ 📋 Duplicate Reference   │        │ 📋 Paste                 │
+│ ↗️  Open in Schema Editor│       │ ➕ Add Path             │
+│ 📋 Duplicate Reference   │       │ 📋 Paste                │
 ├─────────────────────────┤        ├─────────────────────────┤
-│ [ ] Wrap as Array       │        │ ⊞  Toggle Grid           │
-│ { } Use as Partial      │        │ 🔄 Auto-arrange          │
-├─────────────────────────┤        │ 🎯 Fit to View           │
-│ 🔗 Disconnect            │        ├─────────────────────────┤
-│ 🗑️  Remove from Canvas   │        │ 📥 Import from OpenAPI   │
-└─────────────────────────┘        │ 📤 Export Selection      │
+│ [ ] Wrap as Array       │        │ ⊞  Toggle Grid          │
+│ { } Use as Partial      │        │ 🔄 Auto-arrange         │
+├─────────────────────────┤        │ 🎯 Fit to View          │
+│ 🔗 Disconnect           │        ├─────────────────────────┤
+│ 🗑️  Remove from Canvas  │        │ 📥 Import from OpenAPI  │
+└─────────────────────────┘        │ 📤 Export Selection     │
                                    └─────────────────────────┘
 ```
 
@@ -1444,7 +1459,7 @@ Nodes display different visual states for user feedback:
 ```
 DEFAULT STATE:                      SELECTED STATE:
 ┌─────────────────────────┐        ┌─────────────────────────┐
-│ ○ PATH                  │        │ ○ PATH              ⬚⬚ │ ← Resize handles
+│ ○ PATH                  │        │ ○ PATH              ⬚⬚  │ ← Resize handles
 ├─────────────────────────┤        ╔═════════════════════════╗ ← Blue border
 │ /api/v1/users           │        ║ /api/v1/users           ║
 └─────────────────────────┘        ╚═════════════════════════╝
