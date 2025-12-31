@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, Link2 } from 'lucide-react';
+import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, Link2, FileText } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import { Button } from '../../ui/Button';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/db/class-import-actions';
 import UrlImportPanel from '../dashboard/UrlImportPanel';
+import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 
 interface ClassImportDialogProps {
   open: boolean;
@@ -78,7 +79,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   existingClassNames,
 }) => {
   const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'select' | 'importing' | 'done'>('source');
-  const [selectedSource, setSelectedSource] = useState<'file' | 'url' | null>(null);
+  const [selectedSource, setSelectedSource] = useState<'file' | 'url' | 'clipboard' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
@@ -93,10 +94,12 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [importResult, setImportResult] = useState<ImportClassesResult | null>(null);
   const [urlContent, setUrlContent] = useState<string | null>(null);
   const [urlFilename, setUrlFilename] = useState<string | null>(null);
+  const [clipboardContent, setClipboardContent] = useState<string | null>(null);
+  const [clipboardFilename, setClipboardFilename] = useState<string | null>(null);
 
   const existingNamesSet = new Set(existingClassNames.map(n => n.toLowerCase()));
 
-  const handleSourceClick = (source: 'file' | 'url') => {
+  const handleSourceClick = (source: 'file' | 'url' | 'clipboard') => {
     setSelectedSource(source);
     setCurrentStep('file-upload');
   };
@@ -117,6 +120,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       setFileMetadata(null);
       setUrlContent(null);
       setUrlFilename(null);
+      setClipboardContent(null);
+      setClipboardFilename(null);
     }
   };
 
@@ -136,16 +141,18 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setImportResult(null);
     setUrlContent(null);
     setUrlFilename(null);
+    setClipboardContent(null);
+    setClipboardFilename(null);
     onClose();
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile && !urlContent) return;
+    if (!selectedFile && !urlContent && !clipboardContent) return;
 
     setIsAnalyzing(true);
     try {
-      const content = urlContent || await selectedFile!.text();
-      const filename = urlFilename || selectedFile?.name || 'openapi-spec.yaml';
+      const content = urlContent || clipboardContent || await selectedFile!.text();
+      const filename = urlFilename || clipboardFilename || selectedFile?.name || 'openapi-spec.yaml';
       const result = await analyzeSpecification(content, filename);
       setAnalysisResult(result);
 
@@ -197,6 +204,11 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleClipboardSpecificationReady = (content: string, filename: string) => {
+    setClipboardContent(content);
+    setClipboardFilename(filename);
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -413,7 +425,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">
                   Choose Import Source
                 </h2>
-                <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
                   {/* File Upload */}
                   <button
                     onClick={() => handleSourceClick('file')}
@@ -469,6 +481,34 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       </div>
                     </div>
                   </button>
+
+                  {/* Clipboard */}
+                  <button
+                    onClick={() => handleSourceClick('clipboard')}
+                    className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                      selectedSource === 'clipboard'
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center text-center">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                        selectedSource === 'clipboard'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                      }`}>
+                        <FileText className="h-6 w-6" />
+                      </div>
+                      <div className={`font-semibold mb-1 ${
+                        selectedSource === 'clipboard' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                      }`}>
+                        Clipboard Paste
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Paste JSON or YAML content
+                      </div>
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -477,6 +517,12 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
           {currentStep === 'file-upload' && selectedSource === 'url' && (
             <UrlImportPanel
               onSpecificationFetched={handleUrlSpecificationFetched}
+            />
+          )}
+
+          {currentStep === 'file-upload' && selectedSource === 'clipboard' && (
+            <ClipboardImportPanel
+              onSpecificationReady={handleClipboardSpecificationReady}
             />
           )}
 
@@ -896,10 +942,19 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
-                {currentStep === 'file-upload' && (
+                {currentStep === 'file-upload' && selectedSource === 'file' && (
                   <Button
                     onClick={handleAnalyze}
                     disabled={!selectedFile || isAnalyzing || (fileMetadata !== null && !fileMetadata.formatSupported)}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {isAnalyzing ? 'Analyzing...' : 'Continue →'}
+                  </Button>
+                )}
+                {currentStep === 'file-upload' && selectedSource === 'clipboard' && (
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!clipboardContent || isAnalyzing}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Continue →'}
