@@ -4,12 +4,52 @@ import { useState, useEffect, useCallback } from 'react';
 import { FileText, CheckCircle2, AlertTriangle, FileCode, Copy, Trash2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for Monaco Editor to avoid SSR issues
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[300px] flex items-center justify-center bg-gray-900 rounded-lg">
+      <div className="text-gray-400">Loading editor...</div>
+    </div>
+  ),
+});
 
 interface ClipboardImportPanelProps {
   onSpecificationReady: (content: string, filename: string) => void;
 }
 
 type SyntaxType = 'json' | 'yaml' | 'unknown';
+
+// Detect syntax type from content
+function detectSyntax(text: string): SyntaxType {
+  const trimmed = text.trim();
+
+  if (!trimmed) return 'unknown';
+
+  // JSON starts with { or [
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    return 'json';
+  }
+
+  // YAML detection - look for common patterns
+  if (
+    trimmed.includes(':') &&
+    (trimmed.startsWith('openapi') ||
+     trimmed.startsWith('swagger') ||
+     trimmed.startsWith('asyncapi') ||
+     trimmed.startsWith('info') ||
+     trimmed.startsWith('paths') ||
+     trimmed.startsWith('components') ||
+     trimmed.startsWith('definitions') ||
+     /^[a-zA-Z_][a-zA-Z0-9_]*:/m.test(trimmed))
+  ) {
+    return 'yaml';
+  }
+
+  return 'unknown';
+}
 
 export const ClipboardImportPanel: React.FC<ClipboardImportPanelProps> = ({
   onSpecificationReady
@@ -20,6 +60,7 @@ export const ClipboardImportPanel: React.FC<ClipboardImportPanelProps> = ({
   const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [editorMounted, setEditorMounted] = useState(false);
 
   // Detect syntax and extract metadata when content changes
   const analyzeContent = useCallback(async (text: string) => {
@@ -37,21 +78,7 @@ export const ClipboardImportPanel: React.FC<ClipboardImportPanelProps> = ({
 
     try {
       // Detect syntax type
-      const trimmed = text.trim();
-      let syntax: SyntaxType = 'unknown';
-
-      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-        syntax = 'json';
-      } else if (
-        trimmed.includes(':') &&
-        (trimmed.startsWith('openapi') ||
-         trimmed.startsWith('swagger') ||
-         trimmed.startsWith('asyncapi') ||
-         trimmed.match(/^[a-zA-Z_][a-zA-Z0-9_]*:/m))
-      ) {
-        syntax = 'yaml';
-      }
-
+      const syntax = detectSyntax(text);
       setDetectedSyntax(syntax);
 
       // Extract metadata for preview
@@ -109,8 +136,26 @@ export const ClipboardImportPanel: React.FC<ClipboardImportPanelProps> = ({
     onSpecificationReady('', '');
   };
 
+  // Handle editor content change
+  const handleEditorChange = (value: string | undefined) => {
+    setContent(value || '');
+  };
+
+  // Handle editor mount
+  const handleEditorMount = () => {
+    setEditorMounted(true);
+  };
+
   // Check if content is ready for import
   const isReadyForImport = content.trim() && fileMetadata?.syntaxValid && fileMetadata?.formatSupported;
+
+  // Get Monaco language based on detected syntax
+  const getEditorLanguage = (): string => {
+    if (detectedSyntax === 'json') return 'json';
+    if (detectedSyntax === 'yaml') return 'yaml';
+    // Default to yaml for unknown since OpenAPI specs are commonly YAML
+    return content.trim().startsWith('{') || content.trim().startsWith('[') ? 'json' : 'yaml';
+  };
 
   return (
     <div className="space-y-6">
@@ -165,74 +210,83 @@ export const ClipboardImportPanel: React.FC<ClipboardImportPanelProps> = ({
               Paste Your Specification
             </div>
             <div className="text-sm text-indigo-700 dark:text-indigo-300 mt-1">
-              Paste JSON or YAML content directly into the text area below. The format will be auto-detected.
+              Paste JSON or YAML content directly into the editor below. The format will be auto-detected with syntax highlighting.
             </div>
           </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          onClick={handlePasteFromClipboard}
-          className="flex items-center gap-2"
-        >
-          <Copy className="h-4 w-4" />
-          Paste from Clipboard
-        </Button>
-        {content && (
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={handleClear}
-            className="flex items-center gap-2 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+            onClick={handlePasteFromClipboard}
+            className="flex items-center gap-2"
           >
-            <Trash2 className="h-4 w-4" />
-            Clear
+            <Copy className="h-4 w-4" />
+            Paste from Clipboard
           </Button>
+          {content && (
+            <Button
+              variant="outline"
+              onClick={handleClear}
+              className="flex items-center gap-2 text-red-600 dark:text-red-400 border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-4 w-4" />
+              Clear
+            </Button>
+          )}
+        </div>
+        {detectedSyntax !== 'unknown' && (
+          <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+            detectedSyntax === 'json' 
+              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+              : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+          }`}>
+            {detectedSyntax.toUpperCase()} Detected
+          </span>
         )}
       </div>
 
-      {/* Text Area */}
+      {/* Monaco Editor */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Specification Content
-          </label>
-          {detectedSyntax !== 'unknown' && (
-            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-              detectedSyntax === 'json' 
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
-                : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-            }`}>
-              {detectedSyntax.toUpperCase()} Detected
-            </span>
-          )}
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Specification Content
+        </label>
+        <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+          <Editor
+            height="300px"
+            language={getEditorLanguage()}
+            value={content}
+            onChange={handleEditorChange}
+            onMount={handleEditorMount}
+            theme="vs-dark"
+            options={{
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              fontSize: 13,
+              lineNumbers: 'on',
+              folding: true,
+              wordWrap: 'on',
+              wrappingIndent: 'indent',
+              automaticLayout: true,
+              tabSize: 2,
+              insertSpaces: true,
+              formatOnPaste: true,
+              renderWhitespace: 'selection',
+              scrollbar: {
+                verticalScrollbarSize: 10,
+                horizontalScrollbarSize: 10,
+              },
+              padding: {
+                top: 8,
+                bottom: 8,
+              },
+              placeholder: 'Paste your OpenAPI, Swagger, or JSON Schema content here...',
+            }}
+          />
         </div>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={`Paste your OpenAPI, Swagger, or JSON Schema content here...
-
-Example (YAML):
-openapi: 3.1.0
-info:
-  title: My API
-  version: 1.0.0
-paths: {}
-
-Example (JSON):
-{
-  "openapi": "3.1.0",
-  "info": {
-    "title": "My API",
-    "version": "1.0.0"
-  },
-  "paths": {}
-}`}
-          className="block w-full h-64 px-4 py-3 text-sm font-mono rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-          spellCheck={false}
-        />
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <span>{content.length.toLocaleString()} characters</span>
           <span>{content.split('\n').length.toLocaleString()} lines</span>
