@@ -24,15 +24,16 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Direct URL Import**: Fetch spec from public URL
 - ✅ **Authenticated URL**: Support for Bearer, API Key, Basic Auth
 - 📋 **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket
-- 📋 **Branch/Tag Selection**: Import specific versions from git
-- 📋 **Private Repository Support**: OAuth integration for private repos
+- **Branch/Tag Selection**: Import specific versions from git
+- **Private Repository Support**: OAuth integration for private repos
 - 📋 **Swagger Hub Integration**: Direct import from SwaggerHub
 - 📋 **Postman Collection Import**: Import from Postman workspace URL
 
-| Ticket | Feature Description                     |
-|--------|-----------------------------------------|
-| #332   | Ability to import SwaggerHub            |
-| #333   | Ability to import Postman Collection    |
+| Ticket | Feature Description                                |
+|--------|----------------------------------------------------|
+| #332   | Ability to import SwaggerHub                       |
+| #333   | Ability to import Postman Collection               |
+| #569   | Reuse PAT in Linked Accounts for repository import |
 
 ##### Integration Import 📋 PLANNED
 - 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong
@@ -122,64 +123,66 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### Specification Analysis 📋 PARTIALLY IMPLEMENTED
 - ✅ **Schema Count**: Number of schemas to be imported
 - ✅ **Property Count**: Total properties across all schemas
-- **Reference Analysis**: Count and map all $ref relationships
-- **Circular Reference Detection**: Identify circular dependencies
-- **External Reference Inventory**: List all external URLs
+- 📋 **Reference Analysis**: Count and map all $ref relationships
+- 📋 **Circular Reference Detection**: Identify circular dependencies
+- 📋 **External Reference Inventory**: List all external URLs
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                     |
+|--------|-----------------------------------------|
+| #570   | Count and map all $ref relationships    |
+| #571   | Identify circular dependencies          |
+| #572   | External reference inventory - and warn | 
 
 ##### Compatibility Check
-- **Feature Compatibility**: Identify unsupported features
-- **Extension Detection**: List all x- custom extensions
-- **Deprecated Feature Warning**: Flag deprecated constructs
+- 📋 **Feature Compatibility**: Identify unsupported features
+- 📋 **Extension Detection**: List all x- custom extensions
+- 📋 **Deprecated Feature Warning**: Flag deprecated constructs
 - **Security Scheme Analysis**: Identify auth requirements
 - **Breaking Change Detection**: Compare with existing version
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
-##### Quality Score 📋 PARTIALLY IMPLEMENTED
-- **Completeness Score**: Descriptions, examples, documentation
-- **Consistency Score**: Naming conventions, patterns
-- **Best Practices Score**: Industry standard compliance
-- ✅ **Security Score**: Security scheme coverage
-- ✅ **Overall Quality Rating**: A-F grade with breakdown
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description            |
+|--------|--------------------------------|
+| #573   | Identify unsupported features  |
+| #574   | List all x- custom extensions  |
+| #575   | Flag deprecated constructs     |
 
 #### 4.4 Import Preview & Mapping 📋 PLANNED
 
 ##### Visual Preview
-- **Schema Tree View**: Hierarchical view of all schemas
-- **Property Listing**: Expandable property details
-- **Relationship Diagram**: Preview of schema relationships
+- 📋 **Schema Tree View**: Hierarchical view of all schemas
+- 📋 **Property Listing**: Expandable property details
+- 📋 **Relationship Diagram**: Preview of schema relationships
 - **Side-by-Side Comparison**: Compare with existing schemas
 - **Diff Highlighting**: Visual diff for updates
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                      |
+|--------|------------------------------------------|
+| #576   | Add visual hierarchical schema tree view |
+| #577   | Expandable property details              |
+| #578   | Preview of schema relationships          |
 
 ##### Schema Selection 📋 PARTIALLY IMPLEMENTED
 - ✅ **Select All / None**: Bulk selection controls
 - ✅ **Individual Selection**: Cherry-pick specific schemas
-- **Dependency Resolution**: Auto-select required dependencies
-- **Search & Filter**: Find schemas by name, type, tags
-- **Category Grouping**: Group by tag, path, or custom criteria
+- 📋 **Dependency Resolution**: Auto-select required dependencies
+- 📋 **Search & Filter**: Find schemas by name, type, tags
+- **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #579   | Dependency resolution - auto-select required dependencies |
+| #580   | Search & filter schemas by name, type, tags     |
 
-##### Name Mapping
+##### Name Mapping 📋 PLANNED
 - **Auto-Generated Names**: Smart naming from schema context
 - **Custom Name Override**: Manual name assignment
-- **Naming Convention Enforcement**: camelCase, PascalCase, etc.
+- 📋 **Naming Convention Enforcement**: camelCase, PascalCase, etc.
 - **Prefix/Suffix Rules**: Apply consistent naming patterns
 - **Reserved Name Detection**: Prevent conflicts with keywords
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
+| #581  | Enforce naming conventions during import    |
 
 ##### Property Mapping
 - **Type Mapping**: Map external types to internal types
@@ -194,60 +197,67 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 #### 4.5 Conflict Resolution 📋 PLANNED
 
 ##### Conflict Detection
-- **Duplicate Schema Detection**: Same name, different definition
-- **Property Conflicts**: Incompatible property definitions
-- **Reference Conflicts**: Broken or ambiguous references
-- **Type Mismatches**: Incompatible type assignments
-- **Semantic Conflicts**: Logically incompatible constraints
+- 📋 **Duplicate Schema Detection**: Same name, different definition
+- 📋 **Property Conflicts**: Incompatible property definitions
+- 📋 **Reference Conflicts**: Broken or ambiguous references
+- 📋 **Type Mismatches**: Incompatible type assignments
+- 📋 **Semantic Conflicts**: Logically incompatible constraints
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                       |
+|--------|-------------------------------------------|
+| #582   | Detect duplicate schemas by name          |
+| #583   | Detect property definition conflicts      |
+| #584   | Detect broken or ambiguous references     |
+| #585   | Detect incompatible type assignments      |
+| #586   | Detect logically incompatible constraints |
 
 ##### Resolution Strategies
 - **Keep Existing**: Preserve current schema, skip import
-- **Replace**: Overwrite existing with imported schema
-- **Merge**: Intelligently merge properties and constraints
-- **Rename**: Import with modified name to avoid conflict
-- **Create Version**: Import as new version of existing schema
+- 📋 **Replace**: Overwrite existing with imported schema
+- 📋 **Merge**: Intelligently merge properties and constraints
+- 📋 **Rename**: Import with modified name to avoid conflict
+- 📋 **Create Version**: Import as new version of existing schema
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| #587   | Replace existing schema with imported schema |
+| #588   | Merge strategy                               |
+| #589   | Rename imported schema to avoid conflict     |
+| #590   | Import as new version of existing schema     |
 
 ##### Merge Options
-- **Additive Merge**: Add new properties, keep existing
-- **Override Merge**: Imported values take precedence
-- **Selective Merge**: Choose per-property merge strategy
-- **Deep Merge**: Recursively merge nested objects
-- **Array Merge Strategies**: Append, replace, or deduplicate
+- 📋 **Additive Merge**: Add new properties, keep existing
+- 📋 **Override Merge**: Imported values take precedence
+- 📋 **Selective Merge**: Choose per-property merge strategy
+- 📋 **Deep Merge**: Recursively merge nested objects
+- 📋 **Array Merge Strategies**: Append, replace, or deduplicate
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                  |
+|--------|------------------------------------------------------|
+| #591   | Additive merge strategy                              |
+| #592   | Override merge strategy                              |
+| #593   | Selective per-property merge strategy                |
+| #594   | Deep merge for nested objects                        |
+| #595   | Array merge strategies: append, replace, deduplicate |
 
 ##### Conflict Report
-- **Conflict Summary**: Overview of all detected conflicts
-- **Impact Analysis**: What will change if resolved
+- 📋 **Conflict Summary**: Overview of all detected conflicts
+- 📋 **Impact Analysis**: What will change if resolved
 - **Resolution Recommendations**: AI-suggested resolutions
 - **Batch Resolution**: Apply same strategy to similar conflicts
-- **Conflict Export**: Export conflict report for review
+- 📋 **Conflict Export**: Export conflict report for review
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                     |
+|--------|-----------------------------------------|
+| #596   | Overview of all detected conflicts      |
+| #597   | Impact analysis of conflict resolutions |
+| #598   | Conflict export for review              |
 
 #### 4.6 Import Execution 📋 PLANNED
 
-##### Progress Tracking
-- **Step-by-Step Progress**: Current phase indicator
-- **Percentage Complete**: Overall progress bar
-- **Schema Counter**: X of Y schemas imported
-- **Time Estimate**: Estimated completion time
-- **Speed Metrics**: Schemas per second
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-
-##### Execution Options
+##### Execution Options ✅ PARTIALLY IMPLEMENTED
 - **Dry Run Mode**: Preview changes without committing
-- **Transaction Mode**: All-or-nothing import
+- ✅ **Transaction Mode**: All-or-nothing import
 - **Incremental Mode**: Import available, skip failures
 - **Background Import**: Continue working during import
 - **Scheduled Import**: Queue import for later execution
@@ -255,10 +265,10 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
-##### Real-Time Feedback
-- **Live Log**: Streaming import log
-- **Success Indicators**: Green checkmarks for completed
-- **Warning Indicators**: Yellow for non-critical issues
+##### Real-Time Feedback ✅ PARTIALLY IMPLEMENTED
+- ✅ **Live Log**: Streaming import log
+- ✅ **Success Indicators**: Green checkmarks for completed
+- ✅ **Warning Indicators**: Yellow for non-critical issues
 - **Error Indicators**: Red for failures with details
 - **Skip Indicators**: Gray for intentionally skipped items
 
@@ -276,16 +286,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 |--------|--------------------------------------------------|
 
 #### 4.7 Post-Import Actions 📋 PLANNED
-
-##### Import Summary
-- **Success Count**: Schemas successfully imported
-- **Warning Count**: Items with warnings
-- **Error Count**: Failed imports
-- **Skip Count**: Intentionally skipped items
-- **Time Taken**: Total import duration
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
 
 ##### Automatic Actions
 - **Auto-Layout**: Arrange imported schemas on canvas
@@ -677,3 +677,23 @@ The import flow is designed as a multi-step wizard with clear visual progression
   - ✅ Generates OpenAPI from JSON Schema on import
   - ✅ Validates OpenAPI spec on import
   - ✅ Displays validation errors/warnings before import
+
+##### Quality Score ✅ IMPLEMENTED
+- ✅ **Completeness Score**: Descriptions, examples, documentation
+- ✅ **Consistency Score**: Naming conventions, patterns
+- ✅ **Best Practices Score**: Industry standard compliance
+- ✅ **Security Score**: Security scheme coverage
+- ✅ **Overall Quality Rating**: A-F grade with breakdown
+
+##### Progress Tracking ✅ IMPLEMENTED
+- ✅ **Step-by-Step Progress**: Current phase indicator
+- ✅ **Percentage Complete**: Overall progress bar
+- ✅ **Schema Counter**: X of Y schemas imported
+- ✅ **Time Estimate**: Estimated completion time
+
+##### Import Summary ✅ IMPLEMENTED
+- ✅ **Success Count**: Schemas successfully imported
+- ✅ **Warning Count**: Items with warnings
+- ✅ **Error Count**: Failed imports
+- ✅ **Skip Count**: Intentionally skipped items
+- ✅ **Time Taken**: Total import duration
