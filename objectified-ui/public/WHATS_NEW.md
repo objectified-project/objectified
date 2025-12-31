@@ -18,6 +18,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
+  - GitHub and GitLab repository imports
   - Clipboard-based copy/paste editor
   - Class import now supports file, URL, and clipboard import sources
   - Import performs a sanity check to make sure all class imports are valid
