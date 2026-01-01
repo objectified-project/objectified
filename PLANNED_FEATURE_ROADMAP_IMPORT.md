@@ -172,25 +172,34 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #580   | Search & filter schemas by name, type, tags     |
 
 ##### Name Mapping 📋 PLANNED
-- **Auto-Generated Names**: Smart naming from schema context
-- **Custom Name Override**: Manual name assignment
+- 📋 **Auto-Generated Names**: Smart naming from schema context
+- 📋 **Custom Name Override**: Manual name assignment
 - 📋 **Naming Convention Enforcement**: camelCase, PascalCase, etc.
-- **Prefix/Suffix Rules**: Apply consistent naming patterns
+- 📋 **Prefix/Suffix Rules**: Apply consistent naming patterns
 - **Reserved Name Detection**: Prevent conflicts with keywords
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #581  | Enforce naming conventions during import    |
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| #581   | Enforce naming conventions during import     |
+| #753   | Class type name mapping from schema context  |
+| #754   | Custom name override for imported classes    |
+| #755   | Prefix/suffix rules for imported class names |
+| #756   | Reserved name detection to prevent conflicts |
 
-##### Property Mapping
-- **Type Mapping**: Map external types to internal types
-- **Default Value Assignment**: Set defaults during import
-- **Required Field Override**: Modify required status
-- **Description Enhancement**: Add/modify descriptions
-- **Example Generation**: Auto-generate missing examples
+##### Property Mapping 📋 PLANNED
+- 📋 **Type Mapping**: Map external types to internal types
+- 📋 **Default Value Assignment**: Set defaults during import
+- 📋 **Required Field Override**: Modify required status
+- 📋 **Description Enhancement**: Add/modify descriptions
+- 📋 **Example Generation**: Auto-generate missing examples
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                             |
+|--------|-------------------------------------------------|
+| #757   | Type mapping for imported properties            |
+| #758   | Default value assignment during import          |
+| #759   | Required field override for imported properties |
+| #760   | Description enhancement for imported properties |
+| #761   | Example generation for imported properties      |
 
 #### 4.5 Conflict Resolution 📋 PLANNED
 
