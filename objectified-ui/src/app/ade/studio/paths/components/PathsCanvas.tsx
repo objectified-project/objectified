@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef, useMemo, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -11,27 +11,254 @@ import {
   addEdge,
   Connection,
   Panel,
+  useReactFlow,
+  ReactFlowProvider,
+  Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import PathNode, { PathNodeData, PathVariable } from '@/app/components/ade/paths/PathNode';
+import { getPathsForVersionAction, createPathAction, createOperationAction } from '../actions';
+import { useStudio } from '../../StudioContext';
 
-export default function PathsCanvas() {
-  const [nodes, , onNodesChange] = useNodesState([]);
+interface PathsCanvasProps {
+  onNodeSelect?: (node: any | null) => void;
+  onNodeUpdate?: (nodeId: string, data: Partial<PathNodeData>) => void;
+}
+
+// Custom node types
+const nodeTypes = {
+  pathNode: PathNode,
+};
+
+// Generate unique IDs for nodes
+let nodeIdCounter = 0;
+const getNodeId = () => `node_${++nodeIdCounter}`;
+
+function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [showMiniMap, setShowMiniMap] = useState(true);
+  const { screenToFlowPosition } = useReactFlow();
+  const { selectedVersionId } = useStudio();
+
+  // Load existing paths from database when version changes
+  useEffect(() => {
+    if (!selectedVersionId) {
+      setNodes([]);
+      return;
+    }
+
+    const loadPaths = async () => {
+      try {
+        const result = await getPathsForVersionAction(selectedVersionId);
+        const paths = JSON.parse(result);
+
+        if (Array.isArray(paths) && paths.length > 0) {
+          // Convert database paths to ReactFlow nodes
+          const pathNodes: Node[] = paths.map((path: any, index: number) => {
+            const nodeData: PathNodeData = {
+              label: path.path,
+              nodeType: 'path',
+              dbPathId: path.id,
+              path: path.path,
+              summary: path.summary || '',
+              description: path.description || '',
+              tags: path.tags || [],
+              deprecated: path.deprecated || false,
+              pathVariables: [], // Will be extracted from path pattern
+            };
+
+            return {
+              id: `db-path-${path.id}`,
+              type: 'pathNode',
+              position: { x: 100, y: 100 + index * 150 }, // Stack vertically
+              data: nodeData as unknown as Record<string, unknown>,
+            };
+          });
+
+          setNodes(pathNodes);
+        }
+      } catch (error) {
+        console.error('Error loading paths:', error);
+      }
+    };
+
+    loadPaths();
+  }, [selectedVersionId, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
+  // Handle node click to select it
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      onNodeSelect?.(node);
+    },
+    [onNodeSelect]
+  );
+
+  // Handle clicking on the canvas background to deselect
+  const onPaneClick = useCallback(() => {
+    onNodeSelect?.(null);
+  }, [onNodeSelect]);
+
+  // Handle drag over to allow drop
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Update a node's data
+  const updateNodeData = useCallback(
+    (nodeId: string, newData: Partial<PathNodeData>) => {
+      setNodes((nds) =>
+        nds.map((node: Node) => {
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              data: { ...node.data, ...newData },
+            };
+          }
+          return node;
+        })
+      );
+      onNodeUpdate?.(nodeId, newData);
+    },
+    [setNodes, onNodeUpdate]
+  );
+
+  // Handle drop from library
+  const onDrop = useCallback(
+    async (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const data = event.dataTransfer.getData('application/reactflow');
+      if (!data) return;
+
+      try {
+        const item = JSON.parse(data);
+
+        // Get the position where the node was dropped
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        // Create the new node based on the item type
+        const nodeData: PathNodeData = {
+          label: item.label,
+          nodeType: item.type,
+          color: item.color,
+          // Path-specific data
+          ...(item.type === 'path' && {
+            path: '/api/v1/example',
+            summary: '',
+            description: '',
+            tags: [],
+            deprecated: false,
+            pathVariables: [],
+          }),
+          // Method-specific data
+          ...(item.type === 'method' && {
+            method: item.id.toUpperCase(),
+            operationId: '',
+            summary: '',
+            description: '',
+            parameters: [],
+            responses: [],
+          }),
+        };
+
+        // Save to database if it's a path node and we have a version selected
+        let dbPathId: string | undefined;
+        if (item.type === 'path' && selectedVersionId) {
+          try {
+            const result = await createPathAction(
+              selectedVersionId,
+              nodeData.path || '/api/v1/example',
+              nodeData.summary,
+              nodeData.description,
+              null, // servers
+              null, // parameters (path-level parameters)
+              0 // sort_order
+            );
+            const parsedResult = JSON.parse(result);
+            if (parsedResult.success && parsedResult.path) {
+              dbPathId = parsedResult.path.id;
+              // Store the database ID in the node data
+              nodeData.dbPathId = dbPathId;
+            } else {
+              console.error('Failed to create path in database:', parsedResult.error);
+            }
+          } catch (error) {
+            console.error('Error creating path in database:', error);
+          }
+        }
+
+        // Save to database if it's a method node and we have a version selected
+        // Note: Methods need to be attached to a path, so for now we'll just create the node
+        // The user will need to connect it to a path node later
+        if (item.type === 'method' && selectedVersionId) {
+          // We'll handle method creation when the user connects it to a path
+          // or we can store it as pending and create it later
+          nodeData.pendingDbSave = true;
+        }
+
+        const newNode: Node = {
+          id: getNodeId(),
+          type: 'pathNode',
+          position,
+          data: nodeData as unknown as Record<string, unknown>,
+        };
+
+        setNodes((nds) => nds.concat(newNode));
+
+        // Automatically select the new node
+        onNodeSelect?.(newNode);
+      } catch (error) {
+        console.error('Failed to parse dropped item:', error);
+      }
+    },
+    [screenToFlowPosition, setNodes, onNodeSelect, selectedVersionId]
+  );
+
+  // Expose updateNodeData to parent through a ref or context
+  // For now, we'll pass it through the onNodeSelect callback
+  const handleNodeSelect = useCallback(
+    (node: Node | null) => {
+      if (node) {
+        // Attach the update function to the node for the properties panel
+        onNodeSelect?.({ ...node, updateData: (data: Partial<PathNodeData>) => updateNodeData(node.id, data) });
+      } else {
+        onNodeSelect?.(null);
+      }
+    },
+    [onNodeSelect, updateNodeData]
+  );
+
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      handleNodeSelect(node);
+    },
+    [handleNodeSelect]
+  );
+
   return (
-    <div className="flex-1 relative h-full bg-gray-50 dark:bg-gray-900">
+    <div ref={reactFlowWrapper} className="flex-1 relative h-full bg-gray-50 dark:bg-gray-900">
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={handleNodeClick}
+        onPaneClick={onPaneClick}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         fitView
         className="bg-gray-50 dark:bg-gray-900"
       >
@@ -60,3 +287,11 @@ export default function PathsCanvas() {
   );
 }
 
+// Wrapper component that provides the ReactFlow context
+export default function PathsCanvas({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <PathsCanvasInner onNodeSelect={onNodeSelect} onNodeUpdate={onNodeUpdate} />
+    </ReactFlowProvider>
+  );
+}

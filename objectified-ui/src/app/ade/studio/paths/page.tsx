@@ -42,7 +42,9 @@ export default function PathsPage() {
           <LibraryPanel />
 
           {/* Center Panel: React Flow Canvas */}
-          <PathsCanvas />
+          <PathsCanvas
+            onNodeSelect={setSelectedNode}
+          />
 
           {/* Right Panel: Properties */}
           <PropertiesPanel

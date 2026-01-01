@@ -33,9 +33,18 @@ We continue to improve the platform based on your feedback with improvements and
   - Added Save and Load buttons for manual layout management
   - Added group styling options: custom icons, border styles (dashed/solid/dotted), shadow levels, and background opacity
   - Removed existing auto layout code, as it was not working as intended; will fix in a later release
-- Introduction to the Paths feature
 - Added property templates
   - Fixed property copying to a class that contains an object with nested properties
+- Introducing Paths - API endpoint design canvas
+  - Drag-and-drop path nodes onto the canvas from the library panel
+  - Real-time path variable extraction from path patterns (e.g., `/api/{userId}/orders/{orderId}`)
+  - Automatic properties panel opens when path is added to canvas
+  - Configure path variables: description, type (string/integer/number/boolean), example value, required flag
+  - Full database integration with `odb.api_paths` and `odb.path_operations` tables
+  - Path metadata: summary, description, tags, deprecated flag
+  - Changes are automatically saved to the database in real-time
+  - Visual node design with color-coded HTTP methods (GET=green, POST=blue, DELETE=red, etc.)
+  - Path variables displayed as badges on the path node
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
