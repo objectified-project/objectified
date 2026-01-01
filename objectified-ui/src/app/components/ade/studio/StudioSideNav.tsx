@@ -1029,6 +1029,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Browse property templates'}
                   sx={{
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#ffffff',
                     boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {

@@ -16,6 +16,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed additionalProperties in property editor to allow for types and schemas
   - Fixed overall application layout to use less memory and split out sections into separate paths
   - Fixed side-by-side diff comparison view for versions
+  - Fixed deleting a group from the canvas now properly deletes the database record
+  - Fixed property template button icon color in light mode (was appearing black instead of white)
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
@@ -27,7 +29,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Canvas improvements
   - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
-  - Added creation of groups on the canvas
+  - Added creation of groups on the canvas via drag-and-drop from the sidebar
   - Added Save and Load buttons for manual layout management
   - Added group styling options: custom icons, border styles (dashed/solid/dotted), shadow levels, and background opacity
   - Removed existing auto layout code, as it was not working as intended; will fix in a later release
