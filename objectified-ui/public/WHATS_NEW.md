@@ -23,7 +23,7 @@ We continue to improve the platform based on your feedback with improvements and
   - URL imports with tokens and authentication
   - GitHub and GitLab repository imports
   - Clipboard-based copy/paste editor
-  - Class import now supports file, URL, and clipboard import sources
+  - Class import now supports file, URL, clipboard, and Git repository import sources
   - Import performs a sanity check to make sure all class imports are valid
   - Adds Commit/Rollback system to allow users to apply or discard changes made during an import session
 - Canvas improvements
@@ -49,5 +49,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: December 30, 2025*
+*Last updated: January 1, 2026*
 

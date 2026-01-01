@@ -33,6 +33,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const currentUserId = (session?.user as any)?.user_id;
   const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, createGroupFn, clickToFocusEnabled, groups, deleteGroup } = useStudio();
 
   // Check if we're on the code or paths view - hide sidebar for these views
@@ -372,6 +373,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         versionId={selectedVersionId || ''}
         projectId={selectedProjectId || ''}
         existingClassNames={classes.map(c => c.name)}
+        userId={currentUserId || ''}
       />
 
       {/* Property Dialog */}

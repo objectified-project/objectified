@@ -104,6 +104,7 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
 
   const handleSelectRepo = async (repo: any) => {
     setSelectedRepo(repo);
+    setRepoFiles([]); // Clear files immediately
     setIsLoading(true);
     setErrorMessage('');
     setCurrentPath('');
@@ -131,6 +132,7 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
   };
 
   const handleNavigateToPath = async (path: string) => {
+    setRepoFiles([]); // Clear files immediately
     setIsLoading(true);
     setErrorMessage('');
     setCurrentPath(path);
@@ -415,9 +417,10 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
                   Select a repository
                 </span>
               </div>
-            ) : isLoading && repoFiles.length === 0 ? (
-              <div className="flex items-center justify-center py-8">
+            ) : isLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
                 <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
               </div>
             ) : repoFiles.length === 0 ? (
               <div className="flex items-center justify-center h-full p-4">
@@ -426,7 +429,28 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
                 </span>
               </div>
             ) : (
-              repoFiles.map((file: any, idx: number) => {
+              <>
+                {/* Parent directory (..) entry when in a subdirectory */}
+                {currentPath && (
+                  <button
+                    onClick={() => {
+                      const parentPath = currentPath.split('/').slice(0, -1).join('/');
+                      handleNavigateToPath(parentPath);
+                    }}
+                    disabled={isLoading}
+                    className={`w-full px-3 py-2 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                      isLoading ? 'cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                  >
+                    <ArrowLeft className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                      ..
+                    </span>
+                  </button>
+                )}
+
+                {/* File and directory list */}
+                {repoFiles.map((file: any, idx: number) => {
                 const isOpenAPIFile =
                   file.name.includes('openapi') ||
                   file.name.includes('swagger') ||
@@ -453,7 +477,8 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
                     </span>
                   </button>
                 );
-              })
+              })}
+              </>
             )}
           </div>
         </div>
