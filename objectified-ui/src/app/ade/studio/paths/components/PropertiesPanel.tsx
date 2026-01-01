@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Check, ChevronDown } from 'lucide-react';
+import { X, Trash2, Check, ChevronDown, ExternalLink } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import * as Popover from '@radix-ui/react-popover';
 import Editor from '@monaco-editor/react';
-import { extractPathVariables, PathVariable, PathNodeData } from '@/app/components/ade/paths/PathNode';
+import { extractPathVariables, PathVariable, PathNodeData, ExternalDocs } from '@/app/components/ade/paths/PathNode';
 import { updatePathAction, deletePathAction, getTagsForProjectAction } from '../actions';
 import { useStudio } from '../../StudioContext';
 
@@ -29,6 +29,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
   const [description, setDescription] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]); // Array of tag IDs
   const [deprecated, setDeprecated] = useState(false);
+  const [externalDocsUrl, setExternalDocsUrl] = useState('');
+  const [externalDocsDescription, setExternalDocsDescription] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -43,6 +45,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
     description: '',
     selectedTags: [] as string[],
     deprecated: false,
+    externalDocsUrl: '',
+    externalDocsDescription: '',
   });
 
   // Load available tags for the project
@@ -89,6 +93,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
       const newDescription = data.description || '';
       const newSelectedTags = data.tags || []; // Array of tag IDs
       const newDeprecated = data.deprecated || false;
+      const newExternalDocsUrl = data.externalDocs?.url || '';
+      const newExternalDocsDescription = data.externalDocs?.description || '';
 
       setPathPattern(newPathPattern);
       setPathVariables(newPathVariables);
@@ -96,6 +102,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
       setDescription(newDescription);
       setSelectedTags(newSelectedTags);
       setDeprecated(newDeprecated);
+      setExternalDocsUrl(newExternalDocsUrl);
+      setExternalDocsDescription(newExternalDocsDescription);
 
       // Store original values
       setOriginalValues({
@@ -105,6 +113,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
         description: newDescription,
         selectedTags: [...newSelectedTags],
         deprecated: newDeprecated,
+        externalDocsUrl: newExternalDocsUrl,
+        externalDocsDescription: newExternalDocsDescription,
       });
 
       // Reset unsaved changes flag
@@ -176,6 +186,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
     setDescription(originalValues.description);
     setSelectedTags([...originalValues.selectedTags]);
     setDeprecated(originalValues.deprecated);
+    setExternalDocsUrl(originalValues.externalDocsUrl);
+    setExternalDocsDescription(originalValues.externalDocsDescription);
     setHasUnsavedChanges(false);
   };
 
@@ -187,6 +199,11 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
 
     setIsSaving(true);
     try {
+      // Build externalDocs object if URL is provided
+      const externalDocs: ExternalDocs | undefined = externalDocsUrl.trim()
+        ? { url: externalDocsUrl.trim(), description: externalDocsDescription.trim() || undefined }
+        : undefined;
+
       // Update node data in canvas
       if (selectedNode?.updateData) {
         selectedNode.updateData({
@@ -196,6 +213,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
           description: description,
           tags: selectedTags,
           deprecated: deprecated,
+          externalDocs: externalDocs,
         });
       }
 
@@ -216,6 +234,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
         description,
         selectedTags: [...selectedTags],
         deprecated,
+        externalDocsUrl,
+        externalDocsDescription,
       });
 
       setHasUnsavedChanges(false);
@@ -502,6 +522,57 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
                         Select tags to group this path logically
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* External Documentation Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide flex items-center gap-2">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    External Documentation
+                  </h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Documentation URL
+                      </label>
+                      <input
+                        type="url"
+                        value={externalDocsUrl}
+                        onChange={(e) => {
+                          setExternalDocsUrl(e.target.value);
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="https://docs.example.com/api/users"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Link Description
+                      </label>
+                      <input
+                        type="text"
+                        value={externalDocsDescription}
+                        onChange={(e) => {
+                          setExternalDocsDescription(e.target.value);
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="Learn more about user endpoints"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                      />
+                    </div>
+                    {externalDocsUrl && (
+                      <a
+                        href={externalDocsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Open documentation link
+                      </a>
+                    )}
                   </div>
                 </div>
 

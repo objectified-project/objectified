@@ -18,6 +18,7 @@ export interface PathNodeData {
   tags?: string[];
   deprecated?: boolean;
   pathVariables?: PathVariable[];
+  externalDocs?: ExternalDocs;
   // Method-specific data
   method?: string;
   operationId?: string;
@@ -25,6 +26,11 @@ export interface PathNodeData {
   responses?: any[];
   // Allow additional properties
   [key: string]: unknown;
+}
+
+export interface ExternalDocs {
+  url: string;
+  description?: string;
 }
 
 export interface PathVariable {

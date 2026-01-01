@@ -53,8 +53,7 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                              |
 |--------|----------------------------------------------------------------------|
-| #355   | Add tags to paths for visual grouping                                |
-| #356   | Add external documentation links for paths                           |
+| #356   | ✅ Add external documentation links for paths                           |
 
 **Features**: 📋 PLANNED
 - 📋 Click on `{variable}` to open inline schema editor

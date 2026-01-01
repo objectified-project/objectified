@@ -50,6 +50,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Deprecated paths show visual strikethrough and red warning badge
   - Enhanced deprecated checkbox with prominent styling and warning message
   - Tags multi-select using project-defined tags with color-coded badges
+  - External documentation links with URL and description fields, clickable link preview
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
