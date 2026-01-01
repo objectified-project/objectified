@@ -12,7 +12,7 @@ This outlines the AI features that are planned for the Objectified platform.
 ### Preparation
 
 - Install Ollama Cluster
-- Set up Mac Mini cluster using MLX
+- Set up Mac Mini cluster using EXO
 - Deploy Ollama with Qwen 2.5 and Llama 3.2 models
 - Configure network access and security
 - Test Ollama API connectivity from Objectified backend
