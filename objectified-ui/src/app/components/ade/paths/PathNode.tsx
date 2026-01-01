@@ -92,7 +92,7 @@ const PathNode: React.FC<NodeProps> = ({ data, selected }) => {
     <div
       className={`rounded-lg shadow-lg transition-all ${
         selected ? 'ring-2 ring-indigo-400 ring-offset-2 dark:ring-offset-gray-900' : ''
-      }`}
+      } ${nodeData.deprecated ? 'opacity-75' : ''}`}
       style={{
         ...getBackgroundStyle(),
         minWidth: 150,
@@ -103,8 +103,15 @@ const PathNode: React.FC<NodeProps> = ({ data, selected }) => {
       <div className="text-white">
         {nodeType === 'path' && (
           <>
-            <div className="text-xs font-medium opacity-80 mb-1">PATH</div>
-            <div className="font-mono text-sm font-semibold truncate max-w-[200px]">
+            <div className="text-xs font-medium opacity-80 mb-1 flex items-center gap-2">
+              PATH
+              {nodeData.deprecated && (
+                <span className="px-1.5 py-0.5 bg-red-500/80 text-white text-[10px] font-bold rounded uppercase">
+                  Deprecated
+                </span>
+              )}
+            </div>
+            <div className={`font-mono text-sm font-semibold truncate max-w-[200px] ${nodeData.deprecated ? 'line-through decoration-2' : ''}`}>
               {path || label}
             </div>
             {pathVars.length > 0 && (
@@ -112,7 +119,7 @@ const PathNode: React.FC<NodeProps> = ({ data, selected }) => {
                 {pathVars.map((v) => (
                   <span
                     key={v}
-                    className="px-1.5 py-0.5 bg-white/20 rounded text-xs font-mono"
+                    className={`px-1.5 py-0.5 bg-white/20 rounded text-xs font-mono ${nodeData.deprecated ? 'line-through' : ''}`}
                   >
                     {v}
                   </span>

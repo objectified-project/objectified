@@ -42,18 +42,17 @@ structure immediately recognizable.
 
 **Visual Design**: Rounded rectangle with URL path as header, gray-blue gradient background
 
-**Configurable Properties**: 📋 PLANNED
+**Configurable Properties**: ✅ IMPLEMENTED
 - ✅ Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
-- 📋 Summary and description (markdown support)
+- ✅ Summary and description (markdown support with Monaco Editor)
 - 📋 Server overrides for multi-environment routing
-- 📋 Deprecated flag with visual strikethrough
+- ✅ Deprecated flag with visual strikethrough and warning badge
 - 📋 Path tags for logical grouping
 - 📋 Common parameters inherited by all operations
 - 📋 External documentation links
 
 | Ticket | Feature                                                              |
 |--------|----------------------------------------------------------------------|
-| #353   | Paths should include a summary and description                       |
 | #354   | Add deprecated flag to support deprecation with visual strikethrough |
 | #355   | Add tags to paths for visual grouping                                |
 | #356   | Add external documentation links for paths                           |

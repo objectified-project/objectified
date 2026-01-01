@@ -46,6 +46,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Visual node design with color-coded HTTP methods (GET=green, POST=blue, DELETE=red, etc.)
   - Path variables displayed as badges on the path node
   - Monaco Editor for description field with syntax highlighting and markdown support
+  - Cancel and Save buttons for explicit change control
+  - Deprecated paths show visual strikethrough and red warning badge
+  - Enhanced deprecated checkbox with prominent styling and warning message
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

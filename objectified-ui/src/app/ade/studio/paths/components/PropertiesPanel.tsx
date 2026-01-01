@@ -404,7 +404,11 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
                     Options
                   </h4>
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className={`flex items-start gap-3 cursor-pointer p-3 rounded-lg border-2 transition-colors ${
+                      deprecated 
+                        ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20' 
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}>
                       <input
                         type="checkbox"
                         checked={deprecated}
@@ -412,9 +416,16 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
                           setDeprecated(e.target.checked);
                           handleFieldChange('deprecated', e.target.checked);
                         }}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500 mt-0.5"
                       />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Deprecated</span>
+                      <div className="flex-1">
+                        <span className={`text-sm font-medium ${deprecated ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                          Mark as Deprecated
+                        </span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Deprecated paths will be displayed with a strikethrough and warning badge
+                        </p>
+                      </div>
                     </label>
                   </div>
                 </div>
