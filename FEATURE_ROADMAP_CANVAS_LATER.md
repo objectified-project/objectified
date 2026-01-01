@@ -50,6 +50,32 @@ These are the features to do later.
 
 ---
 
+### 11. Developer Productivity Features
+
+#### Quick Actions & Command Palette
+- `Cmd+K` / `Ctrl+K` command palette for all canvas actions
+- Fuzzy search for classes, properties, actions
+- Recent actions history in palette
+- Contextual actions based on selection
+- Custom action shortcuts configuration
+- Action categories: Navigate, Edit, View, Export, Layout
+
+| Ticket | Feature |
+|--------|---------|
+
+#### Inline Documentation
+- Rich markdown editor in property tooltips
+- Code examples in documentation with syntax highlighting
+- Documentation templates per property type
+- Auto-generate documentation from property schema
+- Documentation coverage indicators on nodes
+- Bulk documentation editing mode
+
+| Ticket | Feature |
+|--------|---------|
+
+---
+
 ### 12. Enterprise Governance & Compliance
 
 #### Access Control Visualization
