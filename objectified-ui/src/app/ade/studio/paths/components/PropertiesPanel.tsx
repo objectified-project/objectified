@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
+import Editor from '@monaco-editor/react';
 import { extractPathVariables, PathVariable, PathNodeData } from '@/app/components/ade/paths/PathNode';
 import { updatePathAction, deletePathAction } from '../actions';
 
@@ -18,17 +19,63 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('');
   const [deprecated, setDeprecated] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Store original values for cancel functionality
+  const [originalValues, setOriginalValues] = useState({
+    pathPattern: '',
+    pathVariables: [] as PathVariable[],
+    summary: '',
+    description: '',
+    tags: '',
+    deprecated: false,
+  });
+
+  // Detect dark mode from system preferences
+  useEffect(() => {
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsDarkMode(e.matches);
+    };
+
+    darkModeMediaQuery.addEventListener('change', handleChange);
+    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   // Initialize state when node is selected
   useEffect(() => {
     if (selectedNode?.data) {
       const data = selectedNode.data as PathNodeData;
-      setPathPattern(data.path || '');
-      setPathVariables(data.pathVariables || []);
-      setSummary(data.summary || '');
-      setDescription(data.description || '');
-      setTags(data.tags?.join(', ') || '');
-      setDeprecated(data.deprecated || false);
+      const newPathPattern = data.path || '';
+      const newPathVariables = data.pathVariables || [];
+      const newSummary = data.summary || '';
+      const newDescription = data.description || '';
+      const newTags = data.tags?.join(', ') || '';
+      const newDeprecated = data.deprecated || false;
+
+      setPathPattern(newPathPattern);
+      setPathVariables(newPathVariables);
+      setSummary(newSummary);
+      setDescription(newDescription);
+      setTags(newTags);
+      setDeprecated(newDeprecated);
+
+      // Store original values
+      setOriginalValues({
+        pathPattern: newPathPattern,
+        pathVariables: JSON.parse(JSON.stringify(newPathVariables)), // Deep copy
+        summary: newSummary,
+        description: newDescription,
+        tags: newTags,
+        deprecated: newDeprecated,
+      });
+
+      // Reset unsaved changes flag
+      setHasUnsavedChanges(false);
     }
   }, [selectedNode?.id]);
 
@@ -69,22 +116,10 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
   }, [pathPattern, selectedNode?.data?.nodeType]);
 
   // Handle path pattern change
-  const handlePathPatternChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePathPatternChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPath = e.target.value;
     setPathPattern(newPath);
-
-    if (selectedNode?.updateData) {
-      selectedNode.updateData({ path: newPath });
-    }
-
-    // Save to database if we have a dbPathId
-    if (selectedNode?.data?.dbPathId) {
-      try {
-        await updatePathAction(selectedNode.data.dbPathId, { path: newPath });
-      } catch (error) {
-        console.error('Error updating path in database:', error);
-      }
-    }
+    setHasUnsavedChanges(true);
   };
 
   // Handle variable field changes
@@ -92,35 +127,69 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
     const updatedVariables = [...pathVariables];
     updatedVariables[index] = { ...updatedVariables[index], [field]: value };
     setPathVariables(updatedVariables);
-
-    if (selectedNode?.updateData) {
-      selectedNode.updateData({ pathVariables: updatedVariables });
-    }
+    setHasUnsavedChanges(true);
   };
 
   // Handle other field changes
-  const handleFieldChange = async (field: keyof PathNodeData, value: any) => {
-    if (selectedNode?.updateData) {
-      selectedNode.updateData({ [field]: value });
+  const handleFieldChange = (field: keyof PathNodeData, value: any) => {
+    setHasUnsavedChanges(true);
+  };
+
+  // Cancel changes - revert to original values
+  const handleCancel = () => {
+    setPathPattern(originalValues.pathPattern);
+    setPathVariables(JSON.parse(JSON.stringify(originalValues.pathVariables)));
+    setSummary(originalValues.summary);
+    setDescription(originalValues.description);
+    setTags(originalValues.tags);
+    setDeprecated(originalValues.deprecated);
+    setHasUnsavedChanges(false);
+  };
+
+  // Save changes to database
+  const handleSave = async () => {
+    if (!selectedNode?.data?.dbPathId || selectedNode?.data?.nodeType !== 'path') {
+      return;
     }
 
-    // Save to database if we have a dbPathId and it's a path-related field
-    if (selectedNode?.data?.dbPathId && selectedNode?.data?.nodeType === 'path') {
-      try {
-        const updates: any = {};
-
-        // Map field names to database columns
-        if (field === 'summary') updates.summary = value;
-        if (field === 'description') updates.description = value;
-        if (field === 'tags') updates.tags = value;
-        if (field === 'deprecated') updates.deprecated = value;
-
-        if (Object.keys(updates).length > 0) {
-          await updatePathAction(selectedNode.data.dbPathId, updates);
-        }
-      } catch (error) {
-        console.error('Error updating path field in database:', error);
+    setIsSaving(true);
+    try {
+      // Update node data in canvas
+      if (selectedNode?.updateData) {
+        selectedNode.updateData({
+          path: pathPattern,
+          pathVariables: pathVariables,
+          summary: summary,
+          description: description,
+          tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+          deprecated: deprecated,
+        });
       }
+
+      // Save to database
+      const updates: any = {
+        path: pathPattern,
+        summary: summary,
+        description: description,
+      };
+
+      await updatePathAction(selectedNode.data.dbPathId, updates);
+
+      // Update original values to match saved values
+      setOriginalValues({
+        pathPattern,
+        pathVariables: JSON.parse(JSON.stringify(pathVariables)),
+        summary,
+        description,
+        tags,
+        deprecated,
+      });
+
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Error saving path changes:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
   if (!selectedNode) {
@@ -277,18 +346,40 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                        Description
+                        Description (Markdown supported)
                       </label>
-                      <textarea
-                        rows={3}
-                        value={description}
-                        onChange={(e) => {
-                          setDescription(e.target.value);
-                          handleFieldChange('description', e.target.value);
-                        }}
-                        placeholder="Detailed description"
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 resize-none"
-                      />
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <Editor
+                          height="200px"
+                          language="markdown"
+                          value={description}
+                          onChange={(value) => {
+                            const newValue = value || '';
+                            setDescription(newValue);
+                            handleFieldChange('description', newValue);
+                          }}
+                          theme={isDarkMode ? 'vs-dark' : 'light'}
+                          options={{
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            fontSize: 12,
+                            lineNumbers: 'off',
+                            wordWrap: 'on',
+                            wrappingStrategy: 'advanced',
+                            padding: { top: 8, bottom: 8 },
+                            folding: false,
+                            glyphMargin: false,
+                            lineDecorationsWidth: 0,
+                            lineNumbersMinChars: 0,
+                            renderLineHighlight: 'none',
+                            contextmenu: true,
+                            automaticLayout: true,
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Supports Markdown formatting (bold, italic, lists, links, etc.)
+                      </p>
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
@@ -403,6 +494,43 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
           <ScrollArea.Thumb className="flex-1 bg-gray-400 dark:bg-gray-600 rounded-full relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-11 before:min-h-11" />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
+
+      {/* Footer with Cancel/Save buttons - only show for path nodes with unsaved changes */}
+      {selectedNode?.data?.nodeType === 'path' && (
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900/50">
+          <div className="flex gap-2">
+            <button
+              onClick={handleCancel}
+              disabled={!hasUnsavedChanges}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!hasUnsavedChanges || isSaving}
+              className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+          </div>
+          {hasUnsavedChanges && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+              You have unsaved changes
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

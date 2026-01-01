@@ -43,7 +43,7 @@ structure immediately recognizable.
 **Visual Design**: Rounded rectangle with URL path as header, gray-blue gradient background
 
 **Configurable Properties**: 📋 PLANNED
-- 📋 Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
+- ✅ Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
 - 📋 Summary and description (markdown support)
 - 📋 Server overrides for multi-environment routing
 - 📋 Deprecated flag with visual strikethrough
@@ -53,7 +53,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                              |
 |--------|----------------------------------------------------------------------|
-| #352   | Adding a path to the path canvas                                     |
 | #353   | Paths should include a summary and description                       |
 | #354   | Add deprecated flag to support deprecation with visual strikethrough |
 | #355   | Add tags to paths for visual grouping                                |

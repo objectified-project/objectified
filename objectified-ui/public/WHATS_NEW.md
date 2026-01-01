@@ -41,10 +41,11 @@ We continue to improve the platform based on your feedback with improvements and
   - Automatic properties panel opens when path is added to canvas
   - Configure path variables: description, type (string/integer/number/boolean), example value, required flag
   - Full database integration with `odb.api_paths` and `odb.path_operations` tables
-  - Path metadata: summary, description, tags, deprecated flag
+  - Path metadata: summary, description (with Monaco Editor and Markdown support), tags, deprecated flag
   - Changes are automatically saved to the database in real-time
   - Visual node design with color-coded HTTP methods (GET=green, POST=blue, DELETE=red, etc.)
   - Path variables displayed as badges on the path node
+  - Monaco Editor for description field with syntax highlighting and markdown support
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
