@@ -88,7 +88,7 @@ Current features for the profile include:
 
 ### API & Developer Settings 📋 PLANNED
 - Personal API keys (user-scoped, not tenant)
-- Personal access tokens
+- ✅ Personal access tokens
 - SSH keys for Git operations
 - Webhook endpoints (personal)
 - CLI/SDK authentication tokens
