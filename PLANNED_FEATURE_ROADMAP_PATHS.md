@@ -42,18 +42,14 @@ structure immediately recognizable.
 
 **Visual Design**: Rounded rectangle with URL path as header, gray-blue gradient background
 
-**Configurable Properties**: ✅ IMPLEMENTED
+**Configurable Properties**: ✅ PARTIALLY IMPLEMENTED
 - ✅ Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
 - ✅ Summary and description (markdown support with Monaco Editor)
 - 📋 Server overrides for multi-environment routing
 - ✅ Deprecated flag with visual strikethrough and warning badge
 - ✅ Path tags for logical grouping (multi-select from project-defined tags)
 - 📋 Common parameters inherited by all operations
-- 📋 External documentation links
-
-| Ticket | Feature                                                              |
-|--------|----------------------------------------------------------------------|
-| #356   | ✅ Add external documentation links for paths                           |
+- ✅ External documentation links
 
 **Features**: 📋 PLANNED
 - 📋 Click on `{variable}` to open inline schema editor
@@ -83,7 +79,7 @@ structure immediately recognizable.
 | OPTIONS  | Gray   | CORS preflight                |
 
 **Configurable Properties**:
-- 📋 Operation ID (auto-generated from method + path)
+- ✅ Operation ID (auto-generated from method + path)
 - 📋 Tags for API grouping
 - 📋 Summary and description
 - 📋 Request body schema binding
@@ -97,7 +93,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                  |
 |--------|----------------------------------------------------------|
-| #361   | Add operationId auto-generation                          |
 | #362   | Add tags for API Grouping                                |
 | #363   | Add summary and description to HTTP Operation            |
 | #364   | Add request body schema binding                          |

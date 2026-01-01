@@ -105,6 +105,15 @@ const PathNode: React.FC<NodeProps> = ({ data, selected }) => {
         padding: '10px 14px',
       }}
     >
+      {/* Input handle - top (for method, parameter, response nodes) */}
+      {(nodeType === 'method' || nodeType === 'parameter' || nodeType === 'response') && (
+        <Handle
+          type="target"
+          position={Position.Top}
+          className="!bg-white !border-2 !border-gray-400 !w-3 !h-3"
+        />
+      )}
+
       {/* Node content */}
       <div className="text-white">
         {nodeType === 'path' && (
@@ -156,12 +165,14 @@ const PathNode: React.FC<NodeProps> = ({ data, selected }) => {
         )}
       </div>
 
-      {/* Output handle - bottom only */}
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!bg-white !border-2 !border-gray-400 !w-3 !h-3"
-      />
+      {/* Output handle - bottom (for path, method, parameter nodes) */}
+      {(nodeType === 'path' || nodeType === 'method' || nodeType === 'parameter') && (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!bg-white !border-2 !border-gray-400 !w-3 !h-3"
+        />
+      )}
     </div>
   );
 };

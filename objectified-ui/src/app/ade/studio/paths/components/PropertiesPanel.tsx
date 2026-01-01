@@ -9,6 +9,105 @@ import { extractPathVariables, PathVariable, PathNodeData, ExternalDocs } from '
 import { updatePathAction, deletePathAction, getTagsForProjectAction } from '../actions';
 import { useStudio } from '../../StudioContext';
 
+/**
+ * Generates an operation ID based on the HTTP method and path pattern.
+ * Examples:
+ * - GET /users -> getUsers
+ * - GET /users/{userId} -> getUserById
+ * - POST /users -> createUser
+ * - PUT /users/{userId} -> updateUser
+ * - DELETE /users/{userId} -> deleteUser
+ * - GET /users/{userId}/orders -> getUserOrders
+ * - POST /users/{userId}/orders -> createUserOrder
+ */
+function generateOperationId(method: string, path: string): string {
+  // Normalize method to lowercase
+  const verb = method.toLowerCase();
+
+  // Map HTTP verbs to semantic prefixes
+  const verbMap: Record<string, string> = {
+    get: 'get',
+    post: 'create',
+    put: 'update',
+    patch: 'update',
+    delete: 'delete',
+    head: 'head',
+    options: 'options',
+  };
+
+  const prefix = verbMap[verb] || verb;
+
+  // Split path into segments and filter out empty ones
+  const segments = path.split('/').filter(s => s.length > 0);
+
+  if (segments.length === 0) {
+    return prefix;
+  }
+
+  // Process segments
+  const parts: string[] = [];
+  let hasPathVariable = false;
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    const isVariable = segment.startsWith('{') && segment.endsWith('}');
+
+    if (isVariable) {
+      hasPathVariable = true;
+      // For GET with path variable at the end, use "ById" suffix
+      if (i === segments.length - 1 && verb === 'get' && parts.length > 0) {
+        // Don't add anything, we'll add "ById" at the end
+      }
+    } else {
+      // Convert to singular for certain verbs when followed by an ID
+      let word = segment;
+      const nextSegment = segments[i + 1];
+      const nextIsVariable = nextSegment?.startsWith('{') && nextSegment?.endsWith('}');
+
+      // Singularize if this resource is followed by an ID variable
+      if (nextIsVariable && word.endsWith('s') && word.length > 1) {
+        // Simple singularization: remove trailing 's'
+        // Handle common cases like 'users' -> 'user', 'orders' -> 'order'
+        if (word.endsWith('ies')) {
+          word = word.slice(0, -3) + 'y';
+        } else if (word.endsWith('es') && (word.endsWith('sses') || word.endsWith('xes') || word.endsWith('zes') || word.endsWith('shes') || word.endsWith('ches'))) {
+          word = word.slice(0, -2);
+        } else if (word.endsWith('s') && !word.endsWith('ss')) {
+          word = word.slice(0, -1);
+        }
+      }
+
+      parts.push(word);
+    }
+  }
+
+  if (parts.length === 0) {
+    return prefix;
+  }
+
+  // Build the operation ID
+  // First part is lowercased, rest are PascalCased
+  const camelCaseParts = parts.map((part, index) => {
+    if (index === 0 && prefix) {
+      // First resource after verb
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    }
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  });
+
+  let operationId = prefix + camelCaseParts.join('');
+
+  // Add "ById" suffix for GET requests that end with a path variable
+  const lastSegment = segments[segments.length - 1];
+  if (lastSegment?.startsWith('{') && lastSegment?.endsWith('}')) {
+    if (verb === 'get') {
+      operationId += 'ById';
+    }
+  }
+
+  return operationId;
+}
+
 interface Tag {
   id: string;
   name: string;
@@ -31,6 +130,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
   const [deprecated, setDeprecated] = useState(false);
   const [externalDocsUrl, setExternalDocsUrl] = useState('');
   const [externalDocsDescription, setExternalDocsDescription] = useState('');
+  const [operationId, setOperationId] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,6 +147,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
     deprecated: false,
     externalDocsUrl: '',
     externalDocsDescription: '',
+    operationId: '',
   });
 
   // Load available tags for the project
@@ -95,6 +196,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
       const newDeprecated = data.deprecated || false;
       const newExternalDocsUrl = data.externalDocs?.url || '';
       const newExternalDocsDescription = data.externalDocs?.description || '';
+      const newOperationId = data.operationId || '';
 
       setPathPattern(newPathPattern);
       setPathVariables(newPathVariables);
@@ -104,6 +206,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
       setDeprecated(newDeprecated);
       setExternalDocsUrl(newExternalDocsUrl);
       setExternalDocsDescription(newExternalDocsDescription);
+      setOperationId(newOperationId);
 
       // Store original values
       setOriginalValues({
@@ -115,6 +218,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
         deprecated: newDeprecated,
         externalDocsUrl: newExternalDocsUrl,
         externalDocsDescription: newExternalDocsDescription,
+        operationId: newOperationId,
       });
 
       // Reset unsaved changes flag
@@ -188,12 +292,16 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
     setDeprecated(originalValues.deprecated);
     setExternalDocsUrl(originalValues.externalDocsUrl);
     setExternalDocsDescription(originalValues.externalDocsDescription);
+    setOperationId(originalValues.operationId);
     setHasUnsavedChanges(false);
   };
 
   // Save changes to database
   const handleSave = async () => {
-    if (!selectedNode?.data?.dbPathId || selectedNode?.data?.nodeType !== 'path') {
+    const nodeType = selectedNode?.data?.nodeType;
+
+    // Only save if we have a valid node type
+    if (!nodeType || !['path', 'method'].includes(nodeType)) {
       return;
     }
 
@@ -206,25 +314,34 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
 
       // Update node data in canvas
       if (selectedNode?.updateData) {
-        selectedNode.updateData({
-          path: pathPattern,
-          pathVariables: pathVariables,
-          summary: summary,
-          description: description,
-          tags: selectedTags,
-          deprecated: deprecated,
-          externalDocs: externalDocs,
-        });
+        if (nodeType === 'path') {
+          selectedNode.updateData({
+            path: pathPattern,
+            pathVariables: pathVariables,
+            summary: summary,
+            description: description,
+            tags: selectedTags,
+            deprecated: deprecated,
+            externalDocs: externalDocs,
+          });
+        } else if (nodeType === 'method') {
+          selectedNode.updateData({
+            operationId: operationId,
+            summary: summary,
+            description: description,
+          });
+        }
       }
 
-      // Save to database
-      const updates: any = {
-        path: pathPattern,
-        summary: summary,
-        description: description,
-      };
-
-      await updatePathAction(selectedNode.data.dbPathId, updates);
+      // Save to database for path nodes
+      if (nodeType === 'path' && selectedNode?.data?.dbPathId) {
+        const updates: any = {
+          path: pathPattern,
+          summary: summary,
+          description: description,
+        };
+        await updatePathAction(selectedNode.data.dbPathId, updates);
+      }
 
       // Update original values to match saved values
       setOriginalValues({
@@ -236,11 +353,12 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
         deprecated,
         externalDocsUrl,
         externalDocsDescription,
+        operationId,
       });
 
       setHasUnsavedChanges(false);
     } catch (error) {
-      console.error('Error saving path changes:', error);
+      console.error('Error saving changes:', error);
     } finally {
       setIsSaving(false);
     }
@@ -625,12 +743,84 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
                   </label>
                   <input
                     type="text"
-                    defaultValue="operationName"
+                    value={operationId}
+                    onChange={(e) => {
+                      setOperationId(e.target.value);
+                      setHasUnsavedChanges(true);
+                    }}
+                    placeholder="e.g., getUserById"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      // Get the method from the node data
+                      const method = selectedNode?.data?.method || 'get';
+                      // Try to find the connected path to get the path pattern
+                      // For now, use a sample path - in the future we could traverse edges
+                      const connectedPath = selectedNode?.data?.connectedPath || '/api/v1/example';
+                      const generatedId = generateOperationId(method, connectedPath);
+                      setOperationId(generatedId);
+                      setHasUnsavedChanges(true);
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-md transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Auto-generate from path
+                  </button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Unique identifier for this operation (e.g., getUsers, createOrder)
+                  </p>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Summary
+                  </label>
+                  <input
+                    type="text"
+                    value={summary}
+                    onChange={(e) => {
+                      setSummary(e.target.value);
+                      setHasUnsavedChanges(true);
+                    }}
+                    placeholder="Brief description of the operation"
                     className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                   />
-                  <button className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">
-                    💡 Auto-generate
-                  </button>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Description
+                  </label>
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <Editor
+                      height="150px"
+                      language="markdown"
+                      value={description}
+                      onChange={(value) => {
+                        setDescription(value || '');
+                        setHasUnsavedChanges(true);
+                      }}
+                      theme={isDarkMode ? 'vs-dark' : 'light'}
+                      options={{
+                        minimap: { enabled: false },
+                        scrollBeyondLastLine: false,
+                        fontSize: 12,
+                        lineNumbers: 'off',
+                        wordWrap: 'on',
+                        wrappingStrategy: 'advanced',
+                        padding: { top: 8, bottom: 8 },
+                        folding: false,
+                        glyphMargin: false,
+                        lineDecorationsWidth: 0,
+                        lineNumbersMinChars: 0,
+                        renderLineHighlight: 'none',
+                        automaticLayout: true,
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
@@ -683,8 +873,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>
 
-      {/* Footer with Cancel/Save buttons - only show for path nodes with unsaved changes */}
-      {selectedNode?.data?.nodeType === 'path' && (
+      {/* Footer with Cancel/Save buttons - show for path and method nodes */}
+      {(selectedNode?.data?.nodeType === 'path' || selectedNode?.data?.nodeType === 'method') && (
         <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900/50">
           <div className="flex gap-2">
             <button

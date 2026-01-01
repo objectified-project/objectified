@@ -51,6 +51,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Enhanced deprecated checkbox with prominent styling and warning message
   - Tags multi-select using project-defined tags with color-coded badges
   - External documentation links with URL and description fields, clickable link preview
+  - HTTP method nodes with auto-generate operation ID from path and verb (e.g., getUserById, createOrder)
+  - Method node properties: operation ID, summary, description with Monaco Editor
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
