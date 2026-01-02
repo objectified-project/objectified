@@ -728,7 +728,7 @@ const Versions = () => {
               )}
             </DialogTitle>
           </DialogHeader>
-          <div className="h-[70vh] overflow-auto">
+          <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden">
             {diffResult.length === 0 ? (
               <div className="space-y-4 p-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -762,35 +762,36 @@ const Versions = () => {
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}</div>
                 </div>
-                <div className="border border-gray-300 dark:border-gray-600 rounded overflow-auto font-mono text-xs mb-6" style={{ maxHeight: 'calc(50vh - 80px)' }}>
+                <div className="border border-gray-300 dark:border-gray-600 rounded font-mono text-xs mb-6 h-[400px]">
                   {diffViewMode === 'overlay' ? (
-                    // Overlay/Unified diff view
-                    diffResult.map((part, i) => (
-                      <div key={i} className={part.added ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200' : part.removed ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}>
-                        {part.value.split('\n').filter(Boolean).map((line, j) => (
-                          <div key={j} className="px-3 py-0.5" style={{ whiteSpace: 'pre-wrap' }}>
-                            {part.added && '+ '}{part.removed && '- '}{line}
-                          </div>
-                        ))}
-                      </div>
-                    ))
+                    // Overlay/Unified diff view - has its own overflow
+                    <div className="h-full overflow-y-auto">
+                      {diffResult.map((part, i) => (
+                        <div key={i} className={part.added ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200' : part.removed ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}>
+                          {part.value.split('\n').filter(Boolean).map((line, j) => (
+                            <div key={j} className="px-3 py-0.5" style={{ whiteSpace: 'pre-wrap' }}>
+                              {part.added && '+ '}{part.removed && '- '}{line}
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    // Side-by-side view
-                    <div className="flex">
+                    // Side-by-side view - panels have their own overflow with sync
+                    <div className="flex h-full">
                       {/* Left panel - Version 1 (Base) */}
                       <div
                         ref={leftPanelRef}
                         onScroll={handleLeftScroll}
-                        className="w-1/2 border-r border-gray-300 dark:border-gray-600 overflow-auto"
-                        style={{ maxHeight: 'calc(50vh - 80px)' }}
+                        className="w-1/2 border-r border-gray-300 dark:border-gray-600 h-full overflow-y-auto"
                       >
-                        <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600">
+                        <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
                           v{versions.find(v => v.id === compareVersion1Id)?.version_id} (Base)
                         </div>
                         {(() => {
                           const content1 = compareFormat === 'json' ? compareSpec1 : YAML.stringify(JSON.parse(compareSpec1));
                           return content1.split('\n').map((line, i) => {
-                            // Check if this line was removed (exists in base but not in compare)
+                            // ...existing code...
                             const isRemoved = diffResult.some(part => part.removed && part.value.includes(line));
                             return (
                               <div
@@ -809,10 +810,9 @@ const Versions = () => {
                       <div
                         ref={rightPanelRef}
                         onScroll={handleRightScroll}
-                        className="w-1/2 overflow-auto"
-                        style={{ maxHeight: 'calc(50vh - 80px)' }}
+                        className="w-1/2 h-full overflow-y-auto"
                       >
-                        <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600">
+                        <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
                           v{versions.find(v => v.id === compareVersion2Id)?.version_id} (Compare To)
                         </div>
                         {(() => {
