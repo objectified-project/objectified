@@ -1044,3 +1044,131 @@ export async function setPathTags(pathId: string, tagIds: string[]) {
     return errorResponse(error.message);
   }
 }
+
+// ============================================================================
+// OPERATION TAGS MANAGEMENT
+// Functions for managing tags on API operations
+// ============================================================================
+
+/**
+ * Get all tags for an operation
+ */
+export async function getTagsForOperation(operationId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT ot.id, ot.operation_id, ot.tag_id, ot.created_at,
+              t.name as tag_name, t.color as tag_color, t.description as tag_description
+       FROM odb.operation_tags ot
+       JOIN odb.api_tags t ON ot.tag_id = t.id
+       WHERE ot.operation_id = $1
+       ORDER BY t.name ASC`,
+      [operationId]
+    );
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching tags for operation:', error);
+    return JSON.stringify([]);
+  }
+}
+
+/**
+ * Assign a tag to an operation
+ */
+export async function assignTagToOperation(operationId: string, tagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `INSERT INTO odb.operation_tags (operation_id, tag_id)
+       VALUES ($1, $2)
+       ON CONFLICT (operation_id, tag_id) DO NOTHING
+       RETURNING id, operation_id, tag_id, created_at`,
+      [operationId, tagId]
+    );
+
+    // If conflict, fetch existing record
+    if (result.rowCount === 0) {
+      const existing = await connectionPool.query(
+        `SELECT ot.id, ot.operation_id, ot.tag_id, ot.created_at,
+                t.name as tag_name, t.color as tag_color
+         FROM odb.operation_tags ot
+         JOIN odb.api_tags t ON ot.tag_id = t.id
+         WHERE ot.operation_id = $1 AND ot.tag_id = $2`,
+        [operationId, tagId]
+      );
+      if (existing.rowCount > 0) {
+        return successResponse({ operation_tag: existing.rows[0], already_existed: true });
+      }
+    }
+
+    // Get tag info for the newly created relationship
+    const tagInfo = await connectionPool.query(
+      `SELECT ot.id, ot.operation_id, ot.tag_id, ot.created_at,
+              t.name as tag_name, t.color as tag_color
+       FROM odb.operation_tags ot
+       JOIN odb.api_tags t ON ot.tag_id = t.id
+       WHERE ot.id = $1`,
+      [result.rows[0].id]
+    );
+
+    return successResponse({ operation_tag: tagInfo.rows[0] });
+  } catch (error: any) {
+    console.error('Error assigning tag to operation:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Remove a tag from an operation
+ */
+export async function removeTagFromOperation(operationId: string, tagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.operation_tags WHERE operation_id = $1 AND tag_id = $2 RETURNING id`,
+      [operationId, tagId]
+    );
+
+    if (result.rowCount === 0) {
+      return errorResponse('Tag assignment not found');
+    }
+
+    return successResponse();
+  } catch (error: any) {
+    console.error('Error removing tag from operation:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Assign multiple tags to an operation (replaces existing tags)
+ */
+export async function setOperationTags(operationId: string, tagIds: string[]) {
+  try {
+    // Start transaction
+    await connectionPool.query('BEGIN');
+
+    // Remove all existing tags
+    await connectionPool.query(
+      'DELETE FROM odb.operation_tags WHERE operation_id = $1',
+      [operationId]
+    );
+
+    // Insert new tags
+    if (tagIds.length > 0) {
+      const values = tagIds.map((tagId, index) => `($1, $${index + 2})`).join(', ');
+      const params = [operationId, ...tagIds];
+      await connectionPool.query(
+        `INSERT INTO odb.operation_tags (operation_id, tag_id) VALUES ${values}`,
+        params
+      );
+    }
+
+    await connectionPool.query('COMMIT');
+
+    // Return updated tags
+    return await getTagsForOperation(operationId);
+  } catch (error: any) {
+    await connectionPool.query('ROLLBACK');
+    console.error('Error setting operation tags:', error);
+    return errorResponse(error.message);
+  }
+}
+

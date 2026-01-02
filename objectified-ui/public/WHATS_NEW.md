@@ -57,6 +57,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Operations saved to database when connected to paths or via Save button
   - Tags for operational grouping - assign multiple tags to paths from project-defined tags
   - Tags saved to database with full CRUD support via path_tags join table
+  - **Tags for HTTP method operations** - assign tags to individual operations (GET, POST, etc.)
+  - Operation tags saved to database via operation_tags join table with full CRUD support
+  - Tags automatically load from database for both paths and operations
   - Complete verification and testing suite included (see docs/PATH_TAGS_TESTING.md)
   - Comprehensive unit tests (53 tests) covering all functionality (see docs/PATH_TAGS_TESTS_COMPLETE.md)
 

@@ -15,7 +15,11 @@ import {
   getTagsForPath,
   assignTagToPath,
   removeTagFromPath,
-  setPathTags
+  setPathTags,
+  getTagsForOperation,
+  assignTagToOperation,
+  removeTagFromOperation,
+  setOperationTags
 } from '../../../../../lib/db/helper-paths';
 
 import { getTagsForProject } from '../../../../../lib/db/helper';
@@ -115,3 +119,24 @@ export async function removeTagFromPathAction(pathId: string, tagId: string) {
 export async function setPathTagsAction(pathId: string, tagIds: string[]) {
   return await setPathTags(pathId, tagIds);
 }
+
+// ============================================================================
+// OPERATION TAG ACTIONS
+// ============================================================================
+
+export async function getTagsForOperationAction(operationId: string) {
+  return await getTagsForOperation(operationId);
+}
+
+export async function assignTagToOperationAction(operationId: string, tagId: string) {
+  return await assignTagToOperation(operationId, tagId);
+}
+
+export async function removeTagFromOperationAction(operationId: string, tagId: string) {
+  return await removeTagFromOperation(operationId, tagId);
+}
+
+export async function setOperationTagsAction(operationId: string, tagIds: string[]) {
+  return await setOperationTags(operationId, tagIds);
+}
+

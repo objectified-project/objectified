@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import PathNode, { PathNodeData, PathVariable } from '@/app/components/ade/paths/PathNode';
-import { getPathsForVersionAction, createPathAction, createOperationAction, getOperationsForPathAction, getTagsForPathAction } from '../actions';
+import { getPathsForVersionAction, createPathAction, createOperationAction, getOperationsForPathAction, getTagsForPathAction, getTagsForOperationAction } from '../actions';
 import { useStudio } from '../../StudioContext';
 
 interface PathsCanvasProps {
@@ -104,7 +104,21 @@ function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
               const operations = JSON.parse(opsResult);
 
               if (Array.isArray(operations) && operations.length > 0) {
-                operations.forEach((op: any, opIndex: number) => {
+                for (let opIndex = 0; opIndex < operations.length; opIndex++) {
+                  const op = operations[opIndex];
+
+                  // Load tags for this operation
+                  let operationTagIds: string[] = [];
+                  try {
+                    const tagsResult = await getTagsForOperationAction(op.id);
+                    const operationTags = JSON.parse(tagsResult);
+                    if (Array.isArray(operationTags)) {
+                      operationTagIds = operationTags.map((ot: any) => ot.tag_id);
+                    }
+                  } catch (error) {
+                    console.error(`Error loading tags for operation ${op.id}:`, error);
+                  }
+
                   // Create method node for each operation
                   const methodNodeData: PathNodeData = {
                     label: op.method.toUpperCase(),
@@ -115,6 +129,7 @@ function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
                     operationId: op.operation_id || '',
                     summary: op.summary || '',
                     description: op.description || '',
+                    tags: operationTagIds,
                     deprecated: op.deprecated || false,
                     pendingDbSave: false, // Already saved
                   };
@@ -138,7 +153,7 @@ function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
                     target: `db-operation-${op.id}`,
                     type: 'default',
                   });
-                });
+                }
               }
             } catch (error) {
               console.error(`Error loading operations for path ${path.id}:`, error);

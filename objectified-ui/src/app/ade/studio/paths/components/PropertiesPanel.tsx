@@ -12,7 +12,8 @@ import {
   getTagsForProjectAction,
   createOperationAction,
   updateOperationAction,
-  setPathTagsAction
+  setPathTagsAction,
+  setOperationTagsAction
 } from '../actions';
 import { useStudio } from '../../StudioContext';
 
@@ -368,6 +369,9 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
               description: description,
             };
             await updateOperationAction(dbOperationId, updates);
+
+            // Save tags to database
+            await setOperationTagsAction(dbOperationId, selectedTags);
           } else if (!selectedNode?.data?.pendingDbSave) {
             // Create new operation only if not pending
             // (pendingDbSave means it needs to be connected to a path first)
@@ -877,6 +881,115 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
                       }}
                     />
                   </div>
+                </div>
+
+                {/* Tags Section for Method Nodes */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Tags
+                  </label>
+                  <Popover.Root>
+                    <Popover.Trigger asChild>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-left flex items-center justify-between hover:border-gray-300 dark:hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                      >
+                        <span className="text-gray-900 dark:text-white">
+                          {selectedTags.length === 0 ? 'Select tags...' : `${selectedTags.length} tag${selectedTags.length !== 1 ? 's' : ''} selected`}
+                        </span>
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      </button>
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Content
+                        className="z-9999 w-[260px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden"
+                        sideOffset={5}
+                        align="start"
+                      >
+                        <div className="max-h-[300px] overflow-y-auto p-2">
+                          {availableTags.length === 0 ? (
+                            <div className="px-3 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                              No tags defined for this project
+                            </div>
+                          ) : (
+                            availableTags.map((tag) => {
+                              const isSelected = selectedTags.includes(tag.id);
+                              return (
+                                <button
+                                  key={tag.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedTags(selectedTags.filter(id => id !== tag.id));
+                                    } else {
+                                      setSelectedTags([...selectedTags, tag.id]);
+                                    }
+                                    setHasUnsavedChanges(true);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-left"
+                                >
+                                  <div className="flex-shrink-0 w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded flex items-center justify-center">
+                                    {isSelected && <Check className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <div
+                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: tag.color }}
+                                      />
+                                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {tag.name}
+                                      </span>
+                                    </div>
+                                    {tag.description && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                        {tag.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </Popover.Content>
+                    </Popover.Portal>
+                  </Popover.Root>
+                  {selectedTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {selectedTags.map((tagId) => {
+                        const tag = availableTags.find(t => t.id === tagId);
+                        if (!tag) return null;
+                        return (
+                          <span
+                            key={tagId}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border"
+                            style={{
+                              backgroundColor: `${tag.color}15`,
+                              borderColor: `${tag.color}40`,
+                              color: tag.color,
+                            }}
+                          >
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            {tag.name}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTags(selectedTags.filter(id => id !== tagId));
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="hover:opacity-70"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
