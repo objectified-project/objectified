@@ -371,6 +371,7 @@
   - ✅ Dynamic detail based on zoom level
   - ✅ Fade transitions between LOD levels
   - Show canvas node detail for properties that reference others even when collapsed
+  - 📋 Level of detail toggling mode
 - **Caching**:
   - ✅ Cache rendered node SVG/Canvas elements
   - ✅ Cache layout calculations
@@ -396,6 +397,7 @@
 | #199   | Show property references even when class nodes are collapsed |
 | #475   | Lazy loading of node properties                              |
 | #476   | Memory profiling tooling                                     |
+| #762   | Toggle level of detail mode                                  |
 
 ---
 

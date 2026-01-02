@@ -49,6 +49,8 @@ interface StudioContextType {
   setCreateGroupAtPositionFn: (fn: ((position: { x: number; y: number }) => void) | null) => void;
   clickToFocusEnabled: boolean;
   setClickToFocusEnabled: (value: boolean) => void;
+  lodEnabled: boolean;
+  setLodEnabled: (value: boolean) => void;
   // Group management
   groups: CanvasGroup[];
   setGroups: (groups: CanvasGroup[]) => void;
@@ -71,6 +73,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [createGroupFn, setCreateGroupFn] = useState<(() => void) | null>(null);
   const [createGroupAtPositionFn, setCreateGroupAtPositionFn] = useState<((position: { x: number; y: number }) => void) | null>(null);
   const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(true);
+  const [lodEnabled, setLodEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lodEnabled');
+      return saved ? JSON.parse(saved) : true; // Default to enabled
+    }
+    return true;
+  });
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
   const triggerCanvasRefresh = () => {
@@ -133,6 +142,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setCreateGroupAtPositionFn,
       clickToFocusEnabled,
       setClickToFocusEnabled,
+      lodEnabled,
+      setLodEnabled,
       groups,
       setGroups,
       addGroup,

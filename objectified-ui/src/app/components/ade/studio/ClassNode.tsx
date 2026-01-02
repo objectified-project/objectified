@@ -30,6 +30,7 @@ type ClassNodeData = {
   expandedProperties?: Set<string>; // Global expanded properties state
   onTogglePropertyExpansion?: (propertyId: string) => void; // Callback to toggle property expansion
   zoomLevel?: number; // Current zoom level for level-of-detail rendering
+  lodEnabled?: boolean; // Whether LOD is enabled (defaults to true)
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -45,21 +46,24 @@ function ClassNode({ data, selected }: NodeProps) {
   // At zoom 0.5-1.0, transition from minimal to full detail
   // At zoom >= 1.0 (zoomed in), show full detail
   const zoom = typedData.zoomLevel ?? 1;
+  const lodEnabled = typedData.lodEnabled ?? true; // Default to enabled if not specified
 
   // Calculate opacity for different detail levels
   // Properties fade out completely when zoomed out to 50% or less
-  const propertiesOpacity = Math.max(0, Math.min(1, (zoom - 0.5) / 0.5));
+  // If LOD is disabled, always show full opacity
+  const propertiesOpacity = lodEnabled ? Math.max(0, Math.min(1, (zoom - 0.5) / 0.5)) : 1;
 
   // Description fades out when zooming out to 75% or less
-  const descriptionOpacity = Math.max(0, Math.min(1, (zoom - 0.75) / 0.25));
+  // If LOD is disabled, always show full opacity
+  const descriptionOpacity = lodEnabled ? Math.max(0, Math.min(1, (zoom - 0.75) / 0.25)) : 1;
 
   // Tags fade out at same rate as description
   const tagsOpacity = descriptionOpacity;
 
-  // Show properties only when there's visible opacity
-  const showProperties = propertiesOpacity > 0.05;
-  const showDescription = descriptionOpacity > 0.05;
-  const showTags = tagsOpacity > 0.05;
+  // Show properties only when there's visible opacity (or LOD is disabled)
+  const showProperties = !lodEnabled || propertiesOpacity > 0.05;
+  const showDescription = !lodEnabled || descriptionOpacity > 0.05;
+  const showTags = !lodEnabled || tagsOpacity > 0.05;
 
   // Use global expanded state if provided, otherwise use local state
   const expandedProperties = typedData.expandedProperties || localExpandedProperties;

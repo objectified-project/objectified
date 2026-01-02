@@ -47,7 +47,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setSelectedVersionId: setContextVersionId,
     setIsReadOnly,
     clickToFocusEnabled,
-    setClickToFocusEnabled
+    setClickToFocusEnabled,
+    lodEnabled,
+    setLodEnabled
   } = useStudio();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -109,6 +111,13 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setClickToFocusEnabled(!clickToFocusEnabled);
     localStorage.setItem('clickToFocusEnabled', JSON.stringify(!clickToFocusEnabled));
   }, [clickToFocusEnabled, setClickToFocusEnabled]);
+
+  // Toggle LOD mode
+  const toggleLod = React.useCallback(() => {
+    const newValue = !lodEnabled;
+    setLodEnabled(newValue);
+    localStorage.setItem('lodEnabled', JSON.stringify(newValue));
+  }, [lodEnabled, setLodEnabled]);
 
   // Sync local state with context
   React.useEffect(() => {
@@ -332,15 +341,15 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                 </svg>
                 Canvas
               </ToggleGroup.Item>
-              <ToggleGroup.Item
-                value="paths"
-                className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-amber-600 dark:data-[state=on]:text-amber-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-                Paths
-              </ToggleGroup.Item>
+              {/*<ToggleGroup.Item*/}
+              {/*  value="paths"*/}
+              {/*  className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-amber-600 dark:data-[state=on]:text-amber-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"*/}
+              {/*>*/}
+              {/*  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">*/}
+              {/*    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />*/}
+              {/*  </svg>*/}
+              {/*  Paths*/}
+              {/*</ToggleGroup.Item>*/}
               <ToggleGroup.Item
                 value="code"
                 className="px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -407,6 +416,20 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                       <span className="flex-1">Click-to-Focus</span>
                       <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                         {clickToFocusEnabled ? 'ON' : 'OFF'}
+                      </span>
+                    </DropdownMenu.Item>
+
+                    {/* Level of Detail Toggle */}
+                    <DropdownMenu.Item
+                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                      onSelect={() => toggleLod()}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                      </svg>
+                      <span className="flex-1">Level of Detail</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                        {lodEnabled ? 'ON' : 'OFF'}
                       </span>
                     </DropdownMenu.Item>
                   </DropdownMenu.Content>

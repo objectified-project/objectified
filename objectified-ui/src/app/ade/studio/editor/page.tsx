@@ -135,6 +135,7 @@ const StudioContent = () => {
     setCreateGroupFn,
     setCreateGroupAtPositionFn,
     setClickToFocusEnabled: setContextClickToFocusEnabled,
+    lodEnabled,
     groups,
     setGroups,
     addGroup,
@@ -182,6 +183,7 @@ const StudioContent = () => {
 
   // Zoom level state for level-of-detail rendering
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+
 
   // Class-property edit dialog state
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
@@ -279,11 +281,12 @@ const StudioContent = () => {
           isReadOnly,
           expandedProperties: globalExpandedProperties,
           zoomLevel,
+          lodEnabled,
           onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
         },
       }))
     );
-  }, [globalExpandedProperties, isReadOnly, zoomLevel, setNodes]);
+  }, [globalExpandedProperties, isReadOnly, zoomLevel, lodEnabled, setNodes]);
 
   // Handle expand all properties
   const handleExpandAll = useCallback(() => {
@@ -2461,6 +2464,8 @@ const StudioContent = () => {
 
               plantUmlContent += `  ${isRequired} ${propName}: ${propType}${isArray}\n`;
             });
+          } else {
+            plantUmlContent += '  // No properties\n';
           }
 
           plantUmlContent += '}\n\n';
@@ -3106,7 +3111,6 @@ const StudioContent = () => {
           let hasReverseRef = false;
 
           if (targetClass && targetClass.properties) {
-            const sourceClassName = cls.name;
             targetClass.properties.forEach((targetProp: any) => {
               const targetPropData = typeof targetProp.data === 'string' ? JSON.parse(targetProp.data) : targetProp.data;
               // Handle nullable type arrays for target property
@@ -3120,7 +3124,7 @@ const StudioContent = () => {
                     ? extractClassNameFromRef(targetPropData.items.$ref)
                     : null);
 
-              if (targetRefName === sourceClassName) {
+              if (targetRefName === cls.name) {
                 hasReverseRef = true;
                 isTargetArray = targetBaseType === 'array';
               }
@@ -3675,6 +3679,7 @@ const StudioContent = () => {
     } else {
       setVersions([]);
       setSelectedVersionId('');
+      setContextVersionId('');
       setIsReadOnly(false); // Reset read-only flag when no project is selected
     }
   }, [selectedProjectId]);
@@ -3692,238 +3697,28 @@ const StudioContent = () => {
       setLoadingMessage('Loading classes, properties, and tags...');
 
       try {
-        // Bulk load all classes with properties and tags in 3 queries instead of N*2+1
+        // Bulk load all classes with properties and tags in 3 queries
         const result = await getClassesWithPropertiesAndTags(selectedVersionId);
         const classesWithProperties = JSON.parse(result);
 
-        setLoadingMessage(`Processing ${classesWithProperties.length} class${classesWithProperties.length !== 1 ? 'es' : ''}...`);
+        setLoadingMessage('Updating nodes and edges...');
 
-        setLoadingMessage('Creating canvas nodes...');
-
-        // Convert classes to React Flow nodes
+        // Preserve existing node positions when reloading
+        const existingPositions = new Map(nodes.map(n => [n.id, n.position]));
         const newNodes = await classesToNodes(classesWithProperties);
-
-        setLoadingMessage('Creating relationship edges...');
-
-        // Create edges for both property $ref and composition relationships
+        // Restore positions from existing nodes
+        newNodes.forEach(node => {
+          const existingPos = existingPositions.get(node.id);
+          if (existingPos) {
+            node.position = existingPos;
+          }
+        });
+        const finalNodes = newNodes;
         const newEdges = createAllEdges(classesWithProperties);
-
-        // Check if this is the initial load for this version and if saved layout exists
-        const isInitialLoad = initialLayoutAppliedRef.current !== selectedVersionId;
-        let savedLayout: any = null;
-
-        if (isInitialLoad && currentUserId) {
-          try {
-            setLoadingMessage('Checking for saved layout...');
-            const layoutResult = await getDefaultCanvasLayout(selectedVersionId, currentUserId);
-            const layoutResponse = JSON.parse(layoutResult);
-            if (layoutResponse.success && layoutResponse.layout) {
-              savedLayout = layoutResponse.layout;
-            }
-          } catch (e) {
-            console.log('No saved layout found, using default layout');
-          }
-        }
-
-        let finalNodes: Node[];
-
-        if (savedLayout && isInitialLoad) {
-          setLoadingMessage('Applying saved layout...');
-
-          // Apply saved positions to nodes
-          finalNodes = newNodes.map(node => {
-            const savedNode = savedLayout.nodes?.find((n: any) => n.id === node.id);
-            if (savedNode) {
-              return {
-                ...node,
-                position: savedNode.position,
-                ...(savedNode.dimensions && {
-                  style: {
-                    ...node.style,
-                    width: savedNode.dimensions.width,
-                    height: savedNode.dimensions.height
-                  }
-                })
-              };
-            }
-            return node;
-          });
-
-          // Load groups from dedicated table
-          try {
-            const groupsResult = await getGroupsForVersion(selectedVersionId);
-            const loadedGroups = JSON.parse(groupsResult);
-
-            if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
-              // Transform to CanvasGroup format
-              const canvasGroups = loadedGroups.map((g: any) => ({
-                id: g.id,
-                name: g.name,
-                description: g.description,
-                color: g.color,
-                position: g.position,
-                dimensions: g.dimensions,
-                nodeIds: g.nodeIds || [],
-                tags: g.metadata?.tags || [],
-                styleOptions: {
-                  borderStyle: g.borderStyle || 'dashed',
-                  opacity: g.opacity ?? 1,
-                  shadow: g.metadata?.shadow || 'none',
-                  icon: g.metadata?.icon || 'folder'
-                }
-              }));
-
-              setGroups(canvasGroups);
-
-              // Initialize group positions ref for delta tracking during drag
-              canvasGroups.forEach((group: any) => {
-                groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
-              });
-
-              // Create group nodes
-              const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
-              const groupNodes: Node[] = canvasGroups.map((group: any) => ({
-                id: group.id,
-                type: 'groupNode',
-                position: group.position,
-                width: group.dimensions.width,
-                height: group.dimensions.height,
-                style: {
-                  width: group.dimensions.width,
-                  height: group.dimensions.height,
-                  zIndex: -1
-                },
-                data: {
-                  id: group.id,
-                  name: group.name,
-                  color: group.color,
-                  nodeIds: group.nodeIds || [],
-                  tags: group.tags || [],
-                  styleOptions: group.styleOptions,
-                  availableTags,
-                  onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
-                  onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
-                  onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
-                  onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
-                  onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
-                  isReadOnly
-                }
-              }));
-
-              finalNodes = [...groupNodes, ...finalNodes];
-
-              // Trigger sidebar refresh to update groups
-              triggerSidebarRefresh();
-            }
-          } catch (error) {
-            console.error('Error loading groups:', error);
-          }
-
-          // Mark this version as having initial layout applied
-          initialLayoutAppliedRef.current = selectedVersionId;
-
-          // Restore viewport if available using setViewport for accurate restoration
-          if (savedLayout.viewport) {
-            setTimeout(() => {
-              setViewport({ x: savedLayout.viewport.x, y: savedLayout.viewport.y, zoom: savedLayout.viewport.zoom }, { duration: 250 });
-            }, 100);
-          }
-
-          // Trigger sidebar refresh to update groups
-          triggerSidebarRefresh();
-        } else {
-          setLoadingMessage('Applying auto-layout...');
-
-          // Load groups from dedicated table even without a saved layout
-          try {
-            const groupsResult = await getGroupsForVersion(selectedVersionId);
-            const loadedGroups = JSON.parse(groupsResult);
-
-            if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
-              // Transform to CanvasGroup format
-              const canvasGroups = loadedGroups.map((g: any) => ({
-                id: g.id,
-                name: g.name,
-                description: g.description,
-                color: g.color,
-                position: g.position,
-                dimensions: g.dimensions,
-                nodeIds: g.nodeIds || [],
-                tags: g.metadata?.tags || [],
-                styleOptions: {
-                  borderStyle: g.borderStyle || 'dashed',
-                  opacity: g.opacity ?? 1,
-                  shadow: g.metadata?.shadow || 'none',
-                  icon: g.metadata?.icon || 'folder'
-                }
-              }));
-
-              setGroups(canvasGroups);
-
-              // Initialize group positions ref for delta tracking during drag
-              canvasGroups.forEach((group: any) => {
-                groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
-              });
-
-              // Create group nodes
-              const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
-              const groupNodes: Node[] = canvasGroups.map((group: any) => ({
-                id: group.id,
-                type: 'groupNode',
-                position: group.position,
-                width: group.dimensions.width,
-                height: group.dimensions.height,
-                style: {
-                  width: group.dimensions.width,
-                  height: group.dimensions.height,
-                  zIndex: -1
-                },
-                data: {
-                  id: group.id,
-                  name: group.name,
-                  color: group.color,
-                  nodeIds: group.nodeIds || [],
-                  tags: group.tags || [],
-                  styleOptions: group.styleOptions,
-                  availableTags,
-                  onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
-                  onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
-                  onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
-                  onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
-                  onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
-                  isReadOnly
-                }
-              }));
-
-              // Apply auto-layout if enabled, but only to ungrouped nodes
-              finalNodes = [...groupNodes, ...newNodes];
-
-              // Trigger sidebar refresh to update groups
-              triggerSidebarRefresh();
-            } else {
-              // No groups - just use nodes as-is
-              finalNodes = newNodes;
-            }
-          } catch (error) {
-            console.error('Error loading groups:', error);
-            // Fall back to nodes without layout
-            finalNodes = newNodes;
-          }
-
-          // Fit view after a short delay to ensure nodes are rendered
-          setTimeout(() => {
-            fitView({ padding: 0.2, duration: 250 });
-          }, 50);
-        }
-
-        setNodes(finalNodes);
         setEdges(newEdges);
-
-        console.log('Loaded classes for version:', selectedVersionId, 'Classes:', classesWithProperties.length, savedLayout ? '(with saved layout)' : '');
+        setNodes(finalNodes);
       } catch (error) {
-        console.error('Failed to load classes:', error);
-        setNodes([]);
-        setEdges([]);
+        console.error('Failed to reload classes:', error);
       } finally {
         setIsLoadingCanvas(false);
         setLoadingMessage('');
@@ -4167,7 +3962,7 @@ const StudioContent = () => {
             >
               <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2zM4 13a1 1 0 001-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                 </svg>
                 <Select.Value placeholder="Select project..." />
                 <Select.Icon className="ml-auto">
@@ -4303,7 +4098,7 @@ const StudioContent = () => {
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild>
                     <button
-                      className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
+                      className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center justify-center"
                       title="Settings"
                       aria-label="Settings"
                     >
@@ -4390,7 +4185,7 @@ const StudioContent = () => {
                     />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
                   No Project Selected
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400 max-w-sm mx-auto leading-relaxed">
@@ -4505,7 +4300,7 @@ const StudioContent = () => {
                   <div className="p-1 bg-amber-100 dark:bg-amber-800/50 rounded-lg">
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 002 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
+                  </svg>
                   </div>
                   <span className="text-xs font-semibold">Read Only Mode</span>
                 </div>
@@ -4561,7 +4356,7 @@ const StudioContent = () => {
                 <Panel position="top-left" className={`bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 text-red-800 dark:text-red-200 rounded-xl shadow-lg px-4 py-2.5 border border-red-200/80 dark:border-red-700/50 backdrop-blur-sm ${isReadOnly ? 'mt-[8rem]' : 'mt-[4.5rem]'}`}>
                   <div className="flex items-center gap-2.5">
                     <div className="p-1 bg-red-100 dark:bg-red-800/50 rounded-lg">
-                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd"/>
                       </svg>
                     </div>
@@ -4576,7 +4371,7 @@ const StudioContent = () => {
               <div className="relative" ref={layoutDropdownRef}>
                 <button
                   onClick={() => setLayoutDropdownOpen(!layoutDropdownOpen)}
-                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2"
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
                   title="Layout options"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4720,7 +4515,7 @@ const StudioContent = () => {
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2v-6a2 2 0 00-2-2h-2a2 2 0 00-2 2v6z" />
                         </svg>
                         <span>Mermaid Diagram</span>
                       </button>
