@@ -35,6 +35,7 @@ import {
 import { generateOpenApiSpec } from '../../../utils/openapi';
 import YAML from 'yaml';
 import { diffLines, Change } from 'diff';
+import { compareSchemas, type DiffSummary, getPathLabel } from '../../../../../lib/schema-diff';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -98,6 +99,7 @@ const Versions = () => {
   const [compareFormat, setCompareFormat] = useState<'json' | 'yaml'>('json');
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
   const [diffResult, setDiffResult] = useState<Change[]>([]);
+  const [schemaDiffSummary, setSchemaDiffSummary] = useState<DiffSummary | null>(null);
   const [diffViewMode, setDiffViewMode] = useState<'overlay' | 'side-by-side'>('overlay');
 
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -276,17 +278,26 @@ const Versions = () => {
     try {
       const [spec1, spec2] = await Promise.all([loadVersionSpec(compareVersion1Id), loadVersionSpec(compareVersion2Id)]);
       setCompareSpec1(spec1); setCompareSpec2(spec2);
+
+      // Perform schema-aware diff
+      const diffSummary = compareSchemas(spec1, spec2);
+      setSchemaDiffSummary(diffSummary);
+
+      // Also keep line-based diff for fallback
       const content1 = compareFormat === 'json' ? spec1 : YAML.stringify(JSON.parse(spec1));
       const content2 = compareFormat === 'json' ? spec2 : YAML.stringify(JSON.parse(spec2));
       setDiffResult(diffLines(content1, content2));
-    } catch (error) { await alertDialog({ message: 'Failed to load specs for comparison', variant: 'error' }); }
+    } catch (error) {
+      console.error('Comparison error:', error);
+      await alertDialog({ message: 'Failed to load specs for comparison', variant: 'error' });
+    }
     finally { setIsLoadingComparison(false); }
   };
 
   const handleCompareDialogOpen = () => {
     setShowCompareDialog(true); setCompareVersion1Id(''); setCompareVersion2Id('');
     setCompareSpec1(''); setCompareSpec2(''); setCompareFormat('json');
-    setDiffResult([]); setDiffViewMode('overlay');
+    setDiffResult([]); setSchemaDiffSummary(null); setDiffViewMode('overlay');
   };
 
   const handleCompareFormatChange = (newFormat: 'json' | 'yaml') => {
@@ -742,6 +753,7 @@ const Versions = () => {
               </div>
             ) : (
               <div>
+                {/* Line-based diff view - SHOWN FIRST */}
                 <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex gap-4 text-sm">
                     <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-200 dark:bg-red-900 border border-red-400"></div><span>Removed</span></div>
@@ -750,7 +762,7 @@ const Versions = () => {
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400">v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}</div>
                 </div>
-                <div className="border border-gray-300 dark:border-gray-600 rounded overflow-auto font-mono text-xs" style={{ maxHeight: 'calc(70vh - 120px)' }}>
+                <div className="border border-gray-300 dark:border-gray-600 rounded overflow-auto font-mono text-xs mb-6" style={{ maxHeight: 'calc(50vh - 80px)' }}>
                   {diffViewMode === 'overlay' ? (
                     // Overlay/Unified diff view
                     diffResult.map((part, i) => (
@@ -770,7 +782,7 @@ const Versions = () => {
                         ref={leftPanelRef}
                         onScroll={handleLeftScroll}
                         className="w-1/2 border-r border-gray-300 dark:border-gray-600 overflow-auto"
-                        style={{ maxHeight: 'calc(70vh - 120px)' }}
+                        style={{ maxHeight: 'calc(50vh - 80px)' }}
                       >
                         <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600">
                           v{versions.find(v => v.id === compareVersion1Id)?.version_id} (Base)
@@ -798,7 +810,7 @@ const Versions = () => {
                         ref={rightPanelRef}
                         onScroll={handleRightScroll}
                         className="w-1/2 overflow-auto"
-                        style={{ maxHeight: 'calc(70vh - 120px)' }}
+                        style={{ maxHeight: 'calc(50vh - 80px)' }}
                       >
                         <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600">
                           v{versions.find(v => v.id === compareVersion2Id)?.version_id} (Compare To)
@@ -824,6 +836,96 @@ const Versions = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Schema-aware diff summary - SHOWN SECOND */}
+                {schemaDiffSummary && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Schema Changes Summary</h3>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{schemaDiffSummary.added.length}</div>
+                        <div className="text-xs text-green-700 dark:text-green-300">Added</div>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-400">{schemaDiffSummary.removed.length}</div>
+                        <div className="text-xs text-red-700 dark:text-red-300">Removed</div>
+                      </div>
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                        <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{schemaDiffSummary.modified.length}</div>
+                        <div className="text-xs text-yellow-700 dark:text-yellow-300">Modified</div>
+                      </div>
+                    </div>
+
+                    {/* Detailed changes */}
+                    <div className="space-y-4">
+                      {/* Added items */}
+                      {schemaDiffSummary.added.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-green-700 dark:text-green-300 mb-2 flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                            Added ({schemaDiffSummary.added.length})
+                          </h4>
+                          <div className="space-y-1">
+                            {schemaDiffSummary.added.map((diff, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-sm bg-green-50 dark:bg-green-900/10 px-3 py-1.5 rounded border border-green-200 dark:border-green-800">
+                                <span className="text-green-600 dark:text-green-400 font-mono text-xs">+</span>
+                                <span className="text-green-900 dark:text-green-100 font-medium">{getPathLabel(diff.path)}</span>
+                                <span className="text-green-700 dark:text-green-300 text-xs">({diff.itemType})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Removed items */}
+                      {schemaDiffSummary.removed.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-red-700 dark:text-red-300 mb-2 flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
+                            Removed ({schemaDiffSummary.removed.length})
+                          </h4>
+                          <div className="space-y-1">
+                            {schemaDiffSummary.removed.map((diff, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-sm bg-red-50 dark:bg-red-900/10 px-3 py-1.5 rounded border border-red-200 dark:border-red-800">
+                                <span className="text-red-600 dark:text-red-400 font-mono text-xs">-</span>
+                                <span className="text-red-900 dark:text-red-100 font-medium">{getPathLabel(diff.path)}</span>
+                                <span className="text-red-700 dark:text-red-300 text-xs">({diff.itemType})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Modified items */}
+                      {schemaDiffSummary.modified.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-yellow-700 dark:text-yellow-300 mb-2 flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full"></span>
+                            Modified ({schemaDiffSummary.modified.length})
+                          </h4>
+                          <div className="space-y-1">
+                            {schemaDiffSummary.modified.map((diff, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-sm bg-yellow-50 dark:bg-yellow-900/10 px-3 py-1.5 rounded border border-yellow-200 dark:border-yellow-800">
+                                <span className="text-yellow-600 dark:text-yellow-400 font-mono text-xs mt-0.5">~</span>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-yellow-900 dark:text-yellow-100 font-medium">{getPathLabel(diff.path)}</span>
+                                    <span className="text-yellow-700 dark:text-yellow-300 text-xs">({diff.itemType})</span>
+                                  </div>
+                                  {diff.changes && diff.changes.length > 0 && (
+                                    <div className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                                      Changed: {diff.changes.join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

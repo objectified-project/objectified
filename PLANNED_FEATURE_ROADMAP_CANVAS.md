@@ -371,7 +371,7 @@
   - ✅ Dynamic detail based on zoom level
   - ✅ Fade transitions between LOD levels
   - Show canvas node detail for properties that reference others even when collapsed
-  - 📋 Level of detail toggling mode
+  - ✅ Level of detail toggling mode
 - **Caching**:
   - ✅ Cache rendered node SVG/Canvas elements
   - ✅ Cache layout calculations
@@ -397,7 +397,6 @@
 | #199   | Show property references even when class nodes are collapsed |
 | #475   | Lazy loading of node properties                              |
 | #476   | Memory profiling tooling                                     |
-| #762   | Toggle level of detail mode                                  |
 
 ---
 
@@ -566,9 +565,9 @@
 #### Version Comparison View ✅ PARTIALLY COMPLETE
 - ✅ Side-by-side canvas comparison of two versions
 - ✅ Diff highlighting:
-  - 📋 Green for added classes/properties
-  - 📋 Red for removed classes/properties
-  - 📋 Yellow for modified classes/properties
+  - ✅ Green for added classes/properties
+  - ✅ Red for removed classes/properties
+  - ✅ Yellow for modified classes/properties
 - Animated transition between versions
 - "Time travel" slider to scrub through version history
 - Change summary panel with statistics
@@ -576,7 +575,6 @@
 
 | Ticket | Feature                    |
 |--------|----------------------------|
-| #562   | Diff highlighting updates  |
 | #563   | Filter diff by change type |
 
 ---
