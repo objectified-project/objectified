@@ -1,7 +1,8 @@
 import React, { memo, useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { Edit, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Edit, Trash2, ChevronRight, ChevronDown, Palette } from 'lucide-react';
 import { useDialog } from '../../providers/DialogProvider';
+import * as Popover from '@radix-ui/react-popover';
 
 // Define custom node data type for classes
 type ClassProperty = {
@@ -11,6 +12,14 @@ type ClassProperty = {
   description?: string;
   data?: any; // JSONB data containing the property schema
   parent_id?: string | null; // Parent property ID for nested properties
+};
+
+type ClassNodeTheme = {
+  backgroundColor?: string;
+  borderColor?: string;
+  headerGradient?: string;
+  textColor?: string;
+  headerTextColor?: string;
 };
 
 type ClassNodeData = {
@@ -26,11 +35,13 @@ type ClassNodeData = {
   onClassEdit?: (classData: any) => void;
   onClassDelete?: (classId: string, className: string) => void;
   onCreateReference?: (classOrCompositeId: string) => void;
+  onThemeChange?: (classId: string, theme: ClassNodeTheme) => void;
   isReadOnly?: boolean;
   expandedProperties?: Set<string>; // Global expanded properties state
   onTogglePropertyExpansion?: (propertyId: string) => void; // Callback to toggle property expansion
   zoomLevel?: number; // Current zoom level for level-of-detail rendering
   lodEnabled?: boolean; // Whether LOD is enabled (defaults to true)
+  theme?: ClassNodeTheme; // Custom theme from canvas_metadata
 };
 
 function ClassNode({ data, selected }: NodeProps) {
@@ -40,6 +51,33 @@ function ClassNode({ data, selected }: NodeProps) {
   const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+
+  // Predefined color themes (4x4 grid = 16 colors) - matching GroupNode colors
+  const colorThemes = [
+    { name: 'Slate', hex: '#64748b', headerGradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', backgroundColor: '#f8fafc', borderColor: '#64748b', textColor: '#1e293b', headerTextColor: '#ffffff' },
+    { name: 'Gray', hex: '#6b7280', headerGradient: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)', backgroundColor: '#f9fafb', borderColor: '#6b7280', textColor: '#111827', headerTextColor: '#ffffff' },
+    { name: 'Zinc', hex: '#71717a', headerGradient: 'linear-gradient(135deg, #71717a 0%, #52525b 100%)', backgroundColor: '#fafafa', borderColor: '#71717a', textColor: '#18181b', headerTextColor: '#ffffff' },
+    { name: 'Stone', hex: '#78716c', headerGradient: 'linear-gradient(135deg, #78716c 0%, #57534e 100%)', backgroundColor: '#fafaf9', borderColor: '#78716c', textColor: '#1c1917', headerTextColor: '#ffffff' },
+    { name: 'Red', hex: '#ef4444', headerGradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', backgroundColor: '#fef2f2', borderColor: '#ef4444', textColor: '#991b1b', headerTextColor: '#ffffff' },
+    { name: 'Orange', hex: '#f97316', headerGradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', backgroundColor: '#fff7ed', borderColor: '#f97316', textColor: '#9a3412', headerTextColor: '#ffffff' },
+    { name: 'Amber', hex: '#f59e0b', headerGradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', backgroundColor: '#fffbeb', borderColor: '#f59e0b', textColor: '#92400e', headerTextColor: '#ffffff' },
+    { name: 'Yellow', hex: '#eab308', headerGradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', backgroundColor: '#fefce8', borderColor: '#eab308', textColor: '#854d0e', headerTextColor: '#ffffff' },
+    { name: 'Lime', hex: '#84cc16', headerGradient: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)', backgroundColor: '#f7fee7', borderColor: '#84cc16', textColor: '#3f6212', headerTextColor: '#ffffff' },
+    { name: 'Green', hex: '#22c55e', headerGradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', backgroundColor: '#ecfdf5', borderColor: '#10b981', textColor: '#065f46', headerTextColor: '#ffffff' },
+    { name: 'Emerald', hex: '#10b981', headerGradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', backgroundColor: '#ecfdf5', borderColor: '#10b981', textColor: '#065f46', headerTextColor: '#ffffff' },
+    { name: 'Teal', hex: '#14b8a6', headerGradient: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', backgroundColor: '#f0fdfa', borderColor: '#14b8a6', textColor: '#115e59', headerTextColor: '#ffffff' },
+    { name: 'Cyan', hex: '#06b6d4', headerGradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', backgroundColor: '#ecfeff', borderColor: '#06b6d4', textColor: '#164e63', headerTextColor: '#ffffff' },
+    { name: 'Sky', hex: '#0ea5e9', headerGradient: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', backgroundColor: '#f0f9ff', borderColor: '#0ea5e9', textColor: '#0c4a6e', headerTextColor: '#ffffff' },
+    { name: 'Blue', hex: '#3b82f6', headerGradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', backgroundColor: '#eff6ff', borderColor: '#3b82f6', textColor: '#1e40af', headerTextColor: '#ffffff' },
+    { name: 'Indigo', hex: '#6366f1', headerGradient: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', backgroundColor: '#eef2ff', borderColor: '#6366f1', textColor: '#3730a3', headerTextColor: '#ffffff' },
+  ];
+
+  const handleThemeSelect = (theme: Omit<ClassNodeTheme, 'name'>) => {
+    if (typedData.onThemeChange) {
+      typedData.onThemeChange(typedData.id, theme);
+    }
+  };
 
   // Level of detail calculations based on zoom
   // At zoom < 0.5 (50% - zoomed out), show minimal detail (class name only)
@@ -371,12 +409,19 @@ function ClassNode({ data, selected }: NodeProps) {
 
   const { topLevel, childMap } = buildPropertyHierarchy();
 
-  // Determine header accent color based on state
+  // Determine header accent color based on state and custom theme
   const getHeaderGradient = () => {
+    if (typedData.theme?.headerGradient) return typedData.theme.headerGradient;
     if (dragTarget === 'node') return 'linear-gradient(135deg, #059669 0%, #047857 100%)';
     if (selected) return 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)';
     return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
   };
+
+  // Get custom colors from theme or defaults
+  const backgroundColor = typedData.theme?.backgroundColor || 'white';
+  const borderColor = typedData.theme?.borderColor || (selected ? '#6366f1' : '#e2e8f0');
+  const textColor = typedData.theme?.textColor || '#1e293b';
+  const headerTextColor = typedData.theme?.headerTextColor || 'white';
 
   return (
     <div
@@ -386,18 +431,19 @@ function ClassNode({ data, selected }: NodeProps) {
       onDoubleClick={handleDoubleClick}
       style={{
         borderRadius: '12px',
-        border: 'none',
-        background: 'white',
+        border: `2px solid ${borderColor}`,
+        background: backgroundColor,
         minWidth: '260px',
         maxWidth: '400px',
         boxShadow: selected
-          ? '0 0 0 2px #6366f1, 0 10px 40px -10px rgba(99, 102, 241, 0.4), 0 4px 20px -4px rgba(0, 0, 0, 0.1)'
+          ? `0 0 0 2px ${borderColor}, 0 10px 40px -10px rgba(99, 102, 241, 0.4), 0 4px 20px -4px rgba(0, 0, 0, 0.1)`
           : dragTarget === 'node'
           ? '0 0 0 2px #10b981, 0 10px 40px -10px rgba(16, 185, 129, 0.3), 0 4px 20px -4px rgba(0, 0, 0, 0.1)'
           : '0 4px 24px -4px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.04)',
         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'hidden',
         cursor: 'pointer',
+        color: textColor,
       }}
     >
       {/* Target handle at the top */}
@@ -449,7 +495,7 @@ function ClassNode({ data, selected }: NodeProps) {
             justifyContent: 'center',
             fontSize: '12px',
             fontWeight: 700,
-            color: 'white',
+            color: headerTextColor,
             flexShrink: 0,
             letterSpacing: '-0.5px',
           }}>
@@ -460,7 +506,7 @@ function ClassNode({ data, selected }: NodeProps) {
             <div style={{
               fontSize: '14px',
               fontWeight: 600,
-              color: 'white',
+              color: headerTextColor,
               letterSpacing: '-0.01em',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -517,41 +563,98 @@ function ClassNode({ data, selected }: NodeProps) {
         </div>
 
         {!typedData.isReadOnly && (
-          <button
-            style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '6px',
-              padding: '6px',
-              cursor: 'pointer',
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: '14px',
-              lineHeight: 1,
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              backdropFilter: 'blur(4px)',
-              position: 'relative',
-              zIndex: 1,
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (typedData.onClassDelete) typedData.onClassDelete(typedData.id, typedData.name);
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
-              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.9)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-            }}
-            title="Delete class"
-          >
-            <Trash2 size={14} />
-          </button>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+            {/* Color picker button using Popover */}
+            <Popover.Root open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
+              <Popover.Trigger asChild>
+                <button
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '6px',
+                    padding: '6px',
+                    cursor: 'pointer',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '14px',
+                    lineHeight: 1,
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    backdropFilter: 'blur(4px)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  title="Change colors"
+                >
+                  <Palette size={14} />
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3"
+                  sideOffset={5}
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="grid grid-cols-4 gap-2">
+                    {colorThemes.map((color) => (
+                      <button
+                        key={color.name}
+                        onClick={() => handleThemeSelect(color)}
+                        className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110"
+                        style={{ backgroundColor: color.hex }}
+                        title={color.name}
+                      />
+                    ))}
+                  </div>
+                  <Popover.Arrow className="fill-white dark:fill-gray-800" />
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+            {/* Delete button */}
+            <button
+              style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '6px',
+                padding: '6px',
+                cursor: 'pointer',
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '14px',
+                lineHeight: 1,
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                backdropFilter: 'blur(4px)',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (typedData.onClassDelete) typedData.onClassDelete(typedData.id, typedData.name);
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.9)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+              title="Delete class"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         )}
       </div>
 

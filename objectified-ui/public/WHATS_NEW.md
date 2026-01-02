@@ -19,7 +19,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed deleting a group from the canvas now properly deletes the database record
   - Fixed property template button icon color in light mode (was appearing black instead of white)
   - Fixed click-to-focus behavior in the canvas
-  - Fixed dark mode and light mode to be separate and predictable (saved preference now takes priority over system preference)
+  - Fixed dark mode and light mode (takes precedence over system settings)
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
@@ -29,6 +29,13 @@ We continue to improve the platform based on your feedback with improvements and
   - Import performs a sanity check to make sure all class imports are valid
   - Adds Commit/Rollback system to allow users to apply or discard changes made during an import session
 - Canvas improvements
+  - Added per-class theming: customize colors for individual class nodes
+    - 16 predefined color themes in a 4x4 grid (Slate, Gray, Red, Orange, Yellow, Green, Teal, Cyan, Blue, Indigo, Violet, Purple, and more)
+    - Custom background, border, header gradient, and text colors
+    - Themes persist in canvas_metadata and save automatically
+    - Easy-to-use color picker with visual color swatches
+    - Hover effects with scaling and shadows for better visual feedback
+    - Reset button to restore default styling
   - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
   - Added creation of groups on the canvas via drag-and-drop from the sidebar

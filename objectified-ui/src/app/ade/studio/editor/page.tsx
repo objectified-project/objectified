@@ -50,7 +50,8 @@ import {
   createProperty,
   saveDefaultCanvasLayout,
   getDefaultCanvasLayout,
-  getGroupsForVersion
+  getGroupsForVersion,
+  updateClassCanvasMetadata
 } from '../../../../../lib/db/helper';
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
@@ -252,6 +253,7 @@ const StudioContent = () => {
   const handleClassEditRef = useRef<any>(null);
   const handleClassDeleteRef = useRef<any>(null);
   const handleCreateReferenceRef = useRef<any>(null);
+  const handleThemeChangeRef = useRef<any>(null);
   const handleTogglePropertyExpansionRef = useRef<any>(null);
 
   // Refs for group handlers - initialized here, values set later
@@ -281,6 +283,51 @@ const StudioContent = () => {
 
   // Keep ref updated
   handleTogglePropertyExpansionRef.current = handleTogglePropertyExpansion;
+
+  // Handle theme changes for a class node
+  const handleThemeChange = useCallback(async (classId: string, theme: any) => {
+    try {
+      // Get current node to preserve position and other metadata
+      const currentNode = nodes.find(n => n.id === classId);
+      if (!currentNode) return;
+
+      // Get existing canvas_metadata or create new one
+      const existingMetadata = (currentNode.data as any).canvas_metadata || {};
+
+      // Update canvas_metadata with new theme
+      const updatedMetadata = {
+        ...existingMetadata,
+        style: theme
+      };
+
+      // Save to database
+      const result = await updateClassCanvasMetadata(classId, updatedMetadata);
+      const response = JSON.parse(result);
+
+      if (response.success) {
+        // Update local node data
+        setNodes((nodes) => nodes.map((n) =>
+          n.id === classId
+            ? {
+                ...n,
+                data: {
+                  ...(n.data as any),
+                  theme: theme,
+                  canvas_metadata: updatedMetadata
+                }
+              }
+            : n
+        ));
+      } else {
+        console.error('Failed to update class theme:', response.error);
+      }
+    } catch (error) {
+      console.error('Error updating class theme:', error);
+    }
+  }, [nodes, setNodes]);
+
+  // Keep ref updated
+  handleThemeChangeRef.current = handleThemeChange;
 
   // Reflect expansion/read-only state changes into node data without re-layout
   useEffect(() => {
@@ -2949,33 +2996,41 @@ const StudioContent = () => {
 
   // Helper function to convert classes to React Flow nodes
   const classesToNodes = async (classes: any[]): Promise<Node[]> => {
-    return classes.map((cls, index) => ({
-      id: cls.id,
-      type: 'classNode',
-      position: {
-        x: 100 + (index % 4) * 280, // Arrange in a grid (4 columns)
-        y: 100 + Math.floor(index / 4) * 180
-      },
-      data: {
+    return classes.map((cls, index) => {
+      // Extract theme from canvas_metadata if it exists
+      const canvasMetadata = cls.canvas_metadata || {};
+      const theme = canvasMetadata.style || {};
+
+      return {
         id: cls.id,
-        name: cls.name,
-        description: cls.description,
-        properties: cls.properties || [],
-        schema: cls.schema, // Pass schema for composition handles
-        tags: cls.tags || [], // Pass tags for display
-        // Use refs to avoid triggering re-renders when callbacks change
-        onPropertyDrop: (...args: any[]) => handlePropertyDropRef.current?.(...args),
-        onPropertyEdit: (...args: any[]) => handlePropertyEditRef.current?.(...args),
-        onPropertyDelete: (...args: any[]) => handlePropertyDeleteRef.current?.(...args),
-        onClassEdit: (...args: any[]) => handleClassEditRef.current?.(...args),
-        onClassDelete: (...args: any[]) => handleClassDeleteRef.current?.(...args),
-        onCreateReference: (...args: any[]) => handleCreateReferenceRef.current?.(...args),
-        isReadOnly: isReadOnly,
-        expandedProperties: globalExpandedProperties,
-        onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
-        zoomLevel: 1 // Initial zoom level
-      }
-    }));
+        type: 'classNode',
+        position: {
+          x: 100 + (index % 4) * 280, // Arrange in a grid (4 columns)
+          y: 100 + Math.floor(index / 4) * 180
+        },
+        data: {
+          id: cls.id,
+          name: cls.name,
+          description: cls.description,
+          properties: cls.properties || [],
+          schema: cls.schema, // Pass schema for composition handles
+          tags: cls.tags || [], // Pass tags for display
+          theme: theme, // Pass theme from canvas_metadata
+          // Use refs to avoid triggering re-renders when callbacks change
+          onPropertyDrop: (...args: any[]) => handlePropertyDropRef.current?.(...args),
+          onPropertyEdit: (...args: any[]) => handlePropertyEditRef.current?.(...args),
+          onPropertyDelete: (...args: any[]) => handlePropertyDeleteRef.current?.(...args),
+          onClassEdit: (...args: any[]) => handleClassEditRef.current?.(...args),
+          onClassDelete: (...args: any[]) => handleClassDeleteRef.current?.(...args),
+          onCreateReference: (...args: any[]) => handleCreateReferenceRef.current?.(...args),
+          onThemeChange: (...args: any[]) => handleThemeChangeRef.current?.(...args),
+          isReadOnly: isReadOnly,
+          expandedProperties: globalExpandedProperties,
+          onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
+          zoomLevel: 1 // Initial zoom level
+        }
+      };
+    });
   };
 
   // Helper function to extract class name from $ref
