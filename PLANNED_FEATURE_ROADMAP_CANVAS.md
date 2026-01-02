@@ -276,16 +276,20 @@
 | #348   | Adds animation to edges               |
 | #349   | Adds edge hover effects               |
 
-**Grid & Alignment:** 📋 PLANNED
-- 📋 Grid snapping (adjustable size: 10px, 20px, 50px)
-- 📋 Grid style (dots, lines, crosses)
+**Grid & Alignment:** ✅ PARTIALLY IMPLEMENTED
+- ✅ **Grid snapping** (adjustable size: 10-50px with 5px increments) - ✅ FULLY IMPLEMENTED
+  - ✅ Snap-to-grid toggle (ON/OFF)
+  - ✅ Grid size slider control in settings (10-50px in 5px steps)
+  - ✅ Real-time grid size adjustment
+  - ✅ Visual feedback with grid dots
+  - ✅ Snapping applies to node dragging and positioning
+- 📋 Grid style options (dots, lines, crosses)
 - 📋 Smart guides on drag
 - 📋 Horizontal/vertical rulers
 - 📋 Equal spacing tools
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-| #324   | Canvas grid snapping settings                    |
 | #325   | Add grid styling to the canvas                   |
 | #326   | Add smart guides when dragging nodes             |
 | #327   | Add Horizontal and Vertical rulers to the canvas |

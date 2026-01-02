@@ -158,6 +158,8 @@ const StudioContent = () => {
     clickToFocusEnabled,
     setClickToFocusEnabled: setContextClickToFocusEnabled,
     lodEnabled,
+    gridSize,
+    snapToGrid,
     groups,
     setGroups,
     addGroup,
@@ -4309,6 +4311,8 @@ const StudioContent = () => {
               onDragOver={handleCanvasDragOver}
               onDrop={handleCanvasDrop}
               onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
+              snapToGrid={snapToGrid}
+              snapGrid={[gridSize, gridSize]}
               fitView
               attributionPosition="bottom-left"
               className={`${isDark ? 'bg-gray-900' : ''} ${isAnimating ? 'layout-animating' : ''}`}
@@ -4325,7 +4329,7 @@ const StudioContent = () => {
             >
             <Background
               variant={BackgroundVariant.Dots}
-              gap={20}
+              gap={gridSize}
               size={1.5}
               color="currentColor"
               style={{

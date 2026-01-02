@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -51,6 +51,11 @@ interface StudioContextType {
   setClickToFocusEnabled: (value: boolean) => void;
   lodEnabled: boolean;
   setLodEnabled: (value: boolean) => void;
+  // Grid settings
+  gridSize: number;
+  setGridSize: (size: number) => void;
+  snapToGrid: boolean;
+  setSnapToGrid: (enabled: boolean) => void;
   // Group management
   groups: CanvasGroup[];
   setGroups: (groups: CanvasGroup[]) => void;
@@ -86,7 +91,38 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
     return true;
   });
+
+  // Grid settings
+  const [gridSize, setGridSize] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('gridSize');
+      return saved ? parseInt(saved, 10) : 20; // Default to 20px
+    }
+    return 20;
+  });
+
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('snapToGrid');
+      return saved ? JSON.parse(saved) : true; // Default to enabled
+    }
+    return true;
+  });
+
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
+
+  // Persist grid settings to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gridSize', gridSize.toString());
+    }
+  }, [gridSize]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('snapToGrid', JSON.stringify(snapToGrid));
+    }
+  }, [snapToGrid]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -150,6 +186,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setClickToFocusEnabled,
       lodEnabled,
       setLodEnabled,
+      gridSize,
+      setGridSize,
+      snapToGrid,
+      setSnapToGrid,
       groups,
       setGroups,
       addGroup,
@@ -170,4 +210,3 @@ export function useStudio() {
   }
   return context;
 }
-
