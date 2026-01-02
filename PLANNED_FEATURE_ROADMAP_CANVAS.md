@@ -83,10 +83,10 @@
   - Pan with middle mouse button or space+drag
   - Pan to edges on node drag
 - 📋 **Global Search** (Cmd+F): Find classes with highlighting
-- 📋 **Search Focus Mode**: Dim everything except search results
-- 📋 **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
-- 📋 **Canvas Layers**: Background, Node, Edge, Annotation, UI layers with toggle/lock
-- 📋 **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
+- **Search Focus Mode**: Dim everything except search results
+- **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
+- **Canvas Layers**: Background, Node, Edge, Annotation, UI layers with toggle/lock
+- **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
 - 📋 **Focus Mode**: Isolate selected classes and relationships, blur non-focused
 
 | Ticket | Feature Description                                          |
