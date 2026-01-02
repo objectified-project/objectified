@@ -4,6 +4,15 @@
  * This file runs before all tests and sets up the testing environment
  */
 
+// Import React Testing Library setup
+import '@testing-library/jest-dom';
+import { TextEncoder, TextDecoder } from 'util';
+
+// Polyfill TextEncoder/TextDecoder for jsdom environment
+// Required for pg library and other Node.js modules
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder as any;
+
 // Extend Jest matchers
 expect.extend({
   toBeValidSchema(received: any) {

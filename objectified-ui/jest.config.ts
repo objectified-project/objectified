@@ -2,14 +2,16 @@ import type { Config } from 'jest';
 
 const config: Config = {
   preset: 'ts-jest',
-  testEnvironment: 'node',
+  testEnvironment: 'jsdom', // Changed from 'node' to support React components
   roots: ['<rootDir>/tests'],
-  testMatch: ['**/*.test.ts'],
+  testMatch: ['**/*.test.ts', '**/*.test.tsx'], // Added tsx
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   collectCoverageFrom: [
     'lib/**/*.{ts,tsx}',
+    'src/**/*.{ts,tsx}',
     '!lib/**/*.d.ts',
     '!lib/**/*.test.{ts,tsx}',
+    '!src/**/*.test.{ts,tsx}',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],

@@ -14,10 +14,11 @@ import {
   useReactFlow,
   ReactFlowProvider,
   Node,
+  Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import PathNode, { PathNodeData, PathVariable } from '@/app/components/ade/paths/PathNode';
-import { getPathsForVersionAction, createPathAction, createOperationAction, getOperationsForPathAction } from '../actions';
+import { getPathsForVersionAction, createPathAction, createOperationAction, getOperationsForPathAction, getTagsForPathAction } from '../actions';
 import { useStudio } from '../../StudioContext';
 
 interface PathsCanvasProps {
@@ -37,7 +38,7 @@ const getNodeId = () => `node_${++nodeIdCounter}`;
 function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [showMiniMap, setShowMiniMap] = useState(true);
   const { screenToFlowPosition } = useReactFlow();
   const { selectedVersionId } = useStudio();
@@ -57,11 +58,23 @@ function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
 
         if (Array.isArray(paths) && paths.length > 0) {
           const allNodes: Node[] = [];
-          const allEdges: any[] = [];
+          const allEdges: Edge[] = [];
 
           // Load paths and their operations
           for (let index = 0; index < paths.length; index++) {
             const path = paths[index];
+
+            // Load tags for this path
+            let pathTagIds: string[] = [];
+            try {
+              const tagsResult = await getTagsForPathAction(path.id);
+              const pathTags = JSON.parse(tagsResult);
+              if (Array.isArray(pathTags)) {
+                pathTagIds = pathTags.map((pt: any) => pt.tag_id);
+              }
+            } catch (error) {
+              console.error(`Error loading tags for path ${path.id}:`, error);
+            }
 
             // Create path node
             const pathNodeData: PathNodeData = {
@@ -71,7 +84,7 @@ function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
               path: path.path,
               summary: path.summary || '',
               description: path.description || '',
-              tags: path.tags || [],
+              tags: pathTagIds,
               deprecated: path.deprecated || false,
               pathVariables: [], // Will be extracted from path pattern
             };
@@ -133,7 +146,7 @@ function PathsCanvasInner({ onNodeSelect, onNodeUpdate }: PathsCanvasProps) {
           }
 
           setNodes(allNodes);
-          setEdges(allEdges);
+          setEdges(allEdges as Edge[]);
         }
       } catch (error) {
         console.error('Error loading paths:', error);

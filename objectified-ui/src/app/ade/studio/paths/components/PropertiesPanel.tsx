@@ -11,7 +11,8 @@ import {
   deletePathAction,
   getTagsForProjectAction,
   createOperationAction,
-  updateOperationAction
+  updateOperationAction,
+  setPathTagsAction
 } from '../actions';
 import { useStudio } from '../../StudioContext';
 
@@ -347,6 +348,9 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
           description: description,
         };
         await updatePathAction(selectedNode.data.dbPathId, updates);
+
+        // Save tags to database
+        await setPathTagsAction(selectedNode.data.dbPathId, selectedTags);
       }
 
       // Save to database for method nodes

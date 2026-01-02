@@ -918,3 +918,129 @@ export async function addRequestBodyContentType(
   }
 }
 
+// ============================================================================
+// PATH TAGS MANAGEMENT
+// Functions for managing tags on API paths
+// ============================================================================
+
+/**
+ * Get all tags for a path
+ */
+export async function getTagsForPath(pathId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT pt.id, pt.path_id, pt.tag_id, pt.created_at,
+              t.name as tag_name, t.color as tag_color, t.description as tag_description
+       FROM odb.path_tags pt
+       JOIN odb.tags t ON pt.tag_id = t.id
+       WHERE pt.path_id = $1
+       ORDER BY t.name ASC`,
+      [pathId]
+    );
+    return JSON.stringify(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching tags for path:', error);
+    return JSON.stringify([]);
+  }
+}
+
+/**
+ * Assign a tag to a path
+ */
+export async function assignTagToPath(pathId: string, tagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `INSERT INTO odb.path_tags (path_id, tag_id)
+       VALUES ($1, $2)
+       ON CONFLICT (path_id, tag_id) DO NOTHING
+       RETURNING id, path_id, tag_id, created_at`,
+      [pathId, tagId]
+    );
+
+    // If conflict, fetch existing record
+    if (result.rowCount === 0) {
+      const existing = await connectionPool.query(
+        `SELECT pt.id, pt.path_id, pt.tag_id, pt.created_at,
+                t.name as tag_name, t.color as tag_color
+         FROM odb.path_tags pt
+         JOIN odb.tags t ON pt.tag_id = t.id
+         WHERE pt.path_id = $1 AND pt.tag_id = $2`,
+        [pathId, tagId]
+      );
+      if (existing.rowCount > 0) {
+        return successResponse({ path_tag: existing.rows[0], already_existed: true });
+      }
+    }
+
+    // Get tag info for the newly created relationship
+    const tagInfo = await connectionPool.query(
+      `SELECT pt.id, pt.path_id, pt.tag_id, pt.created_at,
+              t.name as tag_name, t.color as tag_color
+       FROM odb.path_tags pt
+       JOIN odb.tags t ON pt.tag_id = t.id
+       WHERE pt.id = $1`,
+      [result.rows[0].id]
+    );
+
+    return successResponse({ path_tag: tagInfo.rows[0] });
+  } catch (error: any) {
+    console.error('Error assigning tag to path:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Remove a tag from a path
+ */
+export async function removeTagFromPath(pathId: string, tagId: string) {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.path_tags WHERE path_id = $1 AND tag_id = $2 RETURNING id`,
+      [pathId, tagId]
+    );
+
+    if (result.rowCount === 0) {
+      return errorResponse('Tag assignment not found');
+    }
+
+    return successResponse();
+  } catch (error: any) {
+    console.error('Error removing tag from path:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Assign multiple tags to a path (replaces existing tags)
+ */
+export async function setPathTags(pathId: string, tagIds: string[]) {
+  try {
+    // Start transaction
+    await connectionPool.query('BEGIN');
+
+    // Remove all existing tags
+    await connectionPool.query(
+      'DELETE FROM odb.path_tags WHERE path_id = $1',
+      [pathId]
+    );
+
+    // Insert new tags
+    if (tagIds.length > 0) {
+      const values = tagIds.map((tagId, index) => `($1, $${index + 2})`).join(', ');
+      const params = [pathId, ...tagIds];
+      await connectionPool.query(
+        `INSERT INTO odb.path_tags (path_id, tag_id) VALUES ${values}`,
+        params
+      );
+    }
+
+    await connectionPool.query('COMMIT');
+
+    // Return updated tags
+    return await getTagsForPath(pathId);
+  } catch (error: any) {
+    await connectionPool.query('ROLLBACK');
+    console.error('Error setting path tags:', error);
+    return errorResponse(error.message);
+  }
+}

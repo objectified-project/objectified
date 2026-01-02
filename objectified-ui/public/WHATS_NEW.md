@@ -55,6 +55,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Method node properties: operation ID, summary, description with Monaco Editor
   - Paths and operations load from database on canvas initialization with automatic connections
   - Operations saved to database when connected to paths or via Save button
+  - Tags for operational grouping - assign multiple tags to paths from project-defined tags
+  - Tags saved to database with full CRUD support via path_tags join table
+  - Complete verification and testing suite included (see docs/PATH_TAGS_TESTING.md)
+  - Comprehensive unit tests (53 tests) covering all functionality (see docs/PATH_TAGS_TESTS_COMPLETE.md)
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
