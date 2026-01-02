@@ -4,6 +4,7 @@ import "../globals.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import AuthenticatedLayout from "@/app/components/auth/AuthenticatedLayout";
 import TopHeader from '@/app/components/ade/TopHeader';
+import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import * as React from 'react';
 
 const geistSans = Geist({
@@ -31,12 +32,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SessionWrapper>
-          <AuthenticatedLayout>
-            <TopHeader/>
-            {children}
-          </AuthenticatedLayout>
-        </SessionWrapper>
+        <ThemeProvider>
+          <SessionWrapper>
+            <AuthenticatedLayout>
+              <TopHeader/>
+              {children}
+            </AuthenticatedLayout>
+          </SessionWrapper>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -8,10 +8,93 @@
   --foreground: #171717;
 }
 
-/* Dark mode variables when .dark class is present */
-.dark {
+/* ===== THEME SYSTEM ===== */
+/* Light themes */
+.theme-light,
+[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+.theme-whiteboard,
+[data-theme="whiteboard"] {
+  --background: #fafafa;
+  --foreground: #212121;
+}
+
+/* Dark themes - also add .dark class for Tailwind compatibility */
+.theme-dark,
+[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
+}
+
+.theme-high-contrast,
+[data-theme="high-contrast"] {
+  --background: #000000;
+  --foreground: #ffffff;
+}
+
+.theme-blueprint,
+[data-theme="blueprint"] {
+  --background: #0c1e3a;
+  --foreground: #e3f2fd;
+}
+
+.theme-solarized,
+[data-theme="solarized"] {
+  --background: #002b36;
+  --foreground: #839496;
+}
+
+.theme-nord,
+[data-theme="nord"] {
+  --background: #2e3440;
+  --foreground: #eceff4;
+}
+
+.theme-darcula,
+[data-theme="darcula"] {
+  --background: #2b2b2b;
+  --foreground: #a9b7c6;
+}
+
+/* Override background colors for each theme using data-theme */
+/* These override Tailwind's dark:bg-gray-900 etc. */
+
+[data-theme="high-contrast"] header,
+[data-theme="high-contrast"] .bg-white,
+body[data-theme="high-contrast"] .dark\:bg-gray-900,
+body[data-theme="high-contrast"] .dark\:bg-gray-800 {
+  background-color: #000000 !important;
+}
+
+[data-theme="blueprint"] header,
+[data-theme="blueprint"] .bg-white,
+body[data-theme="blueprint"] .dark\:bg-gray-900,
+body[data-theme="blueprint"] .dark\:bg-gray-800 {
+  background-color: #0c1e3a !important;
+}
+
+[data-theme="solarized"] header,
+[data-theme="solarized"] .bg-white,
+body[data-theme="solarized"] .dark\:bg-gray-900,
+body[data-theme="solarized"] .dark\:bg-gray-800 {
+  background-color: #002b36 !important;
+}
+
+[data-theme="nord"] header,
+[data-theme="nord"] .bg-white,
+body[data-theme="nord"] .dark\:bg-gray-900,
+body[data-theme="nord"] .dark\:bg-gray-800 {
+  background-color: #2e3440 !important;
+}
+
+[data-theme="darcula"] header,
+[data-theme="darcula"] .bg-white,
+body[data-theme="darcula"] .dark\:bg-gray-900,
+body[data-theme="darcula"] .dark\:bg-gray-800 {
+  background-color: #2b2b2b !important;
 }
 
 @theme inline {

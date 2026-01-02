@@ -7,6 +7,8 @@ import { signOut, useSession } from "next-auth/react";
 import Avatar from '@mui/material/Avatar';
 import { usePathname } from 'next/navigation';
 import WhatsNewDialog from './WhatsNewDialog';
+import ThemeSelector from './ThemeSelector';
+import { useTheme } from '../../providers/ThemeProvider';
 import { getTenantsForUser } from '../../../../lib/db/helper';
 
 // Import version from package.json
@@ -22,13 +24,23 @@ const NAV_ITEMS: NavItem[] = [
 
 const TopHeader = () => {
   const [open, setOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
   const [currentTenantName, setCurrentTenantName] = useState<string>('');
   const menuRef = useRef<HTMLDivElement | null>(null);
   const { data: session } = useSession();
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
+  const { currentTheme, isSystemTheme } = useTheme();
+
+  // Get display name for current theme (shows effective theme when system is selected)
+  const getThemeDisplayName = () => {
+    if (isSystemTheme) {
+      const prefersDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return `System (${prefersDark ? 'Dark' : 'Light'})`;
+    }
+    return currentTheme.name;
+  };
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -38,47 +50,6 @@ const TopHeader = () => {
     }
     document.addEventListener("mousedown", handleOutside);
     return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
-
-  useEffect(() => {
-    // Detect dark mode - prioritize localStorage, then fall back to system preference
-    const initTheme = () => {
-      const savedTheme = localStorage.getItem('theme');
-      const html = document.documentElement;
-
-      if (savedTheme === 'dark') {
-        html.classList.add('dark');
-        setIsDarkMode(true);
-      } else if (savedTheme === 'light') {
-        html.classList.remove('dark');
-        setIsDarkMode(false);
-      } else {
-        // No saved preference - use system preference
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (systemPrefersDark) {
-          html.classList.add('dark');
-          setIsDarkMode(true);
-        } else {
-          html.classList.remove('dark');
-          setIsDarkMode(false);
-        }
-      }
-    };
-
-    initTheme();
-
-    // Listen for changes to dark mode class
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    return () => {
-      observer.disconnect();
-    };
   }, []);
 
   // Load current tenant name
@@ -101,21 +72,6 @@ const TopHeader = () => {
     loadTenantName();
   }, [session, currentTenantId]);
 
-  // Toggle theme function
-  const toggleTheme = () => {
-    const html = document.documentElement;
-    const currentlyDark = html.classList.contains('dark');
-
-    if (currentlyDark) {
-      html.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDarkMode(false);
-    } else {
-      html.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDarkMode(true);
-    }
-  };
 
   return (
     <header
@@ -134,7 +90,7 @@ const TopHeader = () => {
       {/* Left: Logo */}
       <div style={{ display: "flex", alignItems: "center", height: 40, gap: 8 }}>
         <img
-          src={isDarkMode ? "/Objectified-05.png" : "/Objectified-02.png"}
+          src={currentTheme.id === 'dark' || currentTheme.id === 'high-contrast' || currentTheme.id === 'blueprint' || currentTheme.id === 'solarized' || currentTheme.id === 'nord' || currentTheme.id === 'darcula' ? "/Objectified-05.png" : "/Objectified-02.png"}
           alt="Objectified Logo"
           style={{ height: "100%", width: "auto", objectFit: "contain" }}
         />
@@ -247,7 +203,7 @@ const TopHeader = () => {
               position: "absolute",
               right: 0,
               marginTop: 8,
-              minWidth: 160,
+              minWidth: 240,
               borderRadius: 8,
               padding: 4,
               zIndex: 2001,
@@ -257,29 +213,24 @@ const TopHeader = () => {
               View Profile
             </Link>
             <div className="h-px bg-gray-200 dark:bg-gray-600 my-1" />
-            {/* Theme Toggle */}
+            {/* Theme Selector */}
             <button
               onClick={() => {
-                toggleTheme();
+                setShowThemeSelector(true);
+                setOpen(false);
               }}
               role="menuitem"
               className="w-full text-left flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300"
               style={{ border: "none", cursor: "pointer", background: "transparent" }}
             >
               <span className="flex items-center gap-2">
-                {isDarkMode ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                )}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
                 Theme
               </span>
               <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                {isDarkMode ? 'Dark' : 'Light'}
+                {getThemeDisplayName()}
               </span>
             </button>
             <div className="h-px bg-gray-200 dark:bg-gray-600 my-1" />
@@ -298,6 +249,12 @@ const TopHeader = () => {
       <WhatsNewDialog
         isOpen={showWhatsNew}
         onClose={() => setShowWhatsNew(false)}
+      />
+
+      {/* Theme Selector Dialog */}
+      <ThemeSelector
+        isOpen={showThemeSelector}
+        onClose={() => setShowThemeSelector(false)}
       />
     </header>
   );

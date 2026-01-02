@@ -217,12 +217,12 @@
 ### 4. Visual Customization
 
 #### Node Styling 📋 PLANNED
-- 📋 **Custom Colors**:
-  - Per-class color picker
-  - Color by group
-  - Color by stereotype (entity, service, DTO)
-  - Color gradients for nodes
-  - Color themes (Material, Pastel, Corporate)
+- ✅ **Custom Colors**:
+  - ✅ Per-class color picker
+  - ✅ Color by group
+  - ✅ Color by stereotype (entity, service, DTO)
+  - ✅ Color gradients for nodes
+  - ✅ Color themes (Material, Pastel, Corporate)
 - 📋 **Node Icons**:
   - Built-in icon library (1000+ icons)
   - Custom icon upload
@@ -245,7 +245,6 @@
 
 | Ticket | Feature Description               |
 |--------|-----------------------------------|
-| #339   | Add custom coloring for nodes     |
 | #340   | Add custom node icons for styling |
 | #341   | Custom node sizing                |
 | #342   | Add node border configuration     |
@@ -292,23 +291,26 @@
 | #327   | Add Horizontal and Vertical rulers to the canvas |
 | #328   | Equal Spacing tools for the canvas               |
 
-#### Canvas Themes 📋 PLANNED
-- 📋 Pre-built themes:
-  - 📋 Light mode (default)
-  - 📋 Dark mode
-  - 📋 High contrast
-  - 📋 Blueprint (blue grid on dark)
-  - 📋 Whiteboard (minimal)
-  - 📋 Solarized
-  - 📋 Nord
-  - 📋 Darcula
+#### Application Themes ✅ IMPLEMENTED
+- ✅ Pre-built themes:
+  - ✅ Light mode (default)
+  - ✅ Dark mode
+  - ✅ High contrast
+  - ✅ Blueprint (blue grid on dark)
+  - ✅ Whiteboard (minimal)
+  - ✅ Solarized
+  - ✅ Nord
+  - ✅ Darcula
+- ✅ Theme selector in profile menu
+- ✅ Visual theme preview with color swatches
+- ✅ Persistent theme selection (localStorage)
+- ✅ Automatic system preference detection
 - 📋 Custom theme creator with full color control
-- Save and share custom themes
-- Theme marketplace
+- 📋 Save and share custom themes
+- 📋 Theme marketplace
 
 | Ticket | Feature                                                            |
 |--------|--------------------------------------------------------------------|
-| #309   | Custom color themes to choose from                                 |
 | #185   | Custom Colors: Per-class color picker, color by group, stereotypes |
 
 #### Canvas Background 📋 PLANNED

@@ -36,6 +36,13 @@ We continue to improve the platform based on your feedback with improvements and
     - Easy-to-use color picker with visual color swatches
     - Hover effects with scaling and shadows for better visual feedback
     - Reset button to restore default styling
+- Application-wide theme system
+  - 9 pre-built themes: Follow System, Light, Dark, High Contrast, Blueprint, Whiteboard, Solarized, Nord, Darcula
+  - Real-time updates: When you change your OS theme, the app updates immediately
+  - Theme selector in profile menu with visual previews
+  - Each theme shows color palette and live text preview
+  - Themes persist across sessions via localStorage
+  - Backward compatible with existing dark mode
   - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
   - Added creation of groups on the canvas via drag-and-drop from the sidebar
