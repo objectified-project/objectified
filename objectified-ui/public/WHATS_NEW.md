@@ -72,6 +72,10 @@ We continue to improve the platform based on your feedback with improvements and
     - Required toggle for mandatory request bodies
     - Visual preview of configured request body with schema name
     - Smart detection: GET/DELETE/OPTIONS/HEAD show "no body" message
+    - **Full database persistence** - Request body settings are saved and loaded from database
+      - Creates/updates/deletes request body records
+      - Saves content type with schema reference
+      - Loads existing request body when selecting method node
   - Complete verification and testing suite included (see docs/PATH_TAGS_TESTING.md)
   - Comprehensive unit tests (53 tests) covering all functionality (see docs/PATH_TAGS_TESTS_COMPLETE.md)
 

@@ -93,7 +93,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                  |
 |--------|----------------------------------------------------------|
-| #364   | Add request body schema binding                          |
 | #365   | Add response definitions to HTTP Operation               |
 | #366   | Add parameters (query, header, cookie) to HTTP Operation |
 | #367   | Add security requirements to HTTP Operation              |

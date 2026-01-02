@@ -10,10 +10,16 @@ import {
   updatePathAction,
   deletePathAction,
   getTagsForProjectAction,
+  getClassesForVersionAction,
   createOperationAction,
   updateOperationAction,
   setPathTagsAction,
-  setOperationTagsAction
+  setOperationTagsAction,
+  getRequestBodyForOperationAction,
+  createOperationRequestBodyAction,
+  updateOperationRequestBodyAction,
+  deleteOperationRequestBodyAction,
+  addRequestBodyContentTypeAction
 } from '../actions';
 import { useStudio } from '../../StudioContext';
 import SchemaPicker from './SchemaPicker';
@@ -130,7 +136,7 @@ interface PropertiesPanelProps {
 }
 
 export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPanelProps) {
-  const { selectedProjectId } = useStudio();
+  const { selectedProjectId, selectedVersionId } = useStudio();
   const [pathPattern, setPathPattern] = useState('');
   const [pathVariables, setPathVariables] = useState<PathVariable[]>([]);
   const [summary, setSummary] = useState('');
@@ -151,9 +157,10 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
   const [requestBodyDescription, setRequestBodyDescription] = useState('');
   const [requestBodyRequired, setRequestBodyRequired] = useState(false);
   const [requestBodyContentType, setRequestBodyContentType] = useState('application/json');
-  const [requestBodySchemaRef, setRequestBodySchemaRef] = useState(''); // Class ID or inline schema
+  const [requestBodySchemaRef, setRequestBodySchemaRef] = useState(''); // Class ID
   const [requestBodySchemaName, setRequestBodySchemaName] = useState(''); // Display name
   const [isSchemaPickerOpen, setIsSchemaPickerOpen] = useState(false);
+  const [requestBodyId, setRequestBodyId] = useState<string | null>(null); // Database ID
 
   // Store original values for cancel functionality
   const [originalValues, setOriginalValues] = useState({
@@ -226,6 +233,20 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
       setExternalDocsDescription(newExternalDocsDescription);
       setOperationId(newOperationId);
 
+      // Reset request body state
+      setRequestBodyEnabled(false);
+      setRequestBodyDescription('');
+      setRequestBodyRequired(false);
+      setRequestBodyContentType('application/json');
+      setRequestBodySchemaRef('');
+      setRequestBodySchemaName('');
+      setRequestBodyId(null);
+
+      // Load request body for method nodes
+      if (data.nodeType === 'method' && data.dbOperationId) {
+        loadRequestBody(data.dbOperationId);
+      }
+
       // Store original values
       setOriginalValues({
         pathPattern: newPathPattern,
@@ -243,6 +264,95 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
       setHasUnsavedChanges(false);
     }
   }, [selectedNode?.id]);
+
+  // Load request body data from database
+  const loadRequestBody = async (operationId: string) => {
+    try {
+      const result = await getRequestBodyForOperationAction(operationId);
+      const requestBody = JSON.parse(result);
+
+      if (requestBody && requestBody.id) {
+        setRequestBodyEnabled(true);
+        setRequestBodyId(requestBody.id);
+        setRequestBodyDescription(requestBody.description || '');
+        setRequestBodyRequired(requestBody.required || false);
+
+        // Load content types if available
+        if (requestBody.content_types && requestBody.content_types.length > 0) {
+          const firstContent = requestBody.content_types[0];
+          setRequestBodyContentType(firstContent.content_type || 'application/json');
+
+          const schemaClassId = firstContent.schema_class_id || '';
+          setRequestBodySchemaRef(schemaClassId);
+
+          // Load schema name from class ID
+          if (schemaClassId && selectedVersionId) {
+            try {
+              const classesResult = await getClassesForVersionAction(selectedVersionId);
+              const classes = JSON.parse(classesResult);
+              const schemaClass = classes.find((c: any) => c.id === schemaClassId);
+              if (schemaClass) {
+                setRequestBodySchemaName(schemaClass.name);
+              }
+            } catch (e) {
+              console.error('Error loading schema class name:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading request body:', error);
+    }
+  };
+
+  // Save request body to database
+  const saveRequestBody = async (operationId: string) => {
+    try {
+      if (requestBodyEnabled) {
+        if (requestBodyId) {
+          // Update existing request body
+          await updateOperationRequestBodyAction(requestBodyId, {
+            description: requestBodyDescription,
+            required: requestBodyRequired,
+          });
+          // Note: Content type updates would need a separate API call
+          // For now we just update the request body metadata
+        } else {
+          // Create new request body
+          const result = await createOperationRequestBodyAction(
+            operationId,
+            requestBodyDescription,
+            requestBodyRequired
+          );
+          const parsedResult = JSON.parse(result);
+
+          if (parsedResult.success && parsedResult.requestBody) {
+            const newRequestBodyId = parsedResult.requestBody.id;
+            setRequestBodyId(newRequestBodyId);
+
+            // Add content type with schema reference
+            if (requestBodyContentType) {
+              await addRequestBodyContentTypeAction(
+                newRequestBodyId,
+                requestBodyContentType,
+                requestBodySchemaRef || undefined,
+                undefined, // schemaInline
+                undefined  // example
+              );
+            }
+          } else {
+            console.error('Failed to create request body:', parsedResult.error);
+          }
+        }
+      } else if (requestBodyId) {
+        // Delete existing request body if disabled
+        await deleteOperationRequestBodyAction(requestBodyId);
+        setRequestBodyId(null);
+      }
+    } catch (error) {
+      console.error('Error saving request body:', error);
+    }
+  };
 
   // Dynamically extract and update path variables when path pattern changes
   useEffect(() => {
@@ -371,6 +481,8 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
         const method = selectedNode?.data?.method;
 
         if (connectedPathId && method) {
+          let currentOperationId = dbOperationId;
+
           if (dbOperationId) {
             // Update existing operation
             const updates: any = {
@@ -397,6 +509,7 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
             );
             const parsedResult = JSON.parse(result);
             if (parsedResult.success && parsedResult.operation) {
+              currentOperationId = parsedResult.operation.id;
               // Store the database ID in the node
               if (selectedNode?.updateData) {
                 selectedNode.updateData({
@@ -407,6 +520,11 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
             } else {
               console.error('Failed to create operation in database:', parsedResult.error);
             }
+          }
+
+          // Save request body if enabled and we have an operation ID
+          if (currentOperationId && !['GET', 'DELETE', 'OPTIONS', 'HEAD'].includes(method?.toUpperCase() || '')) {
+            await saveRequestBody(currentOperationId);
           }
         } else if (!connectedPathId) {
           console.warn('Method node is not connected to a path. Cannot save to database.');

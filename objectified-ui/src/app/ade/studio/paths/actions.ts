@@ -19,7 +19,12 @@ import {
   getTagsForOperation,
   assignTagToOperation,
   removeTagFromOperation,
-  setOperationTags
+  setOperationTags,
+  getRequestBodyForOperation,
+  createOperationRequestBody,
+  updateOperationRequestBody,
+  deleteOperationRequestBody,
+  addRequestBodyContentType
 } from '../../../../../lib/db/helper-paths';
 
 import { getTagsForProject, getClassesForVersion } from '../../../../../lib/db/helper';
@@ -144,3 +149,42 @@ export async function setOperationTagsAction(operationId: string, tagIds: string
   return await setOperationTags(operationId, tagIds);
 }
 
+// ============================================================================
+// REQUEST BODY ACTIONS
+// ============================================================================
+
+export async function getRequestBodyForOperationAction(operationId: string) {
+  return await getRequestBodyForOperation(operationId);
+}
+
+export async function createOperationRequestBodyAction(
+  operationId: string,
+  description?: string,
+  required?: boolean
+) {
+  return await createOperationRequestBody(operationId, description, required);
+}
+
+export async function updateOperationRequestBodyAction(
+  requestBodyId: string,
+  updates: {
+    description?: string;
+    required?: boolean;
+  }
+) {
+  return await updateOperationRequestBody(requestBodyId, updates);
+}
+
+export async function deleteOperationRequestBodyAction(requestBodyId: string) {
+  return await deleteOperationRequestBody(requestBodyId);
+}
+
+export async function addRequestBodyContentTypeAction(
+  requestBodyId: string,
+  contentType: string,
+  schemaClassId?: string,
+  schemaInline?: any,
+  example?: any
+) {
+  return await addRequestBodyContentType(requestBodyId, contentType, schemaClassId, schemaInline, example);
+}
