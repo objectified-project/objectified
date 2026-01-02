@@ -80,8 +80,8 @@ structure immediately recognizable.
 
 **Configurable Properties**:
 - ✅ Operation ID (auto-generated from method + path)
-- 📋 Tags for API grouping
-- 📋 Summary and description
+- ✅ Tags for API grouping
+- ✅ Summary and description
 - 📋 Request body schema binding
 - 📋 Response definitions (status codes + schemas)
 - 📋 Parameters (query, header, cookie)
@@ -93,8 +93,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                  |
 |--------|----------------------------------------------------------|
-| #362   | Add tags for API Grouping                                |
-| #363   | Add summary and description to HTTP Operation            |
 | #364   | Add request body schema binding                          |
 | #365   | Add response definitions to HTTP Operation               |
 | #366   | Add parameters (query, header, cookie) to HTTP Operation |

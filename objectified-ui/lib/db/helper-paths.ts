@@ -1059,7 +1059,7 @@ export async function getTagsForOperation(operationId: string) {
       `SELECT ot.id, ot.operation_id, ot.tag_id, ot.created_at,
               t.name as tag_name, t.color as tag_color, t.description as tag_description
        FROM odb.operation_tags ot
-       JOIN odb.api_tags t ON ot.tag_id = t.id
+       JOIN odb.tags t ON ot.tag_id = t.id
        WHERE ot.operation_id = $1
        ORDER BY t.name ASC`,
       [operationId]
@@ -1090,7 +1090,7 @@ export async function assignTagToOperation(operationId: string, tagId: string) {
         `SELECT ot.id, ot.operation_id, ot.tag_id, ot.created_at,
                 t.name as tag_name, t.color as tag_color
          FROM odb.operation_tags ot
-         JOIN odb.api_tags t ON ot.tag_id = t.id
+         JOIN odb.tags t ON ot.tag_id = t.id
          WHERE ot.operation_id = $1 AND ot.tag_id = $2`,
         [operationId, tagId]
       );
@@ -1104,7 +1104,7 @@ export async function assignTagToOperation(operationId: string, tagId: string) {
       `SELECT ot.id, ot.operation_id, ot.tag_id, ot.created_at,
               t.name as tag_name, t.color as tag_color
        FROM odb.operation_tags ot
-       JOIN odb.api_tags t ON ot.tag_id = t.id
+       JOIN odb.tags t ON ot.tag_id = t.id
        WHERE ot.id = $1`,
       [result.rows[0].id]
     );
