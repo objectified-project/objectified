@@ -134,6 +134,7 @@ const StudioContent = () => {
     setZoomToClassFn,
     setCreateGroupFn,
     setCreateGroupAtPositionFn,
+    clickToFocusEnabled,
     setClickToFocusEnabled: setContextClickToFocusEnabled,
     lodEnabled,
     groups,
@@ -145,13 +146,11 @@ const StudioContent = () => {
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
   const toggleClickToFocus = useCallback(() => {
-    setClickToFocusEnabled((prev) => {
-      const newValue = !prev;
-      localStorage.setItem('clickToFocusEnabled', JSON.stringify(newValue));
-      setContextClickToFocusEnabled(newValue);
-      return newValue;
-    });
-  }, [setContextClickToFocusEnabled]);
+    const newValue = !clickToFocusEnabled;
+    localStorage.setItem('clickToFocusEnabled', JSON.stringify(newValue));
+    setContextClickToFocusEnabled(newValue);
+    return newValue;
+  }, [clickToFocusEnabled, setContextClickToFocusEnabled]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
 
@@ -225,14 +224,6 @@ const StudioContent = () => {
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Click-to-focus mode state
-  const [clickToFocusEnabled, setClickToFocusEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('clickToFocusEnabled');
-      return saved ? JSON.parse(saved) : true; // Default to enabled
-    }
-    return true;
-  });
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -338,10 +329,6 @@ const StudioContent = () => {
     return () => setZoomToClassFn(null);
   }, [zoomToClass, setZoomToClassFn]);
 
-  // Sync clickToFocusEnabled with context
-  useEffect(() => {
-    setContextClickToFocusEnabled(clickToFocusEnabled);
-  }, [clickToFocusEnabled, setContextClickToFocusEnabled]);
 
   // Helper to reload classes for current selectedVersionId (used after edits)
   const reloadClasses = useCallback(async (applyLayout = false) => {
@@ -3854,10 +3841,14 @@ const StudioContent = () => {
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
     console.log('Clicked node:', node);
+    console.log('clickToFocusEnabled value:', clickToFocusEnabled);
 
     // If click-to-focus is enabled, zoom to the clicked node
     if (clickToFocusEnabled) {
+      console.log('Zooming to class:', node.id);
       zoomToClass(node.id);
+    } else {
+      console.log('Click-to-focus is disabled, skipping zoom');
     }
   }, [clickToFocusEnabled, zoomToClass]);
 
