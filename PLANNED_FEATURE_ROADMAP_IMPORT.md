@@ -267,9 +267,9 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Transaction Mode**: All-or-nothing import
 - 📋 **Incremental Mode**: Import available, skip failures
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #729   | Adds dry run mode for imports                   |
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| #729   | Adds dry run mode for imports              |
 | #730   | Incremental mode: import but skip failures |
 
 ##### Real-Time Feedback ✅ PARTIALLY IMPLEMENTED

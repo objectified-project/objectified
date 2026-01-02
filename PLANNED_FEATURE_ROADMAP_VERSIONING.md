@@ -70,20 +70,20 @@ This represents the different versions of the Objectified specification and thei
   - ✅ Copy classes and properties from existing version
   - ✅ Create new version based on previous version
 
-| Ticket | Feature Description                     |
-|--------|-----------------------------------------|
-| #738   | Create version merging functionality    |
-| #739   | Implement version tags feature          |
-| #740   | Highlight added/removed/changed classes |
-| #741   | Detail property-level changes           |
-| #742   | Visual canvas comparison                |
-| #743   | Visual tree of version history          |
-| #744   | Show branches and merges                |
-| #745   | Rollback to any previous version        |
-| #746   | Breaking changes documentation         |
+| Ticket | Feature Description                          |
+|--------|----------------------------------------------|
+| #738   | Create version merging functionality         |
+| #739   | Implement version tags feature               |
+| #740   | Highlight added/removed/changed classes      |
+| #741   | Detail property-level changes                |
+| #742   | Visual canvas comparison                     |
+| #743   | Visual tree of version history               |
+| #744   | Show branches and merges                     |
+| #745   | Rollback to any previous version             |
+| #746   | Breaking changes documentation               |
 | #747   | Migration guide generation for version notes |
-| #748   | Set sunset dates for deprecated versions |
-| #749   | Redirect to newer versions              |
+| #748   | Set sunset dates for deprecated versions     |
+| #749   | Redirect to newer versions                   |
 
 ---
 
