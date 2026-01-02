@@ -16,6 +16,7 @@ import {
   setOperationTagsAction
 } from '../actions';
 import { useStudio } from '../../StudioContext';
+import SchemaPicker from './SchemaPicker';
 
 /**
  * Generates an operation ID based on the HTTP method and path pattern.
@@ -144,6 +145,15 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
   const [isSaving, setIsSaving] = useState(false);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
+
+  // Request body state
+  const [requestBodyEnabled, setRequestBodyEnabled] = useState(false);
+  const [requestBodyDescription, setRequestBodyDescription] = useState('');
+  const [requestBodyRequired, setRequestBodyRequired] = useState(false);
+  const [requestBodyContentType, setRequestBodyContentType] = useState('application/json');
+  const [requestBodySchemaRef, setRequestBodySchemaRef] = useState(''); // Class ID or inline schema
+  const [requestBodySchemaName, setRequestBodySchemaName] = useState(''); // Display name
+  const [isSchemaPickerOpen, setIsSchemaPickerOpen] = useState(false);
 
   // Store original values for cancel functionality
   const [originalValues, setOriginalValues] = useState({
@@ -994,7 +1004,176 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
 
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-                    Request
+                    Request Body
+                  </h4>
+
+                  {/* Check if method typically has request body */}
+                  {['GET', 'DELETE', 'OPTIONS', 'HEAD'].includes(selectedNode?.data?.method?.toUpperCase() || '') ? (
+                    <div className="px-3 py-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                        {selectedNode?.data?.method?.toUpperCase()} requests typically do not have a request body
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Enable Request Body Toggle */}
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={requestBodyEnabled}
+                          onChange={(e) => {
+                            setRequestBodyEnabled(e.target.checked);
+                            setHasUnsavedChanges(true);
+                          }}
+                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Enable Request Body
+                        </span>
+                      </label>
+
+                      {requestBodyEnabled && (
+                        <>
+                          {/* Content Type Selector */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                              Content Type
+                            </label>
+                            <select
+                              value={requestBodyContentType}
+                              onChange={(e) => {
+                                setRequestBodyContentType(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                              <option value="application/json">application/json</option>
+                              <option value="application/xml">application/xml</option>
+                              <option value="multipart/form-data">multipart/form-data</option>
+                              <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+                              <option value="text/plain">text/plain</option>
+                              <option value="application/octet-stream">application/octet-stream</option>
+                            </select>
+                          </div>
+
+                          {/* Schema Reference */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                              Schema Reference
+                            </label>
+                            <div className="flex gap-2">
+                              <div className="flex-1 relative">
+                                <input
+                                  type="text"
+                                  value={requestBodySchemaName || requestBodySchemaRef}
+                                  onChange={(e) => {
+                                    setRequestBodySchemaRef(e.target.value);
+                                    setRequestBodySchemaName('');
+                                    setHasUnsavedChanges(true);
+                                  }}
+                                  placeholder="e.g., CreateOrderRequest"
+                                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono pr-8"
+                                />
+                                {requestBodySchemaName && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRequestBodySchemaRef('');
+                                      setRequestBodySchemaName('');
+                                      setHasUnsavedChanges(true);
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                                    title="Clear selection"
+                                  >
+                                    <X className="w-3 h-3 text-gray-400" />
+                                  </button>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setIsSchemaPickerOpen(true)}
+                                className="px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-lg text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                                title="Browse schemas"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                                </svg>
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Reference a schema class from the library or type a name
+                            </p>
+                          </div>
+
+                          {/* Description */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                              Description
+                            </label>
+                            <textarea
+                              value={requestBodyDescription}
+                              onChange={(e) => {
+                                setRequestBodyDescription(e.target.value);
+                                setHasUnsavedChanges(true);
+                              }}
+                              placeholder="Describe the request body..."
+                              rows={2}
+                              className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                            />
+                          </div>
+
+                          {/* Required Toggle */}
+                          <label className="flex items-center gap-3 cursor-pointer p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={requestBodyRequired}
+                              onChange={(e) => {
+                                setRequestBodyRequired(e.target.checked);
+                                setHasUnsavedChanges(true);
+                              }}
+                              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <div>
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Required
+                              </span>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Mark request body as mandatory for this operation
+                              </p>
+                            </div>
+                          </label>
+
+                          {/* Schema Preview (if set) */}
+                          {(requestBodySchemaRef || requestBodySchemaName) && (
+                            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-mono bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">
+                                  {requestBodyContentType}
+                                </span>
+                                {requestBodyRequired && (
+                                  <span className="text-xs bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-2 py-0.5 rounded">
+                                    required
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-indigo-600 dark:text-indigo-400">{'{ }'}</span>
+                                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                                  {requestBodySchemaName || requestBodySchemaRef}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Parameters Section */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
+                    Parameters
                   </h4>
                   <div className="space-y-2">
                     <button className="w-full px-3 py-2 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
@@ -1078,6 +1257,18 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
           )}
         </div>
       )}
+
+      {/* Schema Picker Modal */}
+      <SchemaPicker
+        isOpen={isSchemaPickerOpen}
+        onClose={() => setIsSchemaPickerOpen(false)}
+        onSelect={(schemaId, schemaName) => {
+          setRequestBodySchemaRef(schemaId);
+          setRequestBodySchemaName(schemaName);
+          setHasUnsavedChanges(true);
+        }}
+        currentValue={requestBodySchemaRef}
+      />
     </div>
   );
 }

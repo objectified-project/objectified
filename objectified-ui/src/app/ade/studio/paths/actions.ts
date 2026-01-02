@@ -22,10 +22,14 @@ import {
   setOperationTags
 } from '../../../../../lib/db/helper-paths';
 
-import { getTagsForProject } from '../../../../../lib/db/helper';
+import { getTagsForProject, getClassesForVersion } from '../../../../../lib/db/helper';
 
 export async function getTagsForProjectAction(projectId: string) {
   return await getTagsForProject(projectId);
+}
+
+export async function getClassesForVersionAction(versionId: string) {
+  return await getClassesForVersion(versionId);
 }
 
 export async function getPathsForVersionAction(versionId: string) {

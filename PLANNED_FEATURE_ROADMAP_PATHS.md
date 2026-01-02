@@ -82,7 +82,7 @@ structure immediately recognizable.
 - ✅ Operation ID (auto-generated from method + path)
 - ✅ Tags for API grouping
 - ✅ Summary and description
-- 📋 Request body schema binding
+- ✅ Request body schema binding
 - 📋 Response definitions (status codes + schemas)
 - 📋 Parameters (query, header, cookie)
 - 📋 Security requirements
@@ -373,7 +373,7 @@ The PathNode serves as the top-level container for an API endpoint:
      ○ ← Output handle for edge connections
 ```
 
-#### MethodNode (HTTP Verb Container)
+#### 9.3.1 MethodNode (HTTP Verb Container)
 
 MethodNodes are color-coded and nest inside PathNodes:
 
@@ -415,7 +415,7 @@ PATCH (Purple #9F7AEA)                 OPTIONS/HEAD (Gray #718096)
 └────────────────────────────┘         └────────────────────────────┘
 ```
 
-#### SchemaRefNode (Draggable from Library)
+#### 9.3.2 SchemaRefNode (Draggable from Library)
 
 When a schema is dragged from the library panel onto the canvas or into a request/response zone:
 
@@ -437,7 +437,7 @@ When a schema is dragged from the library panel onto the canvas or into a reques
   ○ ← Handle for connecting to Request/Response
 ```
 
-#### ParameterNode
+#### 9.3.3 ParameterNode
 
 Parameters appear as compact chips that can be attached to operations:
 
@@ -456,7 +456,7 @@ Header Parameter:                   Cookie Parameter:
 └─────────────────────────────┘    └─────────────────────────────┘
 ```
 
-#### ResponseNode
+#### 9.3.4 ResponseNode
 
 Response nodes show status code with color coding:
 

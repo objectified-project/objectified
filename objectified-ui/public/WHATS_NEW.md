@@ -60,6 +60,18 @@ We continue to improve the platform based on your feedback with improvements and
   - **Tags for HTTP method operations** - assign tags to individual operations (GET, POST, etc.)
   - Operation tags saved to database via operation_tags join table with full CRUD support
   - Tags automatically load from database for both paths and operations
+  - **Request Body Binding** - Configure request body for HTTP methods (POST, PUT, PATCH)
+    - Content type selector (application/json, multipart/form-data, etc.)
+    - **Schema Picker Modal** - Browse and select schema classes from your version
+      - Search functionality to filter schemas
+      - Schema type badges (object, enum, array)
+      - Description preview
+      - Double-click or button to select
+    - Schema reference with browse button and clear functionality
+    - Description field for documentation
+    - Required toggle for mandatory request bodies
+    - Visual preview of configured request body with schema name
+    - Smart detection: GET/DELETE/OPTIONS/HEAD show "no body" message
   - Complete verification and testing suite included (see docs/PATH_TAGS_TESTING.md)
   - Comprehensive unit tests (53 tests) covering all functionality (see docs/PATH_TAGS_TESTS_COMPLETE.md)
 
