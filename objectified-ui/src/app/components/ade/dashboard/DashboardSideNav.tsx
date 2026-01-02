@@ -15,7 +15,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
-import { useColorScheme } from '@mui/material/styles';
+import { useDarkMode } from '@/app/hooks/useDarkMode';
 
 interface NavItem {
   label: string;
@@ -32,8 +32,7 @@ interface NavSection {
 const DashboardSideNav: React.FC = () => {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const { mode, systemMode } = useColorScheme();
-  const isDark = mode === 'dark' || (mode === 'system' && systemMode === 'dark');
+  const isDark = useDarkMode();
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const hasTenant = !!currentTenantId;

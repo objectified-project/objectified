@@ -196,17 +196,29 @@ export default function PropertiesPanel({ selectedNode, onClose }: PropertiesPan
     loadTags();
   }, [selectedProjectId]);
 
-  // Detect dark mode from system preferences
+  // Detect dark mode - prioritize localStorage, then system preference
   useEffect(() => {
-    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDarkMode(darkModeMediaQuery.matches);
-
-    const handleChange = (e: MediaQueryListEvent) => {
-      setIsDarkMode(e.matches);
+    const initTheme = () => {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        setIsDarkMode(true);
+      } else if (savedTheme === 'light') {
+        setIsDarkMode(false);
+      } else {
+        // No saved preference - check class or system preference
+        setIsDarkMode(document.documentElement.classList.contains('dark') ||
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+      }
     };
+    initTheme();
 
-    darkModeMediaQuery.addEventListener('change', handleChange);
-    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+    // Listen for class changes
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => observer.disconnect();
   }, []);
 
   // Initialize state when node is selected

@@ -13,7 +13,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import { useColorScheme } from '@mui/material/styles';
+import { useDarkMode } from '@/app/hooks/useDarkMode';
 import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -87,8 +87,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                                                                 onSubmit,
                                                                 availableClasses = [],
                                                               }) => {
-  const { mode: colorMode, systemMode } = useColorScheme();
-  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+  const isDark = useDarkMode();
 
   const [viewMode, setViewMode] = useState<'form' | 'json'>('form');
   const [propertyName, setPropertyName] = useState('');

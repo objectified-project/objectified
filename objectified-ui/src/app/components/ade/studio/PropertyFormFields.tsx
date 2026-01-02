@@ -18,7 +18,7 @@ import MuiSelect from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
-import { useColorScheme } from '@mui/material/styles';
+import { useDarkMode } from '@/app/hooks/useDarkMode';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -228,8 +228,7 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, badge }) => {
-  const { mode: colorMode, systemMode } = useColorScheme();
-  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+  const isDark = useDarkMode();
 
   return (
     <Box sx={{
@@ -379,8 +378,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                                                         nestedProperties,
                                                                         availableClasses = [],
                                                                       }) => {
-  const { mode: colorMode, systemMode } = useColorScheme();
-  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+  const isDark = useDarkMode();
 
   const [enumInput, setEnumInput] = React.useState('');
   const [enumError, setEnumError] = React.useState('');

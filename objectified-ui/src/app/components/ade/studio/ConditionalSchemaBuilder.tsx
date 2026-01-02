@@ -10,7 +10,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Tooltip from '@mui/material/Tooltip';
-import { useColorScheme } from '@mui/material/styles';
+import { useDarkMode } from '@/app/hooks/useDarkMode';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -82,8 +82,7 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
   availableProperties,
   disabled = false,
 }) => {
-  const { mode: colorMode, systemMode } = useColorScheme();
-  const isDark = colorMode === 'dark' || (colorMode === 'system' && systemMode === 'dark');
+  const isDark = useDarkMode();
 
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
 

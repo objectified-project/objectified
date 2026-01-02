@@ -1,7 +1,7 @@
 // SideNav.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import Typography from '@mui/material/Typography';
@@ -15,9 +15,9 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
-import { useColorScheme } from '@mui/material/styles';
 import { Search, Add, Edit, Delete, Upload, LibraryBooks, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
+import { useDarkMode } from '@/app/hooks/useDarkMode';
 
 export interface ClassItem {
   id: string;
@@ -112,8 +112,8 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   selectedVersionId = null,
   isReadOnly = false,
 }) => {
-  const { mode, systemMode } = useColorScheme();
-  const isDark = mode === 'dark' || (mode === 'system' && systemMode === 'dark');
+  // Dark mode detection using shared hook
+  const isDark = useDarkMode();
 
   const [currentTab, setCurrentTab] = useState<'classes' | 'properties' | 'groups'>('classes');
   const [classesSearchQuery, setClassesSearchQuery] = useState('');

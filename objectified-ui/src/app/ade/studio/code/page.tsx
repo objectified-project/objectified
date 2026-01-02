@@ -72,24 +72,44 @@ export default function CodePage() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check dark mode
+  // Check dark mode - prioritize localStorage, then fall back to system preference
   useEffect(() => {
-    const checkDarkMode = () => {
-      const isDarkMode = document.documentElement.classList.contains('dark') ||
-                         window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setIsDark(isDarkMode);
+    const initTheme = () => {
+      const savedTheme = localStorage.getItem('theme');
+      const html = document.documentElement;
+
+      if (savedTheme === 'dark') {
+        html.classList.add('dark');
+        setIsDark(true);
+      } else if (savedTheme === 'light') {
+        html.classList.remove('dark');
+        setIsDark(false);
+      } else {
+        // No saved preference - use system preference
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (systemPrefersDark) {
+          html.classList.add('dark');
+          setIsDark(true);
+        } else {
+          html.classList.remove('dark');
+          setIsDark(false);
+        }
+      }
     };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
+
+    initTheme();
+
+    // Listen for class changes
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class']
     });
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', checkDarkMode);
+
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener('change', checkDarkMode);
     };
   }, []);
 

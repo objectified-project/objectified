@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
+/* Configure dark mode to use .dark class on html element */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+/* Dark mode variables when .dark class is present */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -75,8 +84,9 @@
   animation: fadeOut 0.15s ease-in;
 }
 
+/* System preference dark mode (only when no explicit .dark class and no saved preference) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.dark):not([data-theme="light"]) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }

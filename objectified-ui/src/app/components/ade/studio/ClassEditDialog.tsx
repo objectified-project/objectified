@@ -30,22 +30,29 @@ import ConditionalSchemaBuilder, {
   jsonSchemaToConditionalRules
 } from './ConditionalSchemaBuilder';
 
-// Custom hook for dark mode detection
+// Custom hook for dark mode detection - prioritizes localStorage, then system preference
 const useDarkMode = () => {
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDark(document.documentElement.classList.contains('dark') ||
-        window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const initTheme = () => {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        setIsDark(true);
+      } else if (savedTheme === 'light') {
+        setIsDark(false);
+      } else {
+        // No saved preference - check class or system preference
+        setIsDark(document.documentElement.classList.contains('dark') ||
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+      }
     };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
+    initTheme();
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', checkDarkMode);
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener('change', checkDarkMode);
     };
   }, []);
   return isDark;

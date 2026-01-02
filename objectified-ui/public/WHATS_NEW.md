@@ -18,6 +18,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed side-by-side diff comparison view for versions
   - Fixed deleting a group from the canvas now properly deletes the database record
   - Fixed property template button icon color in light mode (was appearing black instead of white)
+  - Fixed click-to-focus behavior in the canvas
+  - Fixed dark mode and light mode to be separate and predictable (saved preference now takes priority over system preference)
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
