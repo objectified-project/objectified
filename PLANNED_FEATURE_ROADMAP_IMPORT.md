@@ -12,13 +12,12 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Multi-File Upload**: Batch import multiple specification files
 - ✅ **Drag & Drop Zone**: Visual dropzone with file type indicators
 - **Folder Upload**: Import entire specification directories
-- **Archive Support**: Import from ZIP, TAR.GZ containing specs
 - **Large File Handling**: Chunked upload for files > 10MB
 - **Upload Resume**: Resume interrupted uploads
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #498   | Adds multi-file upload functionality            |
+| Ticket | Feature Description                  |
+|--------|--------------------------------------|
+| #498   | Adds multi-file upload functionality |
 
 ##### URL Import 📋 PLANNED
 - ✅ **Direct URL Import**: Fetch spec from public URL
@@ -80,7 +79,8 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 **Import From** 📋 PLANNED
 - 📋 Arazzo
 - 📋 OpenAPI 2.0 (Swagger)
-- 📋 OpenAPI 3.0/3.1
+- 📋 OpenAPI 3.0.x
+- ✅ OpenAPI 3.1.x
 - 📋 JSON Schema
 - Postman Collections
 - 📋 GraphQL SDL
@@ -166,10 +166,10 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - 📋 **Search & Filter**: Find schemas by name, type, tags
 - **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                                       |
+|--------|-----------------------------------------------------------|
 | #579   | Dependency resolution - auto-select required dependencies |
-| #580   | Search & filter schemas by name, type, tags     |
+| #580   | Search & filter schemas by name, type, tags               |
 
 ##### Name Mapping 📋 PLANNED
 - 📋 **Auto-Generated Names**: Smart naming from schema context
