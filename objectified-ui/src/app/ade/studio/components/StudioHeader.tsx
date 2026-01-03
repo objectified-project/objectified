@@ -53,7 +53,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     gridSize,
     setGridSize,
     snapToGrid,
-    setSnapToGrid
+    setSnapToGrid,
+    gridStyle,
+    setGridStyle
   } = useStudio();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -417,6 +419,53 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                         <span>10px</span>
                         <span>50px</span>
+                      </div>
+                    </div>
+
+                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+
+                    {/* Grid Style Selector */}
+                    <div className="px-3 py-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Grid Style</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => setGridStyle('dots')}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                            gridStyle === 'dots'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          Dots
+                        </button>
+                        <button
+                          onClick={() => setGridStyle('lines')}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                            gridStyle === 'lines'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          Lines
+                        </button>
+                        <button
+                          onClick={() => setGridStyle('cross')}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                            gridStyle === 'cross'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          Cross
+                        </button>
                       </div>
                     </div>
                   </DropdownMenu.Content>

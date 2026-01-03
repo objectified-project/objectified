@@ -56,6 +56,8 @@ interface StudioContextType {
   setGridSize: (size: number) => void;
   snapToGrid: boolean;
   setSnapToGrid: (enabled: boolean) => void;
+  gridStyle: 'dots' | 'lines' | 'cross';
+  setGridStyle: (style: 'dots' | 'lines' | 'cross') => void;
   // Group management
   groups: CanvasGroup[];
   setGroups: (groups: CanvasGroup[]) => void;
@@ -109,6 +111,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return true;
   });
 
+  const [gridStyle, setGridStyle] = useState<'dots' | 'lines' | 'cross'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('gridStyle');
+      return (saved as 'dots' | 'lines' | 'cross') || 'dots'; // Default to dots
+    }
+    return 'dots';
+  });
+
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
   // Persist grid settings to localStorage
@@ -123,6 +133,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('snapToGrid', JSON.stringify(snapToGrid));
     }
   }, [snapToGrid]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gridStyle', gridStyle);
+    }
+  }, [gridStyle]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -190,6 +206,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setGridSize,
       snapToGrid,
       setSnapToGrid,
+      gridStyle,
+      setGridStyle,
       groups,
       setGroups,
       addGroup,

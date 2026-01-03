@@ -160,6 +160,7 @@ const StudioContent = () => {
     lodEnabled,
     gridSize,
     snapToGrid,
+    gridStyle,
     groups,
     setGroups,
     addGroup,
@@ -4328,7 +4329,13 @@ const StudioContent = () => {
               }}
             >
             <Background
-              variant={BackgroundVariant.Dots}
+              variant={
+                gridStyle === 'dots'
+                  ? BackgroundVariant.Dots
+                  : gridStyle === 'lines'
+                    ? BackgroundVariant.Lines
+                    : BackgroundVariant.Cross
+              }
               gap={gridSize}
               size={1.5}
               color="currentColor"
