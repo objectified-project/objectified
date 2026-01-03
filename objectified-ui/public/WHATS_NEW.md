@@ -36,20 +36,21 @@ We continue to improve the platform based on your feedback with improvements and
     - Easy-to-use color picker with visual color swatches
     - Hover effects with scaling and shadows for better visual feedback
     - Reset button to restore default styling
-- Application-wide theme system
-  - 9 pre-built themes: Follow System, Light, Dark, High Contrast, Blueprint, Whiteboard, Solarized, Nord, Darcula
-  - Real-time updates: When you change your OS theme, the app updates immediately
-  - Theme selector in profile menu with visual previews
-  - Each theme shows color palette and live text preview
-  - Themes persist across sessions via localStorage
-  - Backward compatible with existing dark mode
+  - Application-wide theme system
+    - 9 pre-built themes: Follow System, Light, Dark, High Contrast, Blueprint, Whiteboard, Solarized, Nord, Darcula
+    - Real-time updates: When you change your OS theme, the app updates immediately
+    - Theme selector in profile menu with visual previews
+    - Each theme shows color palette and live text preview
+    - Backward compatible with existing dark mode
   - Added the ability to import a class directly using the same import system 
   - Added ability to persist layout settings for versions
   - Added creation of groups on the canvas via drag-and-drop from the sidebar
-  - Added Save and Load buttons for manual layout management
+  - Added save and load buttons for manual layout management
   - Added group styling options: custom icons, border styles (dashed/solid/dotted), shadow levels, and background opacity
-  - Added Level of Detail toggling
+  - Added "Level of Detail" modal toggling
   - Removed existing auto layout code, as it was not working as intended; will fix in a later release
+  - Added custom snap-to-grid functionality
+  - Added smart guidelines when dragging nodes for better alignment
 - Added property templates
   - Fixed property copying to a class that contains an object with nested properties
 
