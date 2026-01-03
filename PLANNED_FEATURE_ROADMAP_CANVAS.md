@@ -12,9 +12,9 @@
 ### 1. Canvas Layout & Organization
 
 #### Save & Load Layouts ✅ IMPLEMENTED (Basic), 📋 PLANNED (Advanced)
+- 📋 **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
 - ✅ Save current canvas arrangement
 - ✅ Save and load groups with layouts
-- 📋 **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
 - ✅ **Layout Controls**: Compact button with dropdown menu
 - ✅ **Database Table**: Create a database table to store layouts
 - 📋 Multiple saved layouts per version:
@@ -549,21 +549,6 @@
 | #560   | Heatmap visualization to version dashboard     |
 | #561   | Trend indicators (improving/declining metrics) |
 
-#### Version Comparison View ✅ PARTIALLY COMPLETE
-- ✅ Side-by-side canvas comparison of two versions
-- ✅ Diff highlighting:
-  - ✅ Green for added classes/properties
-  - ✅ Red for removed classes/properties
-  - ✅ Yellow for modified classes/properties
-- Animated transition between versions
-- "Time travel" slider to scrub through version history
-- Change summary panel with statistics
-- 📋 Filter diff by change type
-
-| Ticket | Feature                    |
-|--------|----------------------------|
-| #563   | Filter diff by change type |
-
 ---
 
 ### 11. Developer Productivity Features
@@ -613,3 +598,11 @@
   - ✅ Persistent grid style preference (localStorage)
 - ✅ Smart guides on drag
 - ✅ Equal spacing tools
+
+#### Version Comparison View ✅ COMPLETE
+- ✅ Side-by-side canvas comparison of two versions
+- ✅ Diff highlighting:
+  - ✅ Green for added classes/properties
+  - ✅ Red for removed classes/properties
+  - ✅ Yellow for modified classes/properties
+- ✅ Filter diff by change type (additions, removals, modifications)

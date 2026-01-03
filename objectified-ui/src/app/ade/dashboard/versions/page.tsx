@@ -101,6 +101,11 @@ const Versions = () => {
   const [diffResult, setDiffResult] = useState<Change[]>([]);
   const [schemaDiffSummary, setSchemaDiffSummary] = useState<DiffSummary | null>(null);
   const [diffViewMode, setDiffViewMode] = useState<'overlay' | 'side-by-side'>('overlay');
+  const [diffFilter, setDiffFilter] = useState<{
+    showAdded: boolean;
+    showRemoved: boolean;
+    showModified: boolean;
+  }>({ showAdded: true, showRemoved: true, showModified: true });
 
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
@@ -707,8 +712,8 @@ const Versions = () => {
 
       {/* Version Comparison Dialog */}
       <Dialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
-        <DialogContent className="max-w-6xl max-h-[90vh]">
-          <DialogHeader>
+        <DialogContent className="max-w-6xl h-[90vh] min-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center justify-between">
               <div>
                 <div>Compare Version Schemas</div>
@@ -728,7 +733,7 @@ const Versions = () => {
               )}
             </DialogTitle>
           </DialogHeader>
-          <div className="max-h-[70vh] overflow-y-auto overflow-x-hidden">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
             {diffResult.length === 0 ? (
               <div className="space-y-4 p-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -840,7 +845,73 @@ const Versions = () => {
                 {/* Schema-aware diff summary - SHOWN SECOND */}
                 {schemaDiffSummary && (
                   <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Schema Changes Summary</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Schema Changes Summary</h3>
+
+                      {/* Filter Controls */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600 dark:text-gray-400 mr-1">Filter:</span>
+                        <button
+                          onClick={() => setDiffFilter(prev => ({ ...prev, showAdded: !prev.showAdded }))}
+                          className={`px-2 py-1 text-xs rounded border transition-all flex items-center gap-1.5 ${
+                            diffFilter.showAdded
+                              ? 'bg-green-600 dark:bg-green-700 text-white border-green-700 dark:border-green-600 shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                          title={diffFilter.showAdded ? 'Hide additions' : 'Show additions'}
+                        >
+                          {diffFilter.showAdded && (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          <span>+ Added ({schemaDiffSummary.added.length})</span>
+                        </button>
+                        <button
+                          onClick={() => setDiffFilter(prev => ({ ...prev, showRemoved: !prev.showRemoved }))}
+                          className={`px-2 py-1 text-xs rounded border transition-all flex items-center gap-1.5 ${
+                            diffFilter.showRemoved
+                              ? 'bg-red-600 dark:bg-red-700 text-white border-red-700 dark:border-red-600 shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                          title={diffFilter.showRemoved ? 'Hide removals' : 'Show removals'}
+                        >
+                          {diffFilter.showRemoved && (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          <span>- Removed ({schemaDiffSummary.removed.length})</span>
+                        </button>
+                        <button
+                          onClick={() => setDiffFilter(prev => ({ ...prev, showModified: !prev.showModified }))}
+                          className={`px-2 py-1 text-xs rounded border transition-all flex items-center gap-1.5 ${
+                            diffFilter.showModified
+                              ? 'bg-yellow-600 dark:bg-yellow-700 text-white border-yellow-700 dark:border-yellow-600 shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                          title={diffFilter.showModified ? 'Hide modifications' : 'Show modifications'}
+                        >
+                          {diffFilter.showModified && (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          <span>~ Modified ({schemaDiffSummary.modified.length})</span>
+                        </button>
+                        {/* Reset filter button */}
+                        {(!diffFilter.showAdded || !diffFilter.showRemoved || !diffFilter.showModified) && (
+                          <button
+                            onClick={() => setDiffFilter({ showAdded: true, showRemoved: true, showModified: true })}
+                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                            title="Show all changes"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
                         <div className="text-2xl font-bold text-green-600 dark:text-green-400">{schemaDiffSummary.added.length}</div>
@@ -858,8 +929,27 @@ const Versions = () => {
 
                     {/* Detailed changes */}
                     <div className="space-y-4">
+                      {/* Empty state when all filters are off or no matching changes */}
+                      {(!diffFilter.showAdded && !diffFilter.showRemoved && !diffFilter.showModified) ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <div className="text-sm">All change types are filtered out</div>
+                          <div className="text-xs mt-1">Enable at least one filter to see changes</div>
+                        </div>
+                      ) : (
+                        (diffFilter.showAdded && schemaDiffSummary.added.length === 0) &&
+                        (diffFilter.showRemoved && schemaDiffSummary.removed.length === 0) &&
+                        (diffFilter.showModified && schemaDiffSummary.modified.length === 0) &&
+                        (!diffFilter.showAdded || schemaDiffSummary.added.length === 0) &&
+                        (!diffFilter.showRemoved || schemaDiffSummary.removed.length === 0) &&
+                        (!diffFilter.showModified || schemaDiffSummary.modified.length === 0)
+                      ) ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <div className="text-sm">No changes match the current filter</div>
+                        </div>
+                      ) : null}
+
                       {/* Added items */}
-                      {schemaDiffSummary.added.length > 0 && (
+                      {diffFilter.showAdded && schemaDiffSummary.added.length > 0 && (
                         <div>
                           <h4 className="text-xs font-semibold text-green-700 dark:text-green-300 mb-2 flex items-center gap-2">
                             <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
@@ -878,7 +968,7 @@ const Versions = () => {
                       )}
 
                       {/* Removed items */}
-                      {schemaDiffSummary.removed.length > 0 && (
+                      {diffFilter.showRemoved && schemaDiffSummary.removed.length > 0 && (
                         <div>
                           <h4 className="text-xs font-semibold text-red-700 dark:text-red-300 mb-2 flex items-center gap-2">
                             <span className="inline-block w-2 h-2 bg-red-500 rounded-full"></span>
@@ -897,7 +987,7 @@ const Versions = () => {
                       )}
 
                       {/* Modified items */}
-                      {schemaDiffSummary.modified.length > 0 && (
+                      {diffFilter.showModified && schemaDiffSummary.modified.length > 0 && (
                         <div>
                           <h4 className="text-xs font-semibold text-yellow-700 dark:text-yellow-300 mb-2 flex items-center gap-2">
                             <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full"></span>
@@ -929,7 +1019,7 @@ const Versions = () => {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             {diffResult.length > 0 && <Button variant="outline" onClick={() => { setDiffResult([]); setCompareSpec1(''); setCompareSpec2(''); }}>Compare Different Versions</Button>}
             <Button variant="outline" onClick={() => setShowCompareDialog(false)}>Close</Button>
           </DialogFooter>

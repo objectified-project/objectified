@@ -54,6 +54,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Added spacing utility for multiple nodes (selected with Shift key)
 - Added property templates
   - Fixed property copying to a class that contains an object with nested properties
+- Dashboard improvements
+  - Version comparison now shows a more comprehensive list of changes, with the ability to filter by change type (added, removed, modified)
 
 [//]: # (- Introducing Paths - API endpoint design canvas)
 
