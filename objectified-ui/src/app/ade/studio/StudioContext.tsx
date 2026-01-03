@@ -58,6 +58,9 @@ interface StudioContextType {
   setSnapToGrid: (enabled: boolean) => void;
   gridStyle: 'dots' | 'lines' | 'cross';
   setGridStyle: (style: 'dots' | 'lines' | 'cross') => void;
+  // Smart guides
+  smartGuidesEnabled: boolean;
+  setSmartGuidesEnabled: (enabled: boolean) => void;
   // Group management
   groups: CanvasGroup[];
   setGroups: (groups: CanvasGroup[]) => void;
@@ -119,6 +122,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return 'dots';
   });
 
+  const [smartGuidesEnabled, setSmartGuidesEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smartGuidesEnabled');
+      return saved ? JSON.parse(saved) : true; // Default to enabled
+    }
+    return true;
+  });
+
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
   // Persist grid settings to localStorage
@@ -139,6 +150,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('gridStyle', gridStyle);
     }
   }, [gridStyle]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smartGuidesEnabled', JSON.stringify(smartGuidesEnabled));
+    }
+  }, [smartGuidesEnabled]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -208,6 +225,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSnapToGrid,
       gridStyle,
       setGridStyle,
+      smartGuidesEnabled,
+      setSmartGuidesEnabled,
       groups,
       setGroups,
       addGroup,

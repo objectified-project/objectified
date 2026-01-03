@@ -290,13 +290,12 @@
   - ✅ Grid style selector in StudioHeader settings
   - ✅ Real-time grid style switching
   - ✅ Persistent grid style preference (localStorage)
-- 📋 Smart guides on drag
+- ✅ Smart guides on drag
 - 📋 Horizontal/vertical rulers
 - 📋 Equal spacing tools
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-| #325   | Add grid styling to the canvas - ✅ IMPLEMENTED  |
 | #326   | Add smart guides when dragging nodes             |
 | #327   | Add Horizontal and Vertical rulers to the canvas |
 | #328   | Equal Spacing tools for the canvas               |

@@ -161,6 +161,8 @@ const StudioContent = () => {
     gridSize,
     snapToGrid,
     gridStyle,
+    smartGuidesEnabled,
+    setSmartGuidesEnabled,
     groups,
     setGroups,
     addGroup,
@@ -207,6 +209,11 @@ const StudioContent = () => {
   // Zoom level state for level-of-detail rendering
   const [zoomLevel, setZoomLevel] = useState<number>(1);
 
+  // Smart guides state for alignment assistance during drag
+  const [guides, setGuides] = useState<{
+    horizontal: Array<{ y: number; x1: number; x2: number }>;
+    vertical: Array<{ x: number; y1: number; y2: number }>;
+  }>({ horizontal: [], vertical: [] });
 
   // Class-property edit dialog state
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
@@ -1276,23 +1283,107 @@ const StudioContent = () => {
     return null;
   }, [groups]);
 
-  // Handle node drag - check if over a group for visual feedback
+  // Handle node drag - check if over a group for visual feedback and calculate smart guides
   const handleNodeDrag = useCallback((event: React.MouseEvent, node: Node) => {
     if (isReadOnly || node.type === 'groupNode') {
       setDragOverGroupId(null);
+      setGuides({ horizontal: [], vertical: [] });
       return;
     }
 
-    // Get node center
+    // Get node dimensions and positions
     const nodeWidth = (node.measured?.width as number) || (node.width as number) || 260;
     const nodeHeight = (node.measured?.height as number) || (node.height as number) || 200;
     const nodeCenterX = node.position.x + nodeWidth / 2;
     const nodeCenterY = node.position.y + nodeHeight / 2;
+    const nodeLeft = node.position.x;
+    const nodeRight = node.position.x + nodeWidth;
+    const nodeTop = node.position.y;
+    const nodeBottom = node.position.y + nodeHeight;
 
     // Find if over any group
     const overGroupId = findGroupAtPosition(nodeCenterX, nodeCenterY);
     setDragOverGroupId(overGroupId);
-  }, [isReadOnly, findGroupAtPosition]);
+
+    // Only calculate smart guides if enabled
+    if (!smartGuidesEnabled) {
+      setGuides({ horizontal: [], vertical: [] });
+      return;
+    }
+
+    // Calculate smart guides for alignment
+    const SNAP_THRESHOLD = 8; // pixels
+    const newHorizontalGuides: Array<{ y: number; x1: number; x2: number }> = [];
+    const newVerticalGuides: Array<{ x: number; y1: number; y2: number }> = [];
+
+    // Get all other class nodes (not groups, not the dragging node)
+    const otherNodes = nodes.filter(n => n.id !== node.id && n.type !== 'groupNode');
+
+    otherNodes.forEach(otherNode => {
+      const otherWidth = (otherNode.measured?.width as number) || (otherNode.width as number) || 260;
+      const otherHeight = (otherNode.measured?.height as number) || (otherNode.height as number) || 200;
+      const otherCenterX = otherNode.position.x + otherWidth / 2;
+      const otherCenterY = otherNode.position.y + otherHeight / 2;
+      const otherLeft = otherNode.position.x;
+      const otherRight = otherNode.position.x + otherWidth;
+      const otherTop = otherNode.position.y;
+      const otherBottom = otherNode.position.y + otherHeight;
+
+      // Calculate x bounds for horizontal guides
+      const minX = Math.min(nodeLeft, otherLeft) - 20;
+      const maxX = Math.max(nodeRight, otherRight) + 20;
+
+      // Calculate y bounds for vertical guides
+      const minY = Math.min(nodeTop, otherTop) - 20;
+      const maxY = Math.max(nodeBottom, otherBottom) + 20;
+
+      // Horizontal alignment checks (same Y positions)
+      // Top edge alignment
+      if (Math.abs(nodeTop - otherTop) < SNAP_THRESHOLD) {
+        newHorizontalGuides.push({ y: otherTop, x1: minX, x2: maxX });
+      }
+      // Bottom edge alignment
+      if (Math.abs(nodeBottom - otherBottom) < SNAP_THRESHOLD) {
+        newHorizontalGuides.push({ y: otherBottom, x1: minX, x2: maxX });
+      }
+      // Center Y alignment
+      if (Math.abs(nodeCenterY - otherCenterY) < SNAP_THRESHOLD) {
+        newHorizontalGuides.push({ y: otherCenterY, x1: minX, x2: maxX });
+      }
+      // Top to bottom alignment
+      if (Math.abs(nodeTop - otherBottom) < SNAP_THRESHOLD) {
+        newHorizontalGuides.push({ y: otherBottom, x1: minX, x2: maxX });
+      }
+      // Bottom to top alignment
+      if (Math.abs(nodeBottom - otherTop) < SNAP_THRESHOLD) {
+        newHorizontalGuides.push({ y: otherTop, x1: minX, x2: maxX });
+      }
+
+      // Vertical alignment checks (same X positions)
+      // Left edge alignment
+      if (Math.abs(nodeLeft - otherLeft) < SNAP_THRESHOLD) {
+        newVerticalGuides.push({ x: otherLeft, y1: minY, y2: maxY });
+      }
+      // Right edge alignment
+      if (Math.abs(nodeRight - otherRight) < SNAP_THRESHOLD) {
+        newVerticalGuides.push({ x: otherRight, y1: minY, y2: maxY });
+      }
+      // Center X alignment
+      if (Math.abs(nodeCenterX - otherCenterX) < SNAP_THRESHOLD) {
+        newVerticalGuides.push({ x: otherCenterX, y1: minY, y2: maxY });
+      }
+      // Left to right alignment
+      if (Math.abs(nodeLeft - otherRight) < SNAP_THRESHOLD) {
+        newVerticalGuides.push({ x: otherRight, y1: minY, y2: maxY });
+      }
+      // Right to left alignment
+      if (Math.abs(nodeRight - otherLeft) < SNAP_THRESHOLD) {
+        newVerticalGuides.push({ x: otherLeft, y1: minY, y2: maxY });
+      }
+    });
+
+    setGuides({ horizontal: newHorizontalGuides, vertical: newVerticalGuides });
+  }, [isReadOnly, findGroupAtPosition, nodes, smartGuidesEnabled]);
 
   // Check if a node is completely outside a group's bounds
   const isNodeCompletelyOutsideGroup = useCallback((node: Node, groupId: string): boolean => {
@@ -1326,6 +1417,7 @@ const StudioContent = () => {
   // Handle node drag stop - add to group or remove from group
   const handleNodeDragStop = useCallback(async (event: React.MouseEvent, node: Node) => {
     setDragOverGroupId(null);
+    setGuides({ horizontal: [], vertical: [] }); // Clear smart guides
 
     if (isReadOnly || node.type === 'groupNode') return;
 
@@ -4369,6 +4461,68 @@ const StudioContent = () => {
                 border: '1px solid rgba(99, 102, 241, 0.2)',
               }}
             />
+
+            {/* Smart Guides for Alignment - uses viewport to render in flow coordinate space */}
+            {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (() => {
+              const viewport = getViewport();
+              return (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    zIndex: 1000,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <svg
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: 'none',
+                      overflow: 'visible',
+                    }}
+                  >
+                    <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
+                      {/* Horizontal guide lines */}
+                      {guides.horizontal.map((guide, index) => (
+                        <line
+                          key={`h-${index}`}
+                          x1={guide.x1}
+                          y1={guide.y}
+                          x2={guide.x2}
+                          y2={guide.y}
+                          stroke="#f472b6"
+                          strokeWidth={2 / viewport.zoom}
+                          strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
+                          style={{ filter: 'drop-shadow(0 0 2px rgba(244, 114, 182, 0.5))' }}
+                        />
+                      ))}
+                      {/* Vertical guide lines */}
+                      {guides.vertical.map((guide, index) => (
+                        <line
+                          key={`v-${index}`}
+                          x1={guide.x}
+                          y1={guide.y1}
+                          x2={guide.x}
+                          y2={guide.y2}
+                          stroke="#f472b6"
+                          strokeWidth={2 / viewport.zoom}
+                          strokeDasharray={`${6 / viewport.zoom} ${4 / viewport.zoom}`}
+                          style={{ filter: 'drop-shadow(0 0 2px rgba(244, 114, 182, 0.5))' }}
+                        />
+                      ))}
+                    </g>
+                  </svg>
+                </div>
+              );
+            })()}
 
             {/* Read Only Indicator */}
             {isReadOnly && (

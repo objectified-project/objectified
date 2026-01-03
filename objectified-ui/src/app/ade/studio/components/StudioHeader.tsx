@@ -55,7 +55,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     snapToGrid,
     setSnapToGrid,
     gridStyle,
-    setGridStyle
+    setGridStyle,
+    smartGuidesEnabled,
+    setSmartGuidesEnabled
   } = useStudio();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -389,6 +391,20 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                       <span className="flex-1">Snap to Grid</span>
                       <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                         {snapToGrid ? 'ON' : 'OFF'}
+                      </span>
+                    </DropdownMenu.Item>
+
+                    {/* Smart Guides Toggle */}
+                    <DropdownMenu.Item
+                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                      onSelect={() => setSmartGuidesEnabled(!smartGuidesEnabled)}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                      <span className="flex-1">Smart Guides</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${smartGuidesEnabled ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+                        {smartGuidesEnabled ? 'ON' : 'OFF'}
                       </span>
                     </DropdownMenu.Item>
 
