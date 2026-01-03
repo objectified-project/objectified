@@ -296,7 +296,6 @@
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-| #326   | Add smart guides when dragging nodes             |
 | #327   | Add Horizontal and Vertical rulers to the canvas |
 | #328   | Equal Spacing tools for the canvas               |
 
