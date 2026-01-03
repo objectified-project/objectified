@@ -32,6 +32,7 @@ import {
   MiniMap,
   Panel,
   BackgroundVariant,
+  SelectionMode,
   type Connection,
   type Edge,
   type Node,
@@ -214,6 +215,18 @@ const StudioContent = () => {
     horizontal: Array<{ y: number; x1: number; x2: number }>;
     vertical: Array<{ x: number; y1: number; y2: number }>;
   }>({ horizontal: [], vertical: [] });
+
+  // Selected nodes for spacing tools
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+
+  // Spacing indicators state
+  const [spacingIndicators, setSpacingIndicators] = useState<{
+    horizontal: Array<{ x1: number; x2: number; y: number; distance: number }>;
+    vertical: Array<{ y1: number; y2: number; x: number; distance: number }>;
+  }>({ horizontal: [], vertical: [] });
+
+  // Show spacing indicators toggle
+  const [showSpacingIndicators, setShowSpacingIndicators] = useState(false);
 
   // Class-property edit dialog state
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
@@ -4026,6 +4039,197 @@ const StudioContent = () => {
     console.log('Clicked edge:', edge);
   }, []);
 
+  // Handle selection change for spacing tools
+  const onSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
+    const classNodeIds = selectedNodes
+      .filter(n => n.type !== 'groupNode')
+      .map(n => n.id);
+    setSelectedNodeIds(classNodeIds);
+
+    // Update spacing indicators when selection changes
+    if (showSpacingIndicators && classNodeIds.length >= 2) {
+      calculateSpacingIndicators(classNodeIds);
+    } else {
+      setSpacingIndicators({ horizontal: [], vertical: [] });
+    }
+  }, [showSpacingIndicators]);
+
+  // Calculate spacing indicators between selected nodes
+  const calculateSpacingIndicators = useCallback((nodeIds: string[]) => {
+    const selectedNodes = nodes.filter(n => nodeIds.includes(n.id) && n.type !== 'groupNode');
+    if (selectedNodes.length < 2) {
+      setSpacingIndicators({ horizontal: [], vertical: [] });
+      return;
+    }
+
+    // Sort by X position for horizontal spacing
+    const sortedByX = [...selectedNodes].sort((a, b) => a.position.x - b.position.x);
+    // Sort by Y position for vertical spacing
+    const sortedByY = [...selectedNodes].sort((a, b) => a.position.y - b.position.y);
+
+    const horizontal: Array<{ x1: number; x2: number; y: number; distance: number }> = [];
+    const vertical: Array<{ y1: number; y2: number; x: number; distance: number }> = [];
+
+    // Calculate horizontal gaps
+    for (let i = 0; i < sortedByX.length - 1; i++) {
+      const current = sortedByX[i];
+      const next = sortedByX[i + 1];
+      const currentWidth = (current.measured?.width as number) || (current.width as number) || 260;
+      const currentRight = current.position.x + currentWidth;
+      const nextLeft = next.position.x;
+      const gap = nextLeft - currentRight;
+
+      if (gap > 0) {
+        const currentHeight = (current.measured?.height as number) || (current.height as number) || 200;
+        const nextHeight = (next.measured?.height as number) || (next.height as number) || 200;
+        const avgY = (current.position.y + currentHeight / 2 + next.position.y + nextHeight / 2) / 2;
+
+        horizontal.push({
+          x1: currentRight,
+          x2: nextLeft,
+          y: avgY,
+          distance: Math.round(gap)
+        });
+      }
+    }
+
+    // Calculate vertical gaps
+    for (let i = 0; i < sortedByY.length - 1; i++) {
+      const current = sortedByY[i];
+      const next = sortedByY[i + 1];
+      const currentHeight = (current.measured?.height as number) || (current.height as number) || 200;
+      const currentBottom = current.position.y + currentHeight;
+      const nextTop = next.position.y;
+      const gap = nextTop - currentBottom;
+
+      if (gap > 0) {
+        const currentWidth = (current.measured?.width as number) || (current.width as number) || 260;
+        const nextWidth = (next.measured?.width as number) || (next.width as number) || 260;
+        const avgX = (current.position.x + currentWidth / 2 + next.position.x + nextWidth / 2) / 2;
+
+        vertical.push({
+          y1: currentBottom,
+          y2: nextTop,
+          x: avgX,
+          distance: Math.round(gap)
+        });
+      }
+    }
+
+    setSpacingIndicators({ horizontal, vertical });
+  }, [nodes]);
+
+  // Distribute nodes with equal horizontal spacing
+  const distributeHorizontal = useCallback(() => {
+    if (selectedNodeIds.length < 3) return;
+
+    const selectedNodes = nodes.filter(n => selectedNodeIds.includes(n.id) && n.type !== 'groupNode');
+    if (selectedNodes.length < 3) return;
+
+    // Sort by X position
+    const sorted = [...selectedNodes].sort((a, b) => a.position.x - b.position.x);
+
+    // Get first and last node positions
+    const firstNode = sorted[0];
+    const lastNode = sorted[sorted.length - 1];
+    const lastWidth = (lastNode.measured?.width as number) || (lastNode.width as number) || 260;
+
+    // Calculate total width and total spacing needed
+    const totalWidth = sorted.reduce((sum, n) => {
+      const w = (n.measured?.width as number) || (n.width as number) || 260;
+      return sum + w;
+    }, 0);
+
+    const startX = firstNode.position.x;
+    const endX = lastNode.position.x + lastWidth;
+    const availableSpace = endX - startX - totalWidth;
+    const gap = availableSpace / (sorted.length - 1);
+
+    // Update node positions
+    let currentX = startX;
+    const updates: { id: string; position: { x: number; y: number } }[] = [];
+
+    sorted.forEach((node, index) => {
+      const width = (node.measured?.width as number) || (node.width as number) || 260;
+      updates.push({
+        id: node.id,
+        position: { x: currentX, y: node.position.y }
+      });
+      currentX += width + gap;
+    });
+
+    setNodes(prevNodes => prevNodes.map(n => {
+      const update = updates.find(u => u.id === n.id);
+      return update ? { ...n, position: update.position } : n;
+    }));
+
+    // Recalculate indicators
+    if (showSpacingIndicators) {
+      setTimeout(() => calculateSpacingIndicators(selectedNodeIds), 50);
+    }
+  }, [selectedNodeIds, nodes, setNodes, showSpacingIndicators, calculateSpacingIndicators]);
+
+  // Distribute nodes with equal vertical spacing
+  const distributeVertical = useCallback(() => {
+    if (selectedNodeIds.length < 3) return;
+
+    const selectedNodes = nodes.filter(n => selectedNodeIds.includes(n.id) && n.type !== 'groupNode');
+    if (selectedNodes.length < 3) return;
+
+    // Sort by Y position
+    const sorted = [...selectedNodes].sort((a, b) => a.position.y - b.position.y);
+
+    // Get first and last node positions
+    const firstNode = sorted[0];
+    const lastNode = sorted[sorted.length - 1];
+    const lastHeight = (lastNode.measured?.height as number) || (lastNode.height as number) || 200;
+
+    // Calculate total height and total spacing needed
+    const totalHeight = sorted.reduce((sum, n) => {
+      const h = (n.measured?.height as number) || (n.height as number) || 200;
+      return sum + h;
+    }, 0);
+
+    const startY = firstNode.position.y;
+    const endY = lastNode.position.y + lastHeight;
+    const availableSpace = endY - startY - totalHeight;
+    const gap = availableSpace / (sorted.length - 1);
+
+    // Update node positions
+    let currentY = startY;
+    const updates: { id: string; position: { x: number; y: number } }[] = [];
+
+    sorted.forEach((node, index) => {
+      const height = (node.measured?.height as number) || (node.height as number) || 200;
+      updates.push({
+        id: node.id,
+        position: { x: node.position.x, y: currentY }
+      });
+      currentY += height + gap;
+    });
+
+    setNodes(prevNodes => prevNodes.map(n => {
+      const update = updates.find(u => u.id === n.id);
+      return update ? { ...n, position: update.position } : n;
+    }));
+
+    // Recalculate indicators
+    if (showSpacingIndicators) {
+      setTimeout(() => calculateSpacingIndicators(selectedNodeIds), 50);
+    }
+  }, [selectedNodeIds, nodes, setNodes, showSpacingIndicators, calculateSpacingIndicators]);
+
+  // Toggle spacing indicators
+  const toggleSpacingIndicators = useCallback(() => {
+    const newValue = !showSpacingIndicators;
+    setShowSpacingIndicators(newValue);
+    if (newValue && selectedNodeIds.length >= 2) {
+      calculateSpacingIndicators(selectedNodeIds);
+    } else {
+      setSpacingIndicators({ horizontal: [], vertical: [] });
+    }
+  }, [showSpacingIndicators, selectedNodeIds, calculateSpacingIndicators]);
+
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const selectedVersion = versions.find(v => v.id === selectedVersionId);
 
@@ -4401,6 +4605,7 @@ const StudioContent = () => {
               onEdgeClick={onEdgeClick}
               onNodeDrag={handleNodeDrag}
               onNodeDragStop={handleNodeDragStop}
+              onSelectionChange={onSelectionChange}
               onDragOver={handleCanvasDragOver}
               onDrop={handleCanvasDrop}
               onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
@@ -4412,6 +4617,8 @@ const StudioContent = () => {
               nodesDraggable={true}
               nodesConnectable={!isReadOnly}
               elementsSelectable={true}
+              selectionOnDrag={true}
+              selectionMode={SelectionMode.Partial}
               nodesFocusable={true}
               edgesFocusable={true}
               style={{
@@ -4523,6 +4730,247 @@ const StudioContent = () => {
                 </div>
               );
             })()}
+
+            {/* Spacing Indicators - shows distance between selected nodes */}
+            {showSpacingIndicators && (spacingIndicators.horizontal.length > 0 || spacingIndicators.vertical.length > 0) && (() => {
+              const viewport = getViewport();
+              return (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    zIndex: 999,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <svg
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: 'none',
+                      overflow: 'visible',
+                    }}
+                  >
+                    <defs>
+                      <marker
+                        id="arrowStart"
+                        markerWidth="6"
+                        markerHeight="6"
+                        refX="3"
+                        refY="3"
+                        orient="auto"
+                      >
+                        <path d="M6,0 L6,6 L0,3 Z" fill="#10b981" />
+                      </marker>
+                      <marker
+                        id="arrowEnd"
+                        markerWidth="6"
+                        markerHeight="6"
+                        refX="3"
+                        refY="3"
+                        orient="auto"
+                      >
+                        <path d="M0,0 L0,6 L6,3 Z" fill="#10b981" />
+                      </marker>
+                    </defs>
+                    <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
+                      {/* Horizontal spacing indicators */}
+                      {spacingIndicators.horizontal.map((indicator, index) => {
+                        const midX = (indicator.x1 + indicator.x2) / 2;
+                        return (
+                          <g key={`h-spacing-${index}`}>
+                            {/* Distance line */}
+                            <line
+                              x1={indicator.x1}
+                              y1={indicator.y}
+                              x2={indicator.x2}
+                              y2={indicator.y}
+                              stroke="#10b981"
+                              strokeWidth={2 / viewport.zoom}
+                              markerStart="url(#arrowStart)"
+                              markerEnd="url(#arrowEnd)"
+                            />
+                            {/* Vertical caps */}
+                            <line
+                              x1={indicator.x1}
+                              y1={indicator.y - 10 / viewport.zoom}
+                              x2={indicator.x1}
+                              y2={indicator.y + 10 / viewport.zoom}
+                              stroke="#10b981"
+                              strokeWidth={1.5 / viewport.zoom}
+                            />
+                            <line
+                              x1={indicator.x2}
+                              y1={indicator.y - 10 / viewport.zoom}
+                              x2={indicator.x2}
+                              y2={indicator.y + 10 / viewport.zoom}
+                              stroke="#10b981"
+                              strokeWidth={1.5 / viewport.zoom}
+                            />
+                            {/* Distance label background */}
+                            <rect
+                              x={midX - 20 / viewport.zoom}
+                              y={indicator.y - 22 / viewport.zoom}
+                              width={40 / viewport.zoom}
+                              height={16 / viewport.zoom}
+                              rx={4 / viewport.zoom}
+                              fill={isDark ? '#064e3b' : '#d1fae5'}
+                              stroke="#10b981"
+                              strokeWidth={1 / viewport.zoom}
+                            />
+                            {/* Distance label */}
+                            <text
+                              x={midX}
+                              y={indicator.y - 11 / viewport.zoom}
+                              textAnchor="middle"
+                              fontSize={10 / viewport.zoom}
+                              fill={isDark ? '#6ee7b7' : '#047857'}
+                              fontWeight="600"
+                              fontFamily="monospace"
+                            >
+                              {indicator.distance}px
+                            </text>
+                          </g>
+                        );
+                      })}
+                      {/* Vertical spacing indicators */}
+                      {spacingIndicators.vertical.map((indicator, index) => {
+                        const midY = (indicator.y1 + indicator.y2) / 2;
+                        return (
+                          <g key={`v-spacing-${index}`}>
+                            {/* Distance line */}
+                            <line
+                              x1={indicator.x}
+                              y1={indicator.y1}
+                              x2={indicator.x}
+                              y2={indicator.y2}
+                              stroke="#10b981"
+                              strokeWidth={2 / viewport.zoom}
+                              markerStart="url(#arrowStart)"
+                              markerEnd="url(#arrowEnd)"
+                            />
+                            {/* Horizontal caps */}
+                            <line
+                              x1={indicator.x - 10 / viewport.zoom}
+                              y1={indicator.y1}
+                              x2={indicator.x + 10 / viewport.zoom}
+                              y2={indicator.y1}
+                              stroke="#10b981"
+                              strokeWidth={1.5 / viewport.zoom}
+                            />
+                            <line
+                              x1={indicator.x - 10 / viewport.zoom}
+                              y1={indicator.y2}
+                              x2={indicator.x + 10 / viewport.zoom}
+                              y2={indicator.y2}
+                              stroke="#10b981"
+                              strokeWidth={1.5 / viewport.zoom}
+                            />
+                            {/* Distance label background */}
+                            <rect
+                              x={indicator.x + 8 / viewport.zoom}
+                              y={midY - 8 / viewport.zoom}
+                              width={40 / viewport.zoom}
+                              height={16 / viewport.zoom}
+                              rx={4 / viewport.zoom}
+                              fill={isDark ? '#064e3b' : '#d1fae5'}
+                              stroke="#10b981"
+                              strokeWidth={1 / viewport.zoom}
+                            />
+                            {/* Distance label */}
+                            <text
+                              x={indicator.x + 28 / viewport.zoom}
+                              y={midY + 3 / viewport.zoom}
+                              textAnchor="middle"
+                              fontSize={10 / viewport.zoom}
+                              fill={isDark ? '#6ee7b7' : '#047857'}
+                              fontWeight="600"
+                              fontFamily="monospace"
+                            >
+                              {indicator.distance}px
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  </svg>
+                </div>
+              );
+            })()}
+
+            {/* Spacing Tools Panel - shown when multiple nodes selected */}
+            {selectedNodeIds.length >= 2 && (
+              <Panel
+                position="bottom-center"
+                className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
+                    {selectedNodeIds.length} selected
+                  </span>
+                  <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+
+                  {/* Show Spacing Indicators Toggle */}
+                  <button
+                    onClick={toggleSpacingIndicators}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
+                      showSpacingIndicators 
+                        ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700'
+                        : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                    title="Show spacing between nodes"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    <span>Spacing</span>
+                  </button>
+
+                  {selectedNodeIds.length >= 3 && (
+                    <>
+                      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+
+                      {/* Distribute Horizontally */}
+                      <button
+                        onClick={distributeHorizontal}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
+                        title="Distribute nodes with equal horizontal spacing"
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <rect x="2" y="6" width="4" height="12" rx="1" strokeWidth={2} />
+                          <rect x="10" y="6" width="4" height="12" rx="1" strokeWidth={2} />
+                          <rect x="18" y="6" width="4" height="12" rx="1" strokeWidth={2} />
+                          <path d="M6 12h4M14 12h4" strokeWidth={1.5} strokeDasharray="2 1" />
+                        </svg>
+                        <span>Distribute H</span>
+                      </button>
+
+                      {/* Distribute Vertically */}
+                      <button
+                        onClick={distributeVertical}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
+                        title="Distribute nodes with equal vertical spacing"
+                      >
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <rect x="6" y="2" width="12" height="4" rx="1" strokeWidth={2} />
+                          <rect x="6" y="10" width="12" height="4" rx="1" strokeWidth={2} />
+                          <rect x="6" y="18" width="12" height="4" rx="1" strokeWidth={2} />
+                          <path d="M12 6v4M12 14v4" strokeWidth={1.5} strokeDasharray="2 1" />
+                        </svg>
+                        <span>Distribute V</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </Panel>
+            )}
 
             {/* Read Only Indicator */}
             {isReadOnly && (

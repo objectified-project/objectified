@@ -276,29 +276,6 @@
 | #348   | Adds animation to edges               |
 | #349   | Adds edge hover effects               |
 
-**Grid & Alignment:** ✅ IMPLEMENTED
-- ✅ **Grid snapping** (adjustable size: 10-50px with 5px increments) - ✅ FULLY IMPLEMENTED
-  - ✅ Snap-to-grid toggle (ON/OFF)
-  - ✅ Grid size slider control in settings (10-50px in 5px steps)
-  - ✅ Real-time grid size adjustment
-  - ✅ Visual feedback with grid patterns
-  - ✅ Snapping applies to node dragging and positioning
-- ✅ **Grid style options** - ✅ IMPLEMENTED
-  - ✅ Dots pattern (default)
-  - ✅ Lines pattern (grid lines)
-  - ✅ Cross pattern (crosshatch)
-  - ✅ Grid style selector in StudioHeader settings
-  - ✅ Real-time grid style switching
-  - ✅ Persistent grid style preference (localStorage)
-- ✅ Smart guides on drag
-- 📋 Horizontal/vertical rulers
-- 📋 Equal spacing tools
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #327   | Add Horizontal and Vertical rulers to the canvas |
-| #328   | Equal Spacing tools for the canvas               |
-
 #### Application Themes ✅ IMPLEMENTED
 - ✅ Pre-built themes:
   - ✅ Light mode (default)
@@ -619,3 +596,20 @@
 - ✅ Constraint tooltips on hover
 - ✅ Constraint summary panel
 - ✅ Tags displayed on class nodes
+
+**Grid & Alignment:** ✅ IMPLEMENTED
+- ✅ **Grid snapping** (adjustable size: 10-50px with 5px increments) - ✅ FULLY IMPLEMENTED
+  - ✅ Snap-to-grid toggle (ON/OFF)
+  - ✅ Grid size slider control in settings (10-50px in 5px steps)
+  - ✅ Real-time grid size adjustment
+  - ✅ Visual feedback with grid patterns
+  - ✅ Snapping applies to node dragging and positioning
+- ✅ **Grid style options** - ✅ IMPLEMENTED
+  - ✅ Dots pattern (default)
+  - ✅ Lines pattern (grid lines)
+  - ✅ Cross pattern (crosshatch)
+  - ✅ Grid style selector in StudioHeader settings
+  - ✅ Real-time grid style switching
+  - ✅ Persistent grid style preference (localStorage)
+- ✅ Smart guides on drag
+- ✅ Equal spacing tools

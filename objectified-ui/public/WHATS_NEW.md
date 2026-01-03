@@ -51,6 +51,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Removed existing auto layout code, as it was not working as intended; will fix in a later release
   - Added custom snap-to-grid functionality
   - Added smart guidelines when dragging nodes for better alignment
+  - Added spacing utility for multiple nodes (selected with Shift key)
 - Added property templates
   - Fixed property copying to a class that contains an object with nested properties
 
