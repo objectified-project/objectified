@@ -795,6 +795,135 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 </div>
               </div>
 
+              {/* Pre-Import Analysis */}
+              {analysisResult.metrics && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pre-Import Analysis</h3>
+
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    {/* Schema Count */}
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                        {analysisResult.metrics.schemaCount}
+                      </div>
+                      <div className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                        Schemas Found
+                      </div>
+                    </div>
+
+                    {/* Property Count */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {analysisResult.metrics.propertyCount}
+                      </div>
+                      <div className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Total Properties
+                      </div>
+                    </div>
+
+                    {/* Reference Count */}
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {analysisResult.metrics.referenceCount}
+                      </div>
+                      <div className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                        References ($ref)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Circular References Warning */}
+                  {analysisResult.metrics.circularReferences && analysisResult.metrics.circularReferences.length > 0 && (
+                    <div className="mb-4 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                            Circular Dependencies Detected
+                          </h4>
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
+                            The following schemas have circular references. This may cause issues during import or usage:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {analysisResult.metrics.circularReferences.map((schemaName, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 text-xs font-medium text-amber-800 dark:text-amber-200"
+                              >
+                                <Package className="h-3.5 w-3.5" />
+                                {schemaName}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* External References Warning */}
+                  {analysisResult.metrics.externalReferences && analysisResult.metrics.externalReferences.length > 0 && (
+                    <div className="mb-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                            External References Found
+                          </h4>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                            {analysisResult.metrics.externalReferences.length} external URL reference(s) detected. These will need to be resolved:
+                          </p>
+                          <div className="space-y-1 max-h-24 overflow-y-auto">
+                            {analysisResult.metrics.externalReferences.map((url, idx) => (
+                              <div key={idx} className="text-xs font-mono text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded break-all">
+                                {url}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Composition Schemas Info */}
+                  {analysisResult.metrics.compositionSchemas &&
+                   (analysisResult.metrics.compositionSchemas.allOf > 0 ||
+                    analysisResult.metrics.compositionSchemas.oneOf > 0 ||
+                    analysisResult.metrics.compositionSchemas.anyOf > 0) && (
+                    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700">
+                      <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                        Composition Schemas
+                      </h4>
+                      <div className="grid grid-cols-3 gap-3 text-xs">
+                        {analysisResult.metrics.compositionSchemas.allOf > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">allOf:</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {analysisResult.metrics.compositionSchemas.allOf}
+                            </span>
+                          </div>
+                        )}
+                        {analysisResult.metrics.compositionSchemas.oneOf > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">oneOf:</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {analysisResult.metrics.compositionSchemas.oneOf}
+                            </span>
+                          </div>
+                        )}
+                        {analysisResult.metrics.compositionSchemas.anyOf > 0 && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">anyOf:</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {analysisResult.metrics.compositionSchemas.anyOf}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Class Selection */}
               <div className="grid grid-cols-2 gap-6">
                 {/* Left: Class List */}

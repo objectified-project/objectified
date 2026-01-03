@@ -118,19 +118,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 
-##### Specification Analysis 📋 PARTIALLY IMPLEMENTED
-- ✅ **Schema Count**: Number of schemas to be imported
-- ✅ **Property Count**: Total properties across all schemas
-- 📋 **Reference Analysis**: Count and map all $ref relationships
-- 📋 **Circular Reference Detection**: Identify circular dependencies
-- 📋 **External Reference Inventory**: List all external URLs
-
-| Ticket | Feature Description                     |
-|--------|-----------------------------------------|
-| #570   | Count and map all $ref relationships    |
-| #571   | Identify circular dependencies          |
-| #572   | External reference inventory - and warn | 
-
 ##### Compatibility Check
 - 📋 **Feature Compatibility**: Identify unsupported features
 - 📋 **Extension Detection**: List all x- custom extensions
@@ -585,3 +572,10 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Error Count**: Failed imports
 - ✅ **Skip Count**: Intentionally skipped items
 - ✅ **Time Taken**: Total import duration
+
+##### Specification Analysis ✅ PARTIALLY IMPLEMENTED
+- ✅ **Schema Count**: Number of schemas to be imported
+- ✅ **Property Count**: Total properties across all schemas
+- ✅ **Reference Analysis**: Count and map all $ref relationships
+- ✅ **Circular Reference Detection**: Identify circular dependencies
+- ✅ **External Reference Inventory**: List all external URLs
