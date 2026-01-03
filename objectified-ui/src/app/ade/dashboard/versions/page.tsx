@@ -106,6 +106,7 @@ const Versions = () => {
     showRemoved: boolean;
     showModified: boolean;
   }>({ showAdded: true, showRemoved: true, showModified: true });
+  const [activeCompareTab, setActiveCompareTab] = useState<'diff' | 'summary'>('diff');
 
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
@@ -719,7 +720,7 @@ const Versions = () => {
                 <div>Compare Version Schemas</div>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-normal">View differences between two version specifications</div>
               </div>
-              {diffResult.length > 0 && (
+              {diffResult.length > 0 && activeCompareTab === 'diff' && (
                 <div className="flex gap-2">
                   <div className="flex border border-gray-300 dark:border-gray-600 rounded overflow-hidden">
                     <button onClick={() => setDiffViewMode('overlay')} className={`px-2 py-1 text-xs ${diffViewMode === 'overlay' ? 'bg-purple-600 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>Overlay</button>
@@ -757,93 +758,135 @@ const Versions = () => {
                 </div>
               </div>
             ) : (
-              <div>
-                {/* Line-based diff view - SHOWN FIRST */}
-                <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex gap-4 text-sm">
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-200 dark:bg-red-900 border border-red-400"></div><span>Removed</span></div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-200 dark:bg-green-900 border border-green-400"></div><span>Added</span></div>
-                    <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-100 dark:bg-gray-800 border border-gray-300"></div><span>Unchanged</span></div>
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}</div>
+              <div className="flex flex-col h-full">
+                {/* Tab Navigation */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+                  <button
+                    onClick={() => setActiveCompareTab('diff')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeCompareTab === 'diff'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Diff View</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveCompareTab('summary')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeCompareTab === 'summary'
+                        ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span>Schema Changes</span>
+                      {schemaDiffSummary && (
+                        <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
+                          {schemaDiffSummary.added.length + schemaDiffSummary.removed.length + schemaDiffSummary.modified.length}
+                        </span>
+                      )}
+                    </div>
+                  </button>
                 </div>
-                <div className="border border-gray-300 dark:border-gray-600 rounded font-mono text-xs mb-6 h-[400px]">
-                  {diffViewMode === 'overlay' ? (
-                    // Overlay/Unified diff view - has its own overflow
-                    <div className="h-full overflow-y-auto">
-                      {diffResult.map((part, i) => (
-                        <div key={i} className={part.added ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200' : part.removed ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}>
-                          {part.value.split('\n').filter(Boolean).map((line, j) => (
-                            <div key={j} className="px-3 py-0.5" style={{ whiteSpace: 'pre-wrap' }}>
-                              {part.added && '+ '}{part.removed && '- '}{line}
+
+                {/* Tab Content */}
+                {activeCompareTab === 'diff' ? (
+                  // Diff View Tab
+                  <div>
+                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex gap-4 text-sm">
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 bg-red-200 dark:bg-red-900 border border-red-400"></div><span>Removed</span></div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-200 dark:bg-green-900 border border-green-400"></div><span>Added</span></div>
+                        <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-100 dark:bg-gray-800 border border-gray-300"></div><span>Unchanged</span></div>
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">v{versions.find(v => v.id === compareVersion1Id)?.version_id} → v{versions.find(v => v.id === compareVersion2Id)?.version_id}</div>
+                    </div>
+                    <div className="border border-gray-300 dark:border-gray-600 rounded font-mono text-xs h-[calc(90vh-280px)]">
+                      {diffViewMode === 'overlay' ? (
+                        // Overlay/Unified diff view
+                        <div className="h-full overflow-y-auto">
+                          {diffResult.map((part, i) => (
+                            <div key={i} className={part.added ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200' : part.removed ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}>
+                              {part.value.split('\n').filter(Boolean).map((line, j) => (
+                                <div key={j} className="px-3 py-0.5" style={{ whiteSpace: 'pre-wrap' }}>
+                                  {part.added && '+ '}{part.removed && '- '}{line}
+                                </div>
+                              ))}
                             </div>
                           ))}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    // Side-by-side view - panels have their own overflow with sync
-                    <div className="flex h-full">
-                      {/* Left panel - Version 1 (Base) */}
-                      <div
-                        ref={leftPanelRef}
-                        onScroll={handleLeftScroll}
-                        className="w-1/2 border-r border-gray-300 dark:border-gray-600 h-full overflow-y-auto"
-                      >
-                        <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
-                          v{versions.find(v => v.id === compareVersion1Id)?.version_id} (Base)
+                      ) : (
+                        // Side-by-side view
+                        <div className="flex h-full">
+                          {/* Left panel - Version 1 (Base) */}
+                          <div
+                            ref={leftPanelRef}
+                            onScroll={handleLeftScroll}
+                            className="w-1/2 border-r border-gray-300 dark:border-gray-600 h-full overflow-y-auto"
+                          >
+                            <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
+                              v{versions.find(v => v.id === compareVersion1Id)?.version_id} (Base)
+                            </div>
+                            {(() => {
+                              const content1 = compareFormat === 'json' ? compareSpec1 : YAML.stringify(JSON.parse(compareSpec1));
+                              return content1.split('\n').map((line, i) => {
+                                const isRemoved = diffResult.some(part => part.removed && part.value.includes(line));
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`px-3 py-0.5 ${isRemoved ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+                                    style={{ whiteSpace: 'pre-wrap' }}
+                                  >
+                                    <span className="text-gray-400 dark:text-gray-500 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>
+                                    {line || ' '}
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
+                          {/* Right panel - Version 2 (Compare To) */}
+                          <div
+                            ref={rightPanelRef}
+                            onScroll={handleRightScroll}
+                            className="w-1/2 h-full overflow-y-auto"
+                          >
+                            <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
+                              v{versions.find(v => v.id === compareVersion2Id)?.version_id} (Compare To)
+                            </div>
+                            {(() => {
+                              const content2 = compareFormat === 'json' ? compareSpec2 : YAML.stringify(JSON.parse(compareSpec2));
+                              return content2.split('\n').map((line, i) => {
+                                const isAdded = diffResult.some(part => part.added && part.value.includes(line));
+                                return (
+                                  <div
+                                    key={i}
+                                    className={`px-3 py-0.5 ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+                                    style={{ whiteSpace: 'pre-wrap' }}
+                                  >
+                                    <span className="text-gray-400 dark:text-gray-500 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>
+                                    {line || ' '}
+                                  </div>
+                                );
+                              });
+                            })()}
+                          </div>
                         </div>
-                        {(() => {
-                          const content1 = compareFormat === 'json' ? compareSpec1 : YAML.stringify(JSON.parse(compareSpec1));
-                          return content1.split('\n').map((line, i) => {
-                            // ...existing code...
-                            const isRemoved = diffResult.some(part => part.removed && part.value.includes(line));
-                            return (
-                              <div
-                                key={i}
-                                className={`px-3 py-0.5 ${isRemoved ? 'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-                                style={{ whiteSpace: 'pre-wrap' }}
-                              >
-                                <span className="text-gray-400 dark:text-gray-500 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>
-                                {line || ' '}
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-                      {/* Right panel - Version 2 (Compare To) */}
-                      <div
-                        ref={rightPanelRef}
-                        onScroll={handleRightScroll}
-                        className="w-1/2 h-full overflow-y-auto"
-                      >
-                        <div className="sticky top-0 bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-semibold border-b border-gray-300 dark:border-gray-600 z-10">
-                          v{versions.find(v => v.id === compareVersion2Id)?.version_id} (Compare To)
-                        </div>
-                        {(() => {
-                          const content2 = compareFormat === 'json' ? compareSpec2 : YAML.stringify(JSON.parse(compareSpec2));
-                          return content2.split('\n').map((line, i) => {
-                            // Check if this line was added (exists in compare but not in base)
-                            const isAdded = diffResult.some(part => part.added && part.value.includes(line));
-                            return (
-                              <div
-                                key={i}
-                                className={`px-3 py-0.5 ${isAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-200' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
-                                style={{ whiteSpace: 'pre-wrap' }}
-                              >
-                                <span className="text-gray-400 dark:text-gray-500 select-none mr-2 inline-block w-8 text-right">{i + 1}</span>
-                                {line || ' '}
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                {/* Schema-aware diff summary - SHOWN SECOND */}
-                {schemaDiffSummary && (
+                  </div>
+                ) : (
+                  // Schema Changes Summary Tab
+                  <div className="h-[calc(90vh-280px)] overflow-y-auto">
+                    {schemaDiffSummary && (
                   <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Schema Changes Summary</h3>
@@ -1014,6 +1057,8 @@ const Versions = () => {
                         </div>
                       )}
                     </div>
+                  </div>
+                    )}
                   </div>
                 )}
               </div>
