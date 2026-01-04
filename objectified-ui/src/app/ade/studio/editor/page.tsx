@@ -3,8 +3,6 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-import { toPng, toSvg, toJpeg } from 'html-to-image';
-import { jsPDF } from 'jspdf';
 import { useStudio } from '../StudioContext';
 import { Copy, Download, Check, Settings } from 'lucide-react';
 import * as Switch from '@radix-ui/react-switch';
@@ -59,6 +57,10 @@ import {
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
 
+// Import extracted components
+import { useExportFunctions } from './components';
+import type { Project, Version, ViewMode } from './components/types';
+
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -68,21 +70,6 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
     </div>
   ),
 });
-
-interface Project {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-interface Version {
-  id: string;
-  version_id: string;
-  description: string;
-  published: boolean;
-}
-
-type ViewMode = 'canvas' | 'code';
 
 const StudioContent = () => {
   const { data: session } = useSession();
@@ -1673,8 +1660,10 @@ const StudioContent = () => {
           target: edge.target
         }));
 
-        // Include the new group in the groups array
-        const updatedGroups = [...groups, newGroup];
+        // Get updated groups with the new name
+        const updatedGroups = groups.map(g =>
+          g.id === groupId ? { ...g, name: newGroup.name } : g
+        );
 
         await saveDefaultCanvasLayout(
           selectedVersionId,
@@ -2170,7 +2159,7 @@ const StudioContent = () => {
                 name: group.name,
                 color: group.color,
                 nodeIds: group.nodeIds || [],
-                tags: group.tags || [],
+                tags: group.metadata?.tags || [],
                 styleOptions: group.styleOptions,
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
@@ -2250,912 +2239,30 @@ const StudioContent = () => {
   // END LAYOUT SAVE/LOAD HANDLERS
   // ============================================================================
 
-  // Handle PNG export
-  const handleExportPng = useCallback(async () => {
-    try {
-      // Get the ReactFlow viewport element
-      const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
-
-      if (!viewportElement) {
-        await alertDialog({
-          message: 'Canvas not found. Please try again.',
-          variant: 'error',
-        });
-        return;
-      }
-
-      // Get project and version info for filename
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.png`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as PNG...');
-      setIsLoadingCanvas(true);
-
-      // Use html-to-image to convert the canvas to PNG
-      const dataUrl = await toPng(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 1.0,
-        pixelRatio: 2, // Higher quality export (2x resolution)
-        filter: (node) => {
-          // Exclude controls, minimap, and other UI elements
-          if (node.classList) {
-            return !node.classList.contains('react-flow__controls') &&
-                   !node.classList.contains('react-flow__minimap') &&
-                   !node.classList.contains('react-flow__attribution') &&
-                   !node.classList.contains('react-flow__panel');
-          }
-          return true;
-        },
-      });
-
-      // Create a download link and trigger download
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message briefly
-      await alertDialog({
-        message: `Canvas exported as ${filename}`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting PNG:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as PNG. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
-
-  // Handle SVG export
-  const handleExportSvg = useCallback(async () => {
-    try {
-      // Get the ReactFlow viewport element
-      const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
-
-      if (!viewportElement) {
-        await alertDialog({
-          message: 'Canvas not found. Please try again.',
-          variant: 'error',
-        });
-        return;
-      }
-
-      // Get project and version info for filename
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.svg`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as SVG...');
-      setIsLoadingCanvas(true);
-
-      // Use html-to-image to convert the canvas to SVG
-      const dataUrl = await toSvg(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 1.0,
-        filter: (node) => {
-          // Exclude controls, minimap, and other UI elements
-          if (node.classList) {
-            return !node.classList.contains('react-flow__controls') &&
-                   !node.classList.contains('react-flow__minimap') &&
-                   !node.classList.contains('react-flow__attribution') &&
-                   !node.classList.contains('react-flow__panel');
-          }
-          return true;
-        },
-      });
-
-      // Create a download link and trigger download
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message briefly
-      await alertDialog({
-        message: `Canvas exported as ${filename}`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting SVG:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as SVG. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
-
-  // Handle PDF export
-  const handleExportPdf = useCallback(async () => {
-    try {
-      // Get the ReactFlow viewport element
-      const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
-
-      if (!viewportElement) {
-        await alertDialog({
-          message: 'Canvas not found. Please try again.',
-          variant: 'error',
-        });
-        return;
-      }
-
-      // Get project and version info for filename and metadata
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.pdf`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as PDF...');
-      setIsLoadingCanvas(true);
-
-      // First, convert the canvas to PNG for embedding in PDF
-      const imageDataUrl = await toPng(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 1.0,
-        pixelRatio: 2, // High quality for PDF
-        filter: (node) => {
-          // Exclude controls, minimap, and other UI elements
-          if (node.classList) {
-            return !node.classList.contains('react-flow__controls') &&
-                   !node.classList.contains('react-flow__minimap') &&
-                   !node.classList.contains('react-flow__attribution') &&
-                   !node.classList.contains('react-flow__panel');
-          }
-          return true;
-        },
-      });
-
-      // Get the actual dimensions of the viewport
-      const viewportRect = viewportElement.getBoundingClientRect();
-      const imgWidth = viewportRect.width;
-      const imgHeight = viewportRect.height;
-
-      // Calculate PDF page size to fit the canvas
-      // Standard A4 is 210mm x 297mm (landscape: 297mm x 210mm)
-      // We'll use landscape orientation and scale to fit
-      const pdfWidth = 297; // A4 landscape width in mm
-      const pdfHeight = 210; // A4 landscape height in mm
-
-      // Calculate scaling to fit canvas in PDF while maintaining aspect ratio
-      const scaleX = pdfWidth / imgWidth;
-      const scaleY = pdfHeight / imgHeight;
-      const scale = Math.min(scaleX, scaleY);
-
-      const scaledWidth = imgWidth * scale;
-      const scaledHeight = imgHeight * scale;
-
-      // Center the image on the page
-      const xOffset = (pdfWidth - scaledWidth) / 2;
-      const yOffset = (pdfHeight - scaledHeight) / 2;
-
-      // Create PDF document
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      // Add metadata
-      pdf.setProperties({
-        title: `${selectedProject?.name || 'Canvas'} - Version ${selectedVersion?.version_id || '1'}`,
-        subject: 'API Schema Canvas Export',
-        author: 'Objectified',
-        keywords: 'api, schema, openapi, canvas',
-        creator: 'Objectified Studio',
-      });
-
-      // Add title at the top
-      pdf.setFontSize(16);
-      pdf.setTextColor(isDark ? 200 : 40);
-      pdf.text(`${selectedProject?.name || 'Canvas'} - v${selectedVersion?.version_id || '1'}`, 10, 15);
-
-      // Add timestamp
-      pdf.setFontSize(10);
-      pdf.setTextColor(isDark ? 150 : 100);
-      pdf.text(`Exported: ${new Date().toLocaleString()}`, 10, 22);
-
-      // Add the canvas image to PDF
-      pdf.addImage(imageDataUrl, 'PNG', xOffset, yOffset + 15, scaledWidth, scaledHeight - 15);
-
-      // Add footer with page number
-      pdf.setFontSize(8);
-      pdf.setTextColor(isDark ? 150 : 100);
-      pdf.text('Generated by Objectified Studio', pdfWidth - 60, pdfHeight - 5);
-
-      // Save the PDF
-      pdf.save(filename);
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message
-      await alertDialog({
-        message: `Canvas exported as ${filename}`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as PDF. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
-
-  // Handle JPEG export
-  const handleExportJpeg = useCallback(async () => {
-    try {
-      // Get the ReactFlow viewport element
-      const viewportElement = document.querySelector('.react-flow__viewport') as HTMLElement;
-
-      if (!viewportElement) {
-        await alertDialog({
-          message: 'Canvas not found. Please try again.',
-          variant: 'error',
-        });
-        return;
-      }
-
-      // Get project and version info for filename
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.jpg`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as JPEG...');
-      setIsLoadingCanvas(true);
-
-      // Use html-to-image to convert the canvas to JPEG
-      const dataUrl = await toJpeg(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 0.95, // High quality JPEG (0.0 to 1.0)
-        pixelRatio: 2, // Higher quality export (2x resolution)
-        filter: (node) => {
-          // Exclude controls, minimap, and other UI elements
-          if (node.classList) {
-            return !node.classList.contains('react-flow__controls') &&
-                   !node.classList.contains('react-flow__minimap') &&
-                   !node.classList.contains('react-flow__attribution') &&
-                   !node.classList.contains('react-flow__panel');
-          }
-          return true;
-        },
-      });
-
-      // Create a download link and trigger download
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message briefly
-      await alertDialog({
-        message: `Canvas exported as ${filename}`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting JPEG:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as JPEG. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, isDark, alertDialog]);
-
-  // Handle Mermaid Diagram export
-  const handleExportMermaid = useCallback(async () => {
-    try {
-      // Get project and version info for filename
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.id === selectedVersionId);
-      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'diagram';
-      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
-      const filename = `${projectSlug}-${versionSlug}-diagram.mmd`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as Mermaid diagram...');
-      setIsLoadingCanvas(true);
-
-      // Generate Mermaid content from nodes
-      const classesWithProperties = nodes.map(node => ({
-        id: node.id,
-        name: (node.data as any)?.name || 'Unknown',
-        description: (node.data as any)?.description,
-        schema: (node.data as any)?.schema,
-        properties: (node.data as any)?.properties || [],
-      }));
-
-      const mermaidContent = generateMermaidDiagram(classesWithProperties);
-
-      // Create and download the file
-      const blob = new Blob([mermaidContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      // Close dropdown
-      setExportDropdownOpen(false);
-      setIsLoadingCanvas(false);
-
-      await alertDialog({
-        message: `Canvas exported as ${filename}. You can visualize this file using Mermaid Live Editor or other Mermaid-compatible tools.`,
-        variant: 'success',
-      });
-    } catch (error) {
-      setIsLoadingCanvas(false);
-      console.error('Error exporting Mermaid:', error);
-
-      await alertDialog({
-        message: 'Failed to export canvas as Mermaid diagram. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [nodes, projects, versions, selectedProjectId, selectedVersionId, alertDialog]);
-
-  // Handle PlantUML export
-  const handleExportPlantUml = useCallback(async () => {
-    try {
-      // Get project and version info for filename and metadata
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.puml`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as PlantUML...');
-      setIsLoadingCanvas(true);
-
-      // Generate PlantUML content from nodes and edges
-      let plantUmlContent = '@startuml\n';
-      plantUmlContent += `' ${selectedProject?.name || 'Canvas'} - Version ${selectedVersion?.version_id || '1'}\n`;
-      plantUmlContent += `' Generated by Objectified Studio on ${new Date().toLocaleDateString()}\n\n`;
-
-      // Add styling
-      plantUmlContent += 'skinparam classAttributeIconSize 0\n';
-      plantUmlContent += 'skinparam shadowing false\n';
-      plantUmlContent += 'skinparam backgroundColor transparent\n';
-      plantUmlContent += 'skinparam class {\n';
-      plantUmlContent += '  BackgroundColor White\n';
-      plantUmlContent += '  BorderColor #4F46E5\n';
-      plantUmlContent += '  ArrowColor #6366F1\n';
-      plantUmlContent += '  FontColor Black\n';
-      plantUmlContent += '}\n\n';
-
-      // Process nodes (classes)
-      const classMap = new Map<string, any>();
-      nodes.forEach(node => {
-        if (node.data) {
-          classMap.set(node.id, node.data);
-
-          const className = node.data.name || 'UnnamedClass';
-          const description = node.data.description ? ` << ${node.data.description} >>` : '';
-
-          plantUmlContent += `class ${className}${description} {\n`;
-
-          // Add properties
-          if (node.data.properties && Array.isArray(node.data.properties)) {
-            node.data.properties.forEach((prop: any) => {
-              const propName = prop.name || 'unnamed';
-              const propType = prop.type || 'string';
-              const isRequired = prop.required ? '+' : '-';
-              const isArray = prop.is_array ? '[]' : '';
-
-              plantUmlContent += `  ${isRequired} ${propName}: ${propType}${isArray}\n`;
-            });
-          } else {
-            plantUmlContent += '  // No properties\n';
-          }
-
-          plantUmlContent += '}\n\n';
-        }
-      });
-
-      // Process edges (relationships)
-      edges.forEach(edge => {
-        const sourceNode = classMap.get(edge.source);
-        const targetNode = classMap.get(edge.target);
-
-        if (sourceNode && targetNode) {
-          const sourceName = sourceNode.name || 'UnnamedClass';
-          const targetName = targetNode.name || 'UnnamedClass';
-
-          // Determine relationship type based on edge data
-          let relationshipSymbol = '-->';
-          let label = '';
-
-          if (edge.data) {
-            const edgeType = edge.data.type || edge.label;
-
-            if (edgeType === 'allOf' || edgeType === 'inheritance') {
-              relationshipSymbol = '--|>';
-              label = 'extends';
-            } else if (edgeType === 'anyOf') {
-              relationshipSymbol = '-->';
-              label = 'anyOf';
-            } else if (edgeType === 'oneOf') {
-              relationshipSymbol = '-->';
-              label = 'oneOf';
-            } else if (edge.data.cardinality) {
-              label = String(edge.data.cardinality);
-            } else if (edge.label) {
-              label = edge.label.toString();
-            }
-          }
-
-          const labelText = label ? ` : ${label}` : '';
-          plantUmlContent += `${sourceName} ${relationshipSymbol} ${targetName}${labelText}\n`;
-        }
-      });
-
-      plantUmlContent += '\n@enduml\n';
-
-      // Create a blob and download
-      const blob = new Blob([plantUmlContent], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message
-      await alertDialog({
-        message: `Canvas exported as ${filename}. You can visualize this file using PlantUML tools or online renderers.`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting PlantUML:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as PlantUML. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, nodes, edges, alertDialog]);
-
-  // Handle GraphML export
-  const handleExportGraphMl = useCallback(async () => {
-    try {
-      // Get project and version info for filename and metadata
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.graphml`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as GraphML...');
-      setIsLoadingCanvas(true);
-
-      // Generate GraphML content from nodes and edges
-      let graphMlContent = '<?xml version="1.0" encoding="UTF-8"?>\n';
-      graphMlContent += '<graphml xmlns="http://graphml.graphdrawing.org/xmlns"\n';
-      graphMlContent += '    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n';
-      graphMlContent += '    xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns\n';
-      graphMlContent += '    http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">\n\n';
-
-      // Define keys (attributes/properties)
-      graphMlContent += '  <!-- Node attributes -->\n';
-      graphMlContent += '  <key id="d0" for="node" attr.name="name" attr.type="string"/>\n';
-      graphMlContent += '  <key id="d1" for="node" attr.name="description" attr.type="string"/>\n';
-      graphMlContent += '  <key id="d2" for="node" attr.name="properties" attr.type="string"/>\n';
-      graphMlContent += '  <key id="d3" for="node" attr.name="x" attr.type="double"/>\n';
-      graphMlContent += '  <key id="d4" for="node" attr.name="y" attr.type="double"/>\n';
-      graphMlContent += '  <key id="d5" for="node" attr.name="type" attr.type="string"/>\n\n';
-
-      // Define edge attributes
-      graphMlContent += '  <!-- Edge attributes -->\n';
-      graphMlContent += '  <key id="e0" for="edge" attr.name="label" attr.type="string"/>\n';
-      graphMlContent += '  <key id="e1" for="edge" attr.name="type" attr.type="string"/>\n';
-      graphMlContent += '  <key id="e2" for="edge" attr.name="cardinality" attr.type="string"/>\n\n';
-
-      // Graph metadata
-      graphMlContent += `  <graph id="G" edgedefault="directed">\n`;
-      graphMlContent += `    <!-- ${selectedProject?.name || 'Canvas'} - Version ${selectedVersion?.version_id || '1'} -->\n`;
-      graphMlContent += `    <!-- Generated by Objectified Studio on ${new Date().toLocaleDateString()} -->\n\n`;
-
-      // Process nodes
-      nodes.forEach(node => {
-        if (node.data) {
-          graphMlContent += `    <node id="${node.id}">\n`;
-
-          // Add node attributes
-          if (node.data.name) {
-            graphMlContent += `      <data key="d0">${escapeXml(String(node.data.name))}</data>\n`;
-          }
-
-          if (node.data.description) {
-            graphMlContent += `      <data key="d1">${escapeXml(String(node.data.description))}</data>\n`;
-          }
-
-          // Add properties as JSON string
-          if (node.data.properties && Array.isArray(node.data.properties)) {
-            const propsJson = JSON.stringify(node.data.properties.map((prop: any) => ({
-              name: prop.name,
-              type: prop.type,
-              required: prop.required,
-              is_array: prop.is_array,
-              description: prop.description
-            })));
-            graphMlContent += `      <data key="d2">${escapeXml(propsJson)}</data>\n`;
-          }
-
-          // Add position
-          if (node.position) {
-            graphMlContent += `      <data key="d3">${node.position.x}</data>\n`;
-            graphMlContent += `      <data key="d4">${node.position.y}</data>\n`;
-          }
-
-          // Add node type
-          graphMlContent += `      <data key="d5">class</data>\n`;
-
-          graphMlContent += `    </node>\n\n`;
-        }
-      });
-
-      // Process edges
-      edges.forEach((edge, index) => {
-        const edgeId = `e${index}`;
-        graphMlContent += `    <edge id="${edgeId}" source="${edge.source}" target="${edge.target}">\n`;
-
-        // Add edge label
-        if (edge.label) {
-          graphMlContent += `      <data key="e0">${escapeXml(String(edge.label))}</data>\n`;
-        }
-
-        // Add edge type
-        if (edge.data) {
-          const edgeType = edge.data.type || 'reference';
-          graphMlContent += `      <data key="e1">${escapeXml(String(edgeType))}</data>\n`;
-
-          // Add cardinality if available
-          if (edge.data.cardinality) {
-            graphMlContent += `      <data key="e2">${escapeXml(String(edge.data.cardinality))}</data>\n`;
-          }
-        }
-
-        graphMlContent += `    </edge>\n\n`;
-      });
-
-      graphMlContent += '  </graph>\n';
-      graphMlContent += '</graphml>\n';
-
-      // Helper function to escape XML special characters
-      function escapeXml(unsafe: string): string {
-        return unsafe
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&apos;');
-      }
-
-      // Create a blob and download
-      const blob = new Blob([graphMlContent], { type: 'application/xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message
-      await alertDialog({
-        message: `Canvas exported as ${filename}. You can open this file in yEd, Gephi, Cytoscape, Neo4j, or other graph tools.`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting GraphML:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as GraphML. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, nodes, edges, alertDialog]);
-
-  // Handle DOT (GraphViz) export
-  const handleExportDot = useCallback(async () => {
-    try {
-      // Get project and version info for filename and metadata
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}.dot`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as DOT...');
-      setIsLoadingCanvas(true);
-
-      // Generate DOT content from nodes and edges
-      let dotContent = 'digraph {\n';
-      dotContent += `  // ${selectedProject?.name || 'Canvas'} - Version ${selectedVersion?.version_id || '1'}\n`;
-      dotContent += `  // Generated by Objectified Studio on ${new Date().toLocaleDateString()}\n\n`;
-
-      // Graph attributes
-      dotContent += '  // Graph styling\n';
-      dotContent += '  graph [rankdir=TB, nodesep=0.5, ranksep=0.8, bgcolor=transparent];\n';
-      dotContent += '  node [shape=record, style=filled, fillcolor="#f8f9fa", fontname="Arial", fontsize=10];\n';
-      dotContent += '  edge [color="#4F46E5", fontname="Arial", fontsize=9];\n\n';
-
-      // Process nodes
-      const nodeMap = new Map<string, string>();
-      nodes.forEach(node => {
-        if (node.data) {
-          const nodeId = node.id.replace(/[^a-zA-Z0-9_]/g, '_');
-          nodeMap.set(node.id, nodeId);
-
-          const className = String(node.data.name || 'UnnamedClass').replace(/"/g, '\\"');
-
-          // Build node label with properties
-          let label = `{${className}|`;
-
-          if (node.data.properties && Array.isArray(node.data.properties)) {
-            const propLines = node.data.properties.map((prop: any) => {
-              const propName = String(prop.name || 'unnamed').replace(/"/g, '\\"');
-              const propType = String(prop.type || 'string').replace(/"/g, '\\"');
-              const isRequired = prop.required ? '+' : '-';
-              const isArray = prop.is_array ? '[]' : '';
-              return `${isRequired} ${propName}: ${propType}${isArray}`;
-            });
-
-            if (propLines.length > 0) {
-              label += propLines.join('\\l') + '\\l';
-            }
-          }
-
-          label += '}';
-
-          dotContent += `  ${nodeId} [label="${label}"];\n`;
-        }
-      });
-
-      dotContent += '\n  // Relationships\n';
-
-      // Process edges
-      edges.forEach(edge => {
-        const sourceId = nodeMap.get(edge.source);
-        const targetId = nodeMap.get(edge.target);
-
-        if (sourceId && targetId) {
-          let edgeAttrs = [];
-
-          // Determine edge style based on type
-          if (edge.data) {
-            const edgeType = edge.data.type;
-
-            if (edgeType === 'allOf' || edgeType === 'inheritance') {
-              edgeAttrs.push('arrowhead=empty');
-              edgeAttrs.push('style=solid');
-              if (edge.label) {
-                edgeAttrs.push(`label="${String(edge.label).replace(/"/g, '\\"')}"`);
-              } else {
-                edgeAttrs.push('label="extends"');
-              }
-            } else if (edgeType === 'anyOf') {
-              edgeAttrs.push('arrowhead=vee');
-              edgeAttrs.push('style=dashed');
-              edgeAttrs.push('label="anyOf"');
-            } else if (edgeType === 'oneOf') {
-              edgeAttrs.push('arrowhead=vee');
-              edgeAttrs.push('style=dashed');
-              edgeAttrs.push('label="oneOf"');
-            } else {
-              edgeAttrs.push('arrowhead=vee');
-              if (edge.label) {
-                edgeAttrs.push(`label="${String(edge.label).replace(/"/g, '\\"')}"`);
-              }
-            }
-
-            // Add cardinality if available
-            if (edge.data.cardinality) {
-              const card = String(edge.data.cardinality).replace(/"/g, '\\"');
-              if (!edge.label) {
-                edgeAttrs.push(`label="${card}"`);
-              } else {
-                edgeAttrs.push(`headlabel="${card}"`);
-              }
-            }
-          } else if (edge.label) {
-            edgeAttrs.push(`label="${String(edge.label).replace(/"/g, '\\"')}"`);
-          }
-
-          const attrs = edgeAttrs.length > 0 ? ` [${edgeAttrs.join(', ')}]` : '';
-          dotContent += `  ${sourceId} -> ${targetId}${attrs};\n`;
-        }
-      });
-
-      dotContent += '}\n';
-
-      // Create a blob and download
-      const blob = new Blob([dotContent], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message
-      await alertDialog({
-        message: `Canvas exported as ${filename}. You can visualize this file using GraphViz tools (dot, neato, fdp, etc.) or online at https://dreampuf.github.io/GraphvizOnline/`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting DOT:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as DOT. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, nodes, edges, alertDialog]);
-
-  // Handle JSON export
-  const handleExportJson = useCallback(async () => {
-    try {
-      // Get project and version info for filename
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const selectedVersion = versions.find(v => v.version_id === selectedVersionId);
-      const filename = `${selectedProject?.name || 'canvas'}-v${selectedVersion?.version_id || '1'}-canvas.json`;
-
-      // Show loading state
-      setLoadingMessage('Exporting canvas as JSON...');
-      setIsLoadingCanvas(true);
-
-      // Build the canvas data structure
-      const canvasData = {
-        metadata: {
-          projectName: selectedProject?.name || 'Unknown',
-          projectSlug: selectedProject?.slug || '',
-          versionId: selectedVersion?.version_id || '',
-          versionDescription: selectedVersion?.description || '',
-          exportDate: new Date().toISOString(),
-          exportFormat: 'objectified-canvas-v1',
-        },
-        nodes: nodes.map(node => ({
-          id: node.id,
-          type: node.type,
-          position: node.position,
-          data: {
-            id: node.data.id,
-            name: node.data.name,
-            description: node.data.description,
-            properties: Array.isArray(node.data.properties) ? node.data.properties.map((prop: any) => ({
-              id: prop.id,
-              name: prop.name,
-              description: prop.description,
-              data: prop.data,
-              parent_id: prop.parent_id,
-            })) : [],
-            schema: node.data.schema,
-            tags: Array.isArray(node.data.tags) ? node.data.tags.map((tag: any) => ({
-              id: tag.id,
-              name: tag.tag_name,
-              color: tag.tag_color,
-              description: tag.tag_description,
-            })) : [],
-          },
-        })),
-        edges: edges.map(edge => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          sourceHandle: edge.sourceHandle,
-          targetHandle: edge.targetHandle,
-          type: edge.type,
-          label: edge.label,
-          data: edge.data,
-        })),
-        viewport: {
-          x: 0,
-          y: 0,
-          zoom: 1,
-        },
-      };
-
-      // Create a blob and download
-      const jsonContent = JSON.stringify(canvasData, null, 2);
-      const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      // Hide loading state
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      // Close the export dropdown
-      setExportDropdownOpen(false);
-
-      // Show success message
-      await alertDialog({
-        message: `Canvas exported as ${filename}. This JSON file contains the complete canvas structure including nodes, edges, and metadata.`,
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error exporting JSON:', error);
-      setIsLoadingCanvas(false);
-      setLoadingMessage('');
-
-      await alertDialog({
-        message: 'Failed to export canvas as JSON. Please try again.',
-        variant: 'error',
-      });
-    }
-  }, [projects, versions, selectedProjectId, selectedVersionId, nodes, edges, alertDialog]);
+  // Use extracted export functions hook
+  const {
+    handleExportPng,
+    handleExportSvg,
+    handleExportJpeg,
+    handleExportPdf,
+    handleExportMermaid,
+    handleExportPlantUml,
+    handleExportDot,
+    handleExportGraphMl,
+    handleExportJson,
+  } = useExportFunctions({
+    projects,
+    versions,
+    selectedProjectId,
+    selectedVersionId,
+    nodes,
+    edges,
+    isDark,
+    alertDialog,
+    setLoadingMessage,
+    setIsLoadingCanvas,
+    setExportDropdownOpen,
+  });
 
   // Define custom node types
   const nodeTypes = {
@@ -3268,12 +2375,6 @@ const StudioContent = () => {
                     strokeWidth: 3,
                     strokeDasharray
                   },
-                  markerEnd: {
-                    type: 'arrowclosed',
-                    color: edgeColor,
-                    width: 15,
-                    height: 15
-                  },
                   labelStyle: {
                     fill: edgeColor,
                     fontSize: 10,
@@ -3306,10 +2407,6 @@ const StudioContent = () => {
 
         // Check for composition types in array items
         if (isSourceArray && propData.items) {
-          if (propData.items.allOf && Array.isArray(propData.items.allOf)) {
-            createCompositionEdges('allOf', propData.items.allOf);
-            return;
-          }
           if (propData.items.anyOf && Array.isArray(propData.items.anyOf)) {
             createCompositionEdges('anyOf', propData.items.anyOf);
             return;
@@ -3318,9 +2415,13 @@ const StudioContent = () => {
             createCompositionEdges('oneOf', propData.items.oneOf);
             return;
           }
+          if (propData.items.allOf && Array.isArray(propData.items.allOf)) {
+            createCompositionEdges('allOf', propData.items.allOf);
+            return;
+          }
         }
 
-        // Handle single $ref (existing logic)
+        // Check for direct $ref (existing logic)
         let refClassName: string | null = null;
 
         // Direct $ref (one-to-one or many-to-one)
@@ -3955,7 +3056,7 @@ const StudioContent = () => {
 
         try {
           const groupsResult = await getGroupsForVersion(selectedVersionId);
-          const loadedGroups = JSON.parse(groupsResult);
+          let loadedGroups = JSON.parse(groupsResult);
 
           if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
             // Extract class positions from all groups
@@ -3984,6 +3085,7 @@ const StudioContent = () => {
               }
             }));
             setGroups(canvasGroups);
+            loadedGroups = canvasGroups;
 
             // Initialize group positions ref for delta tracking during drag
             canvasGroups.forEach((group: any) => {
@@ -4167,10 +3269,10 @@ const StudioContent = () => {
             const classPropertyId = sourceHandle.replace('prop-', '');
             const targetClassId = String(params.target);
             const res = await updateClassPropertyRef(classPropertyId, targetClassId);
-            const resp = JSON.parse(res);
-            if (!resp.success) {
+            const response = JSON.parse(res);
+            if (!response.success) {
               await alertDialog({
-                message: resp.error || 'Failed to update property reference',
+                message: response.error || 'Failed to update property reference',
                 variant: 'error',
               });
             } else {
@@ -4702,7 +3804,7 @@ const StudioContent = () => {
               <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-full blur-3xl opacity-60" />
 
               <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 md:p-16 text-center shadow-xl shadow-gray-200/50 dark:shadow-gray-900/50">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
                   <svg
                     className="h-10 w-10 text-white"
                     fill="none"
@@ -5082,7 +4184,7 @@ const StudioContent = () => {
                   <span className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
                     {selectedNodeIds.length} selected
                   </span>
-                  <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-4 w-px bg-gray-200 dark:bg-gray-600" />
 
                   {/* Show Spacing Indicators Toggle */}
                   <button
@@ -5203,7 +4305,7 @@ const StudioContent = () => {
                   <div className="flex items-center gap-2.5">
                     <div className="p-1 bg-red-100 dark:bg-red-800/50 rounded-lg">
                       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd"/>
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd" />
                       </svg>
                     </div>
                     <span className="text-xs font-medium max-w-xs">Missing class references detected. Connect property handles to target classes to resolve.</span>
@@ -5227,7 +4329,7 @@ const StudioContent = () => {
 
                 {/* Dropdown Menu */}
                 {layoutDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[1002]">
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[1002]">
                     <div className="py-2">
                       {/* Save/Load Layout Buttons */}
                       <div className="px-4 py-3">
@@ -5259,7 +4361,7 @@ const StudioContent = () => {
                             ) : (
                               <>
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                                 <span>Save</span>
                               </>
