@@ -52,7 +52,9 @@ import {
   saveDefaultCanvasLayout,
   getDefaultCanvasLayout,
   getGroupsForVersion,
-  updateClassCanvasMetadata
+  updateClassCanvasMetadata,
+  addClassToGroup,
+  updateClassPositionInGroup
 } from '../../../../../lib/db/helper';
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
@@ -1207,7 +1209,7 @@ const StudioContent = () => {
   }, [dragOverGroupId, setNodes]);
 
   // Handle adding a node to a group via drag and drop
-  const handleAddNodeToGroup = useCallback((groupId: string, nodeId: string, nodePosition: { x: number; y: number }) => {
+  const handleAddNodeToGroup = useCallback(async (groupId: string, nodeId: string, nodePosition: { x: number; y: number }) => {
     if (isReadOnly) return;
 
     const group = groups.find(g => g.id === groupId);
@@ -1230,6 +1232,21 @@ const StudioContent = () => {
       }
       return node;
     }));
+
+    // Persist to database immediately with position
+    try {
+      const result = await addClassToGroup(groupId, nodeId, {
+        positionX: nodePosition.x,
+        positionY: nodePosition.y,
+        sortOrder: updatedNodeIds.length - 1
+      });
+      const response = JSON.parse(result);
+      if (!response.success) {
+        console.error('Failed to persist class to group:', response.error);
+      }
+    } catch (error) {
+      console.error('Error persisting class to group:', error);
+    }
   }, [isReadOnly, groups, updateGroup, setNodes]);
 
   // Handle removing a node from a group - returns true if confirmed, false if cancelled
@@ -1446,7 +1463,7 @@ const StudioContent = () => {
 
     // Case 1: Node dropped into a new group (not currently in any group)
     if (!currentGroupId && targetGroupId) {
-      handleAddNodeToGroup(targetGroupId, node.id, node.position);
+      await handleAddNodeToGroup(targetGroupId, node.id, node.position);
     }
     // Case 2: Node moved from one group to another different group
     else if (currentGroupId && targetGroupId && currentGroupId !== targetGroupId) {
@@ -1475,7 +1492,7 @@ const StudioContent = () => {
             }));
           }
           // Add to new group
-          handleAddNodeToGroup(targetGroupId, node.id, node.position);
+          await handleAddNodeToGroup(targetGroupId, node.id, node.position);
         } else {
           // Snap back to inside the group - move to center of current group
           const currentGroup = groups.find(g => g.id === currentGroupId);
@@ -1499,6 +1516,14 @@ const StudioContent = () => {
         }
       }
       // If not completely outside, node stays in current group at new position
+      else {
+        // Update position in database
+        try {
+          await updateClassPositionInGroup(currentGroupId, node.id, node.position.x, node.position.y);
+        } catch (error) {
+          console.error('Error updating class position in group:', error);
+        }
+      }
     }
     // Case 3: Node dragged completely out of its group (no target group)
     else if (currentGroupId && !targetGroupId) {
@@ -1527,7 +1552,23 @@ const StudioContent = () => {
           }
         }
       }
-      // If still partially inside, node stays in group at current position
+      // If still partially inside, update position in database
+      else {
+        try {
+          await updateClassPositionInGroup(currentGroupId, node.id, node.position.x, node.position.y);
+        } catch (error) {
+          console.error('Error updating class position in group:', error);
+        }
+      }
+    }
+    // Case 4: Node dragged within the same group (currentGroupId == targetGroupId)
+    else if (currentGroupId && targetGroupId && currentGroupId === targetGroupId) {
+      // Update position in database
+      try {
+        await updateClassPositionInGroup(currentGroupId, node.id, node.position.x, node.position.y);
+      } catch (error) {
+        console.error('Error updating class position in group:', error);
+      }
     }
   }, [isReadOnly, findNodeGroup, findGroupAtPosition, handleAddNodeToGroup, handleRemoveNodeFromGroup, groups, confirmDialog, updateGroup, setNodes, nodes, isNodeCompletelyOutsideGroup]);
 
@@ -2060,11 +2101,19 @@ const StudioContent = () => {
 
       // Load groups from dedicated table
       let loadedGroups: any[] = [];
+      let classPositionsInGroups: Record<string, { x: number | null; y: number | null }> = {};
       try {
         const groupsResult = await getGroupsForVersion(selectedVersionId);
         loadedGroups = JSON.parse(groupsResult);
 
         if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
+          // Extract class positions from all groups
+          loadedGroups.forEach((g: any) => {
+            if (g.classPositions) {
+              Object.assign(classPositionsInGroups, g.classPositions);
+            }
+          });
+
           // Transform to CanvasGroup format
           const canvasGroups = loadedGroups.map((g: any) => ({
             id: g.id,
@@ -2140,6 +2189,18 @@ const StudioContent = () => {
           setNodes(prevNodes => {
             // Map existing nodes to update positions
             const updatedNodes = prevNodes.map(node => {
+              // First check if this node is in a group and has saved position
+              if (classPositionsInGroups[node.id]) {
+                const savedPos = classPositionsInGroups[node.id];
+                if (savedPos.x !== null && savedPos.y !== null) {
+                  return {
+                    ...node,
+                    position: { x: savedPos.x, y: savedPos.y }
+                  };
+                }
+              }
+
+              // Otherwise use position from layout.nodes
               const savedNode = layout.nodes.find((n: any) => n.id === node.id);
               if (savedNode) {
                 return {
@@ -3860,6 +3921,7 @@ const StudioContent = () => {
       if (!selectedVersionId) {
         setNodes([]);
         setEdges([]);
+        setGroups([]);
         return;
       }
 
@@ -3883,10 +3945,115 @@ const StudioContent = () => {
             node.position = existingPos;
           }
         });
-        const finalNodes = newNodes;
         const newEdges = createAllEdges(classesWithProperties);
         setEdges(newEdges);
-        setNodes(finalNodes);
+
+        // Load groups from database
+        setLoadingMessage('Loading groups...');
+        let groupNodes: Node[] = [];
+        let classPositionsInGroups: Record<string, { x: number | null; y: number | null }> = {};
+
+        try {
+          const groupsResult = await getGroupsForVersion(selectedVersionId);
+          const loadedGroups = JSON.parse(groupsResult);
+
+          if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
+            // Extract class positions from all groups
+            loadedGroups.forEach((g: any) => {
+              if (g.classPositions) {
+                Object.assign(classPositionsInGroups, g.classPositions);
+              }
+            });
+
+            // Transform to CanvasGroup format and set in context
+            const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
+            const canvasGroups = loadedGroups.map((g: any) => ({
+              id: g.id,
+              name: g.name,
+              description: g.description,
+              color: g.color,
+              position: g.position,
+              dimensions: g.dimensions,
+              nodeIds: g.nodeIds || [],
+              tags: g.metadata?.tags || [],
+              styleOptions: {
+                borderStyle: g.borderStyle || 'dashed',
+                opacity: g.opacity ?? 1,
+                shadow: g.metadata?.shadow || 'none',
+                icon: g.metadata?.icon || 'folder'
+              }
+            }));
+            setGroups(canvasGroups);
+
+            // Initialize group positions ref for delta tracking during drag
+            canvasGroups.forEach((group: any) => {
+              groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
+            });
+
+            // Create group nodes for ReactFlow
+            loadedGroups.forEach((group: any) => {
+              const groupNode: Node = {
+                id: group.id,
+                type: 'groupNode',
+                position: group.position,
+                width: group.dimensions.width,
+                height: group.dimensions.height,
+                style: {
+                  width: group.dimensions.width,
+                  height: group.dimensions.height,
+                  zIndex: -1
+                },
+                data: {
+                  id: group.id,
+                  name: group.name,
+                  color: group.color,
+                  nodeIds: group.nodeIds || [],
+                  tags: group.metadata?.tags || [],
+                  styleOptions: {
+                    borderStyle: group.borderStyle || 'dashed',
+                    opacity: group.opacity ?? 1,
+                    shadow: group.metadata?.shadow || 'none',
+                    icon: group.metadata?.icon || 'folder'
+                  },
+                  availableTags,
+                  onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
+                  onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
+                  onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
+                  onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
+                  onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
+                  isReadOnly
+                }
+              };
+              groupNodes.push(groupNode);
+            });
+          } else {
+            // No groups found, clear groups
+            setGroups([]);
+          }
+        } catch (error) {
+          console.error('Error loading groups:', error);
+          setGroups([]);
+        }
+
+        // Apply class positions from groups if available
+        const finalNodes = newNodes.map(node => {
+          if (classPositionsInGroups[node.id]) {
+            const savedPos = classPositionsInGroups[node.id];
+            if (savedPos.x !== null && savedPos.y !== null) {
+              return {
+                ...node,
+                position: { x: savedPos.x, y: savedPos.y }
+              };
+            }
+          }
+          return node;
+        });
+
+        // Set nodes with group nodes first (behind class nodes due to zIndex: -1)
+        setNodes([...groupNodes, ...finalNodes]);
+
+        // Trigger sidebar refresh to update groups list
+        triggerSidebarRefresh();
       } catch (error) {
         console.error('Failed to reload classes:', error);
       } finally {

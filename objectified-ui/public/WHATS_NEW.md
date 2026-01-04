@@ -20,6 +20,11 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed property template button icon color in light mode (was appearing black instead of white)
   - Fixed click-to-focus behavior in the canvas
   - Fixed dark mode and light mode (takes precedence over system settings)
+  - Fixed group class positions not saving to database when dragging classes within groups (regression)
+    - Classes dragged into groups now immediately persist to database with position
+    - Moving classes within groups now updates positions in database
+    - Class positions within groups are now properly restored when canvas is reloaded
+    - Fixed syncGroupsForVersion to save position_x and position_y for all classes in groups
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication

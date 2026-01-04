@@ -3146,7 +3146,16 @@ export async function saveDefaultCanvasLayout(
     // Sync groups to the dedicated table if provided
     // Note: We sync even if groups array is empty to handle deletion of all groups
     if (groups && Array.isArray(groups)) {
-      await syncGroupsForVersion(versionId, groups);
+      // Create a map of node positions for classes
+      const nodePositions: Record<string, { x: number; y: number }> = {};
+      if (nodes && Array.isArray(nodes)) {
+        nodes.forEach((node: any) => {
+          if (node.id && node.position && node.type !== 'groupNode') {
+            nodePositions[node.id] = { x: node.position.x, y: node.position.y };
+          }
+        });
+      }
+      await syncGroupsForVersion(versionId, groups, nodePositions);
     }
 
     if (existingResult.rowCount > 0) {
@@ -3210,6 +3219,12 @@ export async function getGroupsForVersion(versionId: string) {
         [group.id]
       );
 
+      // Create a map of class positions for easy lookup
+      const classPositions: Record<string, { x: number | null; y: number | null }> = {};
+      classesResult.rows.forEach((c: any) => {
+        classPositions[c.class_id] = { x: c.position_x, y: c.position_y };
+      });
+
       return {
         id: group.id,
         versionId: group.version_id,
@@ -3225,6 +3240,7 @@ export async function getGroupsForVersion(versionId: string) {
         borderStyle: group.border_style,
         metadata: group.metadata,
         nodeIds: classesResult.rows.map((c: any) => c.class_id),
+        classPositions: classPositions,
         createdAt: group.created_at,
         updatedAt: group.updated_at
       };
@@ -3471,10 +3487,39 @@ export async function removeClassFromGroup(groupId: string, classId: string) {
 }
 
 /**
+ * Update a class position within a group
+ */
+export async function updateClassPositionInGroup(
+  groupId: string,
+  classId: string,
+  positionX: number,
+  positionY: number
+) {
+  try {
+    const result = await connectionPool.query(
+      `UPDATE odb.group_classes 
+       SET position_x = $3, position_y = $4, updated_at = NOW()
+       WHERE group_id = $1 AND class_id = $2
+       RETURNING *`,
+      [groupId, classId, positionX, positionY]
+    );
+
+    if (result.rowCount === 0) {
+      return errorResponse('Class not found in group');
+    }
+
+    return successResponse({ groupClass: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating class position in group:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
  * Sync all groups for a version (used when saving canvas state)
  * This replaces all groups for a version with the provided groups
  */
-export async function syncGroupsForVersion(versionId: string, groups: any[]) {
+export async function syncGroupsForVersion(versionId: string, groups: any[], nodePositions?: Record<string, { x: number; y: number }>) {
   try {
     // Start a transaction
     await connectionPool.query('BEGIN');
@@ -3519,14 +3564,20 @@ export async function syncGroupsForVersion(versionId: string, groups: any[]) {
       const newGroupId = groupResult.rows[0].id;
       idMapping[group.id] = newGroupId;
 
-      // Insert group classes
+      // Insert group classes with positions
       const nodeIds = group.nodeIds || [];
       for (let i = 0; i < nodeIds.length; i++) {
+        const nodeId = nodeIds[i];
+        const nodePos = nodePositions?.[nodeId] || null;
+
         await connectionPool.query(
-          `INSERT INTO odb.group_classes (group_id, class_id, sort_order)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (group_id, class_id) DO NOTHING`,
-          [newGroupId, nodeIds[i], i]
+          `INSERT INTO odb.group_classes (group_id, class_id, position_x, position_y, sort_order)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (group_id, class_id) DO UPDATE SET
+             position_x = EXCLUDED.position_x,
+             position_y = EXCLUDED.position_y,
+             sort_order = EXCLUDED.sort_order`,
+          [newGroupId, nodeId, nodePos?.x ?? null, nodePos?.y ?? null, i]
         );
       }
     }
