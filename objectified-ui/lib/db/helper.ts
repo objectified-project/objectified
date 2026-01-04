@@ -3512,12 +3512,7 @@ export async function syncGroupsForVersion(versionId: string, groups: any[]) {
           group.zIndex || 0,
           group.opacity ?? 1.0,
           group.borderStyle || group.styleOptions?.borderStyle || 'dashed',
-          JSON.stringify({
-            ...(group.metadata || {}),
-            ...(group.styleOptions || {}),
-            locked: group.locked || false,
-            tags: group.tags || []
-          })
+          JSON.stringify(group.metadata || group.styleOptions || {})
         ]
       );
 

@@ -97,12 +97,10 @@ export interface GroupNodeData {
   nodeIds: string[]; // IDs of nodes contained in this group
   styleOptions?: GroupStyleOptions; // Visual styling options
   isHighlighted?: boolean; // Visual highlight when node is dragged over
-  locked?: boolean; // If true, prevents repositioning of nodes within the group
   onRename?: (groupId: string, newName: string) => void;
   onDelete?: (groupId: string) => void;
   onColorChange?: (groupId: string, newColor: string) => void;
   onStyleChange?: (groupId: string, styleOptions: GroupStyleOptions) => void;
-  onLockToggle?: (groupId: string, locked: boolean) => void;
   isReadOnly?: boolean;
 }
 
@@ -186,13 +184,6 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
     groupData.onStyleChange?.(groupData.id, newOptions);
   }, [groupData, styleOptions]);
 
-  // Handle lock toggle
-  const handleLockToggle = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (groupData.isReadOnly) return;
-    groupData.onLockToggle?.(groupData.id, !groupData.locked);
-  }, [groupData]);
-
   // Count nodes in this group
   const nodeCount = groupData.nodeIds?.length || 0;
 
@@ -265,32 +256,12 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
             <>
               <span className="text-sm font-semibold">{groupData.name}</span>
               <span className="text-xs opacity-70">({nodeCount})</span>
-
-              {/* Lock indicator (always visible when locked) */}
-              {groupData.locked && (
-                <Lock className={`h-3.5 w-3.5 ml-1 ${useLightText ? 'opacity-70' : ''}`} />
-              )}
             </>
           )}
 
           {/* Actions (visible when selected and not editing) */}
           {selected && !isEditing && !groupData.isReadOnly && (
             <div className={`flex items-center gap-1 ml-2 pl-2 border-l ${useLightText ? 'border-white/30' : 'border-current/20'}`}>
-              {/* Lock toggle button */}
-              <button
-                type="button"
-                onClick={handleLockToggle}
-                onMouseDown={(e) => e.stopPropagation()}
-                className={`p-1 rounded transition-colors cursor-pointer ${
-                  groupData.locked 
-                    ? useLightText ? 'bg-white/30' : 'bg-white/50 dark:bg-gray-700/50'
-                    : useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'
-                }`}
-                title={groupData.locked ? 'Unlock members (allow repositioning)' : 'Lock members (prevent repositioning)'}
-              >
-                <Lock className={`h-3.5 w-3.5 ${groupData.locked ? '' : 'opacity-50'}`} />
-              </button>
-
               {/* Settings popover */}
               <Popover.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <Popover.Trigger asChild>

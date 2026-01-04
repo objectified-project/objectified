@@ -28,7 +28,6 @@ export interface CanvasGroup {
   position: { x: number; y: number };
   dimensions: { width: number; height: number };
   styleOptions?: GroupStyleOptions;
-  locked?: boolean; // If true, prevents repositioning of nodes within the group
 }
 
 interface StudioContextType {
