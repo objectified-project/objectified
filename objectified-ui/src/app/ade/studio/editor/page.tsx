@@ -285,6 +285,7 @@ const StudioContent = () => {
   const handleGroupColorChangeRef = useRef<any>(null);
   const handleGroupStyleChangeRef = useRef<any>(null);
   const handleGroupTagsChangeRef = useRef<any>(null);
+  const handleGroupLockToggleRef = useRef<any>(null);
 
   // Handle toggling property expansion
   const handleTogglePropertyExpansion = useCallback((propertyId: string) => {
@@ -1119,6 +1120,60 @@ const StudioContent = () => {
     }
   }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
 
+  // Handle group lock toggle
+  const handleGroupLockToggle = useCallback(async (groupId: string, locked: boolean) => {
+    if (isReadOnly) return;
+
+    updateGroup(groupId, { locked });
+
+    // Update the node data
+    setNodes(prevNodes => prevNodes.map(node => {
+      if (node.id === groupId && node.type === 'groupNode') {
+        return {
+          ...node,
+          data: { ...node.data, locked }
+        };
+      }
+      return node;
+    }));
+
+    // Auto-save the updated groups to database
+    if (selectedVersionId && currentUserId) {
+      try {
+        const viewport = getViewport();
+        const nodeData = nodes.map(node => ({
+          id: node.id,
+          type: node.type,
+          position: node.position,
+          dimensions: {
+            width: node.measured?.width || node.width || node.style?.width,
+            height: node.measured?.height || node.height || node.style?.height
+          }
+        }));
+        const edgeData = edges.map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target
+        }));
+
+        const updatedGroups = groups.map(g =>
+          g.id === groupId ? { ...g, locked } : g
+        );
+
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          nodeData,
+          edgeData,
+          updatedGroups
+        );
+      } catch (error) {
+        console.error('Failed to auto-save group lock toggle:', error);
+      }
+    }
+  }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
+
   // Handle group tags change
   const handleGroupTagsChange = useCallback(async (groupId: string, tags: any[]) => {
     if (isReadOnly) return;
@@ -1179,6 +1234,7 @@ const StudioContent = () => {
   handleGroupDeleteRef.current = handleGroupDelete;
   handleGroupColorChangeRef.current = handleGroupColorChange;
   handleGroupStyleChangeRef.current = handleGroupStyleChange;
+  handleGroupLockToggleRef.current = handleGroupLockToggle;
 
   // State for drag-over highlighting
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
@@ -1604,10 +1660,12 @@ const StudioContent = () => {
         color: newGroup.color,
         nodeIds: newGroup.nodeIds,
         styleOptions: newGroup.styleOptions,
+        locked: false,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
+        onLockToggle: handleGroupLockToggle,
         isReadOnly: isReadOnly
       }
     };
@@ -1714,10 +1772,12 @@ const StudioContent = () => {
         color: newGroup.color,
         nodeIds: newGroup.nodeIds,
         styleOptions: newGroup.styleOptions,
+        locked: false,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
+        onLockToggle: handleGroupLockToggle,
         isReadOnly: isReadOnly
       }
     };
@@ -1859,6 +1919,7 @@ const StudioContent = () => {
     });
 
     // Second pass: constrain grouped nodes within their group bounds during and after dragging
+    // Also handle locked groups by converting node drags into group drags
     const constrainedChanges = changes.map((change: any) => {
       if (change.type === 'position' && change.position) {
         const node = nodes.find(n => n.id === change.id);
@@ -1866,7 +1927,49 @@ const StudioContent = () => {
         // Skip group nodes - they can move freely
         if (node?.type === 'groupNode') return change;
 
-        // Check if this node belongs to a group
+        // Check if this node belongs to a locked group
+        const lockedParentGroup = groups.find(g => g.nodeIds.includes(change.id));
+        if (lockedParentGroup?.locked && change.dragging) {
+          // Node is in a locked group - instead of preventing movement,
+          // move the group itself to make it feel like the user is dragging the group
+          const groupNode = nodes.find(n => n.id === lockedParentGroup.id && n.type === 'groupNode');
+          if (groupNode && node) {
+            // Calculate the delta from the node's current position to the new position
+            const dx = change.position.x - node.position.x;
+            const dy = change.position.y - node.position.y;
+
+            if (dx !== 0 || dy !== 0) {
+              // Apply this delta to the group's position
+              const newGroupPosition = {
+                x: groupNode.position.x + dx,
+                y: groupNode.position.y + dy,
+              };
+
+              // Store the delta for moving child nodes
+              if (!groupDeltas.has(lockedParentGroup.id)) {
+                groupDeltas.set(lockedParentGroup.id, { dx, dy });
+              } else {
+                const existingDelta = groupDeltas.get(lockedParentGroup.id)!;
+                groupDeltas.set(lockedParentGroup.id, {
+                  dx: existingDelta.dx + dx,
+                  dy: existingDelta.dy + dy
+                });
+              }
+
+              // Update group position ref and context
+              groupPositionsRef.current.set(lockedParentGroup.id, newGroupPosition);
+              updateGroup(lockedParentGroup.id, { position: newGroupPosition });
+            }
+          }
+
+          // Keep the node at its current position (it will move with the group via groupDeltas)
+          return {
+            ...change,
+            position: node?.position || change.position,
+          };
+        }
+
+        // Check if this node belongs to a group (for bounds constraining)
         const parentGroup = groups.find(g => g.nodeIds.includes(change.id));
         if (parentGroup) {
           const groupNode = nodes.find(n => n.id === parentGroup.id);
@@ -1923,13 +2026,26 @@ const StudioContent = () => {
     // Apply the constrained changes
     onNodesChange(constrainedChanges);
 
-    // Move child nodes when their parent group moves
+    // Move group nodes and child nodes when their parent group moves (for locked group dragging)
     if (groupDeltas.size > 0) {
       setNodes((prevNodes) => {
         return prevNodes.map((node) => {
-          if (node.type === 'groupNode') return node;
+          // Check if this is a group node that needs to move
+          if (node.type === 'groupNode') {
+            const delta = groupDeltas.get(node.id);
+            if (delta) {
+              return {
+                ...node,
+                position: {
+                  x: node.position.x + delta.dx,
+                  y: node.position.y + delta.dy,
+                },
+              };
+            }
+            return node;
+          }
 
-          // Check if this node is in any moved group
+          // Check if this node is in any moved group (child nodes)
           for (const [groupId, delta] of groupDeltas) {
             const group = groups.find(g => g.id === groupId);
             if (group && group.nodeIds.includes(node.id)) {
@@ -2075,6 +2191,7 @@ const StudioContent = () => {
             dimensions: g.dimensions,
             nodeIds: g.nodeIds || [],
             tags: g.metadata?.tags || [],
+            locked: g.metadata?.locked || false,
             styleOptions: {
               borderStyle: g.borderStyle || 'dashed',
               opacity: g.opacity ?? 1,
@@ -2123,12 +2240,14 @@ const StudioContent = () => {
                 nodeIds: group.nodeIds || [],
                 tags: group.tags || [],
                 styleOptions: group.styleOptions,
+                locked: group.locked || false,
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
                 onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
                 onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
                 onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
                 onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
+                onLockToggle: (groupId: string, locked: boolean) => handleGroupLockToggleRef.current?.(groupId, locked),
                 isReadOnly
               }
             };
