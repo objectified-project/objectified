@@ -239,6 +239,16 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const beginImport = async () => {
     if (!analysisResult || !importOptions) return;
 
+    // Validate that we have required IDs
+    if (!tenantId) {
+      console.error('Import failed: No tenant ID available');
+      return;
+    }
+    if (!userId) {
+      console.error('Import failed: No user ID available');
+      return;
+    }
+
     const document = analysisResult.document;
     const job = await startImport({
       tenantId,

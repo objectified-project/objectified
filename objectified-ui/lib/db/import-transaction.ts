@@ -80,6 +80,16 @@ export async function createProjectTx(
     return successResponse({ project: result.rows[0] });
   } catch (error: any) {
     if (error.code === '23505') return errorResponse('A project with this slug already exists in this tenant');
+    if (error.code === '23503') {
+      // Foreign key constraint violation
+      if (error.constraint === 'projects_tenant_id_fkey') {
+        return errorResponse('Invalid tenant ID. The tenant may no longer exist or you may need to switch to a valid tenant.');
+      }
+      if (error.constraint === 'projects_creator_id_fkey') {
+        return errorResponse('Invalid user ID. Please try logging out and back in.');
+      }
+      return errorResponse(`Database constraint error: ${error.detail || error.message}`);
+    }
     return errorResponse(error.message);
   }
 }

@@ -78,7 +78,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 **Import From** 📋 PLANNED
 - 📋 Arazzo
-- 📋 OpenAPI 2.0 (Swagger)
+- ✅ OpenAPI 2.0 (Swagger)
 - 📋 OpenAPI 3.0.x
 - ✅ OpenAPI 3.1.x
 - 📋 JSON Schema
@@ -95,7 +95,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description         |
 |--------|-----------------------------|
-| #232   | Import from OpenAPI 2.0     |
 | #233   | Import from OpenAPI 3.0/3.1 |
 | #234   | Import from JSON Schema     |
 | #235   | Import from GraphQL SDL     |

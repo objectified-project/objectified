@@ -6,6 +6,7 @@
  */
 
 import YAML from 'yaml';
+import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 
 export interface ParsedProperty {
   name: string;
@@ -271,6 +272,31 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       spec = YAML.parse(specContent);
     }
 
+    // Check for Swagger 2.x and convert if needed
+    if (isSwagger2(spec)) {
+      const conversionResult = convertSwaggerToOpenAPI(spec);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `Swagger conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      // Use the converted spec
+      spec = conversionResult.document;
+
+      // Add conversion warnings to global warnings
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from Swagger 2.x to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from Swagger 2.x to OpenAPI 3.1.x'];
+
+      // Continue with the converted spec
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
     // Validate OpenAPI version
     if (!spec.openapi || !spec.openapi.startsWith('3.')) {
       return {
@@ -281,89 +307,7 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       };
     }
 
-    // Extract components/schemas
-    if (!spec.components || !spec.components.schemas) {
-      return {
-        success: false,
-        classes: [],
-        warnings: [],
-        error: 'No schemas found in OpenAPI specification'
-      };
-    }
-
-    const schemas = spec.components.schemas;
-    const classes: ParsedClass[] = [];
-    const globalWarnings: string[] = [];
-
-    // Get all schema names for reference validation
-    const allSchemaNames = new Set(Object.keys(schemas));
-
-    // Convert each schema to a class
-    for (const schemaName in schemas) {
-      const originalSchema = schemas[schemaName];
-      const warnings: string[] = [];
-      let isSupported = true;
-
-      // Resolve allOf compositions for validation and reference checking
-      const resolvedSchema = resolveAllOf(originalSchema, schemas);
-
-      // Check for unresolved $ref references
-      const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
-      if (unresolvedRefs.length > 0) {
-        warnings.push(
-          `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
-          `These referenced schemas do not exist in the specification.`
-        );
-        isSupported = false;
-      }
-
-      // Extract ONLY direct properties (not inherited via $ref in allOf)
-      // This prevents storing duplicate properties that come from parent schemas
-      const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
-
-      const properties: ParsedProperty[] = [];
-
-      // Convert only the direct properties for storage
-      for (const propName in directProperties) {
-        const propSchema = directProperties[propName];
-        properties.push(convertSchemaProperty(propName, propSchema, directRequired));
-      }
-
-      classes.push({
-        name: schemaName,
-        description: originalSchema.description || resolvedSchema.description,
-        properties,
-        selected: isSupported, // Only select supported classes by default
-        warnings,
-        isSupported,
-        schema: originalSchema // Preserve original schema with compositions
-      });
-
-      // Add to global warnings if unsupported
-      if (!isSupported) {
-        globalWarnings.push(`${schemaName}: ${warnings.join(' ')}`);
-      }
-    }
-
-    const supportedClasses = classes.filter(c => c.isSupported);
-
-    if (supportedClasses.length === 0) {
-      return {
-        success: false,
-        classes: [],
-        warnings: globalWarnings,
-        error: 'No supported schemas found to import. All schemas have unresolved references.'
-      };
-    }
-
-    return {
-      success: true,
-      classes,
-      warnings: globalWarnings,
-      version: spec.info?.version,
-      title: spec.info?.title,
-      description: spec.info?.description
-    };
+    return parseOpenAPISpecInternal(spec, []);
   } catch (error: any) {
     return {
       success: false,
@@ -372,6 +316,96 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       error: `Failed to parse OpenAPI specification: ${error.message}`
     };
   }
+}
+
+/**
+ * Internal function that parses an already-validated OpenAPI 3.x specification
+ */
+function parseOpenAPISpecInternal(spec: any, initialWarnings: string[]): OpenAPIParseResult {
+  const globalWarnings: string[] = [...initialWarnings];
+
+  // Extract components/schemas
+  if (!spec.components || !spec.components.schemas) {
+    return {
+      success: false,
+      classes: [],
+      warnings: globalWarnings,
+      error: 'No schemas found in OpenAPI specification'
+    };
+  }
+
+  const schemas = spec.components.schemas;
+  const classes: ParsedClass[] = [];
+
+  // Get all schema names for reference validation
+  const allSchemaNames = new Set(Object.keys(schemas));
+
+  // Convert each schema to a class
+  for (const schemaName in schemas) {
+    const originalSchema = schemas[schemaName];
+    const warnings: string[] = [];
+    let isSupported = true;
+
+    // Resolve allOf compositions for validation and reference checking
+    const resolvedSchema = resolveAllOf(originalSchema, schemas);
+
+    // Check for unresolved $ref references
+    const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
+    if (unresolvedRefs.length > 0) {
+      warnings.push(
+        `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
+        `These referenced schemas do not exist in the specification.`
+      );
+      isSupported = false;
+    }
+
+    // Extract ONLY direct properties (not inherited via $ref in allOf)
+    // This prevents storing duplicate properties that come from parent schemas
+    const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
+
+    const properties: ParsedProperty[] = [];
+
+    // Convert only the direct properties for storage
+    for (const propName in directProperties) {
+      const propSchema = directProperties[propName];
+      properties.push(convertSchemaProperty(propName, propSchema, directRequired));
+    }
+
+    classes.push({
+      name: schemaName,
+      description: originalSchema.description || resolvedSchema.description,
+      properties,
+      selected: isSupported, // Only select supported classes by default
+      warnings,
+      isSupported,
+      schema: originalSchema // Preserve original schema with compositions
+    });
+
+    // Add to global warnings if unsupported
+    if (!isSupported) {
+      globalWarnings.push(`${schemaName}: ${warnings.join(' ')}`);
+    }
+  }
+
+  const supportedClasses = classes.filter(c => c.isSupported);
+
+  if (supportedClasses.length === 0) {
+    return {
+      success: false,
+      classes: [],
+      warnings: globalWarnings,
+      error: 'No supported schemas found to import. All schemas have unresolved references.'
+    };
+  }
+
+  return {
+    success: true,
+    classes,
+    warnings: globalWarnings,
+    version: spec.info?.version,
+    title: spec.info?.title,
+    description: spec.info?.description
+  };
 }
 
 /**

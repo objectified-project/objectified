@@ -4,6 +4,7 @@
  */
 
 import YAML from 'yaml';
+import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -125,13 +126,13 @@ function detectFormat(doc: any): FormatDetectionResult {
     };
   }
 
-  // Swagger 2.x (OpenAPI 2.0)
+  // Swagger 2.x (OpenAPI 2.0) - now supported with conversion
   if (doc.swagger) {
     return {
       format: 'swagger',
       version: doc.swagger,
-      supported: false,
-      displayName: `Swagger ${doc.swagger} (not yet supported - upgrade to OpenAPI 3.1.x recommended)`
+      supported: true,
+      displayName: `Swagger ${doc.swagger} (will be converted to OpenAPI 3.1.x)`
     };
   }
 
@@ -498,13 +499,13 @@ function findWarnings(doc: any): AnalysisIssue[] {
     }
   }
 
-  // Check for Swagger 2.x (OpenAPI 2.0)
+  // Check for Swagger 2.x (OpenAPI 2.0) - now supported but add info message
   if (doc.swagger) {
     warnings.push({
       type: 'warning',
-      message: `Swagger ${doc.swagger} (OpenAPI 2.0) is detected but not yet supported for import. Please upgrade to OpenAPI 3.1.x for full compatibility.`,
+      message: `Swagger ${doc.swagger} (OpenAPI 2.0) was automatically converted to OpenAPI 3.1.x format for import.`,
       path: 'swagger',
-      severity: 'high'
+      severity: 'low'
     });
   }
 
@@ -591,9 +592,63 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     };
   }
 
-  const doc = parseResult.data;
+  let doc = parseResult.data;
+  let conversionWarnings: AnalysisIssue[] = [];
 
-  // Detect format
+  // Convert Swagger 2.x to OpenAPI 3.1.x if needed
+  if (isSwagger2(doc)) {
+    const conversionResult = convertSwaggerToOpenAPI(doc);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'swagger',
+        version: doc.swagger || '2.0',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: false,
+        formatDisplayName: `Swagger ${doc.swagger || '2.0'} (conversion failed)`,
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0
+        },
+        errors: [{
+          type: 'error',
+          message: `Swagger conversion failed: ${conversionResult.error}`,
+          severity: 'critical'
+        }],
+        warnings: [],
+        document: null
+      };
+    }
+
+    // Use the converted document for analysis
+    doc = conversionResult.document;
+
+    // Add conversion warnings
+    conversionWarnings = conversionResult.warnings.map(warning => ({
+      type: 'warning' as const,
+      message: warning,
+      severity: 'low' as const
+    }));
+  }
+
+  // Detect format (will now show OpenAPI 3.1.0 for converted Swagger specs)
   const formatDetection = detectFormat(doc);
 
   // Validate meta-schema
@@ -618,6 +673,9 @@ export async function analyzeSpecification(fileContent: string, fileName: string
   // Find warnings
   const warnings = findWarnings(doc);
 
+  // Combine conversion warnings with analysis warnings
+  const allWarnings = [...conversionWarnings, ...warnings];
+
   return {
     isValid: validation.valid,
     format: formatDetection.format,
@@ -630,7 +688,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     metrics,
     qualityScore,
     errors: validation.errors,
-    warnings,
+    warnings: allWarnings,
     document: doc
   };
 }

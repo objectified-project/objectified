@@ -1,0 +1,388 @@
+swagger: "2.0"
+info:
+  title: Pet Store API
+  description: A sample Swagger 2.0 API for testing import functionality
+  version: "1.0.0"
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+host: api.petstore.example.com
+basePath: /v1
+schemes:
+  - https
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: X-API-Key
+    in: header
+  basic_auth:
+    type: basic
+  oauth2:
+    type: oauth2
+    flow: accessCode
+    authorizationUrl: https://example.com/oauth/authorize
+    tokenUrl: https://example.com/oauth/token
+    scopes:
+      read:pets: Read access to pets
+      write:pets: Write access to pets
+tags:
+  - name: pet
+    description: Everything about your Pets
+  - name: store
+    description: Access to Petstore orders
+  - name: user
+    description: Operations about users
+
+paths:
+  /pets:
+    get:
+      summary: List all pets
+      operationId: listPets
+      tags:
+        - pet
+      parameters:
+        - name: limit
+          in: query
+          description: How many items to return at one time
+          required: false
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+        - name: status
+          in: query
+          description: Filter by status
+          required: false
+          type: array
+          items:
+            type: string
+            enum: [available, pending, sold]
+          collectionFormat: multi
+      responses:
+        "200":
+          description: A paged array of pets
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Pet'
+          headers:
+            X-Rate-Limit:
+              type: integer
+              description: Request limit per hour
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      summary: Create a pet
+      operationId: createPet
+      tags:
+        - pet
+      parameters:
+        - name: body
+          in: body
+          description: Pet to add
+          required: true
+          schema:
+            $ref: '#/definitions/NewPet'
+      responses:
+        "201":
+          description: Pet created
+          schema:
+            $ref: '#/definitions/Pet'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /pets/{petId}:
+    get:
+      summary: Get a pet by ID
+      operationId: getPetById
+      tags:
+        - pet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: Expected response to a valid request
+          schema:
+            $ref: '#/definitions/Pet'
+        "404":
+          description: Pet not found
+          schema:
+            $ref: '#/definitions/Error'
+    put:
+      summary: Update a pet
+      operationId: updatePet
+      tags:
+        - pet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          type: integer
+          format: int64
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/UpdatePet'
+      responses:
+        "200":
+          description: Pet updated
+          schema:
+            $ref: '#/definitions/Pet'
+        "404":
+          description: Pet not found
+    delete:
+      summary: Delete a pet
+      operationId: deletePet
+      tags:
+        - pet
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Pet deleted
+        "404":
+          description: Pet not found
+
+  /pets/{petId}/upload:
+    post:
+      summary: Upload pet image
+      operationId: uploadPetImage
+      tags:
+        - pet
+      consumes:
+        - multipart/form-data
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          type: integer
+          format: int64
+        - name: file
+          in: formData
+          type: file
+          description: Image file to upload
+        - name: description
+          in: formData
+          type: string
+          description: Image description
+      responses:
+        "200":
+          description: Image uploaded
+          schema:
+            $ref: '#/definitions/UploadResponse'
+
+definitions:
+  Pet:
+    type: object
+    description: A pet in the store
+    required:
+      - id
+      - name
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: Unique identifier for the pet
+      name:
+        type: string
+        description: Name of the pet
+        minLength: 1
+        maxLength: 100
+      tag:
+        type: string
+        description: Optional tag for the pet
+      status:
+        type: string
+        description: Pet status in the store
+        enum:
+          - available
+          - pending
+          - sold
+      category:
+        $ref: '#/definitions/Category'
+      photoUrls:
+        type: array
+        description: URLs of pet photos
+        items:
+          type: string
+          format: uri
+      createdAt:
+        type: string
+        format: date-time
+        description: When the pet was created
+      metadata:
+        type: object
+        description: Additional metadata
+        additionalProperties:
+          type: string
+
+  NewPet:
+    type: object
+    description: Pet to create
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        description: Name of the pet
+        minLength: 1
+        maxLength: 100
+      tag:
+        type: string
+        description: Optional tag
+      status:
+        type: string
+        enum:
+          - available
+          - pending
+        default: available
+      categoryId:
+        type: integer
+        format: int64
+        description: Category ID
+
+  UpdatePet:
+    type: object
+    description: Pet update payload
+    properties:
+      name:
+        type: string
+        description: New name for the pet
+        minLength: 1
+        maxLength: 100
+      tag:
+        type: string
+        description: New tag
+        x-nullable: true
+      status:
+        type: string
+        enum:
+          - available
+          - pending
+          - sold
+
+  Category:
+    type: object
+    description: A category for a pet
+    properties:
+      id:
+        type: integer
+        format: int64
+      name:
+        type: string
+        minLength: 1
+
+  Error:
+    type: object
+    description: Error response
+    required:
+      - code
+      - message
+    properties:
+      code:
+        type: integer
+        format: int32
+        description: Error code
+      message:
+        type: string
+        description: Error message
+      details:
+        type: array
+        description: Additional error details
+        items:
+          type: object
+          properties:
+            field:
+              type: string
+            reason:
+              type: string
+
+  UploadResponse:
+    type: object
+    description: Response from file upload
+    properties:
+      success:
+        type: boolean
+        description: Whether upload succeeded
+      url:
+        type: string
+        format: uri
+        description: URL of uploaded file
+      size:
+        type: integer
+        format: int64
+        description: File size in bytes
+
+  Order:
+    type: object
+    description: An order for a pet
+    properties:
+      id:
+        type: integer
+        format: int64
+      petId:
+        type: integer
+        format: int64
+      quantity:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 10
+      shipDate:
+        type: string
+        format: date-time
+      status:
+        type: string
+        enum:
+          - placed
+          - approved
+          - delivered
+      complete:
+        type: boolean
+        default: false
+
+  User:
+    type: object
+    description: A user of the store
+    properties:
+      id:
+        type: integer
+        format: int64
+      username:
+        type: string
+        pattern: "^[a-zA-Z0-9_]+$"
+      firstName:
+        type: string
+      lastName:
+        type: string
+      email:
+        type: string
+        format: email
+      phone:
+        type: string
+      userStatus:
+        type: integer
+        format: int32
+        description: User status
+

@@ -407,6 +407,15 @@ async function writeClassWithProperties(
 export async function startImport(input: ImportJobInput) {
   const jobId = rndId();
   const startTime = Date.now();
+
+  // Validate required IDs early
+  if (!input.tenantId) {
+    throw new Error('Tenant ID is required for import. Please ensure you have selected a tenant.');
+  }
+  if (!input.userId) {
+    throw new Error('User ID is required for import. Please ensure you are logged in.');
+  }
+
   const job: JobState = {
     input,
     state: 'queued',

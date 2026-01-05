@@ -33,6 +33,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Class import now supports file, URL, clipboard, and Git repository import sources
   - Import performs a sanity check to make sure all class imports are valid
   - Adds Commit/Rollback system to allow users to apply or discard changes made during an import session
+  - Import supports:
+    - OpenAPI 3.1.x
+    - Swagger 2.0
 - Canvas improvements
   - Added per-class theming: customize colors for individual class nodes
     - 16 predefined color themes in a 4x4 grid (Slate, Gray, Red, Orange, Yellow, Green, Teal, Cyan, Blue, Indigo, Violet, Purple, and more)

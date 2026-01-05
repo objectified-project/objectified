@@ -312,6 +312,8 @@ const Projects = () => {
             onClick={() => setShowNewImportDialog(true)}
             variant="outline"
             className="border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+            disabled={!currentTenantId}
+            title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
           >
             <Upload className="h-5 w-5" />Import
           </Button>
@@ -479,16 +481,20 @@ const Projects = () => {
       </Dialog>
 
       {/* New Import Dialog (Step 1 - Source Selection) */}
-      <ImportDialog
-        open={showNewImportDialog}
-        onClose={() => setShowNewImportDialog(false)}
-        onSuccess={handleImportSuccess}
-        tenantId={currentTenantId}
-        userId={currentUserId}
-      />
+      {currentTenantId && currentUserId && (
+        <ImportDialog
+          open={showNewImportDialog}
+          onClose={() => setShowNewImportDialog(false)}
+          onSuccess={handleImportSuccess}
+          tenantId={currentTenantId}
+          userId={currentUserId}
+        />
+      )}
 
       {/* OpenAPI Import Dialog (Legacy - will be replaced by multi-step flow) */}
-      <OpenAPIImportDialog open={showImportDialog} onClose={() => setShowImportDialog(false)} onSuccess={handleImportSuccess} tenantId={currentTenantId} userId={currentUserId} />
+      {currentTenantId && currentUserId && (
+        <OpenAPIImportDialog open={showImportDialog} onClose={() => setShowImportDialog(false)} onSuccess={handleImportSuccess} tenantId={currentTenantId} userId={currentUserId} />
+      )}
 
       {/* Edit Project Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>

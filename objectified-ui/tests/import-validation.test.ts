@@ -34,9 +34,13 @@ function validateOpenApiFile(filePath: string): { valid: boolean; error?: string
       return { valid: false, error: 'Missing openapi or swagger version', schemas: 0 };
     }
 
-    const components = document.components || document.definitions || {};
-    const schemas = components.schemas || {};
-    const schemaCount = Object.keys(schemas).length;
+    // OpenAPI 3.x uses components.schemas, Swagger 2.x uses definitions directly
+    let schemaCount = 0;
+    if (document.components?.schemas) {
+      schemaCount = Object.keys(document.components.schemas).length;
+    } else if (document.definitions) {
+      schemaCount = Object.keys(document.definitions).length;
+    }
 
     return { valid: true, schemas: schemaCount };
   } catch (error) {
@@ -160,6 +164,15 @@ describe('Import Validation Tests', () => {
       const result = validateOpenApiFile(filePath);
 
       expect(result.valid).toBe(true);
+    });
+
+    test('should validate Swagger 2.0 petstore example', () => {
+      const swaggerExamplesDir = path.join(__dirname, '../examples/swagger');
+      const filePath = path.join(swaggerExamplesDir, '01-swagger-2-petstore.yaml');
+      const result = validateOpenApiFile(filePath);
+
+      expect(result.valid).toBe(true);
+      expect(result.schemas).toBe(8); // Pet, NewPet, UpdatePet, Category, Error, UploadResponse, Order, User
     });
   });
 
