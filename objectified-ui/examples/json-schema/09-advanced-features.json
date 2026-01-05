@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/advanced.json",
+  "title": "AdvancedFeatures",
+  "description": "Schema demonstrating advanced JSON Schema features",
+  "type": "object",
+  "$defs": {
+    "TupleExample": {
+      "type": "object",
+      "description": "Demonstrates tuple validation with prefixItems",
+      "properties": {
+        "coordinates": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number", "description": "Latitude" },
+            { "type": "number", "description": "Longitude" },
+            { "type": "number", "description": "Altitude (optional)" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 3
+        },
+        "rgb": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "integer", "minimum": 0, "maximum": 255 }
+          ],
+          "items": false
+        }
+      }
+    },
+    "PatternPropertiesExample": {
+      "type": "object",
+      "description": "Demonstrates patternProperties for dynamic keys",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "patternProperties": {
+        "^attr_": {
+          "type": "string",
+          "description": "Custom attribute starting with attr_"
+        },
+        "^num_": {
+          "type": "number",
+          "description": "Numeric value starting with num_"
+        },
+        "^is_": {
+          "type": "boolean",
+          "description": "Boolean flag starting with is_"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContainsExample": {
+      "type": "object",
+      "description": "Demonstrates contains for array validation",
+      "properties": {
+        "mixedArray": {
+          "type": "array",
+          "contains": {
+            "type": "object",
+            "properties": {
+              "type": { "const": "required" }
+            },
+            "required": ["type"]
+          },
+          "minContains": 1,
+          "maxContains": 3,
+          "description": "Array must contain 1-3 objects with type='required'"
+        },
+        "numbers": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "contains": {
+            "minimum": 100
+          },
+          "description": "Array must contain at least one number >= 100"
+        }
+      }
+    },
+    "DependentSchemasExample": {
+      "type": "object",
+      "description": "Demonstrates dependentSchemas and dependentRequired",
+      "properties": {
+        "creditCard": {
+          "type": "string"
+        },
+        "cvv": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}$"
+        },
+        "billingAddress": {
+          "type": "object",
+          "properties": {
+            "street": { "type": "string" },
+            "city": { "type": "string" },
+            "zip": { "type": "string" }
+          }
+        },
+        "shippingAddress": {
+          "type": "object",
+          "properties": {
+            "street": { "type": "string" },
+            "city": { "type": "string" },
+            "zip": { "type": "string" }
+          }
+        },
+        "sameAsShipping": {
+          "type": "boolean"
+        }
+      },
+      "dependentRequired": {
+        "creditCard": ["cvv", "billingAddress"]
+      },
+      "dependentSchemas": {
+        "sameAsShipping": {
+          "properties": {
+            "sameAsShipping": { "const": true }
+          },
+          "required": ["shippingAddress"]
+        }
+      }
+    },
+    "PropertyNamesExample": {
+      "type": "object",
+      "description": "Demonstrates propertyNames validation",
+      "propertyNames": {
+        "pattern": "^[a-z][a-zA-Z0-9]*$",
+        "minLength": 2,
+        "maxLength": 30
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ConstAndEnumExample": {
+      "type": "object",
+      "description": "Demonstrates const and enum usage",
+      "properties": {
+        "apiVersion": {
+          "const": "v1",
+          "description": "API version must be exactly 'v1'"
+        },
+        "kind": {
+          "enum": ["Deployment", "Service", "ConfigMap", "Secret"],
+          "description": "Kubernetes resource kind"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "running", "succeeded", "failed"]
+        },
+        "priority": {
+          "type": "integer",
+          "enum": [1, 2, 3, 4, 5]
+        }
+      },
+      "required": ["apiVersion", "kind"]
+    },
+    "RecursiveSchema": {
+      "type": "object",
+      "description": "A recursive schema for tree structures",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": ["string", "number", "boolean", "null"] },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RecursiveSchema" }
+        },
+        "parent": { "$ref": "#/$defs/RecursiveSchema" }
+      },
+      "required": ["id", "name"]
+    },
+    "NullableTypes": {
+      "type": "object",
+      "description": "Demonstrates nullable types in JSON Schema 2020-12",
+      "properties": {
+        "requiredString": {
+          "type": "string"
+        },
+        "nullableString": {
+          "type": ["string", "null"]
+        },
+        "nullableNumber": {
+          "type": ["number", "null"]
+        },
+        "optionalOrNull": {
+          "type": ["object", "null"],
+          "properties": {
+            "data": { "type": "string" }
+          }
+        }
+      },
+      "required": ["requiredString"]
+    }
+  },
+  "properties": {
+    "tuples": { "$ref": "#/$defs/TupleExample" },
+    "patterns": { "$ref": "#/$defs/PatternPropertiesExample" },
+    "contains": { "$ref": "#/$defs/ContainsExample" },
+    "dependent": { "$ref": "#/$defs/DependentSchemasExample" },
+    "propertyNames": { "$ref": "#/$defs/PropertyNamesExample" },
+    "constEnum": { "$ref": "#/$defs/ConstAndEnumExample" },
+    "recursive": { "$ref": "#/$defs/RecursiveSchema" },
+    "nullable": { "$ref": "#/$defs/NullableTypes" }
+  }
+}
+

@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/conditional.json",
+  "title": "ConditionalForm",
+  "description": "Schema demonstrating if-then-else conditional validation",
+  "type": "object",
+  "$defs": {
+    "USAddress": {
+      "type": "object",
+      "description": "US address with state and zip code",
+      "properties": {
+        "country": { "const": "US" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "Two-letter state code"
+        },
+        "zipCode": {
+          "type": "string",
+          "pattern": "^[0-9]{5}(-[0-9]{4})?$"
+        }
+      },
+      "required": ["country", "street", "city", "state", "zipCode"]
+    },
+    "CAAddress": {
+      "type": "object",
+      "description": "Canadian address with province and postal code",
+      "properties": {
+        "country": { "const": "CA" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "province": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "Two-letter province code"
+        },
+        "postalCode": {
+          "type": "string",
+          "pattern": "^[A-Z][0-9][A-Z] [0-9][A-Z][0-9]$"
+        }
+      },
+      "required": ["country", "street", "city", "province", "postalCode"]
+    },
+    "UKAddress": {
+      "type": "object",
+      "description": "UK address with county and postcode",
+      "properties": {
+        "country": { "const": "UK" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "county": { "type": "string" },
+        "postcode": {
+          "type": "string",
+          "pattern": "^[A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2}$"
+        }
+      },
+      "required": ["country", "street", "city", "postcode"]
+    },
+    "InternationalAddress": {
+      "type": "object",
+      "description": "Address that validates based on country",
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "ISO country code"
+        },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "region": { "type": "string" },
+        "postalCode": { "type": "string" }
+      },
+      "required": ["country", "street", "city"],
+      "if": {
+        "properties": { "country": { "const": "US" } }
+      },
+      "then": {
+        "properties": {
+          "region": {
+            "pattern": "^[A-Z]{2}$",
+            "description": "Must be a 2-letter state code for US"
+          },
+          "postalCode": {
+            "pattern": "^[0-9]{5}(-[0-9]{4})?$"
+          }
+        },
+        "required": ["region", "postalCode"]
+      },
+      "else": {
+        "if": {
+          "properties": { "country": { "const": "CA" } }
+        },
+        "then": {
+          "properties": {
+            "region": {
+              "pattern": "^[A-Z]{2}$",
+              "description": "Must be a 2-letter province code for CA"
+            },
+            "postalCode": {
+              "pattern": "^[A-Z][0-9][A-Z] [0-9][A-Z][0-9]$"
+            }
+          },
+          "required": ["region", "postalCode"]
+        }
+      }
+    },
+    "EmploymentForm": {
+      "type": "object",
+      "description": "Employment form with conditional fields based on employment status",
+      "properties": {
+        "name": { "type": "string" },
+        "employmentStatus": {
+          "type": "string",
+          "enum": ["employed", "self-employed", "unemployed", "student", "retired"]
+        },
+        "employer": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "businessName": { "type": "string" },
+        "businessType": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "graduationYear": { "type": "integer" },
+        "retirementYear": { "type": "integer" }
+      },
+      "required": ["name", "employmentStatus"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "employmentStatus": { "const": "employed" } }
+          },
+          "then": {
+            "required": ["employer", "jobTitle"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "employmentStatus": { "const": "self-employed" } }
+          },
+          "then": {
+            "required": ["businessName", "businessType"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "employmentStatus": { "const": "student" } }
+          },
+          "then": {
+            "required": ["schoolName", "graduationYear"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "employmentStatus": { "const": "retired" } }
+          },
+          "then": {
+            "required": ["retirementYear"]
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "form": {
+      "$ref": "#/$defs/EmploymentForm"
+    },
+    "address": {
+      "$ref": "#/$defs/InternationalAddress"
+    }
+  }
+}
+

@@ -7,6 +7,7 @@
 
 import YAML from 'yaml';
 import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
+import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 
 export interface ParsedProperty {
   name: string;
@@ -292,6 +293,31 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       const globalWarnings = conversionResult.warnings.length > 0
         ? [`Converted from Swagger 2.x to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
         : ['Successfully converted from Swagger 2.x to OpenAPI 3.1.x'];
+
+      // Continue with the converted spec
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
+    // Check for JSON Schema and convert if needed
+    if (isJsonSchema(spec)) {
+      const conversionResult = convertJsonSchemaToOpenAPI(spec);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `JSON Schema conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      // Use the converted spec
+      spec = conversionResult.document;
+
+      // Add conversion warnings to global warnings
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from JSON Schema to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from JSON Schema to OpenAPI 3.1.x'];
 
       // Continue with the converted spec
       return parseOpenAPISpecInternal(spec, globalWarnings);

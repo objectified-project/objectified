@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/vehicle.json",
+  "title": "Vehicle",
+  "description": "Vehicle schema demonstrating allOf composition (inheritance)",
+  "type": "object",
+  "$defs": {
+    "VehicleBase": {
+      "type": "object",
+      "description": "Base properties for all vehicles",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "manufacturer": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 1900,
+          "maximum": 2100
+        },
+        "color": {
+          "type": "string"
+        },
+        "vin": {
+          "type": "string",
+          "pattern": "^[A-HJ-NPR-Z0-9]{17}$",
+          "description": "Vehicle Identification Number"
+        }
+      },
+      "required": ["id", "manufacturer", "model", "year"]
+    },
+    "Car": {
+      "description": "A car extending VehicleBase",
+      "allOf": [
+        { "$ref": "#/$defs/VehicleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "vehicleType": {
+              "const": "car"
+            },
+            "numberOfDoors": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 5
+            },
+            "fuelType": {
+              "type": "string",
+              "enum": ["gasoline", "diesel", "electric", "hybrid"]
+            },
+            "transmission": {
+              "type": "string",
+              "enum": ["automatic", "manual", "cvt"]
+            },
+            "seatingCapacity": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9
+            }
+          },
+          "required": ["vehicleType", "numberOfDoors", "fuelType"]
+        }
+      ]
+    },
+    "Motorcycle": {
+      "description": "A motorcycle extending VehicleBase",
+      "allOf": [
+        { "$ref": "#/$defs/VehicleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "vehicleType": {
+              "const": "motorcycle"
+            },
+            "engineCC": {
+              "type": "integer",
+              "minimum": 50,
+              "description": "Engine displacement in cubic centimeters"
+            },
+            "style": {
+              "type": "string",
+              "enum": ["cruiser", "sport", "touring", "standard", "dual-sport", "scooter"]
+            },
+            "hasSidecar": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": ["vehicleType", "engineCC", "style"]
+        }
+      ]
+    },
+    "Truck": {
+      "description": "A truck extending VehicleBase",
+      "allOf": [
+        { "$ref": "#/$defs/VehicleBase" },
+        {
+          "type": "object",
+          "properties": {
+            "vehicleType": {
+              "const": "truck"
+            },
+            "bedLength": {
+              "type": "number",
+              "description": "Truck bed length in feet"
+            },
+            "cabStyle": {
+              "type": "string",
+              "enum": ["regular", "extended", "crew"]
+            },
+            "towingCapacity": {
+              "type": "number",
+              "description": "Maximum towing capacity in pounds"
+            },
+            "payloadCapacity": {
+              "type": "number",
+              "description": "Maximum payload capacity in pounds"
+            }
+          },
+          "required": ["vehicleType", "cabStyle"]
+        }
+      ]
+    }
+  },
+  "properties": {
+    "fleet": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/Car" },
+          { "$ref": "#/$defs/Motorcycle" },
+          { "$ref": "#/$defs/Truck" }
+        ]
+      }
+    }
+  }
+}
+

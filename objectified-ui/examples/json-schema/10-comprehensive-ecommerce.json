@@ -1,0 +1,498 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/ecommerce.json",
+  "title": "E-Commerce Platform",
+  "description": "Comprehensive e-commerce schema combining multiple advanced features",
+  "type": "object",
+  "$defs": {
+    "Money": {
+      "type": "object",
+      "description": "Monetary amount with currency",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "multipleOf": 0.01
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "default": "USD"
+        }
+      },
+      "required": ["amount", "currency"]
+    },
+    "Timestamp": {
+      "type": "object",
+      "description": "Timestamp with timezone",
+      "properties": {
+        "datetime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC"
+        }
+      },
+      "required": ["datetime"]
+    },
+    "Image": {
+      "type": "object",
+      "description": "Image with multiple sizes",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "thumbnails": {
+          "type": "object",
+          "patternProperties": {
+            "^(small|medium|large|xl)$": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      },
+      "required": ["url"]
+    },
+    "BaseEntity": {
+      "type": "object",
+      "description": "Base entity with common fields",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": ["id"]
+    },
+    "Category": {
+      "description": "Product category with hierarchy",
+      "allOf": [
+        { "$ref": "#/$defs/BaseEntity" },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "slug": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "description": {
+              "type": "string"
+            },
+            "parentId": {
+              "type": ["string", "null"],
+              "format": "uuid"
+            },
+            "image": {
+              "$ref": "#/$defs/Image"
+            },
+            "isActive": {
+              "type": "boolean",
+              "default": true
+            },
+            "sortOrder": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          "required": ["name", "slug"]
+        }
+      ]
+    },
+    "ProductVariant": {
+      "type": "object",
+      "description": "Product variant with specific attributes",
+      "properties": {
+        "sku": {
+          "type": "string",
+          "pattern": "^[A-Z0-9-]+$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "price": {
+          "$ref": "#/$defs/Money"
+        },
+        "compareAtPrice": {
+          "$ref": "#/$defs/Money"
+        },
+        "attributes": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z][a-zA-Z0-9_]*$": {
+              "type": ["string", "number", "boolean"]
+            }
+          }
+        },
+        "inventory": {
+          "type": "object",
+          "properties": {
+            "quantity": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "reserved": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "trackInventory": {
+              "type": "boolean",
+              "default": true
+            },
+            "allowBackorder": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": ["quantity"]
+        },
+        "images": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Image" }
+        },
+        "weight": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number", "minimum": 0 },
+            "unit": { "type": "string", "enum": ["kg", "lb", "oz", "g"] }
+          }
+        }
+      },
+      "required": ["sku", "price"]
+    },
+    "Product": {
+      "description": "Product with variants",
+      "allOf": [
+        { "$ref": "#/$defs/BaseEntity" },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "slug": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "description": {
+              "type": "string"
+            },
+            "shortDescription": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "categoryIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "uniqueItems": true
+            },
+            "status": {
+              "type": "string",
+              "enum": ["draft", "active", "archived"]
+            },
+            "variants": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/ProductVariant" },
+              "minItems": 1
+            },
+            "defaultVariantSku": {
+              "type": "string"
+            },
+            "images": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Image" }
+            },
+            "seo": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string", "maxLength": 60 },
+                "description": { "type": "string", "maxLength": 160 },
+                "keywords": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              }
+            }
+          },
+          "required": ["name", "slug", "status", "variants"]
+        }
+      ]
+    },
+    "Customer": {
+      "description": "Customer account",
+      "allOf": [
+        { "$ref": "#/$defs/BaseEntity" },
+        {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "addresses": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Address" }
+            },
+            "defaultBillingAddressId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "defaultShippingAddressId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "acceptsMarketing": {
+              "type": "boolean",
+              "default": false
+            },
+            "isVerified": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": ["email"]
+        }
+      ]
+    },
+    "Address": {
+      "type": "object",
+      "description": "Postal address",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "company": { "type": "string" },
+        "address1": { "type": "string" },
+        "address2": { "type": "string" },
+        "city": { "type": "string" },
+        "province": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "country": { "type": "string" },
+        "phone": { "type": "string" },
+        "isDefault": { "type": "boolean", "default": false }
+      },
+      "required": ["firstName", "lastName", "address1", "city", "postalCode", "country"]
+    },
+    "CartItem": {
+      "type": "object",
+      "description": "Item in shopping cart",
+      "properties": {
+        "variantSku": { "type": "string" },
+        "productId": { "type": "string", "format": "uuid" },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "unitPrice": { "$ref": "#/$defs/Money" },
+        "totalPrice": { "$ref": "#/$defs/Money" },
+        "discounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Discount" }
+        }
+      },
+      "required": ["variantSku", "productId", "quantity", "unitPrice"]
+    },
+    "Discount": {
+      "type": "object",
+      "description": "Discount applied to cart or item",
+      "properties": {
+        "code": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["percentage", "fixed", "free_shipping"]
+        },
+        "value": { "type": "number", "minimum": 0 },
+        "amount": { "$ref": "#/$defs/Money" }
+      },
+      "required": ["type"]
+    },
+    "Cart": {
+      "description": "Shopping cart",
+      "allOf": [
+        { "$ref": "#/$defs/BaseEntity" },
+        {
+          "type": "object",
+          "properties": {
+            "customerId": {
+              "type": ["string", "null"],
+              "format": "uuid"
+            },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/CartItem" }
+            },
+            "subtotal": { "$ref": "#/$defs/Money" },
+            "discounts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Discount" }
+            },
+            "total": { "$ref": "#/$defs/Money" },
+            "currency": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "abandonedAt": {
+              "$ref": "#/$defs/Timestamp"
+            }
+          },
+          "required": ["items", "currency"]
+        }
+      ]
+    },
+    "OrderLine": {
+      "type": "object",
+      "description": "Line item in an order",
+      "properties": {
+        "productId": { "type": "string", "format": "uuid" },
+        "variantSku": { "type": "string" },
+        "name": { "type": "string" },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "unitPrice": { "$ref": "#/$defs/Money" },
+        "totalPrice": { "$ref": "#/$defs/Money" },
+        "discounts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Discount" }
+        },
+        "fulfillmentStatus": {
+          "type": "string",
+          "enum": ["unfulfilled", "partial", "fulfilled"]
+        }
+      },
+      "required": ["productId", "variantSku", "name", "quantity", "unitPrice", "totalPrice"]
+    },
+    "Order": {
+      "description": "Customer order",
+      "allOf": [
+        { "$ref": "#/$defs/BaseEntity" },
+        {
+          "type": "object",
+          "properties": {
+            "orderNumber": {
+              "type": "string",
+              "pattern": "^ORD-[0-9]+$"
+            },
+            "customerId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "lines": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/OrderLine" },
+              "minItems": 1
+            },
+            "shippingAddress": { "$ref": "#/$defs/Address" },
+            "billingAddress": { "$ref": "#/$defs/Address" },
+            "subtotal": { "$ref": "#/$defs/Money" },
+            "shippingCost": { "$ref": "#/$defs/Money" },
+            "tax": { "$ref": "#/$defs/Money" },
+            "discounts": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/Discount" }
+            },
+            "total": { "$ref": "#/$defs/Money" },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "refunded"]
+            },
+            "paymentStatus": {
+              "type": "string",
+              "enum": ["pending", "authorized", "paid", "partially_refunded", "refunded", "voided"]
+            },
+            "fulfillmentStatus": {
+              "type": "string",
+              "enum": ["unfulfilled", "partial", "fulfilled"]
+            },
+            "notes": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["orderNumber", "email", "lines", "shippingAddress", "billingAddress", "total", "status"]
+        }
+      ]
+    }
+  },
+  "properties": {
+    "categories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Category" }
+    },
+    "products": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Product" }
+    },
+    "customers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Customer" }
+    },
+    "orders": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Order" }
+    }
+  }
+}
+

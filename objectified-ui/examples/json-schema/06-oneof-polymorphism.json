@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/payment.json",
+  "title": "Payment",
+  "description": "Payment schema demonstrating oneOf polymorphism",
+  "type": "object",
+  "$defs": {
+    "PaymentMethod": {
+      "description": "A payment method - one of several types",
+      "oneOf": [
+        { "$ref": "#/$defs/CreditCard" },
+        { "$ref": "#/$defs/BankTransfer" },
+        { "$ref": "#/$defs/PayPal" },
+        { "$ref": "#/$defs/Cryptocurrency" }
+      ]
+    },
+    "CreditCard": {
+      "type": "object",
+      "description": "Credit card payment method",
+      "properties": {
+        "type": {
+          "const": "credit_card"
+        },
+        "cardNumber": {
+          "type": "string",
+          "pattern": "^[0-9]{16}$"
+        },
+        "cardHolder": {
+          "type": "string"
+        },
+        "expiryMonth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "expiryYear": {
+          "type": "integer",
+          "minimum": 2020
+        },
+        "cvv": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}$"
+        },
+        "billingAddress": {
+          "$ref": "#/$defs/Address"
+        }
+      },
+      "required": ["type", "cardNumber", "cardHolder", "expiryMonth", "expiryYear", "cvv"]
+    },
+    "BankTransfer": {
+      "type": "object",
+      "description": "Bank transfer payment method",
+      "properties": {
+        "type": {
+          "const": "bank_transfer"
+        },
+        "bankName": {
+          "type": "string"
+        },
+        "accountNumber": {
+          "type": "string"
+        },
+        "routingNumber": {
+          "type": "string",
+          "pattern": "^[0-9]{9}$"
+        },
+        "accountType": {
+          "type": "string",
+          "enum": ["checking", "savings"]
+        }
+      },
+      "required": ["type", "bankName", "accountNumber", "routingNumber", "accountType"]
+    },
+    "PayPal": {
+      "type": "object",
+      "description": "PayPal payment method",
+      "properties": {
+        "type": {
+          "const": "paypal"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "payerId": {
+          "type": "string"
+        }
+      },
+      "required": ["type", "email"]
+    },
+    "Cryptocurrency": {
+      "type": "object",
+      "description": "Cryptocurrency payment method",
+      "properties": {
+        "type": {
+          "const": "crypto"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["BTC", "ETH", "LTC", "USDT", "USDC"]
+        },
+        "walletAddress": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string",
+          "enum": ["mainnet", "testnet"]
+        }
+      },
+      "required": ["type", "currency", "walletAddress"]
+    },
+    "Address": {
+      "type": "object",
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zipCode": { "type": "string" },
+        "country": { "type": "string" }
+      },
+      "required": ["street", "city", "state", "zipCode", "country"]
+    },
+    "Payment": {
+      "type": "object",
+      "description": "A payment transaction",
+      "properties": {
+        "paymentId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0.01
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "method": {
+          "$ref": "#/$defs/PaymentMethod"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "processing", "completed", "failed", "refunded"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["paymentId", "amount", "currency", "method", "status"]
+    }
+  },
+  "properties": {
+    "payment": {
+      "$ref": "#/$defs/Payment"
+    }
+  }
+}
+

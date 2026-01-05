@@ -5,6 +5,7 @@
 
 import YAML from 'yaml';
 import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
+import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -648,6 +649,62 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     }));
   }
 
+  // Convert JSON Schema to OpenAPI 3.1.x if needed
+  if (isJsonSchema(doc)) {
+    const conversionResult = convertJsonSchemaToOpenAPI(doc, fileName);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'jsonschema',
+        version: doc.$schema || 'unknown',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: false,
+        formatDisplayName: 'JSON Schema (conversion failed)',
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0
+        },
+        errors: [{
+          type: 'error',
+          message: `JSON Schema conversion failed: ${conversionResult.error}`,
+          severity: 'critical'
+        }],
+        warnings: [],
+        document: null
+      };
+    }
+
+    // Use the converted document for analysis
+    doc = conversionResult.document;
+
+    // Add conversion warnings
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
+  }
+
   // Detect format (will now show OpenAPI 3.1.0 for converted Swagger specs)
   const formatDetection = detectFormat(doc);
 
@@ -739,8 +796,8 @@ export function extractFileMetadata(content: string): FileMetadataPreview {
     version: formatDetection.version,
     formatDisplayName: formatDetection.displayName,
     formatSupported: formatDetection.supported,
-    title: doc.info?.title,
-    description: doc.info?.description,
+    title: doc.info?.title || doc.title,
+    description: doc.info?.description || doc.description,
     specVersion: doc.info?.version
   };
 }

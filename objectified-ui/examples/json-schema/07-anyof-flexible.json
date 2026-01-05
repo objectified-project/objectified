@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/config.json",
+  "title": "Configuration",
+  "description": "Configuration schema demonstrating anyOf for flexible validation",
+  "type": "object",
+  "$defs": {
+    "DatabaseConfig": {
+      "type": "object",
+      "description": "Database configuration - can be any of these types",
+      "anyOf": [
+        { "$ref": "#/$defs/PostgresConfig" },
+        { "$ref": "#/$defs/MySQLConfig" },
+        { "$ref": "#/$defs/MongoDBConfig" },
+        { "$ref": "#/$defs/SQLiteConfig" }
+      ]
+    },
+    "PostgresConfig": {
+      "type": "object",
+      "description": "PostgreSQL database configuration",
+      "properties": {
+        "type": { "const": "postgres" },
+        "host": { "type": "string" },
+        "port": { "type": "integer", "default": 5432 },
+        "database": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "ssl": { "type": "boolean", "default": false },
+        "poolSize": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+      },
+      "required": ["type", "host", "database", "username", "password"]
+    },
+    "MySQLConfig": {
+      "type": "object",
+      "description": "MySQL database configuration",
+      "properties": {
+        "type": { "const": "mysql" },
+        "host": { "type": "string" },
+        "port": { "type": "integer", "default": 3306 },
+        "database": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "charset": { "type": "string", "default": "utf8mb4" }
+      },
+      "required": ["type", "host", "database", "username", "password"]
+    },
+    "MongoDBConfig": {
+      "type": "object",
+      "description": "MongoDB database configuration",
+      "properties": {
+        "type": { "const": "mongodb" },
+        "connectionString": { "type": "string", "format": "uri" },
+        "database": { "type": "string" },
+        "replicaSet": { "type": "string" },
+        "authSource": { "type": "string" }
+      },
+      "required": ["type", "connectionString", "database"]
+    },
+    "SQLiteConfig": {
+      "type": "object",
+      "description": "SQLite database configuration",
+      "properties": {
+        "type": { "const": "sqlite" },
+        "filename": { "type": "string" },
+        "mode": { "type": "string", "enum": ["memory", "file"], "default": "file" }
+      },
+      "required": ["type", "filename"]
+    },
+    "CacheConfig": {
+      "type": "object",
+      "description": "Cache configuration",
+      "anyOf": [
+        {
+          "properties": {
+            "type": { "const": "redis" },
+            "host": { "type": "string" },
+            "port": { "type": "integer", "default": 6379 },
+            "password": { "type": "string" },
+            "db": { "type": "integer", "default": 0 }
+          },
+          "required": ["type", "host"]
+        },
+        {
+          "properties": {
+            "type": { "const": "memcached" },
+            "servers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          },
+          "required": ["type", "servers"]
+        },
+        {
+          "properties": {
+            "type": { "const": "memory" },
+            "maxSize": { "type": "integer", "default": 1000 },
+            "ttl": { "type": "integer", "default": 3600 }
+          },
+          "required": ["type"]
+        }
+      ]
+    },
+    "LoggingConfig": {
+      "type": "object",
+      "description": "Logging configuration",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["trace", "debug", "info", "warn", "error", "fatal"],
+          "default": "info"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "text", "pretty"],
+          "default": "json"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": { "const": "console" }
+                },
+                "required": ["type"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": { "const": "file" },
+                  "path": { "type": "string" },
+                  "maxSize": { "type": "string" },
+                  "maxFiles": { "type": "integer" }
+                },
+                "required": ["type", "path"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": { "const": "syslog" },
+                  "host": { "type": "string" },
+                  "port": { "type": "integer" },
+                  "facility": { "type": "string" }
+                },
+                "required": ["type", "host"]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "AppConfig": {
+      "type": "object",
+      "description": "Complete application configuration",
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production"]
+        },
+        "database": { "$ref": "#/$defs/DatabaseConfig" },
+        "cache": { "$ref": "#/$defs/CacheConfig" },
+        "logging": { "$ref": "#/$defs/LoggingConfig" }
+      },
+      "required": ["name", "environment", "database"]
+    }
+  },
+  "properties": {
+    "config": { "$ref": "#/$defs/AppConfig" }
+  }
+}
+

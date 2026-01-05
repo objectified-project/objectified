@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/product.json",
+  "title": "Product",
+  "description": "A product schema with various data types",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Unique product identifier"
+    },
+    "name": {
+      "type": "string",
+      "description": "Product name",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "price": {
+      "type": "number",
+      "description": "Product price",
+      "minimum": 0,
+      "exclusiveMinimum": 0
+    },
+    "inStock": {
+      "type": "boolean",
+      "description": "Whether the product is in stock",
+      "default": true
+    },
+    "tags": {
+      "type": "array",
+      "description": "Product tags",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 0,
+      "maxItems": 10,
+      "uniqueItems": true
+    },
+    "category": {
+      "type": "string",
+      "description": "Product category",
+      "enum": ["electronics", "clothing", "food", "books", "other"]
+    },
+    "dimensions": {
+      "type": "object",
+      "description": "Product dimensions",
+      "properties": {
+        "length": {
+          "type": "number",
+          "minimum": 0
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["cm", "in", "m"],
+          "default": "cm"
+        }
+      },
+      "required": ["length", "width", "height"]
+    }
+  },
+  "required": ["id", "name", "price"]
+}
+
