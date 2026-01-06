@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  Link2,
   Palette,
   FileText,
   Download,
@@ -148,7 +147,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Summary</h3>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center border border-green-200 dark:border-green-800">
             <div className="text-3xl font-bold text-green-600 dark:text-green-400">
               {summary?.success || 0}
@@ -174,15 +173,6 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
             <div className="text-sm text-red-700 dark:text-red-300 flex items-center justify-center gap-1 mt-1">
               <XCircle className="h-4 w-4" />
               Failed
-            </div>
-          </div>
-          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 text-center border border-indigo-200 dark:border-indigo-800">
-            <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-              {summary?.properties || 0}
-            </div>
-            <div className="text-sm text-indigo-700 dark:text-indigo-300 flex items-center justify-center gap-1 mt-1">
-              <Link2 className="h-4 w-4" />
-              Properties
             </div>
           </div>
         </div>
