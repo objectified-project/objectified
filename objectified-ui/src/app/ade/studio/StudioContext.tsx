@@ -30,6 +30,16 @@ export interface CanvasGroup {
   styleOptions?: GroupStyleOptions;
 }
 
+// Edge styling options
+export type EdgeStyleType = 'solid' | 'dashed' | 'dotted' | 'double';
+
+export interface EdgeStylingOptions {
+  directReferences: EdgeStyleType;
+  optionalReferences: EdgeStyleType;
+  weakReferences: EdgeStyleType;
+  bidirectional: EdgeStyleType;
+}
+
 interface StudioContextType {
   selectedProjectId: string | null;
   setSelectedProjectId: (id: string | null) => void;
@@ -61,6 +71,9 @@ interface StudioContextType {
   // Smart guides
   smartGuidesEnabled: boolean;
   setSmartGuidesEnabled: (enabled: boolean) => void;
+  // Edge styling
+  edgeStyling: EdgeStylingOptions;
+  setEdgeStyling: (options: EdgeStylingOptions) => void;
   // Group management
   groups: CanvasGroup[];
   setGroups: (groups: CanvasGroup[]) => void;
@@ -130,6 +143,24 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return true;
   });
 
+  const [edgeStyling, setEdgeStyling] = useState<EdgeStylingOptions>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('edgeStyling');
+      return saved ? JSON.parse(saved) : {
+        directReferences: 'solid',
+        optionalReferences: 'dashed',
+        weakReferences: 'dotted',
+        bidirectional: 'double'
+      };
+    }
+    return {
+      directReferences: 'solid',
+      optionalReferences: 'dashed',
+      weakReferences: 'dotted',
+      bidirectional: 'double'
+    };
+  });
+
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
   // Persist grid settings to localStorage
@@ -156,6 +187,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('smartGuidesEnabled', JSON.stringify(smartGuidesEnabled));
     }
   }, [smartGuidesEnabled]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('edgeStyling', JSON.stringify(edgeStyling));
+    }
+  }, [edgeStyling]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -227,6 +264,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setGridStyle,
       smartGuidesEnabled,
       setSmartGuidesEnabled,
+      edgeStyling,
+      setEdgeStyling,
       groups,
       setGroups,
       addGroup,

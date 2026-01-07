@@ -252,11 +252,11 @@
 | #343   | Add custom node label styling     |
 
 #### Edge/Relationship Styling 📋 PLANNED
-- 📋 Different line styles for relationship types:
-  - Solid for direct references
-  - Dashed for optional references
-  - Dotted for weak references
-  - Double lines for bidirectional
+- ✅ Different line styles for relationship types:
+  - ✅ Solid for direct references
+  - ✅ Dashed for optional references
+  - ✅ Dotted for weak references
+  - ✅ Double lines for bidirectional
 - 📋 Edge colors customizable
 - 📋 Edge thickness (1-5px)
 - 📋 Edge labels (show property name on relationship)
@@ -270,7 +270,6 @@
 
 | Ticket | Feature Description                   |
 |--------|---------------------------------------|
-| #344   | Adds edge styling                     |
 | #345   | Adds edge color and thickness styling |
 | #346   | Adds edge routing styles              |
 | #347   | Adds edge arrow styles                |

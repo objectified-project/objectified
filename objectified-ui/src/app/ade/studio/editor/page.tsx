@@ -57,6 +57,7 @@ import {
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
 import { applyAutoLayout } from '../../../utils/canvas-auto-layout';
+import { applyEdgeStyling } from '../../../utils/edge-styling';
 
 // Import extracted components
 import { useExportFunctions } from './components';
@@ -149,6 +150,7 @@ const StudioContent = () => {
     clickToFocusEnabled,
     setClickToFocusEnabled: setContextClickToFocusEnabled,
     lodEnabled,
+    edgeStyling,
     gridSize,
     snapToGrid,
     gridStyle,
@@ -2562,7 +2564,8 @@ const StudioContent = () => {
       });
     });
 
-    return edges;
+    // Apply edge styling based on user preferences
+    return edges.map(edge => applyEdgeStyling(edge, edgeStyling));
   };
 
   // Helper function to create edges from composition relationships (allOf/anyOf/oneOf)
@@ -2698,7 +2701,8 @@ const StudioContent = () => {
       }
     });
 
-    return edges;
+    // Apply edge styling based on user preferences
+    return edges.map(edge => applyEdgeStyling(edge, edgeStyling));
   };
 
   // Helper function to create all edges (properties + composition)
@@ -3205,6 +3209,25 @@ const StudioContent = () => {
 
     loadClasses();
   }, [selectedVersionId, selectedProjectId, canvasRefreshKey, setNodes, setEdges, fitView, projects, versions, currentUserId, setGroups, setViewport, projectTags, isReadOnly, triggerSidebarRefresh]);
+
+  // Regenerate edges when edge styling preferences change
+  useEffect(() => {
+    if (nodes.length > 0 && selectedVersionId) {
+      // Extract class data from nodes
+      const classesWithProperties = nodes
+        .filter(n => n.type !== 'groupNode')
+        .map(node => ({
+          id: node.id,
+          name: (node.data as any).name,
+          properties: (node.data as any).properties || [],
+          schema: (node.data as any).schema,
+        }));
+
+      // Regenerate edges with new styling
+      const newEdges = createAllEdges(classesWithProperties);
+      setEdges(newEdges);
+    }
+  }, [edgeStyling]);
 
   // Generate specs on-demand when switching views or when canvas changes
   useEffect(() => {
