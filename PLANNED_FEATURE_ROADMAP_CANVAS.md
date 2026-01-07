@@ -257,8 +257,7 @@
   - ✅ Dashed for optional references
   - ✅ Dotted for weak references
   - ✅ Double lines for bidirectional
-- 📋 Edge colors customizable
-- 📋 Edge thickness (1-5px)
+- ✅ Edge colors customizable
 - 📋 Edge labels (show property name on relationship)
 - 📋 Edge routing options:
   - Straight lines
@@ -270,7 +269,6 @@
 
 | Ticket | Feature Description                   |
 |--------|---------------------------------------|
-| #345   | Adds edge color and thickness styling |
 | #346   | Adds edge routing styles              |
 | #347   | Adds edge arrow styles                |
 | #348   | Adds animation to edges               |

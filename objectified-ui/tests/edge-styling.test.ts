@@ -125,6 +125,10 @@ describe('Edge Styling Utilities', () => {
       optionalReferences: 'dashed' as const,
       weakReferences: 'dotted' as const,
       bidirectional: 'double' as const,
+      directColor: '#3b82f6',
+      optionalColor: '#f97316',
+      weakColor: '#8b5cf6',
+      bidirectionalColor: '#ec4899',
     };
 
     test('should apply solid styling to direct reference', () => {
@@ -209,6 +213,10 @@ describe('Edge Styling Utilities', () => {
         optionalReferences: 'dotted' as const,
         weakReferences: 'solid' as const,
         bidirectional: 'solid' as const,
+        directColor: '#ef4444',
+        optionalColor: '#22c55e',
+        weakColor: '#06b6d4',
+        bidirectionalColor: '#f59e0b',
       };
 
       const edge = {
@@ -222,6 +230,7 @@ describe('Edge Styling Utilities', () => {
 
       const result = applyEdgeStyling(edge, customStyling);
       expect(result.style.strokeDasharray).toBe('5,5'); // dashed for direct
+      expect(result.style.stroke).toBe('#ef4444'); // custom red color
     });
   });
 
@@ -239,21 +248,25 @@ describe('Edge Styling Utilities', () => {
         optionalReferences: 'dashed' as const,
         weakReferences: 'dotted' as const,
         bidirectional: 'double' as const,
+        directColor: '#3b82f6',
+        optionalColor: '#f97316',
+        weakColor: '#8b5cf6',
+        bidirectionalColor: '#ec4899',
       };
 
       const result = applyEdgeStyling(edge, styling);
       expect(result.style).toBeDefined();
-      expect(result.style.stroke).toBeDefined();
+      expect(result.style.stroke).toBe('#3b82f6'); // direct color
     });
 
-    test('should preserve custom colors', () => {
+    test('should apply custom colors to edges', () => {
       const edge = {
         id: 'edge1',
         source: 'A',
         target: 'B',
         label: 'anyOf:User',
-        markerEnd: { type: 'arrow' },
-        style: { stroke: '#ea580c', strokeWidth: 3 },
+        markerEnd: { type: 'arrow', color: '#000000' },
+        style: { stroke: '#000000', strokeWidth: 3 },
       };
 
       const styling = {
@@ -261,10 +274,41 @@ describe('Edge Styling Utilities', () => {
         optionalReferences: 'dashed' as const,
         weakReferences: 'dotted' as const,
         bidirectional: 'double' as const,
+        directColor: '#3b82f6',
+        optionalColor: '#ea580c',
+        weakColor: '#8b5cf6',
+        bidirectionalColor: '#ec4899',
       };
 
       const result = applyEdgeStyling(edge, styling);
-      expect(result.style.stroke).toBe('#ea580c'); // Preserve original color
+      expect(result.style.stroke).toBe('#ea580c'); // Optional color (orange)
+      expect(result.markerEnd.color).toBe('#ea580c'); // Marker should match
+    });
+
+    test('should update marker colors to match edge color', () => {
+      const edge = {
+        id: 'edge1',
+        source: 'A',
+        target: 'B',
+        markerStart: { type: 'arrow', color: '#000000' },
+        markerEnd: { type: 'arrow', color: '#000000' },
+        style: { stroke: '#000000', strokeWidth: 2 },
+      };
+
+      const styling = {
+        directReferences: 'solid' as const,
+        optionalReferences: 'dashed' as const,
+        weakReferences: 'dotted' as const,
+        bidirectional: 'double' as const,
+        directColor: '#3b82f6',
+        optionalColor: '#f97316',
+        weakColor: '#8b5cf6',
+        bidirectionalColor: '#ec4899',
+      };
+
+      const result = applyEdgeStyling(edge, styling);
+      expect(result.markerStart.color).toBe('#ec4899'); // Bidirectional color
+      expect(result.markerEnd.color).toBe('#ec4899'); // Bidirectional color
     });
   });
 });

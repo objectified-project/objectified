@@ -38,6 +38,10 @@ export interface EdgeStylingOptions {
   optionalReferences: EdgeStyleType;
   weakReferences: EdgeStyleType;
   bidirectional: EdgeStyleType;
+  directColor: string;
+  optionalColor: string;
+  weakColor: string;
+  bidirectionalColor: string;
 }
 
 interface StudioContextType {
@@ -144,21 +148,34 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   });
 
   const [edgeStyling, setEdgeStyling] = useState<EdgeStylingOptions>(() => {
+    const defaults = {
+      directReferences: 'solid' as const,
+      optionalReferences: 'dashed' as const,
+      weakReferences: 'dotted' as const,
+      bidirectional: 'double' as const,
+      directColor: '#64748b', // Slate (first color in palette)
+      optionalColor: '#f97316', // Orange
+      weakColor: '#8b5cf6', // Purple
+      bidirectionalColor: '#ec4899', // Pink
+    };
+
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('edgeStyling');
-      return saved ? JSON.parse(saved) : {
-        directReferences: 'solid',
-        optionalReferences: 'dashed',
-        weakReferences: 'dotted',
-        bidirectional: 'double'
-      };
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Merge with defaults to ensure all properties exist
+          return {
+            ...defaults,
+            ...parsed,
+          };
+        } catch (e) {
+          console.error('Failed to parse edge styling from localStorage:', e);
+          return defaults;
+        }
+      }
     }
-    return {
-      directReferences: 'solid',
-      optionalReferences: 'dashed',
-      weakReferences: 'dotted',
-      bidirectional: 'double'
-    };
+    return defaults;
   });
 
   const [groups, setGroups] = useState<CanvasGroup[]>([]);

@@ -3,16 +3,30 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Check, Settings } from 'lucide-react';
+import { Check, Settings, Palette } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import * as Popover from '@radix-ui/react-popover';
 import { useStudio } from '../StudioContext';
+import { EDGE_COLORS_4X4 } from '../../../utils/color-themes';
 import {
   getProjectsForTenant,
   getVersionsForProject,
   getTagsForProject
 } from '../../../../../lib/db/helper';
+
+// Helper function to determine if a color is dark
+function isColorDark(hexColor: string | undefined): boolean {
+  if (!hexColor) hexColor = '#64748b'; // Default to Slate gray if undefined
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
 
 interface Project {
   id: string;
@@ -499,60 +513,191 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                       </div>
                       <div className="space-y-2">
                         {/* Direct References */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 dark:text-gray-400">Direct</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Direct</span>
                           <select
                             value={edgeStyling.directReferences}
                             onChange={(e) => setEdgeStyling({ ...edgeStyling, directReferences: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
                           >
                             <option value="solid">Solid</option>
                             <option value="dashed">Dashed</option>
                             <option value="dotted">Dotted</option>
                             <option value="double">Double</option>
                           </select>
+                          <Popover.Root>
+                            <Popover.Trigger asChild>
+                              <button
+                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
+                                style={{ backgroundColor: edgeStyling.directColor }}
+                                title="Change direct edge color"
+                              >
+                                <Palette
+                                  className="w-4 h-4"
+                                  style={{ color: isColorDark(edgeStyling.directColor) ? 'white' : 'black' }}
+                                />
+                              </button>
+                            </Popover.Trigger>
+                            <Popover.Portal>
+                              <Popover.Content
+                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
+                                sideOffset={5}
+                              >
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {EDGE_COLORS_4X4.map((color) => (
+                                    <button
+                                      key={color.hex}
+                                      onClick={() => setEdgeStyling({ ...edgeStyling, directColor: color.hex })}
+                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
+                                      style={{ backgroundColor: color.hex }}
+                                      title={color.name}
+                                    />
+                                  ))}
+                                </div>
+                              </Popover.Content>
+                            </Popover.Portal>
+                          </Popover.Root>
                         </div>
+
                         {/* Optional References */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 dark:text-gray-400">Optional</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Optional</span>
                           <select
                             value={edgeStyling.optionalReferences}
                             onChange={(e) => setEdgeStyling({ ...edgeStyling, optionalReferences: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
                           >
                             <option value="solid">Solid</option>
                             <option value="dashed">Dashed</option>
                             <option value="dotted">Dotted</option>
                             <option value="double">Double</option>
                           </select>
+                          <Popover.Root>
+                            <Popover.Trigger asChild>
+                              <button
+                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
+                                style={{ backgroundColor: edgeStyling.optionalColor }}
+                                title="Change optional edge color"
+                              >
+                                <Palette
+                                  className="w-4 h-4"
+                                  style={{ color: isColorDark(edgeStyling.optionalColor) ? 'white' : 'black' }}
+                                />
+                              </button>
+                            </Popover.Trigger>
+                            <Popover.Portal>
+                              <Popover.Content
+                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
+                                sideOffset={5}
+                              >
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {EDGE_COLORS_4X4.map((color) => (
+                                    <button
+                                      key={color.hex}
+                                      onClick={() => setEdgeStyling({ ...edgeStyling, optionalColor: color.hex })}
+                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
+                                      style={{ backgroundColor: color.hex }}
+                                      title={color.name}
+                                    />
+                                  ))}
+                                </div>
+                              </Popover.Content>
+                            </Popover.Portal>
+                          </Popover.Root>
                         </div>
+
                         {/* Weak References */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 dark:text-gray-400">Weak</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Weak</span>
                           <select
                             value={edgeStyling.weakReferences}
                             onChange={(e) => setEdgeStyling({ ...edgeStyling, weakReferences: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
                           >
                             <option value="solid">Solid</option>
                             <option value="dashed">Dashed</option>
                             <option value="dotted">Dotted</option>
                             <option value="double">Double</option>
                           </select>
+                          <Popover.Root>
+                            <Popover.Trigger asChild>
+                              <button
+                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
+                                style={{ backgroundColor: edgeStyling.weakColor }}
+                                title="Change weak edge color"
+                              >
+                                <Palette
+                                  className="w-4 h-4"
+                                  style={{ color: isColorDark(edgeStyling.weakColor) ? 'white' : 'black' }}
+                                />
+                              </button>
+                            </Popover.Trigger>
+                            <Popover.Portal>
+                              <Popover.Content
+                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
+                                sideOffset={5}
+                              >
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {EDGE_COLORS_4X4.map((color) => (
+                                    <button
+                                      key={color.hex}
+                                      onClick={() => setEdgeStyling({ ...edgeStyling, weakColor: color.hex })}
+                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
+                                      style={{ backgroundColor: color.hex }}
+                                      title={color.name}
+                                    />
+                                  ))}
+                                </div>
+                              </Popover.Content>
+                            </Popover.Portal>
+                          </Popover.Root>
                         </div>
+
                         {/* Bidirectional */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 dark:text-gray-400">Bidirectional</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Bidir.</span>
                           <select
                             value={edgeStyling.bidirectional}
                             onChange={(e) => setEdgeStyling({ ...edgeStyling, bidirectional: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
                           >
                             <option value="solid">Solid</option>
                             <option value="dashed">Dashed</option>
                             <option value="dotted">Dotted</option>
                             <option value="double">Double</option>
                           </select>
+                          <Popover.Root>
+                            <Popover.Trigger asChild>
+                              <button
+                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
+                                style={{ backgroundColor: edgeStyling.bidirectionalColor }}
+                                title="Change bidirectional edge color"
+                              >
+                                <Palette
+                                  className="w-4 h-4"
+                                  style={{ color: isColorDark(edgeStyling.bidirectionalColor) ? 'white' : 'black' }}
+                                />
+                              </button>
+                            </Popover.Trigger>
+                            <Popover.Portal>
+                              <Popover.Content
+                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
+                                sideOffset={5}
+                              >
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {EDGE_COLORS_4X4.map((color) => (
+                                    <button
+                                      key={color.hex}
+                                      onClick={() => setEdgeStyling({ ...edgeStyling, bidirectionalColor: color.hex })}
+                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
+                                      style={{ backgroundColor: color.hex }}
+                                      title={color.name}
+                                    />
+                                  ))}
+                                </div>
+                              </Popover.Content>
+                            </Popover.Portal>
+                          </Popover.Root>
                         </div>
                       </div>
                     </div>

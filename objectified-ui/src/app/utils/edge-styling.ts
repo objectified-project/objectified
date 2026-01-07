@@ -101,32 +101,44 @@ export function applyEdgeStyling(
     optionalReferences: EdgeStyleType;
     weakReferences: EdgeStyleType;
     bidirectional: EdgeStyleType;
+    directColor: string;
+    optionalColor: string;
+    weakColor: string;
+    bidirectionalColor: string;
   }
 ): any {
   const category = categorizeEdge(edge);
   let styleType: EdgeStyleType;
+  let color: string;
 
   switch (category) {
     case 'direct':
       styleType = edgeStylingOptions.directReferences;
+      color = edgeStylingOptions.directColor;
       break;
     case 'optional':
       styleType = edgeStylingOptions.optionalReferences;
+      color = edgeStylingOptions.optionalColor;
       break;
     case 'weak':
       styleType = edgeStylingOptions.weakReferences;
+      color = edgeStylingOptions.weakColor;
       break;
     case 'bidirectional':
       styleType = edgeStylingOptions.bidirectional;
+      color = edgeStylingOptions.bidirectionalColor;
       break;
   }
 
-  // Get the current stroke color and width
-  const currentStroke = edge.style?.stroke || '#3b82f6';
+  // Get the current stroke width
   const currentStrokeWidth = edge.style?.strokeWidth || 2;
 
-  // Apply the styling
-  const strokeStyle = getEdgeStrokeStyle(styleType, currentStroke, currentStrokeWidth);
+  // Apply the styling with custom color
+  const strokeStyle = getEdgeStrokeStyle(styleType, color, currentStrokeWidth);
+
+  // Update marker colors to match edge color
+  const updatedMarkerStart = edge.markerStart ? { ...edge.markerStart, color } : undefined;
+  const updatedMarkerEnd = edge.markerEnd ? { ...edge.markerEnd, color } : undefined;
 
   return {
     ...edge,
@@ -134,6 +146,8 @@ export function applyEdgeStyling(
       ...edge.style,
       ...strokeStyle,
     },
+    markerStart: updatedMarkerStart,
+    markerEnd: updatedMarkerEnd,
   };
 }
 
