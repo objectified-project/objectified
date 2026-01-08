@@ -153,6 +153,7 @@ const StudioContent = () => {
     lodEnabled,
     edgeStyling,
     edgeRouting,
+    edgeAnimation,
     gridSize,
     snapToGrid,
     gridStyle,
@@ -2382,6 +2383,25 @@ const StudioContent = () => {
     }
   };
 
+  // Helper function to check if edges should be animated
+  const shouldAnimateEdges = (): boolean => {
+    return edgeAnimation !== 'none';
+  };
+
+  // Helper function to get animation class name based on animation type
+  const getAnimationClassName = (): string => {
+    switch (edgeAnimation) {
+      case 'flow':
+        return 'edge-animation-flow';
+      case 'pulse':
+        return 'edge-animation-pulse';
+      case 'dash':
+        return 'edge-animation-dash';
+      default:
+        return '';
+    }
+  };
+
   // Helper function to create edges from property $ref relationships
   const createPropertyRefEdges = (classes: any[]): Edge[] => {
     const edges: Edge[] = [];
@@ -2740,7 +2760,14 @@ const StudioContent = () => {
   const createAllEdges = (classes: any[]): Edge[] => {
     const propertyEdges = createPropertyRefEdges(classes);
     const compositionEdges = createCompositionEdges(classes);
-    return [...propertyEdges, ...compositionEdges];
+    const allEdges = [...propertyEdges, ...compositionEdges];
+
+    // Apply animation to all edges based on user preference
+    return allEdges.map(edge => ({
+      ...edge,
+      animated: shouldAnimateEdges(),
+      className: getAnimationClassName(),
+    }));
   };
 
   // Helper function to generate Mermaid class diagram from classes
@@ -3258,7 +3285,7 @@ const StudioContent = () => {
       const newEdges = createAllEdges(classesWithProperties);
       setEdges(newEdges);
     }
-  }, [edgeStyling, edgeRouting]);
+  }, [edgeStyling, edgeRouting, edgeAnimation]);
 
   // Generate specs on-demand when switching views or when canvas changes
   useEffect(() => {
@@ -3661,6 +3688,46 @@ const StudioContent = () => {
             }
             100% {
               background-position: -200% 0;
+            }
+          }
+        `}</style>
+        <style jsx global>{`
+          /* Edge Animation Styles */
+          .react-flow__edge.edge-animation-flow .react-flow__edge-path {
+            stroke-dasharray: 5;
+            animation: edge-flow 1s linear infinite;
+          }
+          .react-flow__edge.edge-animation-pulse .react-flow__edge-path {
+            animation: edge-pulse 2s ease-in-out infinite;
+          }
+          .react-flow__edge.edge-animation-dash .react-flow__edge-path {
+            stroke-dasharray: 10 5;
+            animation: edge-dash 0.5s linear infinite;
+          }
+          @keyframes edge-flow {
+            0% {
+              stroke-dashoffset: 24;
+            }
+            100% {
+              stroke-dashoffset: 0;
+            }
+          }
+          @keyframes edge-pulse {
+            0%, 100% {
+              stroke-opacity: 1;
+              stroke-width: 2;
+            }
+            50% {
+              stroke-opacity: 0.5;
+              stroke-width: 4;
+            }
+          }
+          @keyframes edge-dash {
+            0% {
+              stroke-dashoffset: 15;
+            }
+            100% {
+              stroke-dashoffset: 0;
             }
           }
         `}</style>

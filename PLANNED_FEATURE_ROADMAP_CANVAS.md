@@ -265,12 +265,11 @@
   - ✅ Orthogonal (right angles)
   - ✅ Smart routing (avoid node overlap)
 - 📋 Arrow styles: Standard, Diamond, Circle, Open arrow
-- 📋 Animated edges (flowing dots for data flow)
+- ✅ Animated edges (flowing dots for data flow)
 
 | Ticket | Feature Description                   |
 |--------|---------------------------------------|
 | #347   | Adds edge arrow styles                |
-| #348   | Adds animation to edges               |
 | #349   | Adds edge hover effects               |
 
 #### Application Themes ✅ IMPLEMENTED

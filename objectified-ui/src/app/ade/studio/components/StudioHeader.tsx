@@ -75,7 +75,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     edgeStyling,
     setEdgeStyling,
     edgeRouting,
-    setEdgeRouting
+    setEdgeRouting,
+    edgeAnimation,
+    setEdgeAnimation
   } = useStudio();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -778,6 +780,86 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                         {edgeRouting === 'bezier' && 'Smooth curved connections'}
                         {edgeRouting === 'orthogonal' && 'Right-angle paths (horizontal/vertical only)'}
                         {edgeRouting === 'smart' && 'Automatically routes around other nodes'}
+                      </p>
+                    </div>
+
+                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+
+                    {/* Edge Animation */}
+                    <div className="px-3 py-3">
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Edge Animation</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setEdgeAnimation('none')}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
+                            edgeAnimation === 'none'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                          title="Static edges with no animation"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                          None
+                        </button>
+                        <button
+                          onClick={() => setEdgeAnimation('flow')}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
+                            edgeAnimation === 'flow'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                          title="Flowing dots animation showing data direction"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <circle cx="6" cy="12" r="2" fill="currentColor" />
+                            <circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.6" />
+                            <circle cx="18" cy="12" r="2" fill="currentColor" opacity="0.3" />
+                          </svg>
+                          Flow
+                        </button>
+                        <button
+                          onClick={() => setEdgeAnimation('pulse')}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
+                            edgeAnimation === 'pulse'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                          title="Pulsing glow effect on edges"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <line x1="5" y1="12" x2="19" y2="12" strokeWidth={3} opacity="0.5" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                          Pulse
+                        </button>
+                        <button
+                          onClick={() => setEdgeAnimation('dash')}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
+                            edgeAnimation === 'dash'
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                          title="Animated dashed lines"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeDasharray="4 2">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                          Dash
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        {edgeAnimation === 'none' && 'Static edges without animation'}
+                        {edgeAnimation === 'flow' && 'Flowing dots showing data direction'}
+                        {edgeAnimation === 'pulse' && 'Pulsing glow effect on connections'}
+                        {edgeAnimation === 'dash' && 'Animated marching dashes'}
                       </p>
                     </div>
                   </DropdownMenu.Content>

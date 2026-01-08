@@ -36,6 +36,9 @@ export type EdgeStyleType = 'solid' | 'dashed' | 'dotted' | 'double';
 // Edge routing options
 export type EdgeRoutingType = 'straight' | 'bezier' | 'orthogonal' | 'smart';
 
+// Edge animation options
+export type EdgeAnimationType = 'none' | 'flow' | 'pulse' | 'dash';
+
 export interface EdgeStylingOptions {
   directReferences: EdgeStyleType;
   optionalReferences: EdgeStyleType;
@@ -84,6 +87,9 @@ interface StudioContextType {
   // Edge routing
   edgeRouting: EdgeRoutingType;
   setEdgeRouting: (routing: EdgeRoutingType) => void;
+  // Edge animation
+  edgeAnimation: EdgeAnimationType;
+  setEdgeAnimation: (animation: EdgeAnimationType) => void;
   // Group management
   groups: CanvasGroup[];
   setGroups: (groups: CanvasGroup[]) => void;
@@ -194,6 +200,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     return 'bezier'; // Default to curved/bezier
   });
 
+  const [edgeAnimation, setEdgeAnimation] = useState<EdgeAnimationType>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('edgeAnimation');
+      if (saved && ['none', 'flow', 'pulse', 'dash'].includes(saved)) {
+        return saved as EdgeAnimationType;
+      }
+    }
+    return 'none'; // Default to no animation
+  });
+
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
   // Persist grid settings to localStorage
@@ -232,6 +248,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('edgeRouting', edgeRouting);
     }
   }, [edgeRouting]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('edgeAnimation', edgeAnimation);
+    }
+  }, [edgeAnimation]);
 
   const triggerCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
@@ -307,6 +329,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setEdgeStyling,
       edgeRouting,
       setEdgeRouting,
+      edgeAnimation,
+      setEdgeAnimation,
       groups,
       setGroups,
       addGroup,
