@@ -3,30 +3,16 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Check, Settings, Palette } from 'lucide-react';
+import { Check, Settings } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import * as Popover from '@radix-ui/react-popover';
 import { useStudio } from '../StudioContext';
-import { EDGE_COLORS_4X4 } from '../../../utils/color-themes';
 import {
   getProjectsForTenant,
   getVersionsForProject,
   getTagsForProject
 } from '../../../../../lib/db/helper';
-
-// Helper function to determine if a color is dark
-function isColorDark(hexColor: string | undefined): boolean {
-  if (!hexColor) hexColor = '#64748b'; // Default to Slate gray if undefined
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  // Calculate relative luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance < 0.5;
-}
+import CanvasSettingsDialog from './CanvasSettingsDialog';
 
 interface Project {
   id: string;
@@ -86,6 +72,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   const [localVersionId, setLocalVersionId] = React.useState<string>(selectedVersionId || '');
   const [isLoadingProjects, setIsLoadingProjects] = React.useState(false);
   const [isLoadingVersions, setIsLoadingVersions] = React.useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
 
   // Determine current view mode from pathname
   const viewMode: ViewMode = pathname?.includes('/code')
@@ -94,18 +81,45 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       ? 'paths'
       : 'editor';
 
-  // Toggle click-to-focus mode
-  const toggleClickToFocus = React.useCallback(() => {
-    setClickToFocusEnabled(!clickToFocusEnabled);
-    localStorage.setItem('clickToFocusEnabled', JSON.stringify(!clickToFocusEnabled));
-  }, [clickToFocusEnabled, setClickToFocusEnabled]);
+  // Handle settings save
+  const handleSettingsSave = React.useCallback((settings: {
+    clickToFocusEnabled: boolean;
+    lodEnabled: boolean;
+    snapToGrid: boolean;
+    smartGuidesEnabled: boolean;
+    gridSize: number;
+    gridStyle: 'dots' | 'lines' | 'cross';
+    edgeStyling: typeof edgeStyling;
+    edgeRouting: typeof edgeRouting;
+    edgeAnimation: typeof edgeAnimation;
+  }) => {
+    setClickToFocusEnabled(settings.clickToFocusEnabled);
+    localStorage.setItem('clickToFocusEnabled', JSON.stringify(settings.clickToFocusEnabled));
 
-  // Toggle LOD mode
-  const toggleLod = React.useCallback(() => {
-    const newValue = !lodEnabled;
-    setLodEnabled(newValue);
-    localStorage.setItem('lodEnabled', JSON.stringify(newValue));
-  }, [lodEnabled, setLodEnabled]);
+    setLodEnabled(settings.lodEnabled);
+    localStorage.setItem('lodEnabled', JSON.stringify(settings.lodEnabled));
+
+    setSnapToGrid(settings.snapToGrid);
+    localStorage.setItem('snapToGrid', JSON.stringify(settings.snapToGrid));
+
+    setSmartGuidesEnabled(settings.smartGuidesEnabled);
+    localStorage.setItem('smartGuidesEnabled', JSON.stringify(settings.smartGuidesEnabled));
+
+    setGridSize(settings.gridSize);
+    localStorage.setItem('gridSize', String(settings.gridSize));
+
+    setGridStyle(settings.gridStyle);
+    localStorage.setItem('gridStyle', settings.gridStyle);
+
+    setEdgeStyling(settings.edgeStyling);
+    localStorage.setItem('edgeStyling', JSON.stringify(settings.edgeStyling));
+
+    setEdgeRouting(settings.edgeRouting);
+    localStorage.setItem('edgeRouting', settings.edgeRouting);
+
+    setEdgeAnimation(settings.edgeAnimation);
+    localStorage.setItem('edgeAnimation', settings.edgeAnimation);
+  }, [setClickToFocusEnabled, setLodEnabled, setSnapToGrid, setSmartGuidesEnabled, setGridSize, setGridStyle, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
   // Sync local state with context
   React.useEffect(() => {
@@ -349,523 +363,33 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               </ToggleGroup.Item>
             </ToggleGroup.Root>
 
-            {/* Settings Dropdown */}
+            {/* Settings Button */}
             <div className="ml-auto">
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <button
-                    className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
-                    title="Settings"
-                    aria-label="Settings"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
-                </DropdownMenu.Trigger>
-
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    className="min-w-[180px] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[9999]"
-                    sideOffset={5}
-                    align="end"
-                  >
-
-                    {/* Click-to-Focus Toggle */}
-                    <DropdownMenu.Item
-                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
-                      onSelect={() => toggleClickToFocus()}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      <span className="flex-1">Click-to-Focus</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                        {clickToFocusEnabled ? 'ON' : 'OFF'}
-                      </span>
-                    </DropdownMenu.Item>
-
-                    {/* Level of Detail Toggle */}
-                    <DropdownMenu.Item
-                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
-                      onSelect={() => toggleLod()}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-                      </svg>
-                      <span className="flex-1">Level of Detail</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                        {lodEnabled ? 'ON' : 'OFF'}
-                      </span>
-                    </DropdownMenu.Item>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {/* Snap to Grid Toggle */}
-                    <DropdownMenu.Item
-                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
-                      onSelect={() => setSnapToGrid(!snapToGrid)}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                      </svg>
-                      <span className="flex-1">Snap to Grid</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                        {snapToGrid ? 'ON' : 'OFF'}
-                      </span>
-                    </DropdownMenu.Item>
-
-                    {/* Smart Guides Toggle */}
-                    <DropdownMenu.Item
-                      className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
-                      onSelect={() => setSmartGuidesEnabled(!smartGuidesEnabled)}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                      </svg>
-                      <span className="flex-1">Smart Guides</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${smartGuidesEnabled ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
-                        {smartGuidesEnabled ? 'ON' : 'OFF'}
-                      </span>
-                    </DropdownMenu.Item>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {/* Grid Size Slider */}
-                    <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Grid Size</span>
-                        <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-medium">
-                          {gridSize}px
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="50"
-                        step="5"
-                        value={gridSize}
-                        onChange={(e) => setGridSize(Number(e.target.value))}
-                        className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onPointerMove={(e) => e.stopPropagation()}
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        <span>10px</span>
-                        <span>50px</span>
-                      </div>
-                    </div>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {/* Grid Style Selector */}
-                    <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Grid Style</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          onClick={() => setGridStyle('dots')}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                            gridStyle === 'dots'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          Dots
-                        </button>
-                        <button
-                          onClick={() => setGridStyle('lines')}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                            gridStyle === 'lines'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          Lines
-                        </button>
-                        <button
-                          onClick={() => setGridStyle('cross')}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                            gridStyle === 'cross'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          Cross
-                        </button>
-                      </div>
-                    </div>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {/* Edge Styling */}
-                    <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Edge Styles</span>
-                      </div>
-                      <div className="space-y-2">
-                        {/* Direct References */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Direct</span>
-                          <select
-                            value={edgeStyling.directReferences}
-                            onChange={(e) => setEdgeStyling({ ...edgeStyling, directReferences: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
-                          >
-                            <option value="solid">Solid</option>
-                            <option value="dashed">Dashed</option>
-                            <option value="dotted">Dotted</option>
-                            <option value="double">Double</option>
-                          </select>
-                          <Popover.Root>
-                            <Popover.Trigger asChild>
-                              <button
-                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
-                                style={{ backgroundColor: edgeStyling.directColor }}
-                                title="Change direct edge color"
-                              >
-                                <Palette
-                                  className="w-4 h-4"
-                                  style={{ color: isColorDark(edgeStyling.directColor) ? 'white' : 'black' }}
-                                />
-                              </button>
-                            </Popover.Trigger>
-                            <Popover.Portal>
-                              <Popover.Content
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
-                                sideOffset={5}
-                              >
-                                <div className="grid grid-cols-4 gap-1.5">
-                                  {EDGE_COLORS_4X4.map((color) => (
-                                    <button
-                                      key={color.hex}
-                                      onClick={() => setEdgeStyling({ ...edgeStyling, directColor: color.hex })}
-                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
-                                      style={{ backgroundColor: color.hex }}
-                                      title={color.name}
-                                    />
-                                  ))}
-                                </div>
-                              </Popover.Content>
-                            </Popover.Portal>
-                          </Popover.Root>
-                        </div>
-
-                        {/* Optional References */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Optional</span>
-                          <select
-                            value={edgeStyling.optionalReferences}
-                            onChange={(e) => setEdgeStyling({ ...edgeStyling, optionalReferences: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
-                          >
-                            <option value="solid">Solid</option>
-                            <option value="dashed">Dashed</option>
-                            <option value="dotted">Dotted</option>
-                            <option value="double">Double</option>
-                          </select>
-                          <Popover.Root>
-                            <Popover.Trigger asChild>
-                              <button
-                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
-                                style={{ backgroundColor: edgeStyling.optionalColor }}
-                                title="Change optional edge color"
-                              >
-                                <Palette
-                                  className="w-4 h-4"
-                                  style={{ color: isColorDark(edgeStyling.optionalColor) ? 'white' : 'black' }}
-                                />
-                              </button>
-                            </Popover.Trigger>
-                            <Popover.Portal>
-                              <Popover.Content
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
-                                sideOffset={5}
-                              >
-                                <div className="grid grid-cols-4 gap-1.5">
-                                  {EDGE_COLORS_4X4.map((color) => (
-                                    <button
-                                      key={color.hex}
-                                      onClick={() => setEdgeStyling({ ...edgeStyling, optionalColor: color.hex })}
-                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
-                                      style={{ backgroundColor: color.hex }}
-                                      title={color.name}
-                                    />
-                                  ))}
-                                </div>
-                              </Popover.Content>
-                            </Popover.Portal>
-                          </Popover.Root>
-                        </div>
-
-                        {/* Weak References */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Weak</span>
-                          <select
-                            value={edgeStyling.weakReferences}
-                            onChange={(e) => setEdgeStyling({ ...edgeStyling, weakReferences: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
-                          >
-                            <option value="solid">Solid</option>
-                            <option value="dashed">Dashed</option>
-                            <option value="dotted">Dotted</option>
-                            <option value="double">Double</option>
-                          </select>
-                          <Popover.Root>
-                            <Popover.Trigger asChild>
-                              <button
-                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
-                                style={{ backgroundColor: edgeStyling.weakColor }}
-                                title="Change weak edge color"
-                              >
-                                <Palette
-                                  className="w-4 h-4"
-                                  style={{ color: isColorDark(edgeStyling.weakColor) ? 'white' : 'black' }}
-                                />
-                              </button>
-                            </Popover.Trigger>
-                            <Popover.Portal>
-                              <Popover.Content
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
-                                sideOffset={5}
-                              >
-                                <div className="grid grid-cols-4 gap-1.5">
-                                  {EDGE_COLORS_4X4.map((color) => (
-                                    <button
-                                      key={color.hex}
-                                      onClick={() => setEdgeStyling({ ...edgeStyling, weakColor: color.hex })}
-                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
-                                      style={{ backgroundColor: color.hex }}
-                                      title={color.name}
-                                    />
-                                  ))}
-                                </div>
-                              </Popover.Content>
-                            </Popover.Portal>
-                          </Popover.Root>
-                        </div>
-
-                        {/* Bidirectional */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400 w-20">Bidir.</span>
-                          <select
-                            value={edgeStyling.bidirectional}
-                            onChange={(e) => setEdgeStyling({ ...edgeStyling, bidirectional: e.target.value as any })}
-                            className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 flex-1"
-                          >
-                            <option value="solid">Solid</option>
-                            <option value="dashed">Dashed</option>
-                            <option value="dotted">Dotted</option>
-                            <option value="double">Double</option>
-                          </select>
-                          <Popover.Root>
-                            <Popover.Trigger asChild>
-                              <button
-                                className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors flex-shrink-0 relative flex items-center justify-center"
-                                style={{ backgroundColor: edgeStyling.bidirectionalColor }}
-                                title="Change bidirectional edge color"
-                              >
-                                <Palette
-                                  className="w-4 h-4"
-                                  style={{ color: isColorDark(edgeStyling.bidirectionalColor) ? 'white' : 'black' }}
-                                />
-                              </button>
-                            </Popover.Trigger>
-                            <Popover.Portal>
-                              <Popover.Content
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]"
-                                sideOffset={5}
-                              >
-                                <div className="grid grid-cols-4 gap-1.5">
-                                  {EDGE_COLORS_4X4.map((color) => (
-                                    <button
-                                      key={color.hex}
-                                      onClick={() => setEdgeStyling({ ...edgeStyling, bidirectionalColor: color.hex })}
-                                      className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
-                                      style={{ backgroundColor: color.hex }}
-                                      title={color.name}
-                                    />
-                                  ))}
-                                </div>
-                              </Popover.Content>
-                            </Popover.Portal>
-                          </Popover.Root>
-                        </div>
-                      </div>
-                    </div>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {/* Edge Routing */}
-                    <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Edge Routing</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => setEdgeRouting('straight')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeRouting === 'straight'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Direct straight lines between nodes"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <line x1="4" y1="4" x2="20" y2="20" />
-                          </svg>
-                          Straight
-                        </button>
-                        <button
-                          onClick={() => setEdgeRouting('bezier')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeRouting === 'bezier'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Smooth curved bezier lines"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <path d="M4 4 C 10 4, 14 20, 20 20" />
-                          </svg>
-                          Curved
-                        </button>
-                        <button
-                          onClick={() => setEdgeRouting('orthogonal')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeRouting === 'orthogonal'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Right-angle orthogonal routing"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <path d="M4 4 L 4 12 L 20 12 L 20 20" />
-                          </svg>
-                          Orthogonal
-                        </button>
-                        <button
-                          onClick={() => setEdgeRouting('smart')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeRouting === 'smart'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Smart routing that avoids node overlap"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <path d="M4 4 L 4 8 L 12 8 L 12 16 L 20 16 L 20 20" />
-                            <rect x="8" y="10" width="4" height="4" fill="currentColor" opacity="0.3" />
-                          </svg>
-                          Smart
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        {edgeRouting === 'straight' && 'Direct lines between connected nodes'}
-                        {edgeRouting === 'bezier' && 'Smooth curved connections'}
-                        {edgeRouting === 'orthogonal' && 'Right-angle paths (horizontal/vertical only)'}
-                        {edgeRouting === 'smart' && 'Automatically routes around other nodes'}
-                      </p>
-                    </div>
-
-                    <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-
-                    {/* Edge Animation */}
-                    <div className="px-3 py-3">
-                      <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Edge Animation</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => setEdgeAnimation('none')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeAnimation === 'none'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Static edges with no animation"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                          None
-                        </button>
-                        <button
-                          onClick={() => setEdgeAnimation('flow')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeAnimation === 'flow'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Flowing dots animation showing data direction"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <circle cx="6" cy="12" r="2" fill="currentColor" />
-                            <circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.6" />
-                            <circle cx="18" cy="12" r="2" fill="currentColor" opacity="0.3" />
-                          </svg>
-                          Flow
-                        </button>
-                        <button
-                          onClick={() => setEdgeAnimation('pulse')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeAnimation === 'pulse'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Pulsing glow effect on edges"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                            <line x1="5" y1="12" x2="19" y2="12" strokeWidth={3} opacity="0.5" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                          Pulse
-                        </button>
-                        <button
-                          onClick={() => setEdgeAnimation('dash')}
-                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
-                            edgeAnimation === 'dash'
-                              ? 'bg-indigo-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                          }`}
-                          title="Animated dashed lines"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeDasharray="4 2">
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                          </svg>
-                          Dash
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        {edgeAnimation === 'none' && 'Static edges without animation'}
-                        {edgeAnimation === 'flow' && 'Flowing dots showing data direction'}
-                        {edgeAnimation === 'pulse' && 'Pulsing glow effect on connections'}
-                        {edgeAnimation === 'dash' && 'Animated marching dashes'}
-                      </p>
-                    </div>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
+              <button
+                onClick={() => setSettingsDialogOpen(true)}
+                className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
             </div>
+
+            {/* Canvas Settings Dialog */}
+            <CanvasSettingsDialog
+              open={settingsDialogOpen}
+              onOpenChange={setSettingsDialogOpen}
+              clickToFocusEnabled={clickToFocusEnabled}
+              lodEnabled={lodEnabled}
+              snapToGrid={snapToGrid}
+              smartGuidesEnabled={smartGuidesEnabled}
+              gridSize={gridSize}
+              gridStyle={gridStyle}
+              edgeStyling={edgeStyling}
+              edgeRouting={edgeRouting}
+              edgeAnimation={edgeAnimation}
+              onSave={handleSettingsSave}
+            />
           </>
         )}
       </div>
