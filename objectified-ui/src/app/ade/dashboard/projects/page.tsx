@@ -338,109 +338,182 @@ const Projects = () => {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-            <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
-              <tr>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Project Name</th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created By</th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
-                <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
-              {projects.map((project) => (
-                <tr key={project.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">{project.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{(project as any).slug}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">{project.description || '—'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">{project.creator_name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{project.creator_email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{formatDate(project.created_at)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          setDropdownPosition({
-                            top: rect.bottom + 4,
-                            right: window.innerWidth - rect.right
-                          });
-                          setOpenProjectDropdown(openProjectDropdown === project.id ? null : project.id);
-                        }}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
-                        title="Actions"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+              <thead className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900 dark:to-gray-800">
+                <tr>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-64">
+                    Project Name
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-56">
+                    Created By
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">
+                    Created
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-40">
+                    Updated
+                  </th>
+                  <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
 
-                      {openProjectDropdown === project.id && dropdownPosition && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenProjectDropdown(null);
-                            }}
-                          />
-                          <div
-                            className="fixed w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
-                            style={{
-                              top: `${dropdownPosition.top}px`,
-                              right: `${dropdownPosition.right}px`
-                            }}>
-                            <div className="py-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenProjectDropdown(null);
-                                  handleEditClick(project);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                              >
-                                <Edit2 className="w-4 h-4 text-indigo-500" />
-                                Edit Project
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenProjectDropdown(null);
-                                  handleDelete(project.id);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                                Delete Project
-                              </button>
-                              <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenProjectDropdown(null);
-                                  handlePermanentDelete(project);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
-                              >
-                                <AlertTriangle className="w-4 h-4" />
-                                Permanently Delete
-                              </button>
-                            </div>
-                          </div>
-                        </>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                {projects.map((project) => (
+                  <tr key={project.id} className="hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-all duration-200">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-xs" title={project.name}>
+                          {project.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={(project as any).slug}>
+                          {(project as any).slug || '—'}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-md" title={project.description || ''}>
+                        {project.description || <span className="text-gray-400 dark:text-gray-600">No description</span>}
+                      </div>
+                      {project.metadata?.summary && (
+                        <div className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-md mt-1" title={project.metadata.summary}>
+                          {project.metadata.summary}
+                        </div>
                       )}
-                    </div>
-                  </td>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          {project.enabled ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                              Enabled
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                              Disabled
+                            </span>
+                          )}
+                        </div>
+                        {project.deleted_at && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                            <Trash2 className="w-3 h-3" />
+                            Deleted
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 dark:text-white truncate" title={project.creator_name}>
+                        {project.creator_name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate" title={project.creator_email}>
+                        {project.creator_email}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 dark:text-gray-400" title={new Date(project.created_at).toLocaleString()}>
+                        {new Date(project.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500">
+                        {new Date(project.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 dark:text-gray-400" title={new Date(project.updated_at).toLocaleString()}>
+                        {new Date(project.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500">
+                        {new Date(project.updated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setDropdownPosition({
+                              top: rect.bottom + 4,
+                              right: window.innerWidth - rect.right
+                            });
+                            setOpenProjectDropdown(openProjectDropdown === project.id ? null : project.id);
+                          }}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
+                          title="Actions"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+
+                        {openProjectDropdown === project.id && dropdownPosition && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenProjectDropdown(null);
+                              }}
+                            />
+                            <div
+                              className="fixed w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20"
+                              style={{
+                                top: `${dropdownPosition.top}px`,
+                                right: `${dropdownPosition.right}px`
+                              }}>
+                              <div className="py-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenProjectDropdown(null);
+                                    handleEditClick(project);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Edit2 className="w-4 h-4 text-indigo-500" />
+                                  Edit Project
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenProjectDropdown(null);
+                                    handleDelete(project.id);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                  Delete Project
+                                </button>
+                                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenProjectDropdown(null);
+                                    handlePermanentDelete(project);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                                >
+                                  <AlertTriangle className="w-4 h-4" />
+                                  Permanently Delete
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
