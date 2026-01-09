@@ -72,8 +72,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed property copying to a class that contains an object with nested properties
 - Dashboard improvements
   - Version comparison now shows a more comprehensive list of changes, with the ability to filter by change type (added, removed, modified)
-
-[//]: # (- Introducing Paths - API endpoint design canvas)
+- Introducing Paths - API endpoint design canvas
+  - Created database to start creating new Paths
+  - Initial version of Paths canvas set up similar to the design canvas
+  - Adding a path adds the path to the sidebar, with the ability to edit and delete paths
 
 [//]: # (  - Drag-and-drop path nodes onto the canvas from the library panel)
 

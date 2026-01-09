@@ -2,13 +2,12 @@
 
 import React, { useState } from 'react';
 import { useStudio } from '../StudioContext';
-import LibraryPanel from './components/LibraryPanel';
-import PathsCanvas from './components/PathsCanvas';
-import PropertiesPanel from './components/PropertiesPanel';
+import PathsSidebar from './components/PathsSidebar';
+import PathsCanvasView from './components/PathsCanvasView';
 
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
-  const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [activeTab, setActiveTab] = useState<'paths' | 'classes' | 'properties'>('paths');
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
@@ -30,27 +29,19 @@ export default function PathsPage() {
                 No Project Selected
               </h2>
               <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                Please select a project and version from the header to view API paths.
+                Please select a project and version from the header to view paths.
               </p>
             </div>
           </div>
         </div>
       ) : (
-        /* Three-Panel Layout: Library | Canvas | Properties */
+        /* Two-Panel Layout: Sidebar | Canvas */
         <div className="flex-1 flex h-full overflow-hidden">
-          {/* Left Panel: Library */}
-          <LibraryPanel />
+          {/* Left Sidebar */}
+          <PathsSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {/* Center Panel: React Flow Canvas */}
-          <PathsCanvas
-            onNodeSelect={setSelectedNode}
-          />
-
-          {/* Right Panel: Properties */}
-          <PropertiesPanel
-            selectedNode={selectedNode}
-            onClose={() => setSelectedNode(null)}
-          />
+          {/* Right Canvas */}
+          <PathsCanvasView />
         </div>
       )}
     </div>
