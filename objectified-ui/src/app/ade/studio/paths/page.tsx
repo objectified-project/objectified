@@ -4,11 +4,23 @@ import React, { useState } from 'react';
 import { useStudio } from '../StudioContext';
 import PathsSidebar from './components/PathsSidebar';
 import PathsCanvasView from './components/PathsCanvasView';
+import OperationPropertiesPanel from './components/OperationPropertiesPanel';
 
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
   const [activeTab, setActiveTab] = useState<'paths' | 'classes' | 'properties'>('paths');
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<{ id: string; pathname: string } | null>(null);
+  const [selectedOperation, setSelectedOperation] = useState<{
+    id: string;
+    operation: string;
+  } | null>(null);
+
+  const handlePathSelect = (pathId: string | null, pathname?: string) => {
+    setSelectedPathId(pathId);
+    setSelectedPath(pathId && pathname ? { id: pathId, pathname } : null);
+    setSelectedOperation(null); // Clear operation when path changes
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
@@ -36,18 +48,31 @@ export default function PathsPage() {
           </div>
         </div>
       ) : (
-        /* Two-Panel Layout: Sidebar | Canvas */
+        /* Two-Panel Layout: Sidebar | Canvas | Properties */
         <div className="flex-1 flex h-full overflow-hidden">
           {/* Left Sidebar */}
           <PathsSidebar
             activeTab={activeTab}
             onTabChange={setActiveTab}
             selectedPathId={selectedPathId}
-            onPathSelect={setSelectedPathId}
+            onPathSelect={handlePathSelect}
           />
 
-          {/* Right Canvas */}
-          <PathsCanvasView selectedPathId={selectedPathId} />
+          {/* Center Canvas */}
+          <PathsCanvasView
+            selectedPathId={selectedPathId}
+            onOperationSelect={setSelectedOperation}
+          />
+
+          {/* Right Properties Panel */}
+          {selectedOperation && selectedPath && (
+            <OperationPropertiesPanel
+              operationId={selectedOperation.id}
+              operation={selectedOperation.operation}
+              pathname={selectedPath.pathname}
+              onClose={() => setSelectedOperation(null)}
+            />
+          )}
         </div>
       )}
     </div>

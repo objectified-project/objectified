@@ -61,7 +61,7 @@ export default function PathsSidebar({
   activeTab: 'paths' | 'classes' | 'properties';
   onTabChange: (tab: 'paths' | 'classes' | 'properties') => void;
   selectedPathId: string | null;
-  onPathSelect: (pathId: string | null) => void;
+  onPathSelect: (pathId: string | null, pathname?: string) => void;
 }) {
   const { selectedVersionId } = useStudio();
   const { confirm: confirmDialog } = useDialog();
@@ -416,7 +416,7 @@ export default function PathsSidebar({
                     paths.map((path) => (
                       <Box
                         key={path.id}
-                        onClick={() => onPathSelect(path.id)}
+                        onClick={() => onPathSelect(path.id, path.pathname)}
                         sx={{
                           display: 'flex',
                           alignItems: 'center',

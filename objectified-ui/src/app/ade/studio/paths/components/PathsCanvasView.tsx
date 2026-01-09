@@ -55,9 +55,10 @@ const OPERATION_COLORS: Record<string, string> = {
 
 interface PathsCanvasInnerProps {
   selectedPathId: string | null;
+  onOperationSelect: (operation: { id: string; operation: string } | null) => void;
 }
 
-function PathsCanvasInner({ selectedPathId }: PathsCanvasInnerProps) {
+function PathsCanvasInner({ selectedPathId, onOperationSelect }: PathsCanvasInnerProps) {
   const {
     gridSize,
     gridStyle,
@@ -136,6 +137,19 @@ function PathsCanvasInner({ selectedPathId }: PathsCanvasInnerProps) {
     event.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  // Handle node click to show properties
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (node.type === 'operation') {
+        onOperationSelect({
+          id: node.data.dbOperationId as string,
+          operation: node.data.operation as string,
+        });
+      }
+    },
+    [onOperationSelect]
+  );
+
   // Handle drop
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
@@ -197,6 +211,7 @@ function PathsCanvasInner({ selectedPathId }: PathsCanvasInnerProps) {
         onEdgesChange={onEdgesChange}
         onDrop={onDrop}
         onDragOver={onDragOver}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         fitView
       >
@@ -224,10 +239,16 @@ function PathsCanvasInner({ selectedPathId }: PathsCanvasInnerProps) {
   );
 }
 
-export default function PathsCanvasView({ selectedPathId }: { selectedPathId: string | null }) {
+export default function PathsCanvasView({
+  selectedPathId,
+  onOperationSelect,
+}: {
+  selectedPathId: string | null;
+  onOperationSelect: (operation: { id: string; operation: string } | null) => void;
+}) {
   return (
     <ReactFlowProvider>
-      <PathsCanvasInner selectedPathId={selectedPathId} />
+      <PathsCanvasInner selectedPathId={selectedPathId} onOperationSelect={onOperationSelect} />
     </ReactFlowProvider>
   );
 }

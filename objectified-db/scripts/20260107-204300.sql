@@ -72,11 +72,12 @@ CREATE TABLE IF NOT EXISTS path_operation_description (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     path_operation_id UUID NOT NULL REFERENCES path_operation(id) ON DELETE CASCADE,
     summary VARCHAR(4096),
-    description TEXT NOT NULL,
+    description TEXT,
     operation_id VARCHAR(255),
     metadata JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(path_operation_id)
 );
 
 -- Table comment
