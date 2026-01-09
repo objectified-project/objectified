@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -11,19 +11,98 @@ import {
   Node,
   Edge,
   ReactFlowProvider,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStudio } from '../../StudioContext';
+import {
+  getOperationsForPath,
+  createOperation,
+  deleteOperation,
+} from '../../../../../../lib/db/helper-path-operations';
 
-export default function PathsCanvasView() {
+// Operation Node Component
+function OperationNode({ data }: { data: { operation: string; color: string } }) {
+  return (
+    <div
+      className="px-4 py-2 rounded-lg shadow-lg border-2 font-bold text-white text-sm"
+      style={{
+        backgroundColor: data.color,
+        borderColor: data.color,
+        minWidth: '80px',
+        textAlign: 'center',
+      }}
+    >
+      {data.operation}
+    </div>
+  );
+}
+
+const nodeTypes = {
+  operation: OperationNode,
+};
+
+// Operation color mapping
+const OPERATION_COLORS: Record<string, string> = {
+  'GET': '#10b981',
+  'POST': '#3b82f6',
+  'PUT': '#f59e0b',
+  'PATCH': '#8b5cf6',
+  'DELETE': '#ef4444',
+  'HEAD': '#6b7280',
+  'OPTIONS': '#64748b',
+};
+
+interface PathsCanvasInnerProps {
+  selectedPathId: string | null;
+}
+
+function PathsCanvasInner({ selectedPathId }: PathsCanvasInnerProps) {
   const {
     gridSize,
     gridStyle,
   } = useStudio();
 
-  const [nodes, , onNodesChange] = useNodesState<Node>([]);
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, , onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
+  const { screenToFlowPosition } = useReactFlow();
+
+  // Load operations when path is selected
+  useEffect(() => {
+    if (!selectedPathId) {
+      setNodes([]);
+      return;
+    }
+
+    const loadOperations = async () => {
+      try {
+        const operationsResponse = await getOperationsForPath(selectedPathId);
+        const operations = JSON.parse(operationsResponse);
+
+        // Convert operations to nodes
+        const operationNodes: Node[] = operations.map((op: any, index: number) => ({
+          id: op.id,
+          type: 'operation',
+          position: { x: 100 + (index * 150), y: 100 },
+          data: {
+            operation: op.operation,
+            color: OPERATION_COLORS[op.operation] || '#64748b',
+            dbOperationId: op.id,
+          },
+        }));
+
+        setNodes(operationNodes);
+      } catch (error) {
+        console.error('Error loading operations:', error);
+      }
+    };
+
+    loadOperations();
+  }, [selectedPathId, setNodes]);
+
+  // ...existing code...
 
   // Detect dark mode
   useEffect(() => {
@@ -51,46 +130,105 @@ export default function PathsCanvasView() {
     }
   }, []);
 
-  return (
-    <div className="flex-1 flex flex-col h-full bg-gray-100 dark:bg-gray-900">
-      <ReactFlowProvider>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          fitView
-        >
-          <Background
-            variant={backgroundVariant(gridStyle)}
-            gap={gridSize}
-            size={1.5}
-            color="currentColor"
-            style={{
-              color: isDark ? 'rgb(148, 163, 184)' : 'rgb(99, 102, 241)',
-              opacity: isDark ? 0.3 : 0.2
-            }}
-          />
-          <Controls
-            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden"
-            style={{
-              bottom: 20,
-              left: 20,
-              right: 'auto',
-              top: 'auto',
-            }}
-          />
-        </ReactFlow>
-      </ReactFlowProvider>
+  // Handle drag over
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
 
-      {/* Placeholder for Toolbox */}
-      <div className="absolute bottom-4 right-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 max-w-xs">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Toolbox</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Additional objects to add to the canvas will appear here.
-        </p>
-      </div>
+  // Handle drop
+  const onDrop = useCallback(
+    async (event: React.DragEvent) => {
+      event.preventDefault();
+
+      if (!selectedPathId) {
+        alert('Please select a path first before adding operations.');
+        return;
+      }
+
+      const data = event.dataTransfer.getData('application/json');
+      if (!data) return;
+
+      const dropData = JSON.parse(data);
+
+      if (dropData.type === 'operation') {
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        try {
+          // Save to database
+          const result = await createOperation(
+            selectedPathId,
+            dropData.operation,
+            { position }
+          );
+          const savedOperation = JSON.parse(result);
+
+          // Add to canvas
+          const newNode: Node = {
+            id: savedOperation.id,
+            type: 'operation',
+            position,
+            data: {
+              operation: savedOperation.operation,
+              color: dropData.color,
+              dbOperationId: savedOperation.id,
+            },
+          };
+
+          setNodes((nds) => [...nds, newNode]);
+        } catch (error) {
+          console.error('Error creating operation:', error);
+          alert('Failed to add operation. Please try again.');
+        }
+      }
+    },
+    [screenToFlowPosition, setNodes, selectedPathId]
+  );
+
+  return (
+    <div ref={reactFlowWrapper} className="flex-1 flex flex-col h-full bg-gray-100 dark:bg-gray-900">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        nodeTypes={nodeTypes}
+        fitView
+      >
+        <Background
+          variant={backgroundVariant(gridStyle)}
+          gap={gridSize}
+          size={1.5}
+          color="currentColor"
+          style={{
+            color: isDark ? 'rgb(148, 163, 184)' : 'rgb(99, 102, 241)',
+            opacity: isDark ? 0.3 : 0.2
+          }}
+        />
+        <Controls
+          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden"
+          style={{
+            bottom: 20,
+            left: 20,
+            right: 'auto',
+            top: 'auto',
+          }}
+        />
+      </ReactFlow>
     </div>
+  );
+}
+
+export default function PathsCanvasView({ selectedPathId }: { selectedPathId: string | null }) {
+  return (
+    <ReactFlowProvider>
+      <PathsCanvasInner selectedPathId={selectedPathId} />
+    </ReactFlowProvider>
   );
 }
 

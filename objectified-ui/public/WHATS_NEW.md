@@ -76,6 +76,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Created database to start creating new Paths
   - Initial version of Paths canvas set up similar to the design canvas
   - Adding a path adds the path to the sidebar, with the ability to edit and delete paths
+  - Adding an operation to a path adds that verb to be associated with the selected path
 
 [//]: # (  - Drag-and-drop path nodes onto the canvas from the library panel)
 

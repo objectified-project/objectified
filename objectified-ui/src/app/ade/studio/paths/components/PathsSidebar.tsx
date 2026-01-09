@@ -41,12 +41,27 @@ interface PathItem {
   updated_at: string;
 }
 
+// Available HTTP operations for OpenAPI
+const AVAILABLE_OPERATIONS = [
+  { id: 'GET', label: 'GET', color: '#10b981' },      // green
+  { id: 'POST', label: 'POST', color: '#3b82f6' },    // blue
+  { id: 'PUT', label: 'PUT', color: '#f59e0b' },      // amber
+  { id: 'PATCH', label: 'PATCH', color: '#8b5cf6' },  // purple
+  { id: 'DELETE', label: 'DELETE', color: '#ef4444' }, // red
+  { id: 'HEAD', label: 'HEAD', color: '#6b7280' },    // gray
+  { id: 'OPTIONS', label: 'OPTIONS', color: '#64748b' }, // slate
+];
+
 export default function PathsSidebar({
   activeTab,
   onTabChange,
+  selectedPathId,
+  onPathSelect,
 }: {
   activeTab: 'paths' | 'classes' | 'properties';
   onTabChange: (tab: 'paths' | 'classes' | 'properties') => void;
+  selectedPathId: string | null;
+  onPathSelect: (pathId: string | null) => void;
 }) {
   const { selectedVersionId } = useStudio();
   const { confirm: confirmDialog } = useDialog();
@@ -198,6 +213,17 @@ export default function PathsSidebar({
     }
   };
 
+  // Handle dragging an operation to the canvas
+  const handleOperationDragStart = (event: React.DragEvent, operation: typeof AVAILABLE_OPERATIONS[0]) => {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/json', JSON.stringify({
+      type: 'operation',
+      operation: operation.id,
+      color: operation.color,
+      label: operation.label,
+    }));
+  };
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: 'paths' | 'classes' | 'properties') => {
     onTabChange(newValue);
   };
@@ -324,15 +350,73 @@ export default function PathsSidebar({
             <>
               {/* Paths Tab Content */}
               {activeTab === 'paths' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {paths.length === 0 ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
-                      No paths yet. Use the + button below to create one.
-                    </span>
-                  ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Available Operations Section */}
+                  <Box>
+                    <Box sx={{ mb: 1, px: 0.5 }}>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        Available Operations
+                      </span>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      {AVAILABLE_OPERATIONS.map((operation) => (
+                        <Box
+                          key={operation.id}
+                          draggable
+                          onDragStart={(e) => handleOperationDragStart(e, operation)}
+                          sx={{
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 1,
+                            border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
+                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
+                            cursor: 'grab',
+                            transition: 'all 0.15s ease',
+                            '&:hover': {
+                              backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            },
+                            '&:active': {
+                              cursor: 'grabbing',
+                            },
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: '50%',
+                                backgroundColor: operation.color,
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span className="text-sm font-medium" style={{ color: operation.color }}>
+                              {operation.label}
+                            </span>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+
+                  {/* Paths List Section */}
+                  <Box>
+                    <Box sx={{ mb: 1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        Paths
+                      </span>
+                    </Box>
+                    {paths.length === 0 ? (
+                      <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                        No paths yet. Use the + button below to create one.
+                      </span>
+                    ) : (
                     paths.map((path) => (
                       <Box
                         key={path.id}
+                        onClick={() => onPathSelect(path.id)}
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
@@ -340,23 +424,37 @@ export default function PathsSidebar({
                           px: 1.5,
                           py: 1,
                           borderRadius: 1,
-                          border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
-                          backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
+                          border: selectedPathId === path.id
+                            ? (isDark ? '2px solid #6366f1' : '2px solid #6366f1')
+                            : (isDark ? '1px solid #374151' : '1px solid #e5e7eb'),
+                          backgroundColor: selectedPathId === path.id
+                            ? (isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)')
+                            : (isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)'),
+                          cursor: 'pointer',
                           transition: 'all 0.15s ease',
                           '&:hover': {
-                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
+                            backgroundColor: selectedPathId === path.id
+                              ? (isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.15)')
+                              : (isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)'),
                           },
                         }}
                       >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <span className="text-sm text-gray-700 dark:text-gray-300 truncate block">
+                          <span className={`text-sm truncate block ${
+                            selectedPathId === path.id 
+                              ? 'text-indigo-600 dark:text-indigo-400 font-semibold' 
+                              : 'text-gray-700 dark:text-gray-300'
+                          }`}>
                             {path.pathname}
                           </span>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <IconButton
                             size="small"
-                            onClick={() => handleEditPath(path)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditPath(path);
+                            }}
                             sx={{
                               padding: '4px',
                               color: isDark ? '#94a3b8' : '#64748b',
@@ -370,7 +468,10 @@ export default function PathsSidebar({
                           </IconButton>
                           <IconButton
                             size="small"
-                            onClick={() => handleDeletePath(path)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePath(path);
+                            }}
                             sx={{
                               padding: '4px',
                               color: isDark ? '#94a3b8' : '#64748b',
@@ -386,6 +487,7 @@ export default function PathsSidebar({
                       </Box>
                     ))
                   )}
+                  </Box>
                 </Box>
               )}
 

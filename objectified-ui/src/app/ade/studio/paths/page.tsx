@@ -8,6 +8,7 @@ import PathsCanvasView from './components/PathsCanvasView';
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
   const [activeTab, setActiveTab] = useState<'paths' | 'classes' | 'properties'>('paths');
+  const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-50 dark:bg-gray-900">
@@ -38,10 +39,15 @@ export default function PathsPage() {
         /* Two-Panel Layout: Sidebar | Canvas */
         <div className="flex-1 flex h-full overflow-hidden">
           {/* Left Sidebar */}
-          <PathsSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <PathsSidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            selectedPathId={selectedPathId}
+            onPathSelect={setSelectedPathId}
+          />
 
           {/* Right Canvas */}
-          <PathsCanvasView />
+          <PathsCanvasView selectedPathId={selectedPathId} />
         </div>
       )}
     </div>
