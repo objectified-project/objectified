@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed property template button icon color in light mode (was appearing black instead of white)
   - Fixed click-to-focus behavior in the canvas
   - Fixed dark mode and light mode (takes precedence over system settings)
+  - Fixed property copying to a class that contains an object with nested properties
   - Fixed group class positions not saving to database when dragging classes within groups (regression)
     - Classes dragged into groups now immediately persist to database with position
     - Moving classes within groups now updates positions in database
@@ -68,8 +69,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Color selection for edges
     - Styling for edge connectors including smart edge routing
     - Edge animations for better visual feedback
-- Added property templates
-  - Fixed property copying to a class that contains an object with nested properties
+- Added class and property templates
 - Dashboard improvements
   - Version comparison now shows a more comprehensive list of changes, with the ability to filter by change type (added, removed, modified)
 - Introducing Paths - API endpoint design canvas

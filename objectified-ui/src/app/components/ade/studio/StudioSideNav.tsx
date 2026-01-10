@@ -68,6 +68,7 @@ export interface StudioSideNavCallbacks {
   onClassDelete?: (classId: string) => void;
   onClassSelect?: (classItem: ClassItem) => void;
   onClassImport?: () => void;
+  onClassTemplates?: () => void;
 
   // Properties callbacks
   onPropertyAdd?: () => void;
@@ -580,6 +581,29 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   }}
                 >
                   <Upload />
+                </Fab>
+                <Fab
+                  color="secondary"
+                  size="small"
+                  onClick={() => callbacks.onClassTemplates?.()}
+                  disabled={!selectedVersionId || isReadOnly}
+                  aria-label="Class templates"
+                  title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Browse class templates'}
+                  sx={{
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    '&:hover': {
+                      transform: 'translateY(-2px) scale(1.05)',
+                      boxShadow: '0 6px 20px rgba(245, 158, 11, 0.5)',
+                    },
+                    '&:disabled': {
+                      background: isDark ? '#475569' : '#e2e8f0',
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  <LibraryBooks />
                 </Fab>
                 <Fab
                   color="primary"

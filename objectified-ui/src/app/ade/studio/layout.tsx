@@ -15,6 +15,7 @@ import PropertyDialog from '@/app/components/ade/studio/PropertyDialog';
 import ClassEditDialog from '@/app/components/ade/studio/ClassEditDialog';
 import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
+import ClassTemplateBrowserDialog from '@/app/components/ade/studio/ClassTemplateBrowserDialog';
 import TagManager from '@/app/components/ade/studio/TagManager';
 import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
@@ -72,6 +73,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const [classImportDialog, setClassImportDialog] = useState({ open: false });
   const [propertyDialog, setPropertyDialog] = useState({ open: false, mode: 'add' as 'add' | 'edit', selectedProperty: null as PropertyItem | null });
   const [propertyTemplateDialog, setPropertyTemplateDialog] = useState({ open: false });
+  const [classTemplateDialog, setClassTemplateDialog] = useState({ open: false });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null as { type: 'class' | 'property'; id: string } | null });
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
@@ -179,6 +181,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     setClassImportDialog({ open: true });
   };
 
+  const handleClassTemplates = async () => {
+    if (!(await checkVersionSelected()) || !(await checkNotReadOnly('add classes'))) return;
+    setClassTemplateDialog({ open: true });
+  };
+
   // Property handlers
   const handlePropertyAdd = async () => {
     if (!(await checkProjectSelected()) || !(await checkNotReadOnly('add properties'))) return;
@@ -244,7 +251,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   };
 
   const callbacks: StudioSideNavCallbacks = {
-    onClassAdd: handleClassAdd, onClassEdit: handleClassEdit, onClassDelete: handleClassDelete, onClassImport: handleClassImport,
+    onClassAdd: handleClassAdd, onClassEdit: handleClassEdit, onClassDelete: handleClassDelete, onClassImport: handleClassImport, onClassTemplates: handleClassTemplates,
     onClassSelect: (classItem) => {
       console.log('Class selected:', classItem);
       // Only zoom if click-to-focus mode is enabled
@@ -393,6 +400,19 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         onSuccess={() => {
           setRefreshKey(prev => prev + 1);
         }}
+        projectId={selectedProjectId || ''}
+        tenantId={currentTenantId}
+      />
+
+      {/* Class Template Browser Dialog */}
+      <ClassTemplateBrowserDialog
+        open={classTemplateDialog.open}
+        onClose={() => setClassTemplateDialog({ open: false })}
+        onSuccess={() => {
+          setRefreshKey(prev => prev + 1);
+          triggerCanvasRefresh?.();
+        }}
+        versionId={selectedVersionId || ''}
         projectId={selectedProjectId || ''}
         tenantId={currentTenantId}
       />
