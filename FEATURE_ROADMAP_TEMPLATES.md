@@ -22,19 +22,32 @@ This contains feature sets for property and schema templates, both system-define
 ### Schema Templates
 
 #### Schema Templates & Snippets 📋 PLANNED
-- Drag-and-drop schema templates onto canvas:
-  - CRUD Resource (Create, Read, Update, Delete, List)
-  - Authentication Set (User, Session, Token, Role, Permission)
-  - Pagination Response (items, total, page, pageSize, hasMore)
-  - Error Response (code, message, details, timestamp)
-  - Audit Trail (id, action, actor, timestamp, changes)
+- 📋 Drag-and-drop schema templates onto canvas:
+  - 📋 Addresses, Common, Content, Integrations, Notifications, Orders, Payments, Products, Security, Users and Auth
+  - 📋 Analytics, Communication, Compliance, Marketplace, Scheduling, Support 
 - Custom template creation from selected classes
 - Template variables with auto-fill prompts
 - Template marketplace integration
 - Team-shared template library
 
-| Ticket | Feature |
-|--------|---------|
+| Ticket  | Feature                  |
+|---------|--------------------------|
+| #773    | Address templates        |
+| #774    | Common templates         |
+| #775    | Content templates        |
+| #776    | Integrations templates   |
+| #777    | Notifications templates  |
+| #778    | Orders templates         |
+| #779    | Payments templates       |
+| #780    | Products templates       |
+| #781    | Security templates       |
+| #782    | Users and Auth templates |
+| #783    | Analytics templates      |
+| #784    | Communication templates  |
+| #785    | Compliance templates     |
+| #786    | Marketplace templates    |
+| #787    | Scheduling templates     |
+| #788    | Support templates        |
 
 ---
 

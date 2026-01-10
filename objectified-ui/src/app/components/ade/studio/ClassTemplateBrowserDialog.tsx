@@ -244,7 +244,7 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-[95vw] max-w-5xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-[95vw] max-w-5xl h-[90vh] min-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
@@ -343,7 +343,7 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                     <p className="text-sm text-gray-500 dark:text-gray-400">No templates found</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-2">
                     {templates.map((template) => {
                       const config = getCategoryConfig(template.category);
                       const propCount = getSchemaPropertyCount(template.schema);
@@ -353,45 +353,50 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                         <button
                           key={template.id}
                           onClick={() => handleTemplateSelect(template)}
-                          className={`text-left p-4 rounded-lg border transition-all ${
+                          className={`w-full text-left p-3 rounded-lg border transition-all ${
                             selectedTemplate?.id === template.id
                               ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/20'
                               : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800'
                           }`}
                         >
-                          <div className="flex items-start gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${config.color}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0 ${config.color}`}>
                               {config.icon}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                                <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">
                                   {template.name}
                                 </h4>
                                 {template.is_system && (
-                                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded flex-shrink-0">
                                     System
                                   </span>
                                 )}
+                                <span className={`px-1.5 py-0.5 text-xs rounded flex-shrink-0 ${config.color}`}>
+                                  {config.label}
+                                </span>
                               </div>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">
-                                {template.description || 'No description'}
-                              </p>
-                              <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                <span>{propCount} properties</span>
-                                {reqCount > 0 && (
-                                  <span>{reqCount} required</span>
-                                )}
-                              </div>
+                              {template.description && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
+                                  {template.description}
+                                </p>
+                              )}
                             </div>
-                            <ChevronRight className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                            <div className="flex items-center gap-3 flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                              <span>{propCount} {propCount === 1 ? 'property' : 'properties'}</span>
+                              {reqCount > 0 && (
+                                <span className="text-red-500">{reqCount} required</span>
+                              )}
+                            </div>
+                            <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${
                               selectedTemplate?.id === template.id ? 'text-indigo-500' : 'text-gray-300 dark:text-gray-600'
                             }`} />
                           </div>
                           {template.tags && template.tags.length > 0 && (
-                            <div className="flex items-center gap-1 mt-3 flex-wrap">
+                            <div className="flex items-center gap-1 mt-2 ml-12 flex-wrap">
                               <Tag className="w-3 h-3 text-gray-400" />
-                              {template.tags.slice(0, 4).map((tag) => (
+                              {template.tags.slice(0, 6).map((tag) => (
                                 <span
                                   key={tag}
                                   className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded"
@@ -399,8 +404,8 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                                   {tag}
                                 </span>
                               ))}
-                              {template.tags.length > 4 && (
-                                <span className="text-xs text-gray-400">+{template.tags.length - 4}</span>
+                              {template.tags.length > 6 && (
+                                <span className="text-xs text-gray-400">+{template.tags.length - 6}</span>
                               )}
                             </div>
                           )}
