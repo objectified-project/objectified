@@ -5,6 +5,7 @@ import { useStudio } from '../StudioContext';
 import PathsSidebar from './components/PathsSidebar';
 import PathsCanvasView from './components/PathsCanvasView';
 import OperationPropertiesPanel from './components/OperationPropertiesPanel';
+import ParameterPropertiesPanel from './components/ParameterPropertiesPanel';
 
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
@@ -15,11 +16,36 @@ export default function PathsPage() {
     id: string;
     operation: string;
   } | null>(null);
+  const [selectedParameter, setSelectedParameter] = useState<{
+    id: string;
+    name: string;
+    operationId: string;
+  } | null>(null);
+  const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
 
   const handlePathSelect = (pathId: string | null, pathname?: string) => {
     setSelectedPathId(pathId);
     setSelectedPath(pathId && pathname ? { id: pathId, pathname } : null);
-    setSelectedOperation(null); // Clear operation when path changes
+    setSelectedOperation(null);
+    setSelectedParameter(null);
+  };
+
+  const handleOperationSelect = (operation: { id: string; operation: string } | null) => {
+    setSelectedOperation(operation);
+    if (operation) {
+      setSelectedParameter(null);
+    }
+  };
+
+  const handleParameterSelect = (parameter: { id: string; name: string; operationId: string } | null) => {
+    setSelectedParameter(parameter);
+    if (parameter) {
+      setSelectedOperation(null);
+    }
+  };
+
+  const handleCanvasRefresh = () => {
+    setCanvasRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -61,16 +87,30 @@ export default function PathsPage() {
           {/* Center Canvas */}
           <PathsCanvasView
             selectedPathId={selectedPathId}
-            onOperationSelect={setSelectedOperation}
+            onOperationSelect={handleOperationSelect}
+            onParameterSelect={handleParameterSelect}
+            refreshKey={canvasRefreshKey}
           />
 
-          {/* Right Properties Panel */}
+          {/* Right Properties Panel - Operation */}
           {selectedOperation && selectedPath && (
             <OperationPropertiesPanel
               operationId={selectedOperation.id}
               operation={selectedOperation.operation}
               pathname={selectedPath.pathname}
               onClose={() => setSelectedOperation(null)}
+              onRefresh={handleCanvasRefresh}
+            />
+          )}
+
+          {/* Right Properties Panel - Parameter */}
+          {selectedParameter && selectedPath && (
+            <ParameterPropertiesPanel
+              parameterId={selectedParameter.id}
+              operationId={selectedParameter.operationId}
+              pathname={selectedPath.pathname}
+              onClose={() => setSelectedParameter(null)}
+              onRefresh={handleCanvasRefresh}
             />
           )}
         </div>
@@ -78,4 +118,3 @@ export default function PathsPage() {
     </div>
   );
 }
-
