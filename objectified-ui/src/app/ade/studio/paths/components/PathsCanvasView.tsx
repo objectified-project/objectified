@@ -24,20 +24,24 @@ import SmartEdge from '../../../../components/ade/studio/SmartEdge';
 import {
   getOperationsForPath,
   createOperation,
+  deleteOperation,
 } from '../../../../../../lib/db/helper-path-operations';
 import {
   getLinkedParametersForOperation,
   linkParameterToOperation,
   unlinkParameterFromOperation,
+  getSharedPathParameters,
+  deleteSharedPathParameter,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
 import PathParameterNode from './PathParameterNode';
+import { Trash2 } from 'lucide-react';
 
-// Operation Node Component with Handle
-function OperationNode({ data }: { data: { operation: string; color: string } }) {
+// Operation Node Component with Handle and Delete button
+function OperationNode({ data }: { data: { operation: string; color: string; onDelete?: () => void } }) {
   return (
     <>
       <div
-        className="px-4 py-2 rounded-lg shadow-lg border-2 font-bold text-white text-sm cursor-pointer"
+        className="px-4 py-2 rounded-lg shadow-lg border-2 font-bold text-white text-sm cursor-pointer relative group"
         style={{
           backgroundColor: data.color,
           borderColor: data.color,
@@ -46,6 +50,18 @@ function OperationNode({ data }: { data: { operation: string; color: string } })
         }}
       >
         {data.operation}
+        {data.onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onDelete?.();
+            }}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
+            title="Delete operation"
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
       <Handle
         type="source"
@@ -84,9 +100,10 @@ interface PathsCanvasInnerProps {
   onOperationSelect: (operation: { id: string; operation: string } | null) => void;
   onParameterSelect?: (parameter: { id: string; name: string; operationId: string } | null) => void;
   refreshKey?: number;
+  onRefresh?: () => void;
 }
 
-function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect, refreshKey }: PathsCanvasInnerProps) {
+function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect, refreshKey, onRefresh }: PathsCanvasInnerProps) {
   const {
     gridSize,
     gridStyle,
@@ -101,6 +118,80 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
+  const { confirm: confirmDialog } = useDialog();
+
+  // Handle delete operation
+  const handleDeleteOperation = useCallback(async (operationId: string, operationName: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Operation',
+      message: `Are you sure you want to delete the ${operationName} operation? This will also unlink all parameters from it.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await deleteOperation(operationId);
+
+      // Remove from UI
+      setNodes((nds) => nds.filter((n) => n.id !== operationId));
+      setEdges((eds) => eds.filter((e) => e.source !== operationId && e.target !== operationId));
+
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Error deleting operation:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to delete operation',
+        variant: 'error',
+      });
+    }
+  }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
+
+  // Handle delete parameter
+  const handleDeleteParameter = useCallback(async (parameterId: string, parameterName: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Parameter',
+      message: `Are you sure you want to delete the parameter "${parameterName}"? This will remove it from all operations.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteSharedPathParameter(parameterId);
+      const parsed = JSON.parse(result);
+
+      if (parsed.success) {
+        // Remove from UI
+        setNodes((nds) => nds.filter((n) => n.id !== `param-${parameterId}`));
+        setEdges((eds) => eds.filter((e) => e.target !== `param-${parameterId}` && e.source !== `param-${parameterId}`));
+
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to delete parameter',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting parameter:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to delete parameter',
+        variant: 'error',
+      });
+    }
+  }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
 
   // Load operations and parameters when path is selected
   useEffect(() => {
@@ -116,7 +207,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         const operationsResponse = await getOperationsForPath(selectedPathId);
         const operations = JSON.parse(operationsResponse);
 
-        // Convert operations to nodes
+        // Convert operations to nodes with delete callback
         const operationNodes: Node[] = operations.map((op: any, index: number) => ({
           id: op.id,
           type: 'operation',
@@ -125,40 +216,50 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             operation: op.operation,
             color: OPERATION_COLORS[op.operation] || '#64748b',
             dbOperationId: op.id,
+            onDelete: () => handleDeleteOperation(op.id, op.operation),
           },
         }));
 
-        // Load parameters for all operations and create parameter nodes
+        // Load ALL shared parameters for this path (not just linked ones)
+        const allParamsResponse = await getSharedPathParameters(selectedPathId);
+        const allParamsData = JSON.parse(allParamsResponse);
+
         const allParameterNodes: Node[] = [];
         const allEdges: Edge[] = [];
-        let paramYOffset = 250;
 
+        if (allParamsData.success && allParamsData.parameters) {
+          // Create nodes for all parameters
+          allParamsData.parameters.forEach((param: any, paramIndex: number) => {
+            const paramNodeId = `param-${param.id}`;
+
+            allParameterNodes.push({
+              id: paramNodeId,
+              type: 'parameter',
+              position: {
+                x: 400,
+                y: 100 + (paramIndex * 150),
+              },
+              data: {
+                name: param.name,
+                inLocation: param.in_location,
+                summary: param.summary,
+                description: param.description,
+                required: param.data?.required ?? (param.in_location === 'path'),
+                dbParameterId: param.id,
+                onDelete: () => handleDeleteParameter(param.id, param.name),
+              },
+            });
+          });
+        }
+
+        // Now load linked parameters to create edges
         for (const op of operations) {
           const paramsResponse = await getLinkedParametersForOperation(op.id);
           const paramsData = JSON.parse(paramsResponse);
 
           if (paramsData.success && paramsData.parameters) {
-            paramsData.parameters.forEach((param: any, paramIndex: number) => {
+            paramsData.parameters.forEach((param: any) => {
               const paramNodeId = `param-${param.id}`;
-
-              // Create parameter node
-              allParameterNodes.push({
-                id: paramNodeId,
-                type: 'parameter',
-                position: {
-                  x: 350 + (paramIndex * 220),
-                  y: paramYOffset
-                },
-                data: {
-                  name: param.name,
-                  inLocation: param.in_location,
-                  summary: param.summary,
-                  description: param.description,
-                  required: param.data?.required ?? (param.in_location === 'path'),
-                  dbParameterId: param.id,
-                  operationId: op.id,
-                },
-              });
 
               // Create edge from operation to parameter
               const edgeType = edgeRouting === 'straight' ? 'straight'
@@ -185,10 +286,6 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                 },
               });
             });
-
-            if (paramsData.parameters.length > 0) {
-              paramYOffset += 120;
-            }
           }
         }
 
@@ -200,7 +297,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation]);
+  }, [selectedPathId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter]);
 
   // Detect dark mode
   useEffect(() => {
@@ -501,11 +598,13 @@ export default function PathsCanvasView({
   onOperationSelect,
   onParameterSelect,
   refreshKey,
+  onRefresh,
 }: {
   selectedPathId: string | null;
   onOperationSelect: (operation: { id: string; operation: string } | null) => void;
   onParameterSelect?: (parameter: { id: string; name: string; operationId: string } | null) => void;
   refreshKey?: number;
+  onRefresh?: () => void;
 }) {
   return (
     <ReactFlowProvider>
@@ -514,6 +613,7 @@ export default function PathsCanvasView({
         onOperationSelect={onOperationSelect}
         onParameterSelect={onParameterSelect}
         refreshKey={refreshKey}
+        onRefresh={onRefresh}
       />
     </ReactFlowProvider>
   );

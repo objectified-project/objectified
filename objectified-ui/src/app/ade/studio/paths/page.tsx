@@ -90,6 +90,7 @@ export default function PathsPage() {
             onOperationSelect={handleOperationSelect}
             onParameterSelect={handleParameterSelect}
             refreshKey={canvasRefreshKey}
+            onRefresh={handleCanvasRefresh}
           />
 
           {/* Right Properties Panel - Operation */}
