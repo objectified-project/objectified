@@ -221,7 +221,7 @@ const TopHeader = () => {
               }}
               role="menuitem"
               className="w-full text-left flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded text-sm transition-colors text-gray-700 dark:text-gray-300"
-              style={{ border: "none", cursor: "pointer", background: "transparent" }}
+              style={{ border: "none", cursor: "pointer" }}
             >
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

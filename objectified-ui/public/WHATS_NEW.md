@@ -16,16 +16,10 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed additionalProperties in property editor to allow for types and schemas
   - Fixed overall application layout to use less memory and split out sections into separate paths
   - Fixed side-by-side diff comparison view for versions
-  - Fixed deleting a group from the canvas now properly deletes the database record
   - Fixed property template button icon color in light mode (was appearing black instead of white)
   - Fixed click-to-focus behavior in the canvas
   - Fixed dark mode and light mode (takes precedence over system settings)
   - Fixed property copying to a class that contains an object with nested properties
-  - Fixed group class positions not saving to database when dragging classes within groups (regression)
-    - Classes dragged into groups now immediately persist to database with position
-    - Moving classes within groups now updates positions in database
-    - Class positions within groups are now properly restored when canvas is reloaded
-    - Fixed syncGroupsForVersion to save position_x and position_y for all classes in groups
 - Implemented a more advanced import system
   - File imports
   - URL imports with tokens and authentication
@@ -35,7 +29,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Import performs a sanity check to make sure all class imports are valid
   - Adds Commit/Rollback system to allow users to apply or discard changes made during an import session
   - Import supports:
-    - OpenAPI 3.1.x
+    - OpenAPI 3.0 and 3.1.x
     - Swagger 2.0
     - JSON Schema Draft 7, 2019-09, 2020-12
     - GraphQL SDL
@@ -77,6 +71,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Initial version of Paths canvas set up similar to the design canvas
   - Adding a path adds the path to the sidebar, with the ability to edit and delete paths
   - Adding an operation to a path adds that verb to be associated with the selected path
+  - Basic path mapping is now implemented
+  - Adds parameter mapping to a schema property
+  - Adds response mapping to a value response
 
 [//]: # (  - Drag-and-drop path nodes onto the canvas from the library panel)
 
