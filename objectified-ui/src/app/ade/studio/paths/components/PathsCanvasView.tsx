@@ -20,6 +20,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
+import SmartEdge from '../../../../components/ade/studio/SmartEdge';
 import {
   getOperationsForPath,
   createOperation,
@@ -60,6 +61,11 @@ function OperationNode({ data }: { data: { operation: string; color: string } })
 const nodeTypes = {
   operation: OperationNode,
   parameter: PathParameterNode,
+};
+
+// Define custom edge types
+const edgeTypes = {
+  smart: SmartEdge,
 };
 
 // Operation color mapping
@@ -157,6 +163,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               // Create edge from operation to parameter
               const edgeType = edgeRouting === 'straight' ? 'straight'
                 : edgeRouting === 'bezier' ? 'default'
+                : edgeRouting === 'smart' ? 'smart'
                 : 'smoothstep';
 
               allEdges.push({
@@ -171,6 +178,10 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                   stroke: '#9ca3af',
                   strokeWidth: 2,
                   strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
+                },
+                data: {
+                  sourceNodeId: op.id,
+                  targetNodeId: paramNodeId,
                 },
               });
             });
@@ -254,6 +265,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
       // Get edge type based on settings
       const edgeType = edgeRouting === 'straight' ? 'straight'
         : edgeRouting === 'bezier' ? 'default'
+        : edgeRouting === 'smart' ? 'smart'
         : 'smoothstep';
 
       // Add edge to UI first
@@ -265,6 +277,10 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           stroke: '#9ca3af',
           strokeWidth: 2,
           strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
+        },
+        data: {
+          sourceNodeId: connection.source,
+          targetNodeId: connection.target,
         },
       }, eds));
 
@@ -440,6 +456,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         onDragOver={onDragOver}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
         fitView
