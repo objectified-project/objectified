@@ -47,7 +47,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### OpenAPI Specifications
 - ✅ **OpenAPI 3.1.x**: Full JSON Schema Draft 2020-12 support
 - ✅ Warn on older versions of OpenAPI Specification
-- ⚠️ **OpenAPI 3.0.x**: Detected but not yet supported (upgrade path planned)
+- ✅ **OpenAPI 3.0.x**: Automatically converted to OpenAPI 3.1.x
 - ✅ **OpenAPI 2.0 (Swagger)**
 - **Multi-File Specs**: Support for $ref across multiple files
 - **External References**: Resolve external $ref URLs
@@ -78,7 +78,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 **Import From** 📋 PLANNED
 - 📋 Arazzo
 - ✅ OpenAPI 2.0 (Swagger)
-- 📋 OpenAPI 3.0.x
+- ✅ OpenAPI 3.0.x
 - ✅ OpenAPI 3.1.x
 - ✅ JSON Schema
 - Postman Collections
@@ -94,7 +94,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description         |
 |--------|-----------------------------|
-| #233   | Import from OpenAPI 3.0/3.1 |
 | #236   | Import from AsyncAPI        |
 | #237   | Import from RAML            |
 | #238   | Import from Protobuf        |

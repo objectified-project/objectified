@@ -7,6 +7,7 @@ import YAML from 'yaml';
 import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
+import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -514,14 +515,14 @@ function findWarnings(doc: any): AnalysisIssue[] {
     if (doc.openapi.startsWith('3.0')) {
       warnings.push({
         type: 'warning',
-        message: `OpenAPI ${doc.openapi} is detected but not yet supported for import. Please upgrade to OpenAPI 3.1.x for full compatibility.`,
+        message: `OpenAPI ${doc.openapi} was automatically converted to OpenAPI 3.1.x format for import.`,
         path: 'openapi',
-        severity: 'high'
+        severity: 'low'
       });
     } else {
       warnings.push({
         type: 'warning',
-        message: `OpenAPI ${doc.openapi} is not supported. Please upgrade to OpenAPI 3.1.x.`,
+        message: `OpenAPI ${doc.openapi} is not supported. Please upgrade to OpenAPI 3.0.x or 3.1.x.`,
         path: 'openapi',
         severity: 'high'
       });
@@ -675,6 +676,62 @@ export async function analyzeSpecification(fileContent: string, fileName: string
       message: warning,
       severity: 'low' as const
     }));
+  }
+
+  // Convert OpenAPI 3.0.x to OpenAPI 3.1.x if needed
+  if (isOpenAPI30(doc)) {
+    const conversionResult = convertOpenAPI30ToOpenAPI31(doc);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'openapi',
+        version: doc.openapi || '3.0',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: false,
+        formatDisplayName: `OpenAPI ${doc.openapi || '3.0'} (conversion failed)`,
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0
+        },
+        errors: [{
+          type: 'error',
+          message: `OpenAPI 3.0 conversion failed: ${conversionResult.error}`,
+          severity: 'critical'
+        }],
+        warnings: [],
+        document: null
+      };
+    }
+
+    // Use the converted document for analysis
+    doc = conversionResult.document;
+
+    // Add conversion warnings
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
   }
 
   // Convert JSON Schema to OpenAPI 3.1.x if needed

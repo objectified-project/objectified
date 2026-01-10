@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: Sample Pet Store API (OpenAPI 3.0)
+  description: A sample API to test OpenAPI 3.0 import functionality
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /pets:
+    get:
+      summary: List all pets
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
+  /pets/{petId}:
+    get:
+      summary: Get a pet by ID
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+components:
+  schemas:
+    Pet:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier for the pet
+        name:
+          type: string
+          description: Name of the pet
+        tag:
+          type: string
+          nullable: true
+          description: Optional tag for categorization
+        age:
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          description: Age of the pet (must be positive)
+        weight:
+          type: number
+          maximum: 500
+          exclusiveMaximum: true
+          description: Weight in kilograms (must be less than 500)
+        category:
+          $ref: '#/components/schemas/Category'
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+

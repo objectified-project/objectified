@@ -9,6 +9,7 @@ import YAML from 'yaml';
 import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
+import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
 
 export interface ParsedProperty {
   name: string;
@@ -319,6 +320,32 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       const globalWarnings = conversionResult.warnings.length > 0
         ? [`Converted from Swagger 2.x to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
         : ['Successfully converted from Swagger 2.x to OpenAPI 3.1.x'];
+
+      // Continue with the converted spec
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
+    // Check for OpenAPI 3.0.x and convert if needed
+    if (isOpenAPI30(spec)) {
+      const originalVersion = spec.openapi || '3.0';
+      const conversionResult = convertOpenAPI30ToOpenAPI31(spec);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `OpenAPI 3.0 conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      // Use the converted spec
+      spec = conversionResult.document;
+
+      // Add conversion warnings to global warnings
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from OpenAPI ${originalVersion} to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : [`Successfully converted from OpenAPI ${originalVersion} to OpenAPI 3.1.x`];
 
       // Continue with the converted spec
       return parseOpenAPISpecInternal(spec, globalWarnings);
