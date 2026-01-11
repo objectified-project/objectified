@@ -35,12 +35,14 @@ import {
   type Edge,
   type Node,
   useReactFlow,
+  useUpdateNodeInternals,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   getProjectsForTenant,
   getVersionsForProject,
   getClassesWithPropertiesAndTags,
+  getClassWithPropertiesAndTags,
   addPropertyToClass,
   removePropertyFromClass,
   deleteClass,
@@ -201,6 +203,7 @@ const StudioContent = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const { fitView, setCenter, getViewport, setViewport } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Zoom level state for level-of-detail rendering
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -468,6 +471,73 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, projects, versions]);
 
+  // Helper to update only a single class node without reloading the entire canvas
+  const updateSingleClassNode = useCallback(async (classId: string) => {
+    if (!classId) return;
+
+    try {
+      // Fetch only the updated class from the database
+      const result = await getClassWithPropertiesAndTags(classId);
+      const classData = JSON.parse(result);
+
+      if (!classData) {
+        console.error('Class not found:', classId);
+        return;
+      }
+
+      // Extract theme from canvas_metadata if it exists
+      const canvasMetadata = classData.canvas_metadata || {};
+      const theme = canvasMetadata.style || {};
+
+      // Update only the affected node's data, preserving its position
+      // Also clear measured dimensions to force React Flow to remeasure
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          if (node.id === classId) {
+            // Create a new node object without the measured property
+            // This forces React Flow to remeasure the node dimensions
+            const { measured, width, height, ...restNode } = node as any;
+            return {
+              ...restNode,
+              data: {
+                ...node.data,
+                id: classData.id,
+                name: classData.name,
+                description: classData.description,
+                properties: classData.properties || [],
+                schema: classData.schema,
+                tags: classData.tags || [],
+                theme: theme,
+              },
+            };
+          }
+          return node;
+        })
+      );
+
+      // Tell React Flow to recalculate the node's dimensions and handle positions
+      // This is needed because the node size changes when properties are added/removed
+      // Use requestAnimationFrame + setTimeout to ensure the DOM has fully updated
+      // before recalculating - this gives React enough time to complete the render cycle
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          updateNodeInternals(classId);
+        }, 50);
+      });
+
+      // Update edges that might be affected by property changes (e.g., new $ref properties)
+      // This is needed because adding a property with $ref creates new edges
+      if (selectedVersionId) {
+        const allClassesResult = await getClassesWithPropertiesAndTags(selectedVersionId);
+        const allClasses = JSON.parse(allClassesResult);
+        const newEdges = createAllEdges(allClasses);
+        setEdges(newEdges);
+      }
+    } catch (error) {
+      console.error('Failed to update single class node:', error);
+    }
+  }, [setNodes, setEdges, selectedVersionId, updateNodeInternals]);
+
 // Helper function to extract inline properties from a property schema
   const extractInlineProperties = (propData: any): { name: string; data: any; description?: string }[] => {
     const children: { name: string; data: any; description?: string }[] = [];
@@ -645,7 +715,7 @@ const StudioContent = () => {
       );
 
       if (result.success) {
-        await reloadClasses(false); // Reuse existing reload function without layout
+        await updateSingleClassNode(classId); // Only update the affected class node
       } else {
         await alertDialog({
           message: result.error || 'Failed to add property to class',
@@ -659,7 +729,7 @@ const StudioContent = () => {
         variant: 'error',
       });
     }
-  }, [isReadOnly, selectedProjectId, reloadClasses, alertDialog]);
+  }, [isReadOnly, selectedProjectId, updateSingleClassNode, alertDialog]);
 
   // Keep ref updated
   handlePropertyDropRef.current = handlePropertyDrop;
@@ -675,7 +745,7 @@ const StudioContent = () => {
       const response = JSON.parse(result);
 
       if (response.success) {
-        await reloadClasses(false); // Reuse existing reload function without layout
+        await updateSingleClassNode(classId); // Only update the affected class node
       } else {
         await alertDialog({
           message: response.error || 'Failed to remove property from class',
@@ -689,7 +759,7 @@ const StudioContent = () => {
         variant: 'error',
       });
     }
-  }, [isReadOnly, reloadClasses, alertDialog]);
+  }, [isReadOnly, updateSingleClassNode, alertDialog]);
 
   // Keep ref updated
   handlePropertyDeleteRef.current = handlePropertyDelete;
@@ -2201,37 +2271,47 @@ const StudioContent = () => {
           setNodes(prevNodes => {
             // Map existing nodes to update positions
             const updatedNodes = prevNodes.map(node => {
+              // Clear measured property to force React Flow to remeasure
+              const { measured, width, height, ...restNode } = node as any;
+
               // First check if this node is in a group and has saved position
               if (classPositionsInGroups[node.id]) {
                 const savedPos = classPositionsInGroups[node.id];
                 if (savedPos.x !== null && savedPos.y !== null) {
                   return {
-                    ...node,
+                    ...restNode,
                     position: { x: savedPos.x, y: savedPos.y }
                   };
                 }
               }
 
               // Otherwise use position from layout.nodes
+              // Note: We intentionally do NOT restore saved dimensions
+              // because the node content may have changed since the layout was saved
               const savedNode = layout.nodes.find((n: any) => n.id === node.id);
               if (savedNode) {
                 return {
-                  ...node,
-                  position: savedNode.position,
-                  ...(savedNode.dimensions && {
-                    style: {
-                      ...node.style,
-                      width: savedNode.dimensions.width,
-                      height: savedNode.dimensions.height
-                    }
-                  })
+                  ...restNode,
+                  position: savedNode.position
                 };
               }
-              return node;
+              return restNode;
             });
 
             // Add group nodes at the beginning (behind other nodes due to zIndex: -1)
             return [...groupNodes, ...updatedNodes];
+          });
+
+          // After nodes are set, update internals for all class nodes to recalculate handle positions
+          // This is needed because the node sizes may differ from when they were saved
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              layout.nodes.forEach((n: any) => {
+                if (n.id) {
+                  updateNodeInternals(n.id);
+                }
+              });
+            }, 100);
           });
         } else {
           // If no saved nodes, just add group nodes
@@ -2256,7 +2336,7 @@ const StudioContent = () => {
       setLoadingMessage('');
       setLayoutDropdownOpen(false);
     }
-  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setViewport, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh]);
+  }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setViewport, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh, updateNodeInternals]);
 
   // Auto-arrange nodes using hierarchical layout algorithm
   const handleAutoArrange = useCallback(() => {
@@ -3279,6 +3359,16 @@ const StudioContent = () => {
         // Set nodes with group nodes first (behind class nodes due to zIndex: -1)
         setNodes([...groupNodes, ...finalNodes]);
 
+        // Update node internals for all class nodes to ensure handle positions are correct
+        // This is needed after initial load because node sizes may vary based on content
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            finalNodes.forEach(node => {
+              updateNodeInternals(node.id);
+            });
+          }, 100);
+        });
+
         // Trigger sidebar refresh to update groups list
         triggerSidebarRefresh();
       } catch (error) {
@@ -3290,7 +3380,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly, updateNodeInternals]);
 
   // Regenerate edges when edge styling or routing preferences change
   useEffect(() => {

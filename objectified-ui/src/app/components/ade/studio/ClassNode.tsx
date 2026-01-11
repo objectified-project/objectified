@@ -1,5 +1,5 @@
-import React, { memo, useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import React, { memo, useState, useEffect, useRef } from 'react';
+import { Handle, Position, type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
 import { Edit, Trash2, ChevronRight, ChevronDown, Palette } from 'lucide-react';
 import { useDialog } from '../../providers/DialogProvider';
 import * as Popover from '@radix-ui/react-popover';
@@ -44,14 +44,51 @@ type ClassNodeData = {
   theme?: ClassNodeTheme; // Custom theme from canvas_metadata
 };
 
-function ClassNode({ data, selected }: NodeProps) {
+function ClassNode({ id, data, selected }: NodeProps) {
   const typedData = data as ClassNodeData;
   const { confirm: confirmDialog } = useDialog();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const nodeRef = useRef<HTMLDivElement>(null);
+
+  // Use ResizeObserver to detect when the node's actual DOM size changes
+  // This is more reliable than depending on property changes
+  useEffect(() => {
+    const element = nodeRef.current;
+    if (!element) return;
+
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce the updateNodeInternals call to avoid excessive updates
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        // When the element size changes, tell React Flow to recalculate handle positions
+        updateNodeInternals(id);
+      }, 10);
+    });
+
+    resizeObserver.observe(element);
+
+    // Also trigger an initial update after mount
+    const initialTimeout = setTimeout(() => {
+      updateNodeInternals(id);
+    }, 100);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      clearTimeout(initialTimeout);
+    };
+  }, [id, updateNodeInternals]);
 
   // Predefined color themes (4x4 grid = 16 colors) - matching GroupNode colors
   const colorThemes = [
@@ -415,6 +452,7 @@ function ClassNode({ data, selected }: NodeProps) {
 
   return (
     <div
+      ref={nodeRef}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -896,16 +934,11 @@ function ClassNode({ data, selected }: NodeProps) {
                       position={Position.Right}
                       id={`prop-${p.id}`}
                       style={{
-                        right: '-6px',
                         background: '#6366f1',
                         width: '10px',
                         height: '10px',
                         border: '2px solid white',
                         borderRadius: '50%',
-                        position: 'absolute',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        zIndex: 1000,
                         boxShadow: '0 2px 4px rgba(99, 102, 241, 0.3)',
                       }}
                       isConnectable={!typedData.isReadOnly}
@@ -967,9 +1000,6 @@ function ClassNode({ data, selected }: NodeProps) {
             position={Position.Bottom}
             id="comp-bottom"
             style={{
-              left: '50%',
-              bottom: '-6px',
-              transform: 'translateX(-50%)',
               background: handleColor,
               width: '12px',
               height: '12px',
@@ -986,4 +1016,41 @@ function ClassNode({ data, selected }: NodeProps) {
   );
 }
 
-export default memo(ClassNode);
+// Custom comparison function for memo - always re-render when data changes
+// This ensures handle positions are recalculated when properties are added/removed
+const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
+  // If id or selected changed, re-render
+  if (prevProps.id !== nextProps.id || prevProps.selected !== nextProps.selected) {
+    return false;
+  }
+
+  // Always re-render when data changes to ensure handles are repositioned
+  // We do a shallow comparison first, then deep compare properties
+  const prevData = prevProps.data as ClassNodeData;
+  const nextData = nextProps.data as ClassNodeData;
+
+  if (prevData === nextData) {
+    return true;
+  }
+
+  // If properties array length changed, definitely re-render
+  const prevProps_ = (prevData?.properties || []);
+  const nextProps_ = (nextData?.properties || []);
+  if (prevProps_.length !== nextProps_.length) {
+    return false;
+  }
+
+  // Check if property IDs are the same
+  const prevIds = prevProps_.map(p => p.id).join(',');
+  const nextIds = nextProps_.map(p => p.id).join(',');
+  if (prevIds !== nextIds) {
+    return false;
+  }
+
+  // For other data changes, do a simple reference check
+  return prevData?.name === nextData?.name &&
+         prevData?.description === nextData?.description &&
+         prevData?.isReadOnly === nextData?.isReadOnly;
+};
+
+export default memo(ClassNode, arePropsEqual);

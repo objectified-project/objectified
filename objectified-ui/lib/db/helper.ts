@@ -884,6 +884,63 @@ export async function getClassesWithPropertiesAndTags(versionId: string) {
   }
 }
 
+/**
+ * Fetch a single class by ID with its properties and tags.
+ * This is more efficient than fetching all classes when only one class needs to be updated.
+ */
+export async function getClassWithPropertiesAndTags(classId: string) {
+  try {
+    // Query 1: Get the class
+    const classResult = await connectionPool.query(
+      `SELECT id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at
+       FROM odb.classes
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [classId]
+    );
+
+    if (classResult.rows.length === 0) {
+      return JSON.stringify(null);
+    }
+
+    const cls = classResult.rows[0];
+
+    // Query 2: Get all properties for this class
+    const propertiesResult = await connectionPool.query(
+      `SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+              p.id as property_source_id, p.name as property_source_name
+       FROM odb.class_properties cp
+       LEFT JOIN odb.properties p ON cp.property_id = p.id
+       WHERE cp.class_id = $1
+       ORDER BY cp.parent_id NULLS FIRST, cp.name ASC`,
+      [classId]
+    );
+
+    // Query 3: Get all tags for this class
+    const tagsResult = await connectionPool.query(
+      `SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+              t.name as tag_name, t.color as tag_color, t.description as tag_description,
+              t.project_id
+       FROM odb.class_tags ct
+       JOIN odb.tags t ON ct.tag_id = t.id
+       WHERE ct.class_id = $1
+       ORDER BY t.name ASC`,
+      [classId]
+    );
+
+    // Combine class with its properties and tags
+    const classWithData = {
+      ...cls,
+      properties: propertiesResult.rows,
+      tags: tagsResult.rows
+    };
+
+    return JSON.stringify(classWithData);
+  } catch (error: any) {
+    console.error('Error loading class with properties and tags:', error);
+    return JSON.stringify(null);
+  }
+}
+
 export async function getClassesForVersion(versionId: string) {
   try {
     const result = await connectionPool.query(
