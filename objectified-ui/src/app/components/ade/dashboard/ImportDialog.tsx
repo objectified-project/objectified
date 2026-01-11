@@ -18,6 +18,7 @@ import UrlImportPanel from './UrlImportPanel';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
+import { generateSlug } from '../../../utils/slug';
 
 interface ImportDialogProps {
   open: boolean;
@@ -257,7 +258,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       document,
       project: {
         name: importOptions.projectName || (document?.info?.title || 'New Project'),
-        slug: (document?.info?.title || 'new-project').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g,'-'),
+        slug: importOptions.projectSlug || generateSlug(document?.info?.title || 'new-project') || 'imported-project',
         description: document?.info?.description || null
       },
       version: {

@@ -126,16 +126,14 @@ function detectFormat(doc: any): FormatDetectionResult {
   // OpenAPI 3.x
   if (doc.openapi) {
     const version = doc.openapi;
-    // Only OpenAPI 3.1.x is fully supported
-    const isSupported = version.startsWith('3.1');
+    // OpenAPI 3.0.x and 3.1.x are supported (3.0.x is converted to 3.1.x)
+    const isSupported = version.startsWith('3.0') || version.startsWith('3.1');
     let displayName = `OpenAPI ${version}`;
 
-    if (!isSupported) {
-      if (version.startsWith('3.0')) {
-        displayName = `OpenAPI ${version} (not yet supported - upgrade to 3.1.x recommended)`;
-      } else {
-        displayName = `OpenAPI ${version} (unsupported version)`;
-      }
+    if (version.startsWith('3.0')) {
+      displayName = `OpenAPI ${version} (will be converted to OpenAPI 3.1.x)`;
+    } else if (!isSupported) {
+      displayName = `OpenAPI ${version} (unsupported version)`;
     }
 
     return {

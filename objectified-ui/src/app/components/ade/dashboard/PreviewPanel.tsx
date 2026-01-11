@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Package, Search, Check, FileJson, FileCode2, List, ChevronRight, ArrowUpAZ, ArrowDownAZ } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
+import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
 
@@ -14,6 +15,7 @@ interface PreviewPanelProps {
 
 export interface ImportOptions {
   projectName: string;
+  projectSlug: string;
   versionSource: 'spec' | 'manual';
   targetVersion: string;
   selectedSchemas: string[];
@@ -86,12 +88,19 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     }));
   });
 
-  const [importOptions, setImportOptions] = useState<ImportOptions>({
-    projectName: analysis.document?.info?.title || 'New Project',
-    versionSource: 'spec',
-    targetVersion: analysis.document?.info?.version || '1.0.0',
-    selectedSchemas: schemas.map(s => s.name)
+  const [importOptions, setImportOptions] = useState<ImportOptions>(() => {
+    const title = analysis.document?.info?.title || 'New Project';
+    return {
+      projectName: title,
+      projectSlug: generateSlug(title) || 'new-project',
+      versionSource: 'spec',
+      targetVersion: analysis.document?.info?.version || '1.0.0',
+      selectedSchemas: schemas.map(s => s.name)
+    };
   });
+
+  // Track if user has manually edited the slug
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
   // Notify parent of initial import options on mount
   useEffect(() => {
@@ -144,7 +153,22 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
   };
 
   const handleOptionChange = (key: keyof ImportOptions, value: any) => {
-    const newOptions = { ...importOptions, [key]: value };
+    let newOptions = { ...importOptions, [key]: value };
+
+    // Auto-update slug when project name changes (if not manually edited)
+    if (key === 'projectName' && !slugManuallyEdited) {
+      newOptions.projectSlug = generateSlug(value) || 'new-project';
+    }
+
+    setImportOptions(newOptions);
+    onImportOptionsChange?.(newOptions);
+  };
+
+  const handleSlugChange = (value: string) => {
+    // Filter to only allow valid slug characters
+    const sanitized = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    setSlugManuallyEdited(true);
+    const newOptions = { ...importOptions, projectSlug: sanitized };
     setImportOptions(newOptions);
     onImportOptionsChange?.(newOptions);
   };
@@ -656,9 +680,9 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
           Import Options
         </h3>
 
-        <div className="grid grid-cols-2 gap-6">
-          {/* Project Name */}
-          <div>
+        <div className="grid grid-cols-4 gap-6">
+          {/* Project Name - 50% (2 columns) */}
+          <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Project Name
             </label>
@@ -674,7 +698,24 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
             </div>
           </div>
 
-          {/* Version Configuration */}
+          {/* Project Slug - 25% (1 column) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Slug
+            </label>
+            <input
+              type="text"
+              value={importOptions.projectSlug}
+              onChange={(e) => handleSlugChange(e.target.value)}
+              placeholder="project-slug"
+              className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              URL-friendly identifier
+            </div>
+          </div>
+
+          {/* Version Configuration - 25% (1 column) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Version
