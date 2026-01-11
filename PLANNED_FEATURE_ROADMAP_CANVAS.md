@@ -77,12 +77,12 @@
 #### Navigation & Controls ✅ PARTIALLY COMPLETE
 - ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
 - ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)
-  - Zoom to selection (fit selected nodes)
-  - Zoom presets: 25%, 50%, 100%, 150%, 200%
-  - Zoom slider in toolbar
+  - ✅ Zoom to selection (fit selected nodes)
+  - ✅ Zoom presets: 25%, 50%, 100%, 150%, 200%
+  - ✅ Zoom slider in toolbar
 - ✅ **Pan & Drag**: Middle-click or space+drag, smooth panning
-  - Pan with middle mouse button or space+drag
-  - Pan to edges on node drag
+  - ✅ Pan with middle mouse button or space+drag
+  - ✅ Pan to edges on node drag
 - 📋 **Global Search** (Cmd+F): Find classes with highlighting
 - **Search Focus Mode**: Dim everything except search results
 - **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
@@ -188,9 +188,9 @@
 - ✅ Nodes stay within group when partially overlapping - only ungroup when completely outside
 - ✅ Grouped nodes are locked to group bounds during dragging - cannot escape unless dragged completely outside
 - 📋 Collapsible groups to reduce canvas clutter
-  - Click to collapse: shows only group title and count
-  - Expand/collapse all groups with keyboard shortcut
-  - Remember collapsed state per user
+  - 📋 Click to collapse: shows only group title and count
+  - 📋 Expand/collapse all groups with keyboard shortcut
+  - 📋 Remember collapsed state per user
 - 📋 Nested groups for hierarchical organization (max 3 levels)
 - 📋 Group-level operations:
   - ✅ Move entire group with one drag
@@ -225,24 +225,24 @@
   - ✅ Color gradients for nodes
   - ✅ Color themes (Material, Pastel, Corporate)
 - 📋 **Node Icons**:
-  - Built-in icon library (1000+ icons)
-  - Custom icon upload
-  - Icons from icon packs (Font Awesome, Material Icons)
-  - Icon position (left, center, badge)
+  - 📋 Built-in icon library (1000+ icons)
+  - 📋 Custom icon upload
+  - 📋 Icons from icon packs (Font Awesome, Material Icons)
+  - 📋 Icon position (left, center, badge)
 - 📋 **Node Sizing**:
-  - Auto-size based on content
-  - Fixed size (small, medium, large, extra-large)
-  - Custom width and height
-  - Size by property count
-  - Compact mode (show only class name)
+  - 📋 Auto-size based on content
+  - 📋 Fixed size (small, medium, large, extra-large)
+  - 📋 Custom width and height
+  - 📋 Size by property count
+  - 📋 Compact mode (show only class name)
 - 📋 **Node Shapes**:
-  - Rectangle (default), Rounded rectangle
-  - Circle/ellipse, Hexagon, Diamond
-  - Custom SVG shapes
+  - 📋 Rectangle (default), Rounded rectangle
+  - 📋 Circle/ellipse, Hexagon, Diamond
+  - 📋 Custom SVG shapes
 - 📋 **Node Borders**:
-  - Border thickness (1-5px)
-  - Border style (solid, dashed, dotted)
-  - Shadow effects (drop shadow, inner shadow)
+  - 📋 Border thickness (1-5px)
+  - 📋 Border style (solid, dashed, dotted)
+  - 📋 Shadow effects (drop shadow, inner shadow)
 
 | Ticket | Feature Description               |
 |--------|-----------------------------------|
@@ -271,28 +271,6 @@
 |--------|---------------------------------------|
 | #347   | Adds edge arrow styles                |
 | #349   | Adds edge hover effects               |
-
-#### Application Themes ✅ IMPLEMENTED
-- ✅ Pre-built themes:
-  - ✅ Light mode (default)
-  - ✅ Dark mode
-  - ✅ High contrast
-  - ✅ Blueprint (blue grid on dark)
-  - ✅ Whiteboard (minimal)
-  - ✅ Solarized
-  - ✅ Nord
-  - ✅ Darcula
-- ✅ Theme selector in profile menu
-- ✅ Visual theme preview with color swatches
-- ✅ Persistent theme selection (localStorage)
-- ✅ Automatic system preference detection
-- 📋 Custom theme creator with full color control
-- 📋 Save and share custom themes
-- 📋 Theme marketplace
-
-| Ticket | Feature                                                            |
-|--------|--------------------------------------------------------------------|
-| #185   | Custom Colors: Per-class color picker, color by group, stereotypes |
 
 #### Canvas Background 📋 PLANNED
 - 📋 Background options (solid color, grid pattern, custom image, gradient, textures)
@@ -602,3 +580,18 @@
   - ✅ Red for removed classes/properties
   - ✅ Yellow for modified classes/properties
 - ✅ Filter diff by change type (additions, removals, modifications)
+
+#### Application Themes ✅ IMPLEMENTED
+- ✅ Pre-built themes:
+  - ✅ Light mode (default)
+  - ✅ Dark mode
+  - ✅ High contrast
+  - ✅ Blueprint (blue grid on dark)
+  - ✅ Whiteboard (minimal)
+  - ✅ Solarized
+  - ✅ Nord
+  - ✅ Darcula
+- ✅ Theme selector in profile menu
+- ✅ Visual theme preview with color swatches
+- ✅ Persistent theme selection (localStorage)
+- ✅ Automatic system preference detection

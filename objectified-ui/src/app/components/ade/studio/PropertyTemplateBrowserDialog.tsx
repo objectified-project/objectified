@@ -381,6 +381,44 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
                       </p>
                     )}
 
+                    {/* Properties Preview (for object types) */}
+                    {selectedTemplate.schema?.type === 'object' && selectedTemplate.schema?.properties && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                          Properties
+                        </h5>
+                        <div className="space-y-2">
+                          {Object.entries(selectedTemplate.schema.properties).map(([name, prop]: [string, any]) => {
+                            const isRequired = selectedTemplate.schema.required?.includes(name);
+                            return (
+                              <div
+                                key={name}
+                                className="px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {name}
+                                  </span>
+                                  {isRequired && (
+                                    <span className="text-xs text-red-500">*</span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                  {Array.isArray(prop.type) ? prop.type.filter((t: string) => t !== 'null').join(' | ') : prop.type}
+                                  {prop.format && ` (${prop.format})`}
+                                </div>
+                                {prop.description && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {prop.description}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Schema Preview */}
                     <div>
                       <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
