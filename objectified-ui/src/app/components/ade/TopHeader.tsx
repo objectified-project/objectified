@@ -12,7 +12,7 @@ import { useTheme } from '../../providers/ThemeProvider';
 import { getTenantsForUser } from '../../../../lib/db/helper';
 
 // Import version from package.json
-const APP_VERSION = '01-2026-02';
+const APP_VERSION = '02-2026';
 
 type NavItem = { label: string; href: string; enabled?: boolean };
 

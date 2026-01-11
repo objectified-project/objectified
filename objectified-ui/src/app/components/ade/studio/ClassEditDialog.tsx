@@ -1184,19 +1184,45 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     </div>
                   </div>
                 )}
+
+                {/* Deprecation Status - compact */}
+                <div className={`mt-4 p-3 rounded-lg border flex items-start gap-4 ${formData.deprecated ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'}`}>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="deprecated"
+                      checked={formData.deprecated}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, deprecated: !!checked }))}
+                      disabled={isReadOnly}
+                    />
+                    <label htmlFor="deprecated" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer flex items-center gap-1">
+                      <AlertTriangle size={14} className={formData.deprecated ? 'text-amber-500' : 'text-gray-400'} />
+                      Deprecated
+                    </label>
+                  </div>
+                  {formData.deprecated && (
+                    <Input
+                      value={formData.deprecationMessage}
+                      onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
+                      placeholder="Deprecation message (e.g., Use NewClass instead)"
+                      disabled={isReadOnly}
+                      className="flex-1 h-8 text-sm"
+                    />
+                  )}
+                </div>
               </div>
 
-              {/* SECTION 2: Schema Settings */}
+              {/* SECTION 2: Property Validation */}
               <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Settings size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Schema Settings</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Validation</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Additional Properties */}
                   <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <h4 className="text-sm font-semibold mb-3 text-gray-900 dark:text-gray-100">Additional Properties</h4>
+                    <p className="text-xs text-gray-500 mb-3">Controls validation for properties not defined in the schema</p>
                     <div className="space-y-2">
                       {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
                         <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -1273,7 +1299,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   {/* Unevaluated Properties */}
                   <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-gray-100">Unevaluated Properties</h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">For schema composition (allOf/oneOf/anyOf)</p>
+                    <p className="text-xs text-gray-500 mb-3">For properties not matched by allOf/oneOf/anyOf subschemas</p>
                     <div className="space-y-2">
                       {(['default', 'allow', 'disallow', 'type', 'schema'] as const).map((value) => (
                         <label key={value} className="flex items-center gap-2 cursor-pointer">
@@ -1346,42 +1372,25 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                       )}
                     </div>
                   </div>
-
-                  {/* Deprecation Status */}
-                  <div className={`p-4 rounded-lg border transition-all ${formData.deprecated ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Checkbox
-                        id="deprecated"
-                        checked={formData.deprecated}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, deprecated: !!checked }))}
-                        disabled={isReadOnly}
-                      />
-                      <label htmlFor="deprecated" className="text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-pointer flex items-center gap-2">
-                        <AlertTriangle size={16} className={formData.deprecated ? 'text-amber-600' : 'text-gray-400'} />
-                        Mark as Deprecated
-                      </label>
-                    </div>
-                    {formData.deprecated && (
-                      <Textarea
-                        value={formData.deprecationMessage}
-                        onChange={(e) => setFormData(prev => ({ ...prev, deprecationMessage: e.target.value }))}
-                        placeholder="e.g., Use NewClass instead. Will be removed in v2.0."
-                        disabled={isReadOnly}
-                        rows={2}
-                        className="mt-2"
-                      />
-                    )}
-                  </div>
                 </div>
               </div>
 
-              {/* SECTION 2.5: Pattern Properties */}
+              {/* ===================== ADVANCED VALIDATION ===================== */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                <div className="flex items-center gap-3 mb-2">
+                  <Code size={20} className="text-purple-500" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Advanced Validation</h3>
+                  <span className="px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">Optional</span>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Configure complex validation rules for dynamic properties, conditional requirements, and schema dependencies.</p>
+              </div>
+
+              {/* Pattern Properties */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Regex size={18} className="text-indigo-500" />
+                    <Regex size={18} className="text-purple-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Pattern Properties</h3>
-                    <span className="text-xs text-gray-500">(Optional)</span>
                   </div>
                   {!isReadOnly && (
                     <Button
@@ -1490,13 +1499,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 )}
               </div>
 
-              {/* SECTION 2.6: Dependent Schemas */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+              {/* Dependent Schemas */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Link size={18} className="text-indigo-500" />
+                    <Link size={18} className="text-purple-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Schemas</h3>
-                    <span className="text-xs text-gray-500">(Optional)</span>
                   </div>
                   {!isReadOnly && (
                     <Button
@@ -1755,13 +1763,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 )}
               </div>
 
-              {/* SECTION 2.7: Dependent Required */}
+              {/* Dependent Required */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <ListChecks size={18} className="text-indigo-500" />
+                    <ListChecks size={18} className="text-purple-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Required</h3>
-                    <span className="text-xs text-gray-500">(Optional)</span>
                   </div>
                   {!isReadOnly && (
                     <Button
@@ -1836,12 +1843,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
               {/* SECTION 3: Composition & Inheritance */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-4">
                   <Layers size={18} className="text-indigo-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Composition & Inheritance</h3>
-                  <span className="text-xs text-gray-500">(Optional)</span>
                 </div>
-                <p className="text-xs text-gray-500 mb-4">Define relationships with other classes using OpenAPI composition keywords</p>
+                <p className="text-sm text-gray-500 mb-4">Define relationships with other classes using OpenAPI composition keywords.</p>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   {/* allOf */}
@@ -2007,16 +2013,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 )}
               </div>
 
-              {/* SECTION 3.5: Discriminator Mapping (for schemas that ARE referenced by discriminators) */}
+              {/* Discriminator Configuration */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-2">
-                  <GitBranch size={18} className="text-purple-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Discriminator Mapping</h3>
-                  <span className="text-xs text-gray-500">(Optional)</span>
+                <div className="flex items-center gap-2 mb-4">
+                  <GitBranch size={18} className="text-indigo-500" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Discriminator Configuration</h3>
                 </div>
-                <p className="text-xs text-gray-500 mb-4">
-                  Configure this class as a discriminator base or specify its discriminator value when extending another class
-                </p>
+                <p className="text-sm text-gray-500 mb-4">Configure polymorphic type handling for subtype identification.</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* As Base Class - Define discriminator */}
@@ -2181,8 +2184,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </div>
               </div>
 
-              {/* SECTION 5: Conditional Schema */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+              {/* Conditional Schema */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <GitBranch size={18} className="text-purple-500" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Conditional Schema (if/then/else)</h3>
+                </div>
                 <ConditionalSchemaBuilder
                   rules={formData.conditionalRules}
                   onChange={(rules) => setFormData(prev => ({ ...prev, conditionalRules: rules }))}
@@ -2191,8 +2198,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 />
               </div>
 
-              {/* SECTION 6: Documentation & Extensions */}
-              <div className={`p-6 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+              {/* Documentation & Extensions */}
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  <ExternalLink size={18} className="text-indigo-500" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Documentation & Extensions</h3>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* External Documentation */}
                   <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">

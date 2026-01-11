@@ -645,7 +645,7 @@ export default function CanvasSettingsDialog({
 
                   {/* Bidirectional */}
                   <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">Bidir.</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">Bidirectional</span>
                     <select
                       value={localEdgeStyling.bidirectional}
                       onChange={(e) => setLocalEdgeStyling({ ...localEdgeStyling, bidirectional: e.target.value as any })}

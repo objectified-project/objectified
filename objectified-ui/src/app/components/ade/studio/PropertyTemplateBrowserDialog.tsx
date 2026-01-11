@@ -173,7 +173,12 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
 
       if (result.success) {
         onSuccess?.(result.property);
-        handleClose();
+        // Don't close dialog - allow adding more properties
+        // Reset the custom name to the template's default name for next addition
+        setCustomName(selectedTemplate.name);
+        // Show success message briefly
+        setError(`✓ Property "${result.property.name}" added successfully!`);
+        setTimeout(() => setError(null), 3000);
       } else {
         setError(result.error || 'Failed to add property');
       }
@@ -441,7 +446,7 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
                   {/* Add Button */}
                   <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                     {error && (
-                      <p className="text-sm text-red-500 dark:text-red-400 mb-3">
+                      <p className={`text-sm mb-3 ${error.startsWith('✓') ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                         {error}
                       </p>
                     )}
@@ -473,6 +478,17 @@ const PropertyTemplateBrowserDialog: React.FC<PropertyTemplateBrowserDialogProps
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <Button
+              onClick={handleClose}
+              variant="outline"
+              className="px-6"
+            >
+              Close
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -517,8 +533,28 @@ const TemplateCard: React.FC<{
               {config.icon}
             </span>
             <span className="text-xs text-gray-400 dark:text-gray-500">
-              {template.schema?.type || 'object'}
-              {template.schema?.format && ` (${template.schema.format})`}
+              {(() => {
+                const schemaType = template.schema?.type;
+                let displayType = 'object';
+                let isOptional = false;
+
+                if (Array.isArray(schemaType)) {
+                  // Filter out 'null' to get the actual type(s)
+                  const nonNullTypes = schemaType.filter((t: string) => t !== 'null');
+                  isOptional = schemaType.includes('null');
+                  displayType = nonNullTypes.join(' | ') || 'object';
+                } else if (schemaType) {
+                  displayType = schemaType;
+                }
+
+                return (
+                  <>
+                    {displayType}
+                    {template.schema?.format && ` (${template.schema.format})`}
+                    {isOptional && <span className="ml-1 text-amber-500 dark:text-amber-400">[optional]</span>}
+                  </>
+                );
+              })()}
             </span>
           </div>
         </div>

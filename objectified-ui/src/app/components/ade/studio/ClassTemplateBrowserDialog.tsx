@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Search, Package, ChevronRight, Plus, Tag, Link2 } from 'lucide-react';
+import { X, Search, Package, ChevronRight, Plus, Tag, Link2, Filter, Star, Clock } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import {
   getClassTemplates,
@@ -246,23 +246,23 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-[95vw] max-w-5xl h-[90vh] min-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
+              <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg">
+                <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
                 <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Class Templates
+                  Class Template Library
                 </Dialog.Title>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Select a template to quickly create a class with predefined properties
+                  Browse and add pre-built class templates to your project
                 </p>
               </div>
             </div>
             <Dialog.Close asChild>
-              <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                <X className="w-5 h-5" />
+              <button className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
               </button>
             </Dialog.Close>
           </div>
@@ -271,37 +271,42 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
           <div className="flex flex-1 overflow-hidden">
             {/* Categories Sidebar */}
             <div className="w-56 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
-              <div className="p-3">
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Categories
+                </h3>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors ${
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                     selectedCategory === null
-                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
-                  All Categories
-                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                    ({templates.length})
+                  <Filter className="h-4 w-4" />
+                  <span>All Categories</span>
+                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-500">
+                    {templates.length}
                   </span>
                 </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1">
+
                 {categories.map((cat) => {
                   const config = getCategoryConfig(cat.category);
                   return (
                     <button
                       key={cat.category}
                       onClick={() => setSelectedCategory(cat.category)}
-                      className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors flex items-center gap-2 ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                         selectedCategory === cat.category
-                          ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                       }`}
                     >
                       <span>{config.icon}</span>
-                      <span className="flex-1">{config.label}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="truncate">{config.label}</span>
+                      <span className="ml-auto text-xs text-gray-500 dark:text-gray-500">
                         {cat.count}
                       </span>
                     </button>
@@ -312,17 +317,16 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
 
             {/* Templates List */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              {/* Search */}
+              {/* Search Bar */}
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search templates..."
+                    placeholder="Search templates by name, description, or tags..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
                   />
                 </div>
               </div>
@@ -355,60 +359,39 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                           onClick={() => handleTemplateSelect(template)}
                           className={`w-full text-left p-3 rounded-lg border transition-all ${
                             selectedTemplate?.id === template.id
-                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800'
+                              ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/20'
+                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0 ${config.color}`}>
-                              {config.icon}
-                            </div>
+                          <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                <span className="font-medium text-gray-900 dark:text-white truncate">
                                   {template.name}
-                                </h4>
-                                {template.is_system && (
-                                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded flex-shrink-0">
-                                    System
-                                  </span>
-                                )}
-                                <span className={`px-1.5 py-0.5 text-xs rounded flex-shrink-0 ${config.color}`}>
-                                  {config.label}
                                 </span>
+                                {template.is_system && (
+                                  <Star className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                                )}
                               </div>
                               {template.description && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
                                   {template.description}
                                 </p>
                               )}
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${config.color}`}>
+                                  {config.icon}
+                                </span>
+                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                  {propCount} {propCount === 1 ? 'property' : 'properties'}
+                                  {reqCount > 0 && <span className="text-red-500 ml-1">({reqCount} required)</span>}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                              <span>{propCount} {propCount === 1 ? 'property' : 'properties'}</span>
-                              {reqCount > 0 && (
-                                <span className="text-red-500">{reqCount} required</span>
-                              )}
-                            </div>
-                            <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${
-                              selectedTemplate?.id === template.id ? 'text-indigo-500' : 'text-gray-300 dark:text-gray-600'
+                            <ChevronRight className={`h-4 w-4 flex-shrink-0 transition-colors ${
+                              selectedTemplate?.id === template.id ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400'
                             }`} />
                           </div>
-                          {template.tags && template.tags.length > 0 && (
-                            <div className="flex items-center gap-1 mt-2 ml-12 flex-wrap">
-                              <Tag className="w-3 h-3 text-gray-400" />
-                              {template.tags.slice(0, 6).map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                              {template.tags.length > 6 && (
-                                <span className="text-xs text-gray-400">+{template.tags.length - 6}</span>
-                              )}
-                            </div>
-                          )}
                         </button>
                       );
                     })}
@@ -418,23 +401,39 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
             </div>
 
             {/* Selected Template Preview */}
-            {selectedTemplate && (
+            {selectedTemplate ? (
               <div className="w-80 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="font-semibold text-gray-900 dark:text-white">
-                    {selectedTemplate.name}
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Template Preview
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {selectedTemplate.description || 'No description'}
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Customize and add to your project
                   </p>
                 </div>
 
-                {/* Properties Preview */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {/* Template Info */}
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                      Properties
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                      {selectedTemplate.name}
                     </h4>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getCategoryConfig(selectedTemplate.category).color}`}>
+                      {getCategoryConfig(selectedTemplate.category).icon} {getCategoryConfig(selectedTemplate.category).label}
+                    </span>
+                  </div>
+
+                  {selectedTemplate.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {selectedTemplate.description}
+                    </p>
+                  )}
+
+                  {/* Properties Preview */}
+                  <div>
+                    <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                      Properties
+                    </h5>
                     {selectedTemplate.schema?.properties ? (
                       <div className="space-y-2">
                         {Object.entries(selectedTemplate.schema.properties).map(([name, prop]: [string, any]) => {
@@ -465,13 +464,57 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                     )}
                   </div>
 
+                  {/* Schema Definition */}
+                  <div>
+                    <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                      Schema Definition
+                    </h5>
+                    <pre className="text-xs bg-gray-100 dark:bg-gray-800 rounded-lg p-3 overflow-auto max-h-40 text-gray-700 dark:text-gray-300">
+                      {JSON.stringify(selectedTemplate.schema, null, 2)}
+                    </pre>
+                  </div>
+
+                  {/* Tags */}
+                  {selectedTemplate.tags && selectedTemplate.tags.length > 0 && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                        Tags
+                      </h5>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedTemplate.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                          >
+                            <Tag className="h-3 w-3 mr-1" />
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Usage Stats */}
+                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    {selectedTemplate.is_system && (
+                      <span className="flex items-center gap-1">
+                        <Star className="h-3 w-3 text-amber-500" />
+                        System Template
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Used {selectedTemplate.usage_count} times
+                    </span>
+                  </div>
+
                   {/* Dependencies Section */}
                   {(dependencies.length > 0 || isLoadingDeps) && (
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
                         <Link2 className="w-3 h-3" />
                         Dependencies
-                      </h4>
+                      </h5>
                       {isLoadingDeps ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">Loading dependencies...</p>
                       ) : (
@@ -511,7 +554,7 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                 {/* Custom Name & Add */}
                 <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                       Class Name
                     </label>
                     <input
@@ -519,8 +562,11 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                       value={customName}
                       onChange={(e) => setCustomName(e.target.value)}
                       placeholder={selectedTemplate.name}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-sm"
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Enter a custom name or use the default
+                    </p>
                   </div>
 
                   {/* Include Dependencies Toggle */}
@@ -539,17 +585,37 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                     </div>
                   )}
 
+                  {error && (
+                    <p className="text-sm text-red-500 dark:text-red-400 mb-3">
+                      {error}
+                    </p>
+                  )}
                   <Button
                     onClick={handleUseTemplate}
                     disabled={isAdding}
-                    className="w-full"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {isAdding ? 'Creating...' : `Create Class${includeDependencies && dependencies.length > 0 ? ` + ${dependencies.length} Dependencies` : ''}`}
+                    {isAdding ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        Add to Project{includeDependencies && dependencies.length > 0 ? ` + ${dependencies.length} Dependencies` : ''}
+                      </>
+                    )}
                   </Button>
-                  {error && (
-                    <p className="text-sm text-red-500 text-center">{error}</p>
-                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="w-80 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
+                <div className="flex-1 flex items-center justify-center p-4">
+                  <div className="text-center text-gray-500 dark:text-gray-400">
+                    <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm">Select a template to preview</p>
+                  </div>
                 </div>
               </div>
             )}
