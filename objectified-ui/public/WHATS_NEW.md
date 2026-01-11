@@ -16,6 +16,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Class Template Library now shows the schema preview.
   - Properties Template Form now includes a "close" button, and allows multiple properties to be added without closing the form.
   - Properties Template Form now shows the inline properties when an "object" type is selected.
+  - **Property New/Edit Form Layout Improvements:** Condensed property flags (Required, Nullable, ReadOnly, WriteOnly, Deprecated) into a compact horizontal layout for faster editing and better visibility.
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

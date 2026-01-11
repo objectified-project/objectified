@@ -852,253 +852,110 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       </Box>
 
       {/* ═══════════════════════════════════════════════════════════════════════════
-          SECTION 2: Property Behavior (Metadata flags)
+          SECTION 2: Property Behavior (Metadata flags) - Compact Layout
           ═══════════════════════════════════════════════════════════════════════════ */}
       {showMetadata && (
         <Box sx={{
-          p: 3,
+          p: 2,
           borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          bgcolor: isDark ? '#1e293b' : '#f8fafc',
         }}>
-          <SectionHeader
-            icon={<TuneIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
-            title="Property Behavior"
-            subtitle="Access and visibility controls"
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <TuneIcon sx={{ color: '#6366f1', fontSize: 16 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', fontSize: '0.875rem' }}>
+              Property Flags
+            </Typography>
+          </Box>
 
+          {/* Compact horizontal checkbox layout */}
           <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' },
-            gap: 2
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: { xs: 1, sm: 2 },
+            alignItems: 'center',
           }}>
             {/* Required */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.required ? 'rgba(239, 68, 68, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.required ? 'rgba(239, 68, 68, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.required ? '0 4px 12px rgba(239, 68, 68, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.required ? '#ef4444' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.required ? '0 6px 16px rgba(239, 68, 68, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
-              onClick={() => onChange('required', !data.required)}
-            >
-              <Checkbox
-                checked={data.required || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.required ? '#ef4444' : undefined,
-                  '&.Mui-checked': { color: '#ef4444' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.required ? '#dc2626' : '#334155' }}>
-                  Required
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Must be provided
-                </Typography>
-              </Box>
-            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.required || false}
+                  onChange={(e) => onChange('required', e.target.checked)}
+                  size="small"
+                  sx={{ py: 0.5, '&.Mui-checked': { color: '#ef4444' } }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.required ? '#dc2626' : (isDark ? '#e2e8f0' : '#334155') }}>Required</Typography>}
+              sx={{ m: 0 }}
+            />
 
-            {/* Nullable (OpenAPI 3.1) */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.nullable ? 'rgba(168, 85, 247, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.nullable ? 'rgba(168, 85, 247, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.nullable ? '0 4px 12px rgba(168, 85, 247, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.nullable ? '#a855f7' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.nullable ? '0 6px 16px rgba(168, 85, 247, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
-              onClick={() => onChange('nullable', !data.nullable)}
-            >
-              <Checkbox
-                checked={data.nullable || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.nullable ? '#a855f7' : undefined,
-                  '&.Mui-checked': { color: '#a855f7' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.nullable ? '#9333ea' : '#334155' }}>
-                  Nullable
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Can be null
-                </Typography>
-              </Box>
-            </Box>
+            {/* Nullable */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.nullable || false}
+                  onChange={(e) => onChange('nullable', e.target.checked)}
+                  size="small"
+                  sx={{ py: 0.5, '&.Mui-checked': { color: '#a855f7' } }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.nullable ? '#9333ea' : (isDark ? '#e2e8f0' : '#334155') }}>Nullable</Typography>}
+              sx={{ m: 0 }}
+            />
 
             {/* Read Only */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.readOnly ? 'rgba(59, 130, 246, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.readOnly ? 'rgba(59, 130, 246, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.readOnly ? '0 4px 12px rgba(59, 130, 246, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.readOnly ? '#3b82f6' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.readOnly ? '0 6px 16px rgba(59, 130, 246, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
-              onClick={() => {
-                onChange('readOnly', !data.readOnly);
-                if (!data.readOnly) onChange('writeOnly', false);
-              }}
-            >
-              <Checkbox
-                checked={data.readOnly || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.readOnly ? '#3b82f6' : undefined,
-                  '&.Mui-checked': { color: '#3b82f6' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.readOnly ? '#2563eb' : '#334155' }}>
-                  Read Only
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Output only
-                </Typography>
-              </Box>
-            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.readOnly || false}
+                  onChange={(e) => {
+                    onChange('readOnly', e.target.checked);
+                    if (e.target.checked) onChange('writeOnly', false);
+                  }}
+                  size="small"
+                  sx={{ py: 0.5, '&.Mui-checked': { color: '#3b82f6' } }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.readOnly ? '#2563eb' : (isDark ? '#e2e8f0' : '#334155') }}>Read Only</Typography>}
+              sx={{ m: 0 }}
+            />
 
             {/* Write Only */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.writeOnly ? 'rgba(34, 197, 94, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.writeOnly ? 'rgba(34, 197, 94, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.writeOnly ? '0 4px 12px rgba(34, 197, 94, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.writeOnly ? '#22c55e' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.writeOnly ? '0 6px 16px rgba(34, 197, 94, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
-              onClick={() => {
-                onChange('writeOnly', !data.writeOnly);
-                if (!data.writeOnly) onChange('readOnly', false);
-              }}
-            >
-              <Checkbox
-                checked={data.writeOnly || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.writeOnly ? '#22c55e' : undefined,
-                  '&.Mui-checked': { color: '#22c55e' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.writeOnly ? '#16a34a' : '#334155' }}>
-                  Write Only
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Input only
-                </Typography>
-              </Box>
-            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.writeOnly || false}
+                  onChange={(e) => {
+                    onChange('writeOnly', e.target.checked);
+                    if (e.target.checked) onChange('readOnly', false);
+                  }}
+                  size="small"
+                  sx={{ py: 0.5, '&.Mui-checked': { color: '#22c55e' } }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.writeOnly ? '#16a34a' : (isDark ? '#e2e8f0' : '#334155') }}>Write Only</Typography>}
+              sx={{ m: 0 }}
+            />
 
             {/* Deprecated */}
-            <Box
-              sx={{
-                p: 2,
-                bgcolor: data.deprecated ? 'rgba(245, 158, 11, 0.08)' : 'white',
-                borderRadius: 2.5,
-                border: '1px solid',
-                borderColor: data.deprecated ? 'rgba(245, 158, 11, 0.3)' : '#e2e8f0',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.5,
-                boxShadow: data.deprecated ? '0 4px 12px rgba(245, 158, 11, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                '&:hover': {
-                  borderColor: data.deprecated ? '#f59e0b' : '#94a3b8',
-                  transform: 'translateY(-2px)',
-                  boxShadow: data.deprecated ? '0 6px 16px rgba(245, 158, 11, 0.2)' : '0 4px 12px rgba(0,0,0,0.1)',
-                }
-              }}
-              onClick={() => onChange('deprecated', !data.deprecated)}
-            >
-              <Checkbox
-                checked={data.deprecated || false}
-                size="small"
-                sx={{
-                  p: 0,
-                  pointerEvents: 'none',
-                  color: data.deprecated ? '#f59e0b' : undefined,
-                  '&.Mui-checked': { color: '#f59e0b' },
-                }}
-                tabIndex={-1}
-              />
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: data.deprecated ? '#d97706' : '#334155' }}>
-                  Deprecated
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.25 }}>
-                  Avoid using
-                </Typography>
-              </Box>
-            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.deprecated || false}
+                  onChange={(e) => onChange('deprecated', e.target.checked)}
+                  size="small"
+                  sx={{ py: 0.5, '&.Mui-checked': { color: '#f59e0b' } }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontWeight: 500, color: data.deprecated ? '#d97706' : (isDark ? '#e2e8f0' : '#334155') }}>Deprecated</Typography>}
+              sx={{ m: 0 }}
+            />
           </Box>
 
           {/* Deprecation Message */}
           <Collapse in={data.deprecated} timeout={300}>
             <TextField
               label="Deprecation Message"
-              size={size}
+              size="small"
               fullWidth
               multiline
               rows={2}
@@ -1106,12 +963,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               onChange={(e) => onChange('deprecationMessage', e.target.value)}
               placeholder="e.g., Use newProperty instead. Will be removed in v2.0."
               sx={{
-                mt: 2.5,
+                mt: 1.5,
                 bgcolor: isDark ? '#0f172a' : 'white',
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  borderColor: 'rgba(245, 158, 11, 0.3)',
-                },
+                '& .MuiOutlinedInput-root': { borderRadius: 2 },
               }}
             />
           </Collapse>
