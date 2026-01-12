@@ -176,6 +176,7 @@
 | #230   | Export to Excel                           |
 | #231   | Export to PDF                             |
 | #509   | Add code generation settings per language |
+| #795   | Export to Liquibase                       |
 
 ---
 

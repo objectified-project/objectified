@@ -109,9 +109,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Syntax Validation**: Real-time YAML/JSON syntax checking
 - **Schema Validation**: Validate against official meta-schemas
 - **Custom Validation Rules**: Enterprise-specific validation
+- 📋 Import summarization details
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
+| Ticket | Feature Description                            |
+|--------|------------------------------------------------|
+| #794   | Import summary details for compliance, scoring |
 
 ##### Compatibility Check
 - 📋 **Feature Compatibility**: Identify unsupported features
