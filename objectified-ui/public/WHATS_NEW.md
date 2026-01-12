@@ -8,8 +8,8 @@ We continue to improve the platform based on your feedback with improvements and
 
 - New Features:
   - Added GraphQL SDL (Schema Definition Language) generation in the Code tab - preview and download GraphQL schemas with types, queries, mutations, and input types.
-  - Added comprehensive test suite (28 tests) for GraphQL generation covering type mapping, queries, mutations, input types, and OpenAPI conversion.
 - Bug fixes:
+  - Fixed ClassNode color changes not being reflected immediately - the memo comparison function now correctly detects theme changes to trigger re-renders.
   - Improves drag/drop behavior in class nodes.
   - Fixed property template list to show [optional] when nullable is selected.
   - Fixed property to show numeric precision when applicable.
@@ -23,6 +23,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Properties now allow multiple properties to be added without closing the form.
   - Properties Template Form now shows the inline properties when an "object" type is selected.
   - Condensed property flags into a compact horizontal layout.
+  - Class node styling changes were not persisting properly, this is now fixed.
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

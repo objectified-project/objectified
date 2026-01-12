@@ -743,6 +743,34 @@ describe('Database Helper - Class Functions', () => {
 
     expect(parsed.success).toBe(true);
   });
+
+  test('updateClassCanvasMetadata should save theme color properties', async () => {
+    const { updateClassCanvasMetadata } = await import('../lib/db/helper');
+
+    const themeMetadata = {
+      style: {
+        backgroundColor: '#f8fafc',
+        borderColor: '#64748b',
+        headerGradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+        textColor: '#1e293b',
+        headerTextColor: '#ffffff'
+      }
+    };
+
+    mockQuery.mockResolvedValue({
+      rows: [{ id: 'class-1', canvas_metadata: themeMetadata }],
+      rowCount: 1
+    });
+
+    const result = await updateClassCanvasMetadata('class-1', themeMetadata);
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.any(String),
+      [JSON.stringify(themeMetadata), 'class-1']
+    );
+  });
 });
 
 describe('Database Helper - Class Property Functions', () => {

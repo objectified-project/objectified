@@ -329,26 +329,31 @@ const StudioContent = () => {
       const response = JSON.parse(result);
 
       if (response.success) {
-        // Update local node data
+        // Update local node data with a completely new object to ensure React detects the change
         setNodes((nodes) => nodes.map((n) =>
           n.id === classId
             ? {
                 ...n,
                 data: {
                   ...(n.data as any),
-                  theme: theme,
+                  theme: { ...theme }, // Create new object reference
                   canvas_metadata: updatedMetadata
                 }
               }
             : n
         ));
+
+        // Force React Flow to update the node internals
+        setTimeout(() => {
+          updateNodeInternals(classId);
+        }, 0);
       } else {
         console.error('Failed to update class theme:', response.error);
       }
     } catch (error) {
       console.error('Error updating class theme:', error);
     }
-  }, []);
+  }, [updateNodeInternals]);
 
   // Keep ref updated
   handleThemeChangeRef.current = handleThemeChange;
@@ -365,6 +370,8 @@ const StudioContent = () => {
           zoomLevel,
           lodEnabled,
           onTogglePropertyExpansion: (...args: any[]) => handleTogglePropertyExpansionRef.current?.(...args),
+          // Preserve theme - don't overwrite it
+          theme: (node.data as any).theme,
         },
       }))
     );

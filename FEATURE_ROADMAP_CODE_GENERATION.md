@@ -165,7 +165,6 @@
 
 | Ticket | Feature Description                       |
 |--------|-------------------------------------------|
-| ✅#221 | Export to GraphQL SDL                     |
 | #222   | Export to AsyncAPI                        |
 | #223   | Export to TypeScript                      |
 | #224   | Export to Python models                   |

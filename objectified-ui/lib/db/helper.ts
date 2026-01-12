@@ -1122,6 +1122,9 @@ export async function updateClassCanvasMetadata(classId: string, canvasMetadata:
   style?: {
     backgroundColor?: string;
     borderColor?: string;
+    headerGradient?: string;
+    textColor?: string;
+    headerTextColor?: string;
     collapsed?: boolean;
     zIndex?: number;
   };
@@ -1162,6 +1165,9 @@ export async function batchUpdateClassCanvasMetadata(updates: Array<{
     style?: {
       backgroundColor?: string;
       borderColor?: string;
+      headerGradient?: string;
+      textColor?: string;
+      headerTextColor?: string;
       collapsed?: boolean;
       zIndex?: number;
     };

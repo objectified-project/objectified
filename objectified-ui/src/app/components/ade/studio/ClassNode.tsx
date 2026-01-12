@@ -114,6 +114,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
     if (typedData.onThemeChange) {
       typedData.onThemeChange(typedData.id, theme);
     }
+    // Close the color picker after selection
+    setColorPickerOpen(false);
   };
 
   // Level of detail calculations based on zoom
@@ -1044,6 +1046,17 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
   const prevIds = prevProps_.map(p => p.id).join(',');
   const nextIds = nextProps_.map(p => p.id).join(',');
   if (prevIds !== nextIds) {
+    return false;
+  }
+
+  // Check if theme changed - compare key theme properties
+  const prevTheme = prevData?.theme;
+  const nextTheme = nextData?.theme;
+  if (prevTheme?.headerGradient !== nextTheme?.headerGradient ||
+      prevTheme?.backgroundColor !== nextTheme?.backgroundColor ||
+      prevTheme?.borderColor !== nextTheme?.borderColor ||
+      prevTheme?.textColor !== nextTheme?.textColor ||
+      prevTheme?.headerTextColor !== nextTheme?.headerTextColor) {
     return false;
   }
 
