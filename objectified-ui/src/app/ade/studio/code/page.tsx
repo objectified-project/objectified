@@ -12,6 +12,7 @@ import { useStudio } from '../StudioContext';
 import { generateOpenApiSpec } from '../../../utils/openapi';
 import { generateArazzoSpec } from '../../../utils/arazzo';
 import { generateJsonSchema } from '../../../utils/jsonschema';
+import { generateGraphQLSchema } from '../../../utils/graphql';
 import {
   getProjectsForTenant,
   getVersionsForProject,
@@ -65,10 +66,11 @@ export default function CodePage() {
 
   // Code view state
   const [codeFormat, setCodeFormat] = useState<'json' | 'yaml'>('json');
-  const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'arazzo' | 'jsonschema'>('openapi');
+  const [codeDisplayFormat, setCodeDisplayFormat] = useState<'openapi' | 'arazzo' | 'jsonschema' | 'graphql'>('openapi');
   const [openApiSpec, setOpenApiSpec] = useState<string>('');
   const [arazzoSpec, setArazzoSpec] = useState<string>('');
   const [jsonSchemaSpec, setJsonSchemaSpec] = useState<string>('');
+  const [graphqlSpec, setGraphqlSpec] = useState<string>('');
   const [codeCopied, setCodeCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -150,6 +152,7 @@ export default function CodePage() {
         setOpenApiSpec('');
         setArazzoSpec('');
         setJsonSchemaSpec('');
+        setGraphqlSpec('');
         return;
       }
 
@@ -182,6 +185,13 @@ export default function CodePage() {
           description: currentVersion?.description || ''
         });
         setJsonSchemaSpec(jsonSchemaContent);
+
+        const graphqlContent = generateGraphQLSchema(classesWithProperties, {
+          projectName: currentProject?.name || 'API',
+          version: currentVersion?.version_id || '1.0.0',
+          description: currentVersion?.description || ''
+        });
+        setGraphqlSpec(graphqlContent);
       } catch (error) {
         console.error('Failed to generate specs:', error);
       } finally {
@@ -201,9 +211,16 @@ export default function CodePage() {
       ? openApiSpec
       : codeDisplayFormat === 'arazzo'
       ? arazzoSpec
+      : codeDisplayFormat === 'graphql'
+      ? graphqlSpec
       : jsonSchemaSpec;
 
     if (!specContent) return '';
+
+    // GraphQL SDL is always plain text, no JSON/YAML conversion
+    if (codeDisplayFormat === 'graphql') {
+      return specContent;
+    }
 
     try {
       return codeFormat === 'json'
@@ -212,7 +229,7 @@ export default function CodePage() {
     } catch {
       return specContent;
     }
-  }, [codeDisplayFormat, openApiSpec, arazzoSpec, jsonSchemaSpec, codeFormat]);
+  }, [codeDisplayFormat, openApiSpec, arazzoSpec, jsonSchemaSpec, graphqlSpec, codeFormat]);
 
   // Handle copy
   const handleCopy = useCallback(() => {
@@ -225,6 +242,26 @@ export default function CodePage() {
   // Handle download
   const handleDownload = useCallback(() => {
     const content = getSpecContent();
+
+    // Handle GraphQL separately - always text/plain with .graphql extension
+    if (codeDisplayFormat === 'graphql') {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      const projectSlug = selectedProject?.slug || selectedProject?.name?.toLowerCase().replace(/\s+/g, '-') || 'api';
+      const versionSlug = selectedVersion?.version_id?.replace(/\./g, '-') || '1-0-0';
+      link.download = `${projectSlug}-${versionSlug}.graphql`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Handle other formats (OpenAPI, Arazzo, JSON Schema)
     const mimeType = codeFormat === 'json' ? 'application/json' : 'text/yaml';
     const extension = codeFormat === 'json' ? 'json' : 'yaml';
 
@@ -289,6 +326,8 @@ export default function CodePage() {
                       ? 'OpenAPI 3.1.0'
                       : codeDisplayFormat === 'arazzo'
                       ? 'Arazzo v1.0.1'
+                      : codeDisplayFormat === 'graphql'
+                      ? 'GraphQL SDL'
                       : 'JSON Schema'}
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -299,7 +338,7 @@ export default function CodePage() {
 
               {/* Display Format Selector */}
               <div className="flex items-center gap-3 pl-5 border-l border-gray-200 dark:border-gray-700">
-                <Select.Root value={codeDisplayFormat} onValueChange={(value) => setCodeDisplayFormat(value as 'openapi' | 'arazzo' | 'jsonschema')}>
+                <Select.Root value={codeDisplayFormat} onValueChange={(value) => setCodeDisplayFormat(value as 'openapi' | 'arazzo' | 'jsonschema' | 'graphql')}>
                   <Select.Trigger className="inline-flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-w-[200px]">
                     <Select.Value />
                     <Select.Icon>
@@ -329,33 +368,41 @@ export default function CodePage() {
                             <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                           </Select.ItemIndicator>
                         </Select.Item>
+                        <Select.Item value="graphql" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                          <Select.ItemText>GraphQL SDL</Select.ItemText>
+                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          </Select.ItemIndicator>
+                        </Select.Item>
                       </Select.Viewport>
                     </Select.Content>
                   </Select.Portal>
                 </Select.Root>
 
-                {/* Format Toggle (JSON/YAML) */}
-                <ToggleGroup.Root
-                  type="single"
-                  value={codeFormat}
-                  onValueChange={(value) => {
-                    if (value) setCodeFormat(value as 'json' | 'yaml');
-                  }}
-                  className="inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1"
-                >
-                  <ToggleGroup.Item
-                    value="json"
-                    className="px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                {/* Format Toggle (JSON/YAML) - hidden for GraphQL */}
+                {codeDisplayFormat !== 'graphql' && (
+                  <ToggleGroup.Root
+                    type="single"
+                    value={codeFormat}
+                    onValueChange={(value) => {
+                      if (value) setCodeFormat(value as 'json' | 'yaml');
+                    }}
+                    className="inline-flex items-center bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1"
                   >
-                    JSON
-                  </ToggleGroup.Item>
-                  <ToggleGroup.Item
-                    value="yaml"
-                    className="px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                  >
-                    YAML
-                  </ToggleGroup.Item>
-                </ToggleGroup.Root>
+                    <ToggleGroup.Item
+                      value="json"
+                      className="px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    >
+                      JSON
+                    </ToggleGroup.Item>
+                    <ToggleGroup.Item
+                      value="yaml"
+                      className="px-3 py-2 text-xs font-semibold rounded-md transition-all duration-200 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm data-[state=off]:text-gray-600 dark:data-[state=off]:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    >
+                      YAML
+                    </ToggleGroup.Item>
+                  </ToggleGroup.Root>
+                )}
               </div>
             </div>
 
@@ -425,7 +472,7 @@ export default function CodePage() {
           ) : (
             <Editor
               height="100%"
-              language={codeFormat}
+              language={codeDisplayFormat === 'graphql' ? 'graphql' : codeFormat}
               value={getSpecContent()}
               theme={isDark ? 'vs-dark' : 'light'}
               options={{

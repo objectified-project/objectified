@@ -151,7 +151,7 @@
   - 📋 **Go**: Structs with JSON tags
   - 📋 **Rust**: Structs with Serde
   - 📋 **Scala**: Case classes with play-json support
-  - 📋 **GraphQL**: SDL schema definitions
+  - ✅ **GraphQL**: SDL schema definitions
   - 📋 **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
 - Customizable generation templates
 - 📋 Code generation settings per language:
@@ -165,7 +165,7 @@
 
 | Ticket | Feature Description                       |
 |--------|-------------------------------------------|
-| #221   | Export to GraphQL SDL                     |
+| ✅#221 | Export to GraphQL SDL                     |
 | #222   | Export to AsyncAPI                        |
 | #223   | Export to TypeScript                      |
 | #224   | Export to Python models                   |
