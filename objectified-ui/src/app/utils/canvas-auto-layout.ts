@@ -312,6 +312,10 @@ function calculatePositions(
 /**
  * Apply auto-layout to nodes
  * Returns new nodes array with updated positions
+ *
+ * IMPORTANT: Classes that belong to groups are NOT repositioned individually.
+ * Groups move as a single unit, and all member classes move with them,
+ * preserving their exact positions relative to the group.
  */
 export function applyAutoLayout(
   nodes: Node[],
@@ -320,19 +324,70 @@ export function applyAutoLayout(
 ): Node[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
-  // Filter out group nodes - only layout class nodes
-  const classNodes = nodes.filter(n => n.type !== 'groupNode');
+  // Separate group nodes from class nodes
   const groupNodes = nodes.filter(n => n.type === 'groupNode');
+  const classNodes = nodes.filter(n => n.type !== 'groupNode');
 
-  if (classNodes.length === 0) {
+  // Build a set of all node IDs that belong to a group, and map them to their group
+  const nodeToGroupMap = new Map<string, string>();
+  groupNodes.forEach(groupNode => {
+    const groupData = groupNode.data as { nodeIds?: string[] };
+    const memberNodeIds = groupData?.nodeIds || [];
+    memberNodeIds.forEach(id => nodeToGroupMap.set(id, groupNode.id));
+  });
+
+  // Separate ungrouped class nodes from grouped class nodes
+  const ungroupedClassNodes = classNodes.filter(n => !nodeToGroupMap.has(n.id));
+  const groupedClassNodes = classNodes.filter(n => nodeToGroupMap.has(n.id));
+
+  // For layout, we'll use the group's ACTUAL stored position, not calculated bounds
+  // This ensures member offsets are preserved exactly
+
+  // Get group dimensions from style or calculate from members
+  const groupDimensions = new Map<string, { width: number; height: number }>();
+  groupNodes.forEach(groupNode => {
+    const styleWidth = (groupNode.style as any)?.width;
+    const styleHeight = (groupNode.style as any)?.height;
+    const dataWidth = (groupNode.data as any)?.width;
+    const dataHeight = (groupNode.data as any)?.height;
+
+    groupDimensions.set(groupNode.id, {
+      width: styleWidth || dataWidth || 300,
+      height: styleHeight || dataHeight || 200,
+    });
+  });
+
+  // Create virtual nodes for groups using their ACTUAL positions
+  const virtualGroupNodes: Node[] = groupNodes.map(groupNode => {
+    const dims = groupDimensions.get(groupNode.id)!;
+    return {
+      ...groupNode,
+      // Use the group's actual position
+      position: { ...groupNode.position },
+      width: dims.width,
+      height: dims.height,
+      measured: { width: dims.width, height: dims.height },
+    };
+  });
+
+  // Nodes to layout: ungrouped class nodes + virtual group nodes
+  const nodesToLayout = [...ungroupedClassNodes, ...virtualGroupNodes];
+
+  if (nodesToLayout.length === 0) {
     return nodes;
   }
 
-  // Build adjacency map
-  const adjacency = buildAdjacencyMap(edges);
+  // Remap edges: if source or target is a grouped node, replace with group ID
+  const remappedEdges = edges.map(edge => {
+    const newSource = nodeToGroupMap.get(edge.source) || edge.source;
+    const newTarget = nodeToGroupMap.get(edge.target) || edge.target;
+    return { ...edge, source: newSource, target: newTarget };
+  }).filter(edge => edge.source !== edge.target); // Remove self-loops
 
-  // Get node IDs
-  const nodeIds = classNodes.map(n => n.id);
+  const adjacency = buildAdjacencyMap(remappedEdges);
+
+  // Get node IDs for layout
+  const nodeIds = nodesToLayout.map(n => n.id);
 
   // Assign layers
   const layerAssignments = assignLayers(nodeIds, adjacency);
@@ -342,24 +397,90 @@ export function applyAutoLayout(
 
   // Get node dimensions
   const nodeDimensions = new Map<string, { width: number; height: number }>();
-  classNodes.forEach(node => {
+  nodesToLayout.forEach(node => {
     nodeDimensions.set(node.id, {
       width: node.measured?.width || (node.width as number) || 280,
       height: node.measured?.height || (node.height as number) || 100,
     });
   });
 
-  // Calculate positions
-  const positions = calculatePositions(orderedLayers, nodeDimensions, opts);
+  // Calculate new positions
+  const newPositions = calculatePositions(orderedLayers, nodeDimensions, opts);
 
-  // Apply positions to nodes
-  const layoutedClassNodes = classNodes.map(node => ({
+  // Apply positions to ungrouped class nodes
+  const layoutedUngroupedNodes = ungroupedClassNodes.map(node => ({
     ...node,
-    position: positions.get(node.id) || node.position,
+    position: newPositions.get(node.id) || node.position,
   }));
 
-  // Return all nodes (class nodes with new positions + unchanged group nodes)
-  return [...layoutedClassNodes, ...groupNodes];
+  // Apply positions to groups and their member nodes
+  const layoutedGroupNodes: Node[] = [];
+  const layoutedGroupedClassNodes: Node[] = [];
+
+  groupNodes.forEach(groupNode => {
+    const newGroupPos = newPositions.get(groupNode.id);
+    const groupData = groupNode.data as { nodeIds?: string[] };
+    const memberNodeIds = groupData?.nodeIds || [];
+    const dims = groupDimensions.get(groupNode.id)!;
+
+    if (!newGroupPos) {
+      // Group wasn't in layout, keep everything as-is
+      layoutedGroupNodes.push(groupNode);
+      memberNodeIds.forEach(nodeId => {
+        const memberNode = groupedClassNodes.find(n => n.id === nodeId);
+        if (memberNode) {
+          layoutedGroupedClassNodes.push(memberNode);
+        }
+      });
+      return;
+    }
+
+    // Calculate how much the group moved from its ORIGINAL position
+    const deltaX = newGroupPos.x - groupNode.position.x;
+    const deltaY = newGroupPos.y - groupNode.position.y;
+
+    // Update group node with new position
+    layoutedGroupNodes.push({
+      ...groupNode,
+      position: newGroupPos,
+      style: {
+        ...(groupNode.style || {}),
+        width: dims.width,
+        height: dims.height,
+      },
+      data: {
+        ...(groupNode.data as any),
+        width: dims.width,
+        height: dims.height,
+      },
+    });
+
+    // Move ALL member nodes by EXACTLY the same delta
+    // This preserves their positions relative to the group perfectly
+    memberNodeIds.forEach(nodeId => {
+      const memberNode = groupedClassNodes.find(n => n.id === nodeId);
+      if (memberNode) {
+        layoutedGroupedClassNodes.push({
+          ...memberNode,
+          position: {
+            x: memberNode.position.x + deltaX,
+            y: memberNode.position.y + deltaY,
+          },
+        });
+      }
+    });
+  });
+
+  // Add any orphaned grouped nodes (not in any group's nodeIds)
+  const processedGroupedIds = new Set(layoutedGroupedClassNodes.map(n => n.id));
+  groupedClassNodes.forEach(node => {
+    if (!processedGroupedIds.has(node.id)) {
+      layoutedGroupedClassNodes.push(node);
+    }
+  });
+
+  // Return: groups first (render behind), then ungrouped, then grouped class nodes
+  return [...layoutedGroupNodes, ...layoutedUngroupedNodes, ...layoutedGroupedClassNodes];
 }
 
 /**

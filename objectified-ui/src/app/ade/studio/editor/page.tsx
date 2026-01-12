@@ -2361,6 +2361,29 @@ const StudioContent = () => {
         // Update nodes with new positions
         setNodes(layoutedNodes);
 
+        // Sync groups state with the updated group node positions and dimensions
+        const updatedGroupNodes = layoutedNodes.filter(n => n.type === 'groupNode');
+        if (updatedGroupNodes.length > 0 && groups.length > 0) {
+          const updatedGroups = groups.map(group => {
+            const groupNode = updatedGroupNodes.find(n => n.id === group.id);
+            if (groupNode) {
+              // Update groupPositionsRef to prevent jump on next drag
+              groupPositionsRef.current.set(groupNode.id, { x: groupNode.position.x, y: groupNode.position.y });
+
+              return {
+                ...group,
+                position: groupNode.position,
+                dimensions: {
+                  width: (groupNode.style as any)?.width || (groupNode.data as any)?.width || group.dimensions?.width || 300,
+                  height: (groupNode.style as any)?.height || (groupNode.data as any)?.height || group.dimensions?.height || 200,
+                },
+              };
+            }
+            return group;
+          });
+          setGroups(updatedGroups);
+        }
+
         // Fit view to show all nodes after a short delay
         setTimeout(() => {
           fitView({ padding: 0.1, duration: 300 });
@@ -2374,7 +2397,7 @@ const StudioContent = () => {
         setLoadingMessage('');
       }
     }, 50);
-  }, [nodes, edges, setNodes, fitView]);
+  }, [nodes, edges, groups, setNodes, setGroups, fitView]);
 
   // ============================================================================
   // END LAYOUT SAVE/LOAD HANDLERS

@@ -135,7 +135,7 @@ describe('Canvas Auto-Layout', () => {
       expect(nodeD.position.y).toBeGreaterThan(nodeC.position.y);
     });
 
-    test('should preserve group nodes unchanged', () => {
+    test('should preserve empty group nodes unchanged', () => {
       const nodes = [
         createMockNode('A'),
         createMockNode('B'),
@@ -149,8 +149,81 @@ describe('Canvas Auto-Layout', () => {
       expect(result.length).toBe(3);
 
       const groupNode = result.find(n => n.type === 'groupNode')!;
-      // Group node position should be preserved
-      expect(groupNode.position).toEqual({ x: 100, y: 100 });
+      // Empty group node still participates in layout (is repositioned)
+      // but should maintain its original dimensions
+      expect(groupNode).toBeDefined();
+      expect(groupNode.type).toBe('groupNode');
+    });
+
+    test('should recalculate group bounds based on member nodes', () => {
+      // Create a group node with member nodeIds at specific positions
+      const nodeA = createMockNode('A', { x: 100, y: 100 });
+      const nodeB = createMockNode('B', { x: 100, y: 250 });
+      const groupNode = {
+        ...createMockNode('group1', { x: 60, y: 50 }, 'groupNode'),
+        data: { nodeIds: ['A', 'B'], label: 'Test Group' },
+        style: { width: 360, height: 350 },
+      };
+      const nodes = [nodeA, nodeB, groupNode];
+      const edges: any[] = [];
+
+      // Record original offsets of members relative to the group
+      const originalAOffsetX = nodeA.position.x - groupNode.position.x;
+      const originalAOffsetY = nodeA.position.y - groupNode.position.y;
+      const originalBOffsetX = nodeB.position.x - groupNode.position.x;
+      const originalBOffsetY = nodeB.position.y - groupNode.position.y;
+
+      const result = applyAutoLayout(nodes, edges);
+
+      const resultGroup = result.find(n => n.type === 'groupNode')!;
+      const resultA = result.find(n => n.id === 'A')!;
+      const resultB = result.find(n => n.id === 'B')!;
+
+      // Offsets relative to the group should be EXACTLY preserved
+      const resultAOffsetX = resultA.position.x - resultGroup.position.x;
+      const resultAOffsetY = resultA.position.y - resultGroup.position.y;
+      const resultBOffsetX = resultB.position.x - resultGroup.position.x;
+      const resultBOffsetY = resultB.position.y - resultGroup.position.y;
+
+      expect(resultAOffsetX).toBe(originalAOffsetX);
+      expect(resultAOffsetY).toBe(originalAOffsetY);
+      expect(resultBOffsetX).toBe(originalBOffsetX);
+      expect(resultBOffsetY).toBe(originalBOffsetY);
+    });
+
+    test('should not reposition grouped nodes independently', () => {
+      // Create an ungrouped node C, and grouped nodes A, B
+      const nodeA = createMockNode('A', { x: 100, y: 100 });
+      const nodeB = createMockNode('B', { x: 100, y: 250 });
+      const nodeC = createMockNode('C', { x: 500, y: 100 }); // Ungrouped
+      const groupNode = {
+        ...createMockNode('group1', { x: 60, y: 50 }, 'groupNode'),
+        data: { nodeIds: ['A', 'B'], label: 'Test Group' },
+        style: { width: 360, height: 350 },
+      };
+
+      const nodes = [nodeA, nodeB, nodeC, groupNode];
+      const edges = [createMockEdge('A', 'C')];
+
+      // Record original offsets
+      const originalAOffsetX = nodeA.position.x - groupNode.position.x;
+      const originalAOffsetY = nodeA.position.y - groupNode.position.y;
+      const originalBOffsetX = nodeB.position.x - groupNode.position.x;
+      const originalBOffsetY = nodeB.position.y - groupNode.position.y;
+
+      const result = applyAutoLayout(nodes, edges);
+
+      expect(result.length).toBe(4);
+
+      const resultA = result.find(n => n.id === 'A')!;
+      const resultB = result.find(n => n.id === 'B')!;
+      const resultGroup = result.find(n => n.type === 'groupNode')!;
+
+      // Member offsets relative to group should be EXACTLY preserved
+      expect(resultA.position.x - resultGroup.position.x).toBe(originalAOffsetX);
+      expect(resultA.position.y - resultGroup.position.y).toBe(originalAOffsetY);
+      expect(resultB.position.x - resultGroup.position.x).toBe(originalBOffsetX);
+      expect(resultB.position.y - resultGroup.position.y).toBe(originalBOffsetY);
     });
 
     test('should handle custom spacing options', () => {

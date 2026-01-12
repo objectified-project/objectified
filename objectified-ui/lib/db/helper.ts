@@ -3555,7 +3555,7 @@ export async function updateClassPositionInGroup(
   try {
     const result = await connectionPool.query(
       `UPDATE odb.group_classes 
-       SET position_x = $3, position_y = $4, updated_at = NOW()
+       SET position_x = $3, position_y = $4
        WHERE group_id = $1 AND class_id = $2
        RETURNING *`,
       [groupId, classId, positionX, positionY]
