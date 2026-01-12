@@ -620,6 +620,17 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
               </div>
             )}
           </div>
+
+          {/* Bottom Bar */}
+          <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <Button
+              onClick={handleClose}
+              variant="outline"
+              className="px-6"
+            >
+              Close
+            </Button>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
