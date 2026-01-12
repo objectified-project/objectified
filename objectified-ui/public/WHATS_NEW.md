@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## New Features and Improvements
 
 - New Features:
+  - Added new Application Dashboard landing page - presents all Objectified applications in an organized tile layout.
   - Added GraphQL SDL (Schema Definition Language) generation in the Code tab - preview and download GraphQL schemas with types, queries, mutations, and input types.
 - Bug fixes:
   - Fixed ClassNode color changes not being reflected immediately - the memo comparison function now correctly detects theme changes to trigger re-renders.

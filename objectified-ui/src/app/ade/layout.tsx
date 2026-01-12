@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import AuthenticatedLayout from "@/app/components/auth/AuthenticatedLayout";
-import TopHeader from '@/app/components/ade/TopHeader';
+import ConditionalHeader from '@/app/components/ade/ConditionalHeader';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import * as React from 'react';
 
@@ -35,7 +35,7 @@ export default function RootLayout({
         <ThemeProvider>
           <SessionWrapper>
             <AuthenticatedLayout>
-              <TopHeader/>
+              <ConditionalHeader />
               {children}
             </AuthenticatedLayout>
           </SessionWrapper>
