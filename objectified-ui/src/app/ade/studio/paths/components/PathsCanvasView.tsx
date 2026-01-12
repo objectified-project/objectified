@@ -108,11 +108,12 @@ interface PathsCanvasInnerProps {
   selectedPathId: string | null;
   onOperationSelect: (operation: { id: string; operation: string } | null) => void;
   onParameterSelect?: (parameter: { id: string; name: string; operationId: string } | null) => void;
+  onResponseSelect?: (response: { id: string; statusCode: string; description: string } | null) => void;
   refreshKey?: number;
   onRefresh?: () => void;
 }
 
-function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect, refreshKey, onRefresh }: PathsCanvasInnerProps) {
+function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect, onResponseSelect, refreshKey, onRefresh }: PathsCanvasInnerProps) {
   const {
     gridSize,
     gridStyle,
@@ -455,6 +456,9 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         if (onParameterSelect) {
           onParameterSelect(null);
         }
+        if (onResponseSelect) {
+          onResponseSelect(null);
+        }
       } else if (node.type === 'parameter') {
         if (onParameterSelect) {
           onParameterSelect({
@@ -464,9 +468,24 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           });
         }
         onOperationSelect(null);
+        if (onResponseSelect) {
+          onResponseSelect(null);
+        }
+      } else if (node.type === 'response') {
+        if (onResponseSelect) {
+          onResponseSelect({
+            id: node.data.dbResponseId as string,
+            statusCode: node.data.statusCode as string,
+            description: node.data.description as string || '',
+          });
+        }
+        onOperationSelect(null);
+        if (onParameterSelect) {
+          onParameterSelect(null);
+        }
       }
     },
-    [onOperationSelect, onParameterSelect]
+    [onOperationSelect, onParameterSelect, onResponseSelect]
   );
 
   // Handle connecting nodes
@@ -779,12 +798,14 @@ export default function PathsCanvasView({
   selectedPathId,
   onOperationSelect,
   onParameterSelect,
+  onResponseSelect,
   refreshKey,
   onRefresh,
 }: {
   selectedPathId: string | null;
   onOperationSelect: (operation: { id: string; operation: string } | null) => void;
   onParameterSelect?: (parameter: { id: string; name: string; operationId: string } | null) => void;
+  onResponseSelect?: (response: { id: string; statusCode: string; description: string } | null) => void;
   refreshKey?: number;
   onRefresh?: () => void;
 }) {
@@ -794,6 +815,7 @@ export default function PathsCanvasView({
         selectedPathId={selectedPathId}
         onOperationSelect={onOperationSelect}
         onParameterSelect={onParameterSelect}
+        onResponseSelect={onResponseSelect}
         refreshKey={refreshKey}
         onRefresh={onRefresh}
       />

@@ -6,6 +6,7 @@ import PathsSidebar from './components/PathsSidebar';
 import PathsCanvasView from './components/PathsCanvasView';
 import OperationPropertiesPanel from './components/OperationPropertiesPanel';
 import ParameterPropertiesPanel from './components/ParameterPropertiesPanel';
+import ResponsePropertiesPanel from './components/ResponsePropertiesPanel';
 
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
@@ -21,6 +22,11 @@ export default function PathsPage() {
     name: string;
     operationId: string;
   } | null>(null);
+  const [selectedResponse, setSelectedResponse] = useState<{
+    id: string;
+    statusCode: string;
+    description: string;
+  } | null>(null);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
 
   const handlePathSelect = (pathId: string | null, pathname?: string) => {
@@ -28,12 +34,14 @@ export default function PathsPage() {
     setSelectedPath(pathId && pathname ? { id: pathId, pathname } : null);
     setSelectedOperation(null);
     setSelectedParameter(null);
+    setSelectedResponse(null);
   };
 
   const handleOperationSelect = (operation: { id: string; operation: string } | null) => {
     setSelectedOperation(operation);
     if (operation) {
       setSelectedParameter(null);
+      setSelectedResponse(null);
     }
   };
 
@@ -41,6 +49,15 @@ export default function PathsPage() {
     setSelectedParameter(parameter);
     if (parameter) {
       setSelectedOperation(null);
+      setSelectedResponse(null);
+    }
+  };
+
+  const handleResponseSelect = (response: { id: string; statusCode: string; description: string } | null) => {
+    setSelectedResponse(response);
+    if (response) {
+      setSelectedOperation(null);
+      setSelectedParameter(null);
     }
   };
 
@@ -89,6 +106,7 @@ export default function PathsPage() {
             selectedPathId={selectedPathId}
             onOperationSelect={handleOperationSelect}
             onParameterSelect={handleParameterSelect}
+            onResponseSelect={handleResponseSelect}
             refreshKey={canvasRefreshKey}
             onRefresh={handleCanvasRefresh}
           />
@@ -112,6 +130,17 @@ export default function PathsPage() {
               operationId={selectedParameter.operationId}
               pathname={selectedPath.pathname}
               onClose={() => setSelectedParameter(null)}
+              onRefresh={handleCanvasRefresh}
+            />
+          )}
+
+          {/* Right Properties Panel - Response */}
+          {selectedResponse && (
+            <ResponsePropertiesPanel
+              responseId={selectedResponse.id}
+              statusCode={selectedResponse.statusCode}
+              initialDescription={selectedResponse.description}
+              onClose={() => setSelectedResponse(null)}
               onRefresh={handleCanvasRefresh}
             />
           )}
