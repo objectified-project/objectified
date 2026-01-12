@@ -10,6 +10,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added GraphQL SDL (Schema Definition Language) generation in the Code tab - preview and download GraphQL schemas with types, queries, mutations, and input types.
 - Bug fixes:
   - Fixed ClassNode color changes not being reflected immediately - the memo comparison function now correctly detects theme changes to trigger re-renders.
+  - Fixed expand/collapse chevrons in ClassNode not responding - the memo comparison function now correctly detects expandedProperties changes.
   - Improves drag/drop behavior in class nodes.
   - Fixed property template list to show [optional] when nullable is selected.
   - Fixed property to show numeric precision when applicable.

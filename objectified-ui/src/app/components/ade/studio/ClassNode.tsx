@@ -1060,6 +1060,25 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
     return false;
   }
 
+  // Check if expandedProperties changed (Set comparison)
+  const prevExpanded = prevData?.expandedProperties;
+  const nextExpanded = nextData?.expandedProperties;
+  if (prevExpanded !== nextExpanded) {
+    // If references are different, check if contents are the same
+    if (!prevExpanded || !nextExpanded) {
+      return false;
+    }
+    if (prevExpanded.size !== nextExpanded.size) {
+      return false;
+    }
+    // Check if all items in prev are in next
+    for (const item of prevExpanded) {
+      if (!nextExpanded.has(item)) {
+        return false;
+      }
+    }
+  }
+
   // For other data changes, do a simple reference check
   return prevData?.name === nextData?.name &&
          prevData?.description === nextData?.description &&
