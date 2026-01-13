@@ -18,9 +18,9 @@ type NavItem = { label: string; href: string; enabled?: boolean };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/ade" },
-  { label: "Dashboard", href: "/ade/dashboard" },
-  { label: "Studio", href: "/ade/studio" },
-  { label: "Database", href: "/ade/database", enabled: false },
+  // { label: "Dashboard", href: "/ade/dashboard" },
+  // { label: "Studio", href: "/ade/studio" },
+  // { label: "Database", href: "/ade/database", enabled: false },
 ];
 
 const TopHeader = () => {
