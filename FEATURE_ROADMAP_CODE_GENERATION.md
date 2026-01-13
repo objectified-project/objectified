@@ -152,7 +152,8 @@
   - 📋 **Rust**: Structs with Serde
   - 📋 **Scala**: Case classes with play-json support
   - ✅ **GraphQL**: SDL schema definitions
-  - 📋 **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
+  - ✅ **SQL**: DDL CREATE TABLE statements (PostgreSQL, MySQL, SQLite, SQL Server, Oracle)
+  - 📋 **Markdown**: Documentation tables and properties in MSON format (see ticket)
 - Customizable generation templates
 - 📋 Code generation settings per language:
   - 📋 Naming conventions (camelCase, snake_case, PascalCase)
@@ -171,12 +172,12 @@
 | #225   | Export to Java                            |
 | #226   | Export to C#                              |
 | #227   | Export to Golang                          |
-| #228   | Export to SQL                             |
 | #229   | Export to Markdown                        |
 | #230   | Export to Excel                           |
 | #231   | Export to PDF                             |
 | #509   | Add code generation settings per language |
 | #795   | Export to Liquibase                       |
+| #797   | Export to Markdown                        |
 
 ---
 
