@@ -403,6 +403,7 @@ export default function CodePage() {
                             <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                           </Select.ItemIndicator>
                         </Select.Item>
+                        <Select.Separator className="h-px my-1 mx-2 bg-gray-200 dark:bg-gray-700" />
                         <Select.Item value="graphql" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                           <Select.ItemText>GraphQL SDL</Select.ItemText>
                           <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
