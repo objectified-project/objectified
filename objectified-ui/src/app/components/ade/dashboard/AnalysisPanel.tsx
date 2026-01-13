@@ -1,15 +1,39 @@
 'use client';
 
-import { CheckCircle2, AlertCircle, XCircle, FileCode, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, AlertCircle, XCircle, FileCode, AlertTriangle, X, ChevronRight } from 'lucide-react';
 import * as Progress from '@radix-ui/react-progress';
-import { AnalysisResult } from '../../../utils/openapi-analyzer';
+import * as Dialog from '@radix-ui/react-dialog';
+import { AnalysisResult, QualityIssue } from '../../../utils/openapi-analyzer';
 
 interface AnalysisPanelProps {
   fileName: string;
   analysis: AnalysisResult;
 }
 
+// Category descriptions for help tooltips
+const categoryDescriptions: Record<string, { title: string; description: string }> = {
+  completeness: {
+    title: 'Completeness Score',
+    description: 'Measures how well-documented your API specification is. Checks for descriptions on schemas, properties, and operations. Higher scores indicate better documentation coverage.'
+  },
+  consistency: {
+    title: 'Consistency Score',
+    description: 'Evaluates naming conventions and patterns throughout your API. Checks for PascalCase schema names, consistent property naming (camelCase vs snake_case), and uniform patterns.'
+  },
+  bestPractices: {
+    title: 'Best Practices Score',
+    description: 'Assesses adherence to OpenAPI best practices including proper info section, versioning, tags for organization, server definitions, and contact/license information.'
+  },
+  security: {
+    title: 'Security Score',
+    description: 'Evaluates security configurations including security schemes (OAuth2, API Key, Bearer), global security requirements, and HTTPS usage for server URLs.'
+  }
+};
+
 export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
+  const [selectedCategory, setSelectedCategory] = useState<'completeness' | 'consistency' | 'bestPractices' | 'security' | null>(null);
+
   const getGradeColor = (grade: string) => {
     switch (grade) {
       case 'A': return 'text-green-600 dark:text-green-400';
@@ -29,6 +53,32 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
       case 'D': return 'Poor Quality';
       case 'F': return 'Needs Improvement';
       default: return 'Unknown';
+    }
+  };
+
+  // Get issues for a specific category
+  const getIssuesForCategory = (category: 'completeness' | 'consistency' | 'bestPractices' | 'security'): QualityIssue[] => {
+    return (analysis.qualityScore.issues || []).filter(issue => issue.category === category);
+  };
+
+  // Get severity color
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high': return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20';
+      case 'medium': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20';
+      case 'low': return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20';
+      default: return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20';
+    }
+  };
+
+  // Get gradient color for category
+  const getCategoryGradient = (category: string) => {
+    switch (category) {
+      case 'completeness': return 'from-indigo-500 to-indigo-600';
+      case 'consistency': return 'from-purple-500 to-purple-600';
+      case 'bestPractices': return 'from-blue-500 to-blue-600';
+      case 'security': return 'from-green-500 to-green-600';
+      default: return 'from-gray-500 to-gray-600';
     }
   };
 
@@ -393,104 +443,225 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
           </div>
         </div>
 
-        {/* Quality Metrics */}
+        {/* Quality Metrics - Clickable Cards */}
         <div className="grid grid-cols-4 gap-4">
           {/* Completeness */}
-          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                Completeness
-              </span>
-              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                {analysis.qualityScore.completeness}%
-              </span>
-            </div>
-            <Progress.Root
-              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
-              value={analysis.qualityScore.completeness}
+            <div
+              onClick={() => setSelectedCategory('completeness')}
+              className="relative bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-md transition-all group"
             >
-              <Progress.Indicator
-                className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-transform duration-300"
-                style={{ transform: `translateX(-${100 - analysis.qualityScore.completeness}%)` }}
-              />
-            </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Descriptions & docs
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Completeness
+                </span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {analysis.qualityScore.completeness}%
+                </span>
+              </div>
+              <Progress.Root
+                className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+                value={analysis.qualityScore.completeness}
+              >
+                <Progress.Indicator
+                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-transform duration-300"
+                  style={{ transform: `translateX(-${100 - analysis.qualityScore.completeness}%)` }}
+                />
+              </Progress.Root>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Descriptions & docs</span>
+                {getIssuesForCategory('completeness').length > 0 && (
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 group-hover:underline">
+                    {getIssuesForCategory('completeness').length} issues <ChevronRight className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Consistency */}
+            <div
+              onClick={() => setSelectedCategory('consistency')}
+              className="relative bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Consistency
+                </span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {analysis.qualityScore.consistency}%
+                </span>
+              </div>
+              <Progress.Root
+                className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+                value={analysis.qualityScore.consistency}
+              >
+                <Progress.Indicator
+                  className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-transform duration-300"
+                  style={{ transform: `translateX(-${100 - analysis.qualityScore.consistency}%)` }}
+                />
+              </Progress.Root>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Naming & patterns</span>
+                {getIssuesForCategory('consistency').length > 0 && (
+                  <span className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1 group-hover:underline">
+                    {getIssuesForCategory('consistency').length} issues <ChevronRight className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Best Practices */}
+            <div
+              onClick={() => setSelectedCategory('bestPractices')}
+              className="relative bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Best Practices
+                </span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {analysis.qualityScore.bestPractices}%
+                </span>
+              </div>
+              <Progress.Root
+                className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+                value={analysis.qualityScore.bestPractices}
+              >
+                <Progress.Indicator
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-transform duration-300"
+                  style={{ transform: `translateX(-${100 - analysis.qualityScore.bestPractices}%)` }}
+                />
+              </Progress.Root>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Industry standards</span>
+                {getIssuesForCategory('bestPractices').length > 0 && (
+                  <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:underline">
+                    {getIssuesForCategory('bestPractices').length} issues <ChevronRight className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Security */}
+            <div
+              onClick={() => setSelectedCategory('security')}
+              className="relative bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-green-300 dark:hover:border-green-600 hover:shadow-md transition-all group"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Security
+                </span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                  {analysis.qualityScore.security}%
+                </span>
+              </div>
+              <Progress.Root
+                className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+                value={analysis.qualityScore.security}
+              >
+                <Progress.Indicator
+                  className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-transform duration-300"
+                  style={{ transform: `translateX(-${100 - analysis.qualityScore.security}%)` }}
+                />
+              </Progress.Root>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Auth & authorization</span>
+                {getIssuesForCategory('security').length > 0 && (
+                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 group-hover:underline">
+                    {getIssuesForCategory('security').length} issues <ChevronRight className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Consistency */}
-          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                Consistency
-              </span>
-              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                {analysis.qualityScore.consistency}%
-              </span>
-            </div>
-            <Progress.Root
-              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
-              value={analysis.qualityScore.consistency}
-            >
-              <Progress.Indicator
-                className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-transform duration-300"
-                style={{ transform: `translateX(-${100 - analysis.qualityScore.consistency}%)` }}
-              />
-            </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Naming & patterns
-            </div>
-          </div>
+        {/* Quality Issues Detail Dialog */}
+        <Dialog.Root open={selectedCategory !== null} onOpenChange={(open) => !open && setSelectedCategory(null)}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10000]" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-[10001] w-full max-w-2xl max-h-[80vh] overflow-hidden">
+              {selectedCategory && (
+                <>
+                  <div className={`p-6 bg-gradient-to-r ${getCategoryGradient(selectedCategory)} text-white`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Dialog.Title className="text-xl font-bold">
+                          {categoryDescriptions[selectedCategory].title}
+                        </Dialog.Title>
+                        <Dialog.Description className="text-white/80 mt-1 text-sm">
+                          {categoryDescriptions[selectedCategory].description}
+                        </Dialog.Description>
+                      </div>
+                      <Dialog.Close asChild>
+                        <button className="p-2 rounded-lg hover:bg-white/20 transition-colors">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </Dialog.Close>
+                    </div>
+                  </div>
 
-          {/* Best Practices */}
-          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                Best Practices
-              </span>
-              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                {analysis.qualityScore.bestPractices}%
-              </span>
-            </div>
-            <Progress.Root
-              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
-              value={analysis.qualityScore.bestPractices}
-            >
-              <Progress.Indicator
-                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-transform duration-300"
-                style={{ transform: `translateX(-${100 - analysis.qualityScore.bestPractices}%)` }}
-              />
-            </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Industry standards
-            </div>
-          </div>
+                  <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      These are the suggested improvements
+                    </h4>
 
-          {/* Security */}
-          <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                Security
-              </span>
-              <span className="text-sm font-bold text-gray-900 dark:text-white">
-                {analysis.qualityScore.security}%
-              </span>
-            </div>
-            <Progress.Root
-              className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
-              value={analysis.qualityScore.security}
-            >
-              <Progress.Indicator
-                className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-transform duration-300"
-                style={{ transform: `translateX(-${100 - analysis.qualityScore.security}%)` }}
-              />
-            </Progress.Root>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Auth & authorization
-            </div>
-          </div>
-        </div>
+                    {getIssuesForCategory(selectedCategory).length === 0 ? (
+                      <div className="flex items-center justify-center py-12 text-center">
+                        <div>
+                          <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                          <div className="text-lg font-medium text-gray-900 dark:text-white">
+                            No issues found!
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Your specification meets all requirements for this category.
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {getIssuesForCategory(selectedCategory).map((issue, index) => (
+                          <div
+                            key={index}
+                            className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700"
+                          >
+                            <div className="flex items-start gap-3">
+                              <AlertCircle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
+                                issue.severity === 'high' ? 'text-red-500' :
+                                issue.severity === 'medium' ? 'text-yellow-500' : 'text-blue-500'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {issue.message}
+                                  </span>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSeverityColor(issue.severity)}`}>
+                                    {issue.severity}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                  {issue.suggestion}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded font-mono text-gray-700 dark:text-gray-300">
+                                    {issue.path}
+                                  </span>
+                                  {issue.line && (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      Line {issue.line}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
 
       {/* Errors */}

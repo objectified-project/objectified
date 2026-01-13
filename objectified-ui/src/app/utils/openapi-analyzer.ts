@@ -43,6 +43,7 @@ export interface AnalysisResult {
     consistency: number;
     bestPractices: number;
     security: number;
+    issues: QualityIssue[];
   };
 
   // Issues
@@ -58,6 +59,15 @@ export interface AnalysisIssue {
   message: string;
   path?: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface QualityIssue {
+  category: 'completeness' | 'consistency' | 'bestPractices' | 'security';
+  message: string;
+  suggestion: string;
+  path: string;
+  line?: number;
+  severity: 'high' | 'medium' | 'low';
 }
 
 /**
@@ -354,91 +364,310 @@ function countPaths(doc: any): number {
 }
 
 /**
- * Calculate completeness score
+ * Calculate completeness score with detailed issues
  */
-function calculateCompleteness(doc: any): number {
+function calculateCompletenessWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
   let score = 0;
   let total = 0;
+  const issues: QualityIssue[] = [];
 
   const schemas = doc.components?.schemas || doc.definitions || {};
+  const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
 
   // Check for descriptions
-  Object.values(schemas).forEach((schema: any) => {
+  Object.entries(schemas).forEach(([schemaName, schema]: [string, any]) => {
     total++;
-    if (schema.description) score++;
+    if (schema.description) {
+      score++;
+    } else {
+      issues.push({
+        category: 'completeness',
+        message: `Schema "${schemaName}" is missing a description`,
+        suggestion: `Add a description field to explain what this schema represents`,
+        path: `${schemaPath}/${schemaName}`,
+        severity: 'medium'
+      });
+    }
 
     if (schema.properties) {
-      Object.values(schema.properties).forEach((prop: any) => {
+      Object.entries(schema.properties).forEach(([propName, prop]: [string, any]) => {
         total++;
-        if (prop.description) score++;
+        if (prop.description) {
+          score++;
+        } else {
+          issues.push({
+            category: 'completeness',
+            message: `Property "${propName}" in "${schemaName}" is missing a description`,
+            suggestion: `Add a description to explain what this property represents`,
+            path: `${schemaPath}/${schemaName}/properties/${propName}`,
+            severity: 'low'
+          });
+        }
       });
     }
   });
 
-  return total > 0 ? Math.round((score / total) * 100) : 100;
+  // Check paths for descriptions
+  if (doc.paths) {
+    Object.entries(doc.paths).forEach(([pathName, pathItem]: [string, any]) => {
+      Object.entries(pathItem).forEach(([method, operation]: [string, any]) => {
+        if (['get', 'post', 'put', 'patch', 'delete'].includes(method)) {
+          total++;
+          if (operation.summary || operation.description) {
+            score++;
+          } else {
+            issues.push({
+              category: 'completeness',
+              message: `Operation ${method.toUpperCase()} ${pathName} is missing a summary/description`,
+              suggestion: `Add a summary or description to explain what this endpoint does`,
+              path: `paths/${pathName}/${method}`,
+              severity: 'medium'
+            });
+          }
+        }
+      });
+    });
+  }
+
+  return {
+    score: total > 0 ? Math.round((score / total) * 100) : 100,
+    issues
+  };
 }
 
 /**
- * Calculate consistency score (naming conventions, patterns)
+ * Calculate consistency score with detailed issues
  */
-function calculateConsistency(doc: any): number {
+function calculateConsistencyWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
   const schemas = doc.components?.schemas || doc.definitions || {};
   const schemaNames = Object.keys(schemas);
+  const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
+  const issues: QualityIssue[] = [];
 
-  if (schemaNames.length === 0) return 100;
+  if (schemaNames.length === 0) return { score: 100, issues: [] };
 
   let score = 100;
 
   // Check for consistent naming (PascalCase)
-  const nonPascalCase = schemaNames.filter(name => {
-    return !/^[A-Z][a-zA-Z0-9]*$/.test(name);
+  schemaNames.forEach(name => {
+    if (!/^[A-Z][a-zA-Z0-9]*$/.test(name)) {
+      score -= 5;
+      issues.push({
+        category: 'consistency',
+        message: `Schema name "${name}" does not follow PascalCase convention`,
+        suggestion: `Rename to "${name.charAt(0).toUpperCase()}${name.slice(1).replace(/[_-](\w)/g, (_, c) => c.toUpperCase())}"`,
+        path: `${schemaPath}/${name}`,
+        severity: 'low'
+      });
+    }
   });
 
-  if (nonPascalCase.length > 0) {
-    score -= Math.min(30, nonPascalCase.length * 5);
-  }
+  // Check property naming consistency
+  Object.entries(schemas).forEach(([schemaName, schema]: [string, any]) => {
+    if (schema.properties) {
+      const propNames = Object.keys(schema.properties);
+      const hasCamelCase = propNames.some(n => /^[a-z][a-zA-Z0-9]*$/.test(n));
+      const hasSnakeCase = propNames.some(n => /^[a-z][a-z0-9_]*$/.test(n) && n.includes('_'));
 
-  return Math.max(0, score);
+      if (hasCamelCase && hasSnakeCase) {
+        score -= 5;
+        issues.push({
+          category: 'consistency',
+          message: `Schema "${schemaName}" has mixed property naming conventions (camelCase and snake_case)`,
+          suggestion: `Use consistent naming convention for all properties - prefer camelCase`,
+          path: `${schemaPath}/${schemaName}/properties`,
+          severity: 'medium'
+        });
+      }
+    }
+  });
+
+  return { score: Math.max(0, Math.min(100, score)), issues };
 }
 
 /**
- * Calculate best practices score
+ * Calculate best practices score with detailed issues
  */
-function calculateBestPractices(doc: any): number {
+function calculateBestPracticesWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
   let score = 100;
+  const issues: QualityIssue[] = [];
 
   // Check for info section
-  if (!doc.info) score -= 20;
-  if (!doc.info?.version) score -= 10;
-  if (!doc.info?.title) score -= 10;
+  if (!doc.info) {
+    score -= 20;
+    issues.push({
+      category: 'bestPractices',
+      message: 'Missing "info" section',
+      suggestion: 'Add an info section with title, version, and description',
+      path: 'info',
+      severity: 'high'
+    });
+  } else {
+    if (!doc.info.version) {
+      score -= 10;
+      issues.push({
+        category: 'bestPractices',
+        message: 'Missing API version in info section',
+        suggestion: 'Add a version field (e.g., "1.0.0") to the info section',
+        path: 'info/version',
+        severity: 'high'
+      });
+    }
+    if (!doc.info.title) {
+      score -= 10;
+      issues.push({
+        category: 'bestPractices',
+        message: 'Missing API title in info section',
+        suggestion: 'Add a title field to describe your API',
+        path: 'info/title',
+        severity: 'high'
+      });
+    }
+    if (!doc.info.description) {
+      score -= 5;
+      issues.push({
+        category: 'bestPractices',
+        message: 'Missing API description in info section',
+        suggestion: 'Add a description to explain what your API does',
+        path: 'info/description',
+        severity: 'medium'
+      });
+    }
+    if (!doc.info.contact) {
+      score -= 5;
+      issues.push({
+        category: 'bestPractices',
+        message: 'Missing contact information',
+        suggestion: 'Add contact info (name, email, url) for API support',
+        path: 'info/contact',
+        severity: 'low'
+      });
+    }
+    if (!doc.info.license) {
+      score -= 5;
+      issues.push({
+        category: 'bestPractices',
+        message: 'Missing license information',
+        suggestion: 'Add a license field to specify the API license',
+        path: 'info/license',
+        severity: 'low'
+      });
+    }
+  }
 
   // Check for tags
   const schemas = doc.components?.schemas || doc.definitions || {};
   if (Object.keys(schemas).length > 0 && !doc.tags) {
     score -= 10;
+    issues.push({
+      category: 'bestPractices',
+      message: 'No tags defined for API organization',
+      suggestion: 'Add tags to group and organize your API endpoints',
+      path: 'tags',
+      severity: 'medium'
+    });
   }
 
-  return Math.max(0, score);
+  // Check for servers
+  if (!doc.servers || doc.servers.length === 0) {
+    score -= 5;
+    issues.push({
+      category: 'bestPractices',
+      message: 'No servers defined',
+      suggestion: 'Add server URLs to specify where your API is hosted',
+      path: 'servers',
+      severity: 'low'
+    });
+  }
+
+  return { score: Math.max(0, score), issues };
 }
 
 /**
- * Calculate security score
+ * Calculate security score with detailed issues
+ */
+function calculateSecurityWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  let score = 100;
+  const issues: QualityIssue[] = [];
+
+  const hasSecuritySchemes = doc.components?.securitySchemes || doc.securityDefinitions;
+  const hasPaths = doc.paths && Object.keys(doc.paths).length > 0;
+
+  if (!hasSecuritySchemes) {
+    if (hasPaths) {
+      score = 50;
+      issues.push({
+        category: 'security',
+        message: 'No security schemes defined',
+        suggestion: 'Add security schemes (OAuth2, API Key, Bearer, etc.) to protect your API',
+        path: 'components/securitySchemes',
+        severity: 'high'
+      });
+    }
+  } else {
+    // Check if security is applied globally or per-operation
+    if (!doc.security && hasPaths) {
+      score -= 20;
+      issues.push({
+        category: 'security',
+        message: 'Security schemes defined but not applied globally',
+        suggestion: 'Add a global security requirement or apply security per-operation',
+        path: 'security',
+        severity: 'medium'
+      });
+    }
+  }
+
+  // Check for HTTPS in servers
+  if (doc.servers) {
+    const insecureServers = doc.servers.filter((s: any) =>
+      s.url && s.url.startsWith('http://') && !s.url.includes('localhost')
+    );
+    if (insecureServers.length > 0) {
+      score -= 10;
+      issues.push({
+        category: 'security',
+        message: 'Non-HTTPS server URLs detected',
+        suggestion: 'Use HTTPS for all production server URLs',
+        path: 'servers',
+        severity: 'high'
+      });
+    }
+  }
+
+  return { score: Math.max(0, score), issues };
+}
+
+/**
+ * Calculate completeness score (legacy wrapper)
+ */
+function calculateCompleteness(doc: any): number {
+  return calculateCompletenessWithIssues(doc).score;
+}
+
+/**
+ * Calculate consistency score (legacy wrapper)
+ */
+function calculateConsistency(doc: any): number {
+  return calculateConsistencyWithIssues(doc).score;
+}
+
+/**
+ * Calculate best practices score (legacy wrapper)
+ */
+function calculateBestPractices(doc: any): number {
+  return calculateBestPracticesWithIssues(doc).score;
+}
+
+/**
+ * Calculate security score (legacy wrapper)
  */
 function calculateSecurity(doc: any): number {
-  let score = 100;
-
-  // Check for security schemes
-  if (doc.components?.securitySchemes || doc.securityDefinitions) {
-    score = 100;
-  } else if (doc.paths && Object.keys(doc.paths).length > 0) {
-    score = 50; // Has paths but no security
-  }
-
-  return score;
+  return calculateSecurityWithIssues(doc).score;
 }
 
 /**
- * Calculate overall quality score
+ * Calculate overall quality score with detailed issues
  */
 function calculateQualityScore(doc: any): {
   overall: number;
@@ -447,13 +676,27 @@ function calculateQualityScore(doc: any): {
   consistency: number;
   bestPractices: number;
   security: number;
+  issues: QualityIssue[];
 } {
-  const completeness = calculateCompleteness(doc);
-  const consistency = calculateConsistency(doc);
-  const bestPractices = calculateBestPractices(doc);
-  const security = calculateSecurity(doc);
+  const completenessResult = calculateCompletenessWithIssues(doc);
+  const consistencyResult = calculateConsistencyWithIssues(doc);
+  const bestPracticesResult = calculateBestPracticesWithIssues(doc);
+  const securityResult = calculateSecurityWithIssues(doc);
 
-  const overall = Math.round((completeness + consistency + bestPractices + security) / 4);
+  const overall = Math.round((
+    completenessResult.score +
+    consistencyResult.score +
+    bestPracticesResult.score +
+    securityResult.score
+  ) / 4);
+
+  // Combine all issues
+  const issues: QualityIssue[] = [
+    ...completenessResult.issues,
+    ...consistencyResult.issues,
+    ...bestPracticesResult.issues,
+    ...securityResult.issues
+  ];
 
   let grade: 'A' | 'B' | 'C' | 'D' | 'F';
   if (overall >= 90) grade = 'A';
@@ -465,10 +708,11 @@ function calculateQualityScore(doc: any): {
   return {
     overall,
     grade,
-    completeness,
-    consistency,
-    bestPractices,
-    security
+    completeness: completenessResult.score,
+    consistency: consistencyResult.score,
+    bestPractices: bestPracticesResult.score,
+    security: securityResult.score,
+    issues
   };
 }
 
@@ -608,7 +852,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
         completeness: 0,
         consistency: 0,
         bestPractices: 0,
-        security: 0
+        security: 0,
+        issues: []
       },
       errors: [{
         type: 'error',
@@ -653,7 +898,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           completeness: 0,
           consistency: 0,
           bestPractices: 0,
-          security: 0
+          security: 0,
+          issues: []
         },
         errors: [{
           type: 'error',
@@ -706,7 +952,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           completeness: 0,
           consistency: 0,
           bestPractices: 0,
-          security: 0
+          security: 0,
+          issues: []
         },
         errors: [{
           type: 'error',
@@ -762,7 +1009,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           completeness: 0,
           consistency: 0,
           bestPractices: 0,
-          security: 0
+          security: 0,
+          issues: []
         },
         errors: [{
           type: 'error',
@@ -819,7 +1067,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           completeness: 0,
           consistency: 0,
           bestPractices: 0,
-          security: 0
+          security: 0,
+          issues: []
         },
         errors: [{
           type: 'error',
@@ -875,7 +1124,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           completeness: 0,
           consistency: 0,
           bestPractices: 0,
-          security: 0
+          security: 0,
+          issues: []
         },
         errors: [{
           type: 'error',

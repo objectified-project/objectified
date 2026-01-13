@@ -103,18 +103,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 #### 4.3 Pre-Import Analysis 📋 PLANNED
 
-##### Format Detection & Validation 📋 PARTIALLY IMPLEMENTED
-- ✅ **Auto-Detection**: Automatically identify specification format
-- ✅ **Version Detection**: Detect OpenAPI/JSON Schema version
-- ✅ **Syntax Validation**: Real-time YAML/JSON syntax checking
-- **Schema Validation**: Validate against official meta-schemas
-- **Custom Validation Rules**: Enterprise-specific validation
-- 📋 Import summarization details
-
-| Ticket | Feature Description                            |
-|--------|------------------------------------------------|
-| #794   | Import summary details for compliance, scoring |
-
 ##### Compatibility Check
 - 📋 **Feature Compatibility**: Identify unsupported features
 - 📋 **Extension Detection**: List all x- custom extensions
@@ -570,9 +558,15 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Skip Count**: Intentionally skipped items
 - ✅ **Time Taken**: Total import duration
 
-##### Specification Analysis ✅ PARTIALLY IMPLEMENTED
+##### Specification Analysis ✅ IMPLEMENTED
 - ✅ **Schema Count**: Number of schemas to be imported
 - ✅ **Property Count**: Total properties across all schemas
 - ✅ **Reference Analysis**: Count and map all $ref relationships
 - ✅ **Circular Reference Detection**: Identify circular dependencies
 - ✅ **External Reference Inventory**: List all external URLs
+
+##### Format Detection & Validation ✅ IMPLEMENTED
+- ✅ **Auto-Detection**: Automatically identify specification format
+- ✅ **Version Detection**: Detect OpenAPI/JSON Schema version
+- ✅ **Syntax Validation**: Real-time YAML/JSON syntax checking
+- ✅ Import summarization details
