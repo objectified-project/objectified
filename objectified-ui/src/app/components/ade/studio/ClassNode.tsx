@@ -123,7 +123,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
   // At zoom 0.5-1.0, transition from minimal to full detail
   // At zoom >= 1.0 (zoomed in), show full detail
   const zoom = typedData.zoomLevel ?? 1;
-  const lodEnabled = typedData.lodEnabled ?? true; // Default to enabled if not specified
+  const lodEnabled = typedData.lodEnabled ?? false; // Default to disabled
 
   // Calculate opacity for different detail levels
   // Properties fade out completely when zoomed out to 50% or less

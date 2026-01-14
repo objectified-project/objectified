@@ -121,9 +121,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [lodEnabled, setLodEnabled] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('lodEnabled');
-      return saved ? JSON.parse(saved) : true; // Default to enabled
+      return saved ? JSON.parse(saved) : false; // Default to disabled
     }
-    return true;
+    return false;
   });
 
   // Grid settings

@@ -154,7 +154,6 @@ interface CanvasSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   // Current settings
   clickToFocusEnabled: boolean;
-  lodEnabled: boolean;
   snapToGrid: boolean;
   smartGuidesEnabled: boolean;
   gridSize: number;
@@ -165,7 +164,6 @@ interface CanvasSettingsDialogProps {
   // Callbacks to apply settings
   onSave: (settings: {
     clickToFocusEnabled: boolean;
-    lodEnabled: boolean;
     snapToGrid: boolean;
     smartGuidesEnabled: boolean;
     gridSize: number;
@@ -180,7 +178,6 @@ export default function CanvasSettingsDialog({
   open,
   onOpenChange,
   clickToFocusEnabled,
-  lodEnabled,
   snapToGrid,
   smartGuidesEnabled,
   gridSize,
@@ -192,7 +189,6 @@ export default function CanvasSettingsDialog({
 }: CanvasSettingsDialogProps) {
   // Local state for form
   const [localClickToFocus, setLocalClickToFocus] = React.useState(clickToFocusEnabled);
-  const [localLodEnabled, setLocalLodEnabled] = React.useState(lodEnabled);
   const [localSnapToGrid, setLocalSnapToGrid] = React.useState(snapToGrid);
   const [localSmartGuides, setLocalSmartGuides] = React.useState(smartGuidesEnabled);
   const [localGridSize, setLocalGridSize] = React.useState(gridSize);
@@ -205,7 +201,6 @@ export default function CanvasSettingsDialog({
   React.useEffect(() => {
     if (open) {
       setLocalClickToFocus(clickToFocusEnabled);
-      setLocalLodEnabled(lodEnabled);
       setLocalSnapToGrid(snapToGrid);
       setLocalSmartGuides(smartGuidesEnabled);
       setLocalGridSize(gridSize);
@@ -214,12 +209,11 @@ export default function CanvasSettingsDialog({
       setLocalEdgeRouting(edgeRouting);
       setLocalEdgeAnimation(edgeAnimation);
     }
-  }, [open, clickToFocusEnabled, lodEnabled, snapToGrid, smartGuidesEnabled, gridSize, gridStyle, edgeStyling, edgeRouting, edgeAnimation]);
+  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, gridSize, gridStyle, edgeStyling, edgeRouting, edgeAnimation]);
 
   const handleSave = () => {
     onSave({
       clickToFocusEnabled: localClickToFocus,
-      lodEnabled: localLodEnabled,
       snapToGrid: localSnapToGrid,
       smartGuidesEnabled: localSmartGuides,
       gridSize: localGridSize,
@@ -388,22 +382,6 @@ export default function CanvasSettingsDialog({
                       type="checkbox"
                       checked={localClickToFocus}
                       onChange={(e) => setLocalClickToFocus(e.target.checked)}
-                      className="w-4 h-4 text-indigo-500 rounded focus:ring-indigo-500"
-                    />
-                  </label>
-
-                  {/* Level of Detail */}
-                  <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-                      </svg>
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Level of Detail</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={localLodEnabled}
-                      onChange={(e) => setLocalLodEnabled(e.target.checked)}
                       className="w-4 h-4 text-indigo-500 rounded focus:ring-indigo-500"
                     />
                   </label>

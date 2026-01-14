@@ -48,8 +48,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setIsReadOnly,
     clickToFocusEnabled,
     setClickToFocusEnabled,
-    lodEnabled,
-    setLodEnabled,
     gridSize,
     setGridSize,
     snapToGrid,
@@ -84,7 +82,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   // Handle settings save
   const handleSettingsSave = React.useCallback((settings: {
     clickToFocusEnabled: boolean;
-    lodEnabled: boolean;
     snapToGrid: boolean;
     smartGuidesEnabled: boolean;
     gridSize: number;
@@ -95,9 +92,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
   }) => {
     setClickToFocusEnabled(settings.clickToFocusEnabled);
     localStorage.setItem('clickToFocusEnabled', JSON.stringify(settings.clickToFocusEnabled));
-
-    setLodEnabled(settings.lodEnabled);
-    localStorage.setItem('lodEnabled', JSON.stringify(settings.lodEnabled));
 
     setSnapToGrid(settings.snapToGrid);
     localStorage.setItem('snapToGrid', JSON.stringify(settings.snapToGrid));
@@ -119,7 +113,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
     setEdgeAnimation(settings.edgeAnimation);
     localStorage.setItem('edgeAnimation', settings.edgeAnimation);
-  }, [setClickToFocusEnabled, setLodEnabled, setSnapToGrid, setSmartGuidesEnabled, setGridSize, setGridStyle, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
+  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setGridSize, setGridStyle, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
   // Sync local state with context
   React.useEffect(() => {
@@ -380,7 +374,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               open={settingsDialogOpen}
               onOpenChange={setSettingsDialogOpen}
               clickToFocusEnabled={clickToFocusEnabled}
-              lodEnabled={lodEnabled}
               snapToGrid={snapToGrid}
               smartGuidesEnabled={smartGuidesEnabled}
               gridSize={gridSize}

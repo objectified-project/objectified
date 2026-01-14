@@ -8,7 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 - New Features:
   - Added new Application Dashboard landing page - presents all Objectified applications in an organized tile layout.
-  - Added interactive quality score cards during import - click on any quality score card (Completeness, Consistency, Best Practices, Security) to see detailed issues with suggestions and paths. Each card has a "?" help icon explaining what the score represents.
+  - Added interactive quality score cards during import - click on any quality score card for more details.
 - Bug fixes:
   - Fixed ClassNode color changes not being reflected immediately - the memo comparison function now correctly detects theme changes to trigger re-renders.
   - Fixed expand/collapse chevrons in ClassNode not responding - the memo comparison function now correctly detects expandedProperties changes.
@@ -26,6 +26,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Properties Template Form now shows the inline properties when an "object" type is selected.
   - Condensed property flags into a compact horizontal layout.
   - Class node styling changes were not persisting properly, this is now fixed.
+  - Removed Level of Detail settings, was causing confusion.
 - Code Generation:
   - Added GraphQL - added support for input types, enums, and interfaces.
   - Added SQL DDL - added support for indexes, constraints, and foreign keys.
