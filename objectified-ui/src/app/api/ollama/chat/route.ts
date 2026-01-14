@@ -77,31 +77,60 @@ When the user requests a specification or makes changes, provide the complete Op
           return;
         }
 
+        let buffer = '';
+
         try {
           while (true) {
             const { done, value } = await reader.read();
 
             if (done) {
+              // Process any remaining buffer
+              if (buffer.trim()) {
+                try {
+                  const data = JSON.parse(buffer);
+                  if (data.message?.content) {
+                    const event = {
+                      content: data.message.content,
+                      done: data.done || false,
+                    };
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                  }
+                } catch (e) {
+                  // Ignore parse errors on final buffer
+                }
+              }
+
               // Send final event to signal completion
               controller.enqueue(encoder.encode('data: [DONE]\n\n'));
               controller.close();
               break;
             }
 
-            // Decode the chunk
+            // Decode the chunk with streaming enabled
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim());
+            buffer += chunk;
 
+            // Process complete lines immediately (split by newline)
+            const lines = buffer.split('\n');
+
+            // Keep the last incomplete line in the buffer
+            buffer = lines.pop() || '';
+
+            // Process each complete line immediately
             for (const line of lines) {
+              if (!line.trim()) continue;
+
               try {
                 const data = JSON.parse(line);
 
-                // Send the message content if available
+                // Send the message content immediately if available
                 if (data.message?.content) {
                   const event = {
                     content: data.message.content,
                     done: data.done || false,
                   };
+
+                  // Enqueue immediately for real-time streaming
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                 }
 
@@ -112,7 +141,7 @@ When the user requests a specification or makes changes, provide the complete Op
                   return;
                 }
               } catch (parseError) {
-                console.error('Error parsing Ollama response line:', parseError);
+                console.error('Error parsing Ollama response line:', parseError, 'Line:', line);
               }
             }
           }

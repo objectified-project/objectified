@@ -77,7 +77,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     } else if (currentStep === 'preview') {
       setCurrentStep('analysis');
     } else if (currentStep === 'analysis') {
-      setCurrentStep('file-upload');
+      // If the source was LLM, skip file-upload and go straight back to source selection
+      if (selectedSource === 'llm') {
+        setCurrentStep('source');
+        setSelectedSource(null);
+        setClipboardContent(null);
+        setClipboardFilename(null);
+      } else {
+        setCurrentStep('file-upload');
+      }
       setAnalysisResult(null);
     } else if (currentStep === 'file-upload') {
       setCurrentStep('source');
