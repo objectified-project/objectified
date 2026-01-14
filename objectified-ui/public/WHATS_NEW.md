@@ -9,6 +9,7 @@ We continue to improve the platform based on your feedback with improvements and
 - New Features:
   - Added new Application Dashboard landing page - presents all Objectified applications in an organized tile layout.
   - Added interactive quality score cards during import - click on any quality score card for more details.
+  - Added Chart View tab in import preview - shows a diagram before importing, showing how classes relate to each other through references.
 - Bug fixes:
   - Fixed ClassNode color changes not being reflected immediately - the memo comparison function now correctly detects theme changes to trigger re-renders.
   - Fixed expand/collapse chevrons in ClassNode not responding - the memo comparison function now correctly detects expandedProperties changes.

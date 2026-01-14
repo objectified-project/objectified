@@ -1,12 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Package, Search, Check, FileJson, FileCode2, List, ChevronRight, ArrowUpAZ, ArrowDownAZ } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Package, Search, Check, FileJson, FileCode2, List, ChevronRight, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  MiniMap,
+  Handle,
+  Position,
+  type Node,
+  type Edge,
+  MarkerType,
+  BackgroundVariant,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
 interface PreviewPanelProps {
   analysis: AnalysisResult;
@@ -73,10 +87,87 @@ function countSchemaProperties(schema: any): number {
   return count;
 }
 
+// Simple preview node component for the chart view
+function PreviewClassNode({ data }: { data: { label: string; propertyCount: number; selected: boolean; hasComposition?: boolean; compositionType?: string } }) {
+  return (
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 min-w-[120px] max-w-[180px] ${
+      data.selected 
+        ? 'border-indigo-400 dark:border-indigo-500' 
+        : 'border-gray-300 dark:border-gray-600 opacity-50'
+    }`}>
+      <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-indigo-500" />
+      <Handle type="target" position={Position.Left} className="w-2 h-2 !bg-indigo-500" />
+
+      <div className={`px-3 py-2 border-b border-gray-200 dark:border-gray-600 rounded-t-lg ${
+        data.hasComposition 
+          ? 'bg-purple-50 dark:bg-purple-900/30' 
+          : 'bg-indigo-50 dark:bg-indigo-900/30'
+      }`}>
+        <div className="flex items-center gap-1.5">
+          {data.hasComposition && data.compositionType && (
+            <span className="text-[9px] px-1 py-0.5 bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-300 rounded">
+              {data.compositionType}
+            </span>
+          )}
+          <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
+            {data.label}
+          </span>
+        </div>
+      </div>
+      <div className="px-3 py-2">
+        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+          {data.propertyCount} {data.propertyCount === 1 ? 'property' : 'properties'}
+        </div>
+      </div>
+
+      <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-indigo-500" />
+      <Handle type="source" position={Position.Bottom} className="w-2 h-2 !bg-indigo-500" />
+    </div>
+  );
+}
+
+const previewNodeTypes = {
+  previewClass: PreviewClassNode,
+};
+
+// Extract references from a schema
+function extractSchemaReferences(schema: any): string[] {
+  const refs: string[] = [];
+
+  const findRefs = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return;
+
+    if (obj.$ref && typeof obj.$ref === 'string') {
+      const refName = obj.$ref.split('/').pop();
+      if (refName && !refs.includes(refName)) {
+        refs.push(refName);
+      }
+    }
+
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        findRefs(obj[key]);
+      }
+    }
+  };
+
+  findRefs(schema);
+  return refs;
+}
+
+// Get composition type if any
+function getCompositionType(schema: any): string | null {
+  if (schema.allOf) return 'allOf';
+  if (schema.oneOf) return 'oneOf';
+  if (schema.anyOf) return 'anyOf';
+  return null;
+}
+
 export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelProps) {
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'json' | 'yaml'>('summary');
+  const [panelView, setPanelView] = useState<'list' | 'chart'>('list');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [schemas, setSchemas] = useState<SchemaInfo[]>(() => {
     const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
@@ -124,6 +215,79 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     });
 
   const selectedCount = schemas.filter(s => s.selected).length;
+
+  // Generate nodes and edges for the chart view
+  const { chartNodes, chartEdges } = useMemo(() => {
+    const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
+    const schemaNames = Object.keys(schemaObj);
+
+    if (schemaNames.length === 0) {
+      return { chartNodes: [], chartEdges: [] };
+    }
+
+    // Create a map of schema names to their selection status
+    const selectionMap = new Map(schemas.map(s => [s.name, s.selected]));
+
+    // Calculate layout - arrange in a grid pattern
+    const cols = Math.ceil(Math.sqrt(schemaNames.length));
+    const nodeWidth = 160;
+    const nodeHeight = 80;
+    const gapX = 80;
+    const gapY = 60;
+
+    // Create nodes
+    const nodes: Node[] = schemaNames.map((name, index) => {
+      const row = Math.floor(index / cols);
+      const col = index % cols;
+      const schema = schemaObj[name];
+      const compositionType = getCompositionType(schema);
+
+      return {
+        id: name,
+        type: 'previewClass',
+        position: {
+          x: col * (nodeWidth + gapX) + 50,
+          y: row * (nodeHeight + gapY) + 50,
+        },
+        data: {
+          label: name,
+          propertyCount: countSchemaProperties(schema),
+          selected: selectionMap.get(name) ?? true,
+          hasComposition: !!compositionType,
+          compositionType: compositionType,
+        },
+      };
+    });
+
+    // Create edges based on $ref relationships
+    const edges: Edge[] = [];
+    schemaNames.forEach(name => {
+      const schema = schemaObj[name];
+      const refs = extractSchemaReferences(schema);
+
+      refs.forEach(refName => {
+        // Only create edge if the referenced schema exists
+        if (schemaNames.includes(refName)) {
+          edges.push({
+            id: `${name}-${refName}`,
+            source: name,
+            target: refName,
+            type: 'smoothstep',
+            animated: false,
+            style: { stroke: '#6366f1', strokeWidth: 1.5 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: '#6366f1',
+              width: 15,
+              height: 15,
+            },
+          });
+        }
+      });
+    });
+
+    return { chartNodes: nodes, chartEdges: edges };
+  }, [analysis.document, schemas]);
 
   const handleSelectAll = () => {
     const newSchemas = schemas.map(s => ({ ...s, selected: true }));
@@ -221,26 +385,57 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
 
   return (
     <div className="space-y-6">
-      {/* Schema Selection Controls */}
+      {/* View Mode Tabs and Schema Selection Controls */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-2">
+          {/* View Mode Tabs */}
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
             <button
-              onClick={handleSelectAll}
-              className="px-3 py-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+              onClick={() => setPanelView('list')}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                panelView === 'list'
+                  ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
             >
-              Select All
+              <LayoutGrid className="h-4 w-4" />
+              List View
             </button>
             <button
-              onClick={handleSelectNone}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              onClick={() => setPanelView('chart')}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                panelView === 'chart'
+                  ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
             >
-              Select None
+              <Network className="h-4 w-4" />
+              Chart View
             </button>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {selectedCount} of {schemas.length} selected
-            </span>
           </div>
+
+          {/* Selection Controls - Only show in list view */}
+          {panelView === 'list' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                onClick={handleSelectNone}
+                className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Select None
+              </button>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {selectedCount} of {schemas.length} selected
+              </span>
+            </div>
+          )}
+
+          {/* Search filter - always visible */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -251,10 +446,55 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
               className="pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
+
+          {/* Schema count - always visible */}
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {selectedCount} of {schemas.length} schemas selected
+          </span>
         </div>
       </div>
 
-      {/* Schema Selection and Preview */}
+      {/* Chart View */}
+      {panelView === 'chart' && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Schema Relationships
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Visualize how schemas relate to each other through references
+            </p>
+          </div>
+          <div className="h-[500px]">
+            <ReactFlowProvider>
+              <ReactFlow
+                nodes={chartNodes}
+                edges={chartEdges}
+                nodeTypes={previewNodeTypes}
+                fitView
+                fitViewOptions={{ padding: 0.2 }}
+                nodesDraggable={true}
+                nodesConnectable={false}
+                elementsSelectable={true}
+                minZoom={0.2}
+                maxZoom={2}
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+                <Controls showInteractive={false} />
+                <MiniMap
+                  nodeColor={(node) => node.data?.selected ? '#6366f1' : '#9ca3af'}
+                  maskColor="rgba(0, 0, 0, 0.1)"
+                  className="bg-gray-100 dark:bg-gray-700"
+                />
+              </ReactFlow>
+            </ReactFlowProvider>
+          </div>
+        </div>
+      )}
+
+      {/* List View - Schema Selection and Preview */}
+      {panelView === 'list' && (
       <div className="grid grid-cols-3 gap-6">
         {/* Left: Schema List - 1/3 width */}
         <div className="col-span-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -673,6 +913,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
           </div>
         </div>
       </div>
+      )}
 
       {/* Import Options */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
