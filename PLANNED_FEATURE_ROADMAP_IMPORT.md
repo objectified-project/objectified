@@ -570,3 +570,6 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Version Detection**: Detect OpenAPI/JSON Schema version
 - ✅ **Syntax Validation**: Real-time YAML/JSON syntax checking
 - ✅ Import summarization details
+
+##### AI Import ✅ IMPLEMENTED
+- ✅ **Natural Language to Spec**: Generate OpenAPI from text description

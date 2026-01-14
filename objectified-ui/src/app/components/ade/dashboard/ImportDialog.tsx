@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import ImportCompletePanel from './ImportCompletePanel';
 import UrlImportPanel from './UrlImportPanel';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
+import LLMImportDialog from './LLMImportDialog';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
 import { generateSlug } from '../../../utils/slug';
 
@@ -55,8 +56,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [gitContent, setGitContent] = useState<string | null>(null);
   const [gitFilename, setGitFilename] = useState<string | null>(null);
   const [gitMetadata, setGitMetadata] = useState<FileMetadataPreview | null>(null);
+  const [showLLMDialog, setShowLLMDialog] = useState(false);
 
   const handleSourceClick = (source: string) => {
+    if (source === 'llm') {
+      setShowLLMDialog(true);
+      return;
+    }
     setSelectedSource(source);
     setCurrentStep('file-upload');
     console.log('Selected source:', source);
@@ -234,6 +240,34 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFileSelect(e.target.files[0]);
+    }
+  };
+
+  const handleLLMImportSpec = async (specContent: string) => {
+    try {
+      // Close the LLM dialog
+      setShowLLMDialog(false);
+
+      // Set this as clipboard content to proceed with normal import flow
+      setSelectedSource('llm');
+      setClipboardContent(specContent);
+      setClipboardFilename('ai-generated-spec.json');
+      setCurrentStep('file-upload');
+
+      // Automatically trigger analysis
+      setIsAnalyzing(true);
+      try {
+        const result = await analyzeSpecification(specContent, 'ai-generated-spec.json');
+        setAnalysisResult(result);
+        setCurrentStep('analysis');
+      } catch (error) {
+        console.error('Analysis error:', error);
+        setIsAnalyzing(false);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    } catch (error) {
+      console.error('Error importing LLM-generated spec:', error);
     }
   };
 
@@ -503,43 +537,74 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   </div>
                 </button>
 
-                {/* SwaggerHub */}
+                {/* AI Assistant */}
                 <button
-                  disabled
-                  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"
-                  title="Coming soon"
+                  onClick={() => handleSourceClick('llm')}
+                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedSource === 'llm'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                  }`}
                 >
+                  <div className="absolute top-2 right-2">
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 rounded-full">
+                      New
+                    </span>
+                  </div>
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">
-                      <Cloud className="h-6 w-6" />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                      selectedSource === 'llm'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                    }`}>
+                      <Sparkles className="h-6 w-6" />
                     </div>
-                    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">
-                      SwaggerHub Integration
+                    <div className="font-semibold mb-1 text-purple-700 dark:text-purple-300">
+                      AI Assistant
                     </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
-                      Import from SwaggerHub
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Generate specs with natural language
                     </div>
                   </div>
                 </button>
 
-                {/* Registry Import */}
-                <button
-                  disabled
-                  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"
-                  title="Coming soon"
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">
-                      <Package className="h-6 w-6" />
-                    </div>
-                    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">
-                      Registry Import
-                    </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
-                      Import from schema registry
-                    </div>
-                  </div>
-                </button>
+                {/*/!* SwaggerHub *!/*/}
+                {/*<button*/}
+                {/*  disabled*/}
+                {/*  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"*/}
+                {/*  title="Coming soon"*/}
+                {/*>*/}
+                {/*  <div className="flex flex-col items-center text-center">*/}
+                {/*    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">*/}
+                {/*      <Cloud className="h-6 w-6" />*/}
+                {/*    </div>*/}
+                {/*    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">*/}
+                {/*      SwaggerHub Integration*/}
+                {/*    </div>*/}
+                {/*    <div className="text-xs text-gray-400 dark:text-gray-500">*/}
+                {/*      Import from SwaggerHub*/}
+                {/*    </div>*/}
+                {/*  </div>*/}
+                {/*</button>*/}
+
+                {/*/!* Registry Import *!/*/}
+                {/*<button*/}
+                {/*  disabled*/}
+                {/*  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"*/}
+                {/*  title="Coming soon"*/}
+                {/*>*/}
+                {/*  <div className="flex flex-col items-center text-center">*/}
+                {/*    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">*/}
+                {/*      <Package className="h-6 w-6" />*/}
+                {/*    </div>*/}
+                {/*    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">*/}
+                {/*      Registry Import*/}
+                {/*    </div>*/}
+                {/*    <div className="text-xs text-gray-400 dark:text-gray-500">*/}
+                {/*      Import from schema registry*/}
+                {/*    </div>*/}
+                {/*  </div>*/}
+                {/*</button>*/}
               </div>
             </div>
           </div>
@@ -1005,6 +1070,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           )}
         </div>
       </DialogContent>
+
+      {/* LLM Import Dialog */}
+      <LLMImportDialog
+        open={showLLMDialog}
+        onClose={() => setShowLLMDialog(false)}
+        onImportSpec={handleLLMImportSpec}
+        tenantId={tenantId}
+        userId={userId}
+      />
     </Dialog>
   );
 };
