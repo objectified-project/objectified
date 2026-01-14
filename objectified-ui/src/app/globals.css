@@ -201,3 +201,66 @@ button {
   transition: d 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Custom prose styles for markdown rendering in chat */
+.prose {
+  color: inherit;
+  max-width: none;
+}
+
+.prose :where(p):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.prose :where(p):last-child:not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  margin-bottom: 0;
+}
+
+.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  color: inherit;
+  font-weight: inherit;
+  background-color: inherit;
+}
+
+.prose :where(pre):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  background-color: transparent;
+}
+
+.prose :where(ul, ol):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose :where(h1, h2, h3, h4, h5, h6):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  color: inherit;
+  font-weight: 600;
+}
+
+.prose :where(blockquote):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  color: inherit;
+  border-left-color: currentColor;
+  opacity: 0.8;
+}
+
+.prose :where(strong):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  color: inherit;
+  font-weight: 600;
+}
+
+.prose :where(em):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  color: inherit;
+  font-style: italic;
+}
+
+.prose :where(a):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose :where(hr):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+  border-color: currentColor;
+  opacity: 0.2;
+}
+

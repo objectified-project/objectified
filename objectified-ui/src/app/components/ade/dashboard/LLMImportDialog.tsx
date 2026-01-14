@@ -17,6 +17,8 @@ import {
 } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
 import * as Select from '@radix-ui/react-select';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface LLMImportDialogProps {
   open: boolean;
@@ -186,65 +188,134 @@ export default function LLMImportDialog({
     return match ? match[1].trim() : null;
   };
 
-  // Render message content with JSON code blocks highlighted
-  const renderMessageContent = (content: string) => {
-    // Check if content contains JSON code blocks
-    const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/g;
+  // Render message content with markdown formatting
+  const renderMessageContent = (content: string, isStreaming: boolean = false) => {
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            // Customize code blocks
+            code: ({ node, className, children, ...props }: any) => {
+              const inline = !className?.includes('language-');
+              const match = /language-(\w+)/.exec(className || '');
+              const language = match ? match[1] : '';
 
-    if (!jsonBlockRegex.test(content)) {
-      // No JSON blocks, render as plain text
-      return <span className="whitespace-pre-wrap">{content}</span>;
-    }
-
-    // Split content by JSON blocks
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    const regex = /```json\s*\n([\s\S]*?)\n```/g;
-    let match;
-
-    while ((match = regex.exec(content)) !== null) {
-      // Add text before the code block
-      if (match.index > lastIndex) {
-        const textBefore = content.substring(lastIndex, match.index);
-        parts.push(
-          <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-            {textBefore}
-          </span>
-        );
-      }
-
-      // Add the JSON code block with syntax highlighting
-      const jsonContent = match[1];
-      parts.push(
-        <div
-          key={`json-${match.index}`}
-          className="my-2 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600"
+              if (!inline && language === 'json') {
+                // JSON code blocks get special styling
+                return (
+                  <div className="my-2 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                    <div className="bg-gray-800 dark:bg-gray-900 px-3 py-1.5 border-b border-gray-700">
+                      <span className="text-xs font-mono text-gray-300">JSON</span>
+                    </div>
+                    <pre className="bg-gray-900 dark:bg-black p-4 overflow-x-auto m-0">
+                      <code className="text-sm font-mono text-green-400 dark:text-green-300" {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  </div>
+                );
+              } else if (!inline) {
+                // Other code blocks
+                return (
+                  <div className="my-2 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                    {language && (
+                      <div className="bg-gray-800 dark:bg-gray-900 px-3 py-1.5 border-b border-gray-700">
+                        <span className="text-xs font-mono text-gray-300">{language}</span>
+                      </div>
+                    )}
+                    <pre className="bg-gray-900 dark:bg-black p-4 overflow-x-auto m-0">
+                      <code className="text-sm font-mono text-gray-100" {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  </div>
+                );
+              } else {
+                // Inline code
+                return (
+                  <code
+                    className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm font-mono"
+                    {...props}
+                  >
+                    {children}
+                  </code>
+                );
+              }
+            },
+            // Customize paragraphs
+            p: ({ children }) => (
+              <p className="mb-2 last:mb-0">{children}</p>
+            ),
+            // Customize headings
+            h1: ({ children }) => (
+              <h1 className="text-xl font-bold mt-4 mb-2 first:mt-0">{children}</h1>
+            ),
+            h2: ({ children }) => (
+              <h2 className="text-lg font-bold mt-3 mb-2 first:mt-0">{children}</h2>
+            ),
+            h3: ({ children }) => (
+              <h3 className="text-base font-bold mt-2 mb-1 first:mt-0">{children}</h3>
+            ),
+            // Customize lists
+            ul: ({ children }) => (
+              <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>
+            ),
+            ol: ({ children }) => (
+              <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>
+            ),
+            li: ({ children }) => (
+              <li className="ml-2">{children}</li>
+            ),
+            // Customize links
+            a: ({ href, children }) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                {children}
+              </a>
+            ),
+            // Customize blockquotes
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic my-2">
+                {children}
+              </blockquote>
+            ),
+            // Customize tables
+            table: ({ children }) => (
+              <div className="overflow-x-auto my-2">
+                <table className="min-w-full divide-y divide-gray-300 dark:divide-gray-600">
+                  {children}
+                </table>
+              </div>
+            ),
+            thead: ({ children }) => (
+              <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>
+            ),
+            th: ({ children }) => (
+              <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">
+                {children}
+              </th>
+            ),
+            td: ({ children }) => (
+              <td className="px-3 py-2 text-sm">{children}</td>
+            ),
+            // Customize horizontal rules
+            hr: () => (
+              <hr className="my-4 border-gray-300 dark:border-gray-600" />
+            ),
+          }}
         >
-          <div className="bg-gray-800 dark:bg-gray-900 px-3 py-1.5 border-b border-gray-700">
-            <span className="text-xs font-mono text-gray-300">JSON</span>
-          </div>
-          <pre className="bg-gray-900 dark:bg-black p-4 overflow-x-auto">
-            <code className="text-sm font-mono text-green-400 dark:text-green-300">
-              {jsonContent}
-            </code>
-          </pre>
-        </div>
-      );
-
-      lastIndex = match.index + match[0].length;
-    }
-
-    // Add any remaining text after the last code block
-    if (lastIndex < content.length) {
-      const textAfter = content.substring(lastIndex);
-      parts.push(
-        <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-          {textAfter}
-        </span>
-      );
-    }
-
-    return <>{parts}</>;
+          {content}
+        </ReactMarkdown>
+        {isStreaming && (
+          <span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse align-middle" />
+        )}
+      </div>
+    );
   };
 
   // Handle importing a spec
@@ -449,8 +520,7 @@ export default function LLMImportDialog({
               <div className="flex flex-col max-w-[80%]">
                 <div className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
                   <div className="text-sm">
-                    {renderMessageContent(streamingContent)}
-                    <span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse" />
+                    {renderMessageContent(streamingContent, true)}
                   </div>
                 </div>
               </div>
