@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Package, Search, Check, FileJson, FileCode2, List, ChevronRight, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network } from 'lucide-react';
+import { Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
 import { generateSlug } from '../../../utils/slug';
@@ -583,9 +583,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                         ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
-                    title="Summary view"
                   >
-                    <List className="h-4 w-4" />
+                    Summary
                   </button>
                   <button
                     onClick={() => setViewMode('json')}
@@ -594,9 +593,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                         ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
-                    title="JSON view"
                   >
-                    <FileJson className="h-4 w-4" />
+                    JSON
                   </button>
                   <button
                     onClick={() => setViewMode('yaml')}
@@ -605,9 +603,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                         ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
-                    title="YAML view"
                   >
-                    <FileCode2 className="h-4 w-4" />
+                    YAML
                   </button>
                 </div>
               )}
