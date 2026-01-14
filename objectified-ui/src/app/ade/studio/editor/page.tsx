@@ -256,6 +256,7 @@ const StudioContent = () => {
 
   // Layout saved state
   const [layoutSaved, setLayoutSaved] = useState(false);
+  const [hasExistingLayout, setHasExistingLayout] = useState(false);
 
   // Track if initial layout has been applied for this version
   const initialLayoutAppliedRef = useRef<string | null>(null);
@@ -2137,6 +2138,7 @@ const StudioContent = () => {
       if (response.success) {
         // Show "Saved" state temporarily
         setLayoutSaved(true);
+        setHasExistingLayout(true);
         setTimeout(() => {
           setLayoutSaved(false);
         }, 2000);
@@ -3411,6 +3413,27 @@ const StudioContent = () => {
 
     loadClasses();
   }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly, updateNodeInternals]);
+
+  // Check if a saved layout exists when version changes
+  useEffect(() => {
+    const checkLayoutExists = async () => {
+      if (!selectedVersionId || !currentUserId) {
+        setHasExistingLayout(false);
+        return;
+      }
+
+      try {
+        const result = await getDefaultCanvasLayout(selectedVersionId, currentUserId);
+        const response = JSON.parse(result);
+        setHasExistingLayout(response.success && response.layout !== null);
+      } catch (error) {
+        console.error('Error checking layout existence:', error);
+        setHasExistingLayout(false);
+      }
+    };
+
+    checkLayoutExists();
+  }, [selectedVersionId, currentUserId]);
 
   // Regenerate edges when edge styling or routing preferences change
   useEffect(() => {
@@ -4688,8 +4711,13 @@ const StudioContent = () => {
                           </button>
                           <button
                             onClick={handleLoadLayout}
-                            className="px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700"
-                            title="Load saved layout"
+                            disabled={!hasExistingLayout}
+                            className={`px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                              hasExistingLayout
+                                ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-gray-200 dark:border-gray-600'
+                            }`}
+                            title={hasExistingLayout ? 'Load saved layout' : 'No saved layout available'}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />

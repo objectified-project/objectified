@@ -22,6 +22,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed group member nodes jumping after auto-layout when dragging the group - properly synchronizes group position reference.
   - Fixed response nodes in path canvas - clicking a response node now shows the ResponsePropertiesPanel with existing description loaded for editing.
   - Fixed JSON Schema refs, was #/components/schemas, but this needs to be #/$defs according to the spec.
+  - Fixed Canvas Layout option so that Load is only available if a previous layout has been saved.
   - Class Template Library now shows the schema preview.
   - Properties and Class Template Form now includes a "close" button
   - Properties now allow multiple properties to be added without closing the form.
