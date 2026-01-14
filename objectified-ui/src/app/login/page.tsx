@@ -10,7 +10,7 @@ export default async function LoginPage({
 }) {
   const session = await getServerSession(authOptions);
   if (session) {
-    redirect('/ade/dashboard');
+    redirect('/ade');
   }
 
   const params = await searchParams;

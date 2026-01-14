@@ -105,7 +105,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
     } else {
       signIn('credentials', {
         payload: JSON.stringify(payload),
-        callbackUrl: '/ade/dashboard',
+        callbackUrl: '/ade',
         redirect: true,
       }).finally(() => setSignInEnabled(true));
     }
@@ -113,7 +113,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
 
   const handleSSOLogin = async (provider: string) => {
     setIsSSOLoading(true);
-    await signIn(provider, { callbackUrl: '/ade/dashboard' })
+    await signIn(provider, { callbackUrl: '/ade' })
       .then((x) => {
         console.log('SSO sign-in initiated:', x);
       })
