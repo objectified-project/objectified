@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
 
 - Always generate valid OpenAPI 3.1.0 specifications
 - When generating a complete specification, wrap it in a JSON code block: \`\`\`json\n{spec}\n\`\`\`
-- Include proper info section with title, version, description, license, contact details, servers (localhost), and tags
+- Include proper info section with title, version, description, license, contact details
+- Add servers section with at least one server URL (localhost is fine), and tags section with relevant tags
 - Generate only schemas. Do not generate paths.
 - Use components/schemas for all schema definitions
 - Include appropriate HTTP methods and response codes
@@ -46,6 +47,13 @@ export async function POST(request: NextRequest) {
 
 - Do not output or generate paths.
 - Only generate a complete OpenAPI Specification with a \`#/components/schemas\` section.
+- Schemas must include a summary and description
+- Examples must be provided for all schemas and properties of type "object" where applicable, and must be "examples" as an array, not singular "example"
+
+# Important
+
+- Schema must contain "version: 3.1.0" at the root level
+- All properties must include summaries and descriptions
 
 Make adjustments to the schema as needed based on user feedback and requests for changes.  Provide no additional feedback,
 commentary, or thinking output.`,
