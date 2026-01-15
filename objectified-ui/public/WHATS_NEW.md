@@ -10,7 +10,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Added new Application Dashboard landing page - presents all Objectified applications in an organized tile layout.
   - Added interactive quality score cards during import - click on any quality score card for more details.
   - Added Chart View tab in import preview - shows a diagram before importing, showing how classes relate to each other through references.
-  - Added AI-Powered Import - Generate OpenAPI 3.1.0 specifications using natural language with real-time streaming responses and conversational context.
+- Import Improvements:
+  - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
+  - Adds SwaggerHub import support.
 - Bug fixes:
   - Fixed ClassNode color changes not being reflected immediately - the memo comparison function now correctly detects theme changes to trigger re-renders.
   - Fixed expand/collapse chevrons in ClassNode not responding - the memo comparison function now correctly detects expandedProperties changes.
@@ -48,5 +50,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: January 13, 2026*
+*Last updated: January 14, 2026*
 

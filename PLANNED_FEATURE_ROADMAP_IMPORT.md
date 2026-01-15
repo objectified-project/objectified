@@ -24,12 +24,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Authenticated URL**: Support for Bearer, API Key, Basic Auth
 - ✅ **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket, Private Repos
 - ✅ **Branch/Tag Selection**: Import specific versions from git
-- 📋 **Swagger Hub Integration**: Direct import from SwaggerHub
+- ✅ **Swagger Hub Integration**: Direct import from SwaggerHub
 - 📋 **Postman Collection Import**: Import from Postman workspace URL
 
 | Ticket | Feature Description                                |
 |--------|----------------------------------------------------|
-| #332   | Ability to import SwaggerHub                       |
 | #333   | Ability to import Postman Collection               |
 
 ##### Integration Import 📋 PLANNED

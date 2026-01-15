@@ -17,6 +17,7 @@ import ImportCompletePanel from './ImportCompletePanel';
 import UrlImportPanel from './UrlImportPanel';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
+import SwaggerHubImportPanel from './SwaggerHubImportPanel';
 import LLMImportDialog from './LLMImportDialog';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
 import { generateSlug } from '../../../utils/slug';
@@ -56,6 +57,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [gitContent, setGitContent] = useState<string | null>(null);
   const [gitFilename, setGitFilename] = useState<string | null>(null);
   const [gitMetadata, setGitMetadata] = useState<FileMetadataPreview | null>(null);
+  const [swaggerHubContent, setSwaggerHubContent] = useState<string | null>(null);
+  const [swaggerHubFilename, setSwaggerHubFilename] = useState<string | null>(null);
+  const [swaggerHubMetadata, setSwaggerHubMetadata] = useState<FileMetadataPreview | null>(null);
   const [showLLMDialog, setShowLLMDialog] = useState(false);
 
   const handleSourceClick = (source: string) => {
@@ -100,6 +104,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setGitContent(null);
       setGitFilename(null);
       setGitMetadata(null);
+      setSwaggerHubContent(null);
+      setSwaggerHubFilename(null);
+      setSwaggerHubMetadata(null);
     }
   };
 
@@ -140,21 +147,23 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile && !urlContent && !clipboardContent && !gitContent) return;
+    if (!selectedFile && !urlContent && !clipboardContent && !gitContent && !swaggerHubContent) return;
 
     console.log('Starting analysis...', {
       selectedFile: selectedFile?.name,
       urlFilename,
       clipboardFilename,
       gitFilename,
+      swaggerHubFilename,
       hasUrlContent: !!urlContent,
       hasClipboardContent: !!clipboardContent,
-      hasGitContent: !!gitContent
+      hasGitContent: !!gitContent,
+      hasSwaggerHubContent: !!swaggerHubContent
     });
     setIsAnalyzing(true);
     try {
-      const content = urlContent || clipboardContent || gitContent || await selectedFile!.text();
-      const filename = urlFilename || clipboardFilename || gitFilename || selectedFile?.name || 'openapi-spec.yaml';
+      const content = urlContent || clipboardContent || gitContent || swaggerHubContent || await selectedFile!.text();
+      const filename = urlFilename || clipboardFilename || gitFilename || swaggerHubFilename || selectedFile?.name || 'openapi-spec.yaml';
       console.log('Content loaded, length:', content.length);
       const result = await analyzeSpecification(content, filename);
       console.log('Analysis complete:', result);
@@ -185,6 +194,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setGitContent(content);
     setGitFilename(filename);
     setGitMetadata(metadata || null);
+    // Don't auto-analyze - user needs to click "Analyze →" button
+  };
+
+  const handleSwaggerHubSpecificationFetched = (content: string, filename: string, metadata?: FileMetadataPreview) => {
+    setSwaggerHubContent(content);
+    setSwaggerHubFilename(filename);
+    setSwaggerHubMetadata(metadata || null);
     // Don't auto-analyze - user needs to click "Analyze →" button
   };
 
@@ -576,24 +592,33 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   </div>
                 </button>
 
-                {/*/!* SwaggerHub *!/*/}
-                {/*<button*/}
-                {/*  disabled*/}
-                {/*  className="group relative p-6 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-60 cursor-not-allowed"*/}
-                {/*  title="Coming soon"*/}
-                {/*>*/}
-                {/*  <div className="flex flex-col items-center text-center">*/}
-                {/*    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-gray-700 text-gray-400">*/}
-                {/*      <Cloud className="h-6 w-6" />*/}
-                {/*    </div>*/}
-                {/*    <div className="font-semibold mb-1 text-gray-500 dark:text-gray-400">*/}
-                {/*      SwaggerHub Integration*/}
-                {/*    </div>*/}
-                {/*    <div className="text-xs text-gray-400 dark:text-gray-500">*/}
-                {/*      Import from SwaggerHub*/}
-                {/*    </div>*/}
-                {/*  </div>*/}
-                {/*</button>*/}
+                {/* SwaggerHub */}
+                <button
+                  onClick={() => handleSourceClick('swaggerhub')}
+                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedSource === 'swaggerhub'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex flex-col items-center text-center">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                      selectedSource === 'swaggerhub'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                    }`}>
+                      <Cloud className="h-6 w-6" />
+                    </div>
+                    <div className={`font-semibold mb-1 ${
+                      selectedSource === 'swaggerhub' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                    }`}>
+                      SwaggerHub
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Import from SwaggerHub
+                    </div>
+                  </div>
+                </button>
 
                 {/*/!* Registry Import *!/*/}
                 {/*<button*/}
@@ -932,6 +957,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   onSpecificationFetched={handleGitSpecificationFetched}
                 />
               );
+            } else if (currentStep === 'file-upload' && selectedSource === 'swaggerhub') {
+              console.log('Rendering: SwaggerHub import panel');
+              return (
+                <SwaggerHubImportPanel
+                  onSpecificationFetched={handleSwaggerHubSpecificationFetched}
+                />
+              );
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
               return (
@@ -1033,6 +1065,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   <Button
                     onClick={handleAnalyze}
                     disabled={!gitContent || isAnalyzing || (gitMetadata !== null && !gitMetadata.formatSupported)}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
+                  </Button>
+                )}
+                {currentStep === 'file-upload' && selectedSource === 'swaggerhub' && (
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!swaggerHubContent || isAnalyzing || (swaggerHubMetadata !== null && !swaggerHubMetadata.formatSupported)}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
