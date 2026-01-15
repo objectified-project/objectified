@@ -49,6 +49,9 @@ export async function POST(request: NextRequest) {
 - Only generate a complete OpenAPI Specification with a \`#/components/schemas\` section.
 - Schemas must include a summary and description
 - Examples must be provided for all schemas and properties of type "object" where applicable, and must be "examples" as an array, not singular "example"
+- Property names are camelCase
+- Schema and Tag names are PascalCase
+- Objects cannot be outside of the properties definitions - all objects must contain properties unless they are allOf/oneOf/anyOf discriminators
 
 # Important
 

@@ -36,10 +36,12 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - **CI/CD Pipeline Integration**: Import from build artifacts
 - **Registry Import**: Import from schema registries
 - **Webhook Import**: Automated import via webhook triggers
+- 📋 **Objectified Import**: Import from Objectified schema registry
 
-| Ticket | Feature Description                             |
-|--------|-------------------------------------------------|
-| #350   | Adds the ability to import via AWS API Gateway  |
+| Ticket | Feature Description                            |
+|--------|------------------------------------------------|
+| #350   | Adds the ability to import via AWS API Gateway |
+| #800   | Add ability to import Objectified schema       |
 
 #### 4.2 Supported Formats ✅ PARTIALLY IMPLEMENTED
 

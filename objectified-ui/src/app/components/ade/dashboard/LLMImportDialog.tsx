@@ -8,7 +8,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, Download, Sparkles, Bot, User, Loader2 } from 'lucide-react';
+import { X, Send, Download, Sparkles, Bot, User, Loader2, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -393,6 +393,16 @@ export default function LLMImportDialog({
                 Generate OpenAPI specifications using natural language
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* AI Caveat Warning */}
+        <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              <strong>Important:</strong> AI can make mistakes. Always review and verify generated specifications before importing.
+            </p>
           </div>
         </div>
 
