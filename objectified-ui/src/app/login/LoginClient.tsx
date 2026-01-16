@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Mail, Lock, User, Info } from 'lucide-react';
 import { signIn } from "next-auth/react";
 import { createSignupRequest } from '../../../lib/db/helper';
+import { useDarkMode } from '../hooks/useDarkMode';
 import { SiGithub, SiGitlab } from "react-icons/si";
 import BetaBackground from './BetaBackground';
 
@@ -40,6 +41,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
   const [signInEnabled, setSignInEnabled] = useState(true);
   const [signupMessage, setSignupMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [isSSOLoading, setIsSSOLoading] = useState(false);
+  const isDark = useDarkMode();
 
   // Handle OAuth error from URL
   const getErrorMessage = (errorCode?: string): { type: 'error' | 'info'; text: string } | null => {
@@ -149,7 +151,7 @@ const LoginClient: React.FC<LoginClientProps> = ({ error }) => {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 blur-xl opacity-20 rounded-full scale-150" />
               <img
-                src="/Objectified-02.png"
+                src={isDark ? "/Objectified-05.png" : "/Objectified-02.png"}
                 alt="Objectified Logo"
                 className="relative"
                 style={{ height: "56px", width: "auto", objectFit: "contain" }}

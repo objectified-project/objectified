@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useTheme as useNextTheme } from 'next-themes';
 import { Theme, themes, getThemeById, getDefaultTheme } from '../config/themes';
 
 interface ThemeContextType {
@@ -15,12 +16,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [currentTheme, setCurrentTheme] = useState<Theme>(getDefaultTheme());
   const [isSystemTheme, setIsSystemTheme] = useState(false);
+  const mountedRef = useRef(false);
+  const { setTheme: setNextTheme, resolvedTheme, theme: nextTheme } = useNextTheme();
 
   // Get the effective theme for system preference
   const getSystemPreferredTheme = useCallback(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const prefersDark = resolvedTheme === 'dark';
     return prefersDark ? getThemeById('dark') || getDefaultTheme() : getThemeById('light') || getDefaultTheme();
-  }, []);
+  }, [resolvedTheme]);
 
   // Apply theme to DOM
   const applyTheme = useCallback((theme: Theme, isSystem: boolean = false) => {
@@ -44,12 +47,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const darkThemes = ['dark', 'high-contrast', 'blueprint', 'solarized', 'nord', 'darcula'];
     const isDarkBased = darkThemes.includes(effectiveTheme.id);
 
+    // Use next-themes to set the theme class (it will handle .dark class)
     if (isDarkBased) {
-      html.classList.add('dark');
-      body.classList.add('dark');
+      setNextTheme('dark');
     } else {
-      html.classList.remove('dark');
-      body.classList.remove('dark');
+      setNextTheme('light');
     }
 
     // Add new theme class to both html and body
@@ -63,13 +65,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Force body background and color
     body.style.backgroundColor = effectiveTheme.colors.background;
     body.style.color = effectiveTheme.colors.foreground;
-  }, [getSystemPreferredTheme]);
+  }, [getSystemPreferredTheme, setNextTheme]);
 
-  // Initialize theme from localStorage or system preference
+  // Initialize theme from localStorage or system preference (only runs once on mount)
   useEffect(() => {
-    const savedThemeId = localStorage.getItem('app-theme');
+    if (mountedRef.current) return;
 
-    if (savedThemeId === 'system') {
+    mountedRef.current = true;
+    // Use same storage key as next-themes: 'theme'
+    const savedThemeId = localStorage.getItem('app-theme');
+    const nextThemeSaved = localStorage.getItem('theme');
+
+    // Check if next-themes is set to system or if no preference exists
+    const shouldUseSystem = !nextThemeSaved || nextThemeSaved === 'system';
+
+    if (savedThemeId === 'system' || shouldUseSystem) {
       // User chose to follow system
       const systemTheme = getThemeById('system');
       if (systemTheme) {
@@ -92,24 +102,36 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       applyTheme(systemTheme, true);
       localStorage.setItem('app-theme', 'system');
     }
-  }, [applyTheme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Listen for system preference changes when using system theme
+  // Listen for resolved theme changes from next-themes
   useEffect(() => {
-    if (!isSystemTheme) return;
+    if (!mountedRef.current) return;
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const handleChange = () => {
+    if (isSystemTheme && resolvedTheme) {
       const systemTheme = getThemeById('system');
       if (systemTheme) {
         applyTheme(systemTheme, true);
       }
-    };
+    }
+  }, [isSystemTheme, resolvedTheme, applyTheme]);
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [isSystemTheme, applyTheme]);
+  // Sync with next-themes when it changes
+  useEffect(() => {
+    if (!mountedRef.current) return;
+
+    // If next-themes is set to system, update our theme accordingly
+    if (nextTheme === 'system' && !isSystemTheme) {
+      const systemTheme = getThemeById('system');
+      if (systemTheme) {
+        setCurrentTheme(systemTheme);
+        setIsSystemTheme(true);
+        applyTheme(systemTheme, true);
+        localStorage.setItem('app-theme', 'system');
+      }
+    }
+  }, [nextTheme, isSystemTheme, applyTheme]);
 
   const setTheme = (themeId: string) => {
     const theme = getThemeById(themeId);

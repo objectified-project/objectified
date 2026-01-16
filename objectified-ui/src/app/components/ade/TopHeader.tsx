@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation';
 import WhatsNewDialog from './WhatsNewDialog';
 import ThemeSelector from './ThemeSelector';
 import { useTheme } from '../../providers/ThemeProvider';
+import { useDarkMode } from '../../hooks/useDarkMode';
 import { getTenantsForUser } from '../../../../lib/db/helper';
 import packageJson from '../../../../package.json';
 
@@ -37,6 +38,7 @@ const TopHeader = () => {
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const { currentTheme, isSystemTheme } = useTheme();
+  const isDark = useDarkMode();
 
   // Get display name for current theme (shows effective theme when system is selected)
   const getThemeDisplayName = () => {
@@ -95,7 +97,7 @@ const TopHeader = () => {
       {/* Left: Logo */}
       <div style={{ display: "flex", alignItems: "center", height: 40, gap: 8 }}>
         <img
-          src={currentTheme.id === 'dark' || currentTheme.id === 'high-contrast' || currentTheme.id === 'blueprint' || currentTheme.id === 'solarized' || currentTheme.id === 'nord' || currentTheme.id === 'darcula' ? "/Objectified-05.png" : "/Objectified-02.png"}
+          src={isDark ? "/Objectified-05.png" : "/Objectified-02.png"}
           alt="Objectified Logo"
           style={{ height: "100%", width: "auto", objectFit: "contain" }}
         />
