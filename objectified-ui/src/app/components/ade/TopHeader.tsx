@@ -10,9 +10,10 @@ import WhatsNewDialog from './WhatsNewDialog';
 import ThemeSelector from './ThemeSelector';
 import { useTheme } from '../../providers/ThemeProvider';
 import { getTenantsForUser } from '../../../../lib/db/helper';
+import packageJson from '../../../../package.json';
 
 // Import version from package.json
-const APP_VERSION = '02-2026';
+const APP_VERSION = `02-2026-v${packageJson.version}`;
 
 type NavItem = { label: string; href: string; enabled?: boolean; opensNewBrowser?: boolean };
 

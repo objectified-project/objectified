@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "@radix-ui/themes/styles.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import ThemeRegistry from "@/app/components/theme/ThemeRegistry";
 import { DialogProvider } from "@/app/components/providers/DialogProvider";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { Theme as RadixTheme } from "@radix-ui/themes";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,39 +24,31 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Inline script to set theme before hydration (prevents flash)
-  const themeScript = `
-    (function() {
-      try {
-        const savedTheme = localStorage.getItem('theme');
-        const html = document.documentElement;
-        if (savedTheme === 'dark') {
-          html.classList.add('dark');
-        } else if (savedTheme === 'light') {
-          html.classList.remove('dark');
-        } else {
-          // No saved preference - use system preference
-          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            html.classList.add('dark');
-          }
-        }
-      } catch (e) {}
-    })();
-  `;
-
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
       <body className="antialiased">
-        <ThemeRegistry>
-          <SessionWrapper>
-            <DialogProvider>
-              {children}
-            </DialogProvider>
-          </SessionWrapper>
-        </ThemeRegistry>
+        <NextThemesProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          storageKey="theme"
+        >
+          <RadixTheme
+            accentColor="indigo"
+            grayColor="slate"
+            panelBackground="solid"
+            radius="medium"
+            scaling="100%"
+          >
+            <ThemeRegistry>
+              <SessionWrapper>
+                <DialogProvider>
+                  {children}
+                </DialogProvider>
+              </SessionWrapper>
+            </ThemeRegistry>
+          </RadixTheme>
+        </NextThemesProvider>
       </body>
     </html>
   );

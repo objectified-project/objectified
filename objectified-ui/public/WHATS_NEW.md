@@ -26,6 +26,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed response nodes in path canvas - clicking a response node now shows the ResponsePropertiesPanel with existing description loaded for editing.
   - Fixed JSON Schema refs, was #/components/schemas, but this needs to be #/$defs according to the spec.
   - Fixed Canvas Layout option so that Load is only available if a previous layout has been saved.
+  - Fixed issue with system theming not applying properly on initial load.
   - Class Template Library now shows the schema preview.
   - Properties and Class Template Form now includes a "close" button
   - Properties now allow multiple properties to be added without closing the form.
@@ -50,5 +51,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: January 14, 2026*
+*Last updated: January 15, 2026*
 

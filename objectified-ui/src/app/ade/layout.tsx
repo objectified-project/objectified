@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
+import "@radix-ui/themes/styles.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import AuthenticatedLayout from "@/app/components/auth/AuthenticatedLayout";
 import ConditionalHeader from '@/app/components/ade/ConditionalHeader';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { Theme as RadixTheme } from "@radix-ui/themes";
 import * as React from 'react';
 
 const geistSans = Geist({
@@ -28,18 +31,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          <SessionWrapper>
-            <AuthenticatedLayout>
-              <ConditionalHeader />
-              {children}
-            </AuthenticatedLayout>
-          </SessionWrapper>
-        </ThemeProvider>
+        <NextThemesProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          storageKey="theme"
+        >
+          <RadixTheme
+            accentColor="indigo"
+            grayColor="slate"
+            panelBackground="solid"
+            radius="medium"
+            scaling="100%"
+          >
+            <ThemeProvider>
+              <SessionWrapper>
+                <AuthenticatedLayout>
+                  <ConditionalHeader />
+                  {children}
+                </AuthenticatedLayout>
+              </SessionWrapper>
+            </ThemeProvider>
+          </RadixTheme>
+        </NextThemesProvider>
       </body>
     </html>
   );
