@@ -183,8 +183,26 @@ export async function updateSharedPathResponse(
     params.push(updates.description);
   }
   if (updates.data !== undefined) {
-    setClauses.push(`data = $${++paramIndex}`);
-    params.push(JSON.stringify(updates.data));
+    setClauses.push(`data = $${++paramIndex}::jsonb`);
+    // For JSONB columns, PostgreSQL expects a JSON string
+    // If data is null, we want to set it to NULL, otherwise stringify it
+    let dataValue: string | null = null;
+    if (updates.data !== null) {
+      if (typeof updates.data === 'string') {
+        // Already a string, use it directly (but validate it's valid JSON)
+        try {
+          JSON.parse(updates.data);
+          dataValue = updates.data;
+        } catch (e) {
+          // Invalid JSON string, stringify the original object
+          dataValue = JSON.stringify(updates.data);
+        }
+      } else {
+        // Object, stringify it
+        dataValue = JSON.stringify(updates.data);
+      }
+    }
+    params.push(dataValue);
   }
 
   const query = `
@@ -196,10 +214,22 @@ export async function updateSharedPathResponse(
 
   try {
     const result = await connectionPool.query(query, params);
+    
     if (result.rowCount === 0) {
       return JSON.stringify({ success: false, error: 'Response not found' });
     }
-    return JSON.stringify({ success: true, response: result.rows[0] });
+    
+    const response = result.rows[0];
+    // Ensure data is properly parsed if it's a string
+    if (response.data && typeof response.data === 'string') {
+      try {
+        response.data = JSON.parse(response.data);
+      } catch (e) {
+        // If it's already an object, leave it as is
+      }
+    }
+    
+    return JSON.stringify({ success: true, response });
   } catch (error: any) {
     console.error('Error updating shared response:', error);
     return JSON.stringify({ success: false, error: error.message });

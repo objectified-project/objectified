@@ -28,6 +28,15 @@ export default function PathsPage() {
     description: string;
   } | null>(null);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
+  const [helpDismissed, setHelpDismissed] = useState(false);
+  const [responsePanelRefreshKey, setResponsePanelRefreshKey] = useState(0);
+
+  // Check if help was dismissed
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHelpDismissed(sessionStorage.getItem('paths-help-dismissed') === 'true');
+    }
+  }, []);
 
   const handlePathSelect = (pathId: string | null, pathname?: string) => {
     setSelectedPathId(pathId);
@@ -54,6 +63,11 @@ export default function PathsPage() {
   };
 
   const handleResponseSelect = (response: { id: string; statusCode: string; description: string } | null) => {
+    // Force panel refresh by updating the refresh key when selecting a response
+    // This ensures the panel reloads data even if clicking the same response node
+    if (response) {
+      setResponsePanelRefreshKey(prev => prev + 1);
+    }
     setSelectedResponse(response);
     if (response) {
       setSelectedOperation(null);
@@ -63,6 +77,8 @@ export default function PathsPage() {
 
   const handleCanvasRefresh = () => {
     setCanvasRefreshKey(prev => prev + 1);
+    // Also refresh response panel if it's open
+    setResponsePanelRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -91,8 +107,8 @@ export default function PathsPage() {
           </div>
         </div>
       ) : (
-        /* Two-Panel Layout: Sidebar | Canvas | Properties */
-        <div className="flex-1 flex h-full overflow-hidden">
+        /* Three-Panel Layout: Sidebar | Canvas | Properties */
+        <div className="flex-1 flex h-full overflow-hidden relative">
           {/* Left Sidebar */}
           <PathsSidebar
             activeTab={activeTab}
@@ -102,14 +118,39 @@ export default function PathsPage() {
           />
 
           {/* Center Canvas */}
-          <PathsCanvasView
-            selectedPathId={selectedPathId}
-            onOperationSelect={handleOperationSelect}
-            onParameterSelect={handleParameterSelect}
-            onResponseSelect={handleResponseSelect}
-            refreshKey={canvasRefreshKey}
-            onRefresh={handleCanvasRefresh}
-          />
+          <div className="flex-1 relative">
+            {!selectedPathId && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-xl max-w-md mx-4 pointer-events-auto">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      Select a Path
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                      Choose a path from the sidebar to start designing your API endpoints.
+                    </p>
+                    <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
+                      <p>💡 <strong>Tip:</strong> Drag operations from the sidebar to the canvas</p>
+                      <p>💡 <strong>Tip:</strong> Drag classes/properties onto operations to define schemas</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <PathsCanvasView
+              selectedPathId={selectedPathId}
+              onOperationSelect={handleOperationSelect}
+              onParameterSelect={handleParameterSelect}
+              onResponseSelect={handleResponseSelect}
+              refreshKey={canvasRefreshKey}
+              onRefresh={handleCanvasRefresh}
+            />
+          </div>
 
           {/* Right Properties Panel - Operation */}
           {selectedOperation && selectedPath && (
@@ -135,14 +176,57 @@ export default function PathsPage() {
           )}
 
           {/* Right Properties Panel - Response */}
-          {selectedResponse && (
+          {selectedResponse && selectedPathId && (
             <ResponsePropertiesPanel
+              key={`response-panel-${selectedResponse.id}-${responsePanelRefreshKey}`}
               responseId={selectedResponse.id}
               statusCode={selectedResponse.statusCode}
               initialDescription={selectedResponse.description}
+              versionPathId={selectedPathId}
+              refreshKey={responsePanelRefreshKey}
               onClose={() => setSelectedResponse(null)}
               onRefresh={handleCanvasRefresh}
             />
+          )}
+
+          {/* Help Banner - Show when path is selected but no operation/parameter/response is selected */}
+          {selectedPathId && !selectedOperation && !selectedParameter && !selectedResponse && !helpDismissed && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-none">
+              <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 shadow-xl max-w-2xl mx-4 pointer-events-auto">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                      Drag & Drop Design
+                    </h4>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                      <p>• <strong>Operations:</strong> Drag from sidebar → Drop on canvas</p>
+                      <p>• <strong>Schemas:</strong> Drag classes/properties from sidebar → Drop on operation nodes</p>
+                      <p>• <strong>Parameters/Responses:</strong> Click operation nodes to configure</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Store dismissal in sessionStorage
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('paths-help-dismissed', 'true');
+                        setHelpDismissed(true);
+                      }
+                    }}
+                    className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    aria-label="Dismiss"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

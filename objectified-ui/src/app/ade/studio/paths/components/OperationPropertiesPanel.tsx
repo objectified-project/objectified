@@ -6,6 +6,8 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 import { Close, Save, Add, Delete, ArrowBack } from '@mui/icons-material';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
@@ -28,6 +30,7 @@ import {
   unlinkResponseFromOperation,
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
+import SchemaBuilder from './SchemaBuilder';
 
 interface OperationPropertiesPanelProps {
   operationId: string | null;
@@ -82,6 +85,10 @@ export default function OperationPropertiesPanel({
   // New response form state
   const [newResponseStatusCode, setNewResponseStatusCode] = useState('200');
   const [newResponseDescription, setNewResponseDescription] = useState('');
+
+  // Request body schema state
+  const [requestBodySchema, setRequestBodySchema] = useState<any>(null);
+  const [requestBodyRequired, setRequestBodyRequired] = useState(true);
 
   // Load operation description when operationId changes
   useEffect(() => {
@@ -981,6 +988,44 @@ export default function OperationPropertiesPanel({
                   </Box>
                 )}
               </Box>
+
+              {/* Request Body Section (for POST/PUT/PATCH) */}
+              {['POST', 'PUT', 'PATCH'].includes(operation) && (
+                <Box sx={{ mt: 2, pt: 2, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      Request Body
+                    </label>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={requestBodyRequired}
+                          onChange={(e) => setRequestBodyRequired(e.target.checked)}
+                          size="small"
+                          sx={{
+                            color: isDark ? '#64748b' : '#94a3b8',
+                            '&.Mui-checked': {
+                              color: '#8b5cf6',
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <span className="text-[10px] text-gray-600 dark:text-gray-400">
+                          Required
+                        </span>
+                      }
+                    />
+                  </Box>
+                  <SchemaBuilder
+                    value={requestBodySchema}
+                    onChange={setRequestBodySchema}
+                    label=""
+                    description="Define the request body schema using existing classes or create inline schemas"
+                    allowInline={true}
+                  />
+                </Box>
+              )}
 
               {/* Responses Section */}
               <Box sx={{ mt: 2 }}>

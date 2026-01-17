@@ -493,66 +493,190 @@ export default function PathsSidebar({
 
               {/* Classes Tab Content */}
               {activeTab === 'classes' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {classes.length === 0 ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
-                      No classes found.
-                    </span>
+                    <Box
+                      sx={{
+                        py: 3,
+                        px: 2,
+                        textAlign: 'center',
+                        border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        No classes found. Create classes in the main Studio editor.
+                      </span>
+                    </Box>
                   ) : (
-                    classes.map((cls) => (
-                      <Box
-                        key={cls.id}
-                        sx={{
-                          px: 1.5,
-                          py: 1,
-                          borderRadius: 1,
-                          border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
-                          backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
-                          fontSize: '0.875rem',
-                          color: isDark ? '#d1d5db' : '#374151',
-                          cursor: 'default',
-                          transition: 'all 0.15s ease',
-                          '&:hover': {
-                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
-                          },
-                        }}
-                      >
-                        {cls.name}
+                    <>
+                      <Box sx={{ px: 0.5, mb: 0.5 }}>
+                        <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Drag to Canvas
+                        </span>
                       </Box>
-                    ))
+                      {classes.map((cls) => {
+                        const handleClassDragStart = (e: React.DragEvent) => {
+                          e.dataTransfer.effectAllowed = 'copy';
+                          e.dataTransfer.setData('application/json', JSON.stringify({
+                            type: 'class',
+                            classId: cls.id,
+                            className: cls.name,
+                          }));
+                        };
+
+                        return (
+                          <Box
+                            key={cls.id}
+                            draggable
+                            onDragStart={handleClassDragStart}
+                            sx={{
+                              px: 2,
+                              py: 1.5,
+                              borderRadius: 1.5,
+                              border: isDark ? '1px solid #475569' : '1px solid #cbd5e1',
+                              background: isDark
+                                ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
+                                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
+                              fontSize: '0.875rem',
+                              color: isDark ? '#e2e8f0' : '#1e293b',
+                              cursor: 'grab',
+                              transition: 'all 0.2s ease',
+                              position: 'relative',
+                              boxShadow: isDark
+                                ? '0 1px 3px rgba(0, 0, 0, 0.3)'
+                                : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              '&:hover': {
+                                backgroundColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(241, 245, 249, 1)',
+                                transform: 'translateY(-1px)',
+                                boxShadow: isDark
+                                  ? '0 4px 12px rgba(0, 0, 0, 0.4)'
+                                  : '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                borderColor: isDark ? '#6366f1' : '#818cf8',
+                              },
+                              '&:active': {
+                                cursor: 'grabbing',
+                                transform: 'translateY(0)',
+                              },
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Box
+                                sx={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                  flexShrink: 0,
+                                  boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)',
+                                }}
+                              />
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <div className="font-semibold text-sm truncate">{cls.name}</div>
+                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                  Class Schema
+                                </div>
+                              </Box>
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                    </>
                   )}
                 </Box>
               )}
 
               {/* Properties Tab Content */}
               {activeTab === 'properties' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {properties.length === 0 ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
-                      No properties found.
-                    </span>
+                    <Box
+                      sx={{
+                        py: 3,
+                        px: 2,
+                        textAlign: 'center',
+                        border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        No properties found. Create properties in the main Studio editor.
+                      </span>
+                    </Box>
                   ) : (
-                    properties.map((prop) => (
-                      <Box
-                        key={prop.id}
-                        sx={{
-                          px: 1.5,
-                          py: 1,
-                          borderRadius: 1,
-                          border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
-                          backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
-                          fontSize: '0.875rem',
-                          color: isDark ? '#d1d5db' : '#374151',
-                          cursor: 'default',
-                          transition: 'all 0.15s ease',
-                          '&:hover': {
-                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
-                          },
-                        }}
-                      >
-                        {prop.name}
+                    <>
+                      <Box sx={{ px: 0.5, mb: 0.5 }}>
+                        <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Drag to Canvas
+                        </span>
                       </Box>
-                    ))
+                      {properties.map((prop) => {
+                        const handlePropertyDragStart = (e: React.DragEvent) => {
+                          e.dataTransfer.effectAllowed = 'copy';
+                          e.dataTransfer.setData('application/json', JSON.stringify({
+                            type: 'property',
+                            propertyId: prop.id,
+                            propertyName: prop.name,
+                          }));
+                        };
+
+                        return (
+                          <Box
+                            key={prop.id}
+                            draggable
+                            onDragStart={handlePropertyDragStart}
+                            sx={{
+                              px: 2,
+                              py: 1.5,
+                              borderRadius: 1.5,
+                              border: isDark ? '1px solid #475569' : '1px solid #cbd5e1',
+                              background: isDark
+                                ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
+                                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
+                              fontSize: '0.875rem',
+                              color: isDark ? '#e2e8f0' : '#1e293b',
+                              cursor: 'grab',
+                              transition: 'all 0.2s ease',
+                              position: 'relative',
+                              boxShadow: isDark
+                                ? '0 1px 3px rgba(0, 0, 0, 0.3)'
+                                : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                              '&:hover': {
+                                backgroundColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(241, 245, 249, 1)',
+                                transform: 'translateY(-1px)',
+                                boxShadow: isDark
+                                  ? '0 4px 12px rgba(0, 0, 0, 0.4)'
+                                  : '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                borderColor: isDark ? '#8b5cf6' : '#a78bfa',
+                              },
+                              '&:active': {
+                                cursor: 'grabbing',
+                                transform: 'translateY(0)',
+                              },
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Box
+                                sx={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '2px',
+                                  background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
+                                  flexShrink: 0,
+                                  boxShadow: '0 0 6px rgba(139, 92, 246, 0.4)',
+                                }}
+                              />
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <div className="font-medium text-sm truncate">{prop.name}</div>
+                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                  Property
+                                </div>
+                              </Box>
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                    </>
                   )}
                 </Box>
               )}

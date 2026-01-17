@@ -39,38 +39,161 @@ import {
   deleteSharedPathResponse,
   unlinkResponseFromOperation,
   linkResponseToOperation,
+  updateSharedPathResponse,
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import PathParameterNode from './PathParameterNode';
 import PathResponseNode from './PathResponseNode';
+import PathClassNode, { PathClassNodeData } from './PathClassNode';
 import { Trash2 } from 'lucide-react';
+import {
+  getClassesWithPropertiesAndTags,
+} from '../../../../../../lib/db/helper';
 
-// Operation Node Component with Handle and Delete button
-function OperationNode({ data }: { data: { operation: string; color: string; onDelete?: () => void } }) {
+// Enhanced Operation Node Component with Schema Drop Zones
+function OperationNode({ data }: { 
+  data: { 
+    operation: string; 
+    color: string; 
+    dbOperationId?: string;
+    onDelete?: () => void;
+    onSchemaDrop?: (operationId: string, schemaType: 'request' | 'response', schemaData: any) => void;
+  } 
+}) {
+  const [dragOverRequest, setDragOverRequest] = useState(false);
+  const [dragOverResponse, setDragOverResponse] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, type: 'request' | 'response') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === 'request') {
+      setDragOverRequest(true);
+    } else {
+      setDragOverResponse(true);
+    }
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>, type: 'request' | 'response') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === 'request') {
+      setDragOverRequest(false);
+    } else {
+      setDragOverResponse(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, type: 'request' | 'response') => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (type === 'request') {
+      setDragOverRequest(false);
+    } else {
+      setDragOverResponse(false);
+    }
+
+    const dataStr = e.dataTransfer.getData('application/json');
+    if (!dataStr || !data.dbOperationId || !data.onSchemaDrop) return;
+
+    try {
+      const dropData = JSON.parse(dataStr);
+      if (dropData.type === 'class' || dropData.type === 'property') {
+        data.onSchemaDrop(data.dbOperationId, type, dropData);
+      }
+    } catch (error) {
+      console.error('Error parsing drop data:', error);
+    }
+  };
+
+  const needsRequestBody = ['POST', 'PUT', 'PATCH'].includes(data.operation);
+
   return (
     <>
+      {/* Input handle for parameters */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="operation-input"
+        className="w-3 h-3 bg-white/80 border-2"
+        style={{ borderColor: data.color }}
+      />
+
       <div
-        className="px-4 py-2 rounded-lg shadow-lg border-2 font-bold text-white text-sm cursor-pointer relative group"
+        className="rounded-xl shadow-xl border-2 relative group min-w-[200px] dark:bg-gray-800/95"
         style={{
-          backgroundColor: data.color,
           borderColor: data.color,
-          minWidth: '80px',
-          textAlign: 'center',
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
         }}
       >
-        {data.operation}
+        {/* Delete button */}
         {data.onDelete && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               data.onDelete?.();
             }}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-20"
             title="Delete operation"
           >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
           </button>
         )}
+
+        {/* Operation Header */}
+        <div
+          className="px-4 py-2.5 rounded-t-xl font-bold text-white text-sm"
+          style={{
+            background: `linear-gradient(135deg, ${data.color} 0%, ${data.color}dd 100%)`,
+          }}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <span>{data.operation}</span>
+          </div>
+        </div>
+
+        {/* Request Body Drop Zone (for POST/PUT/PATCH) */}
+        {needsRequestBody && (
+          <div
+            onDragOver={(e) => handleDragOver(e, 'request')}
+            onDragLeave={(e) => handleDragLeave(e, 'request')}
+            onDrop={(e) => handleDrop(e, 'request')}
+            className={`px-3 py-2 border-t border-b transition-all cursor-pointer ${
+              dragOverRequest
+                ? 'bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border-purple-300 dark:border-purple-600'
+                : 'bg-gray-50/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100/50 dark:hover:bg-gray-700/70'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-purple-500 opacity-60" />
+              <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                {dragOverRequest ? 'Drop schema here' : 'Request Body'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Response Drop Zone */}
+        <div
+          onDragOver={(e) => handleDragOver(e, 'response')}
+          onDragLeave={(e) => handleDragLeave(e, 'response')}
+          onDrop={(e) => handleDrop(e, 'response')}
+          className={`px-3 py-2 rounded-b-xl transition-all cursor-pointer ${
+            dragOverResponse
+              ? 'bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 border-t border-emerald-300 dark:border-emerald-600'
+              : 'bg-gray-50/50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 hover:bg-gray-100/50 dark:hover:bg-gray-700/70'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 opacity-60" />
+            <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
+              {dragOverResponse ? 'Drop schema here' : 'Response'}
+            </span>
+          </div>
+        </div>
       </div>
+
+      {/* Output handle for responses */}
       <Handle
         type="source"
         position={Position.Right}
@@ -86,6 +209,7 @@ const nodeTypes = {
   operation: OperationNode,
   parameter: PathParameterNode,
   response: PathResponseNode,
+  class: PathClassNode,
 };
 
 // Define custom edge types
@@ -120,15 +244,15 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     snapToGrid,
     edgeRouting,
     edgeAnimation,
+    selectedVersionId,
   } = useStudio();
 
-  const { alert: alertDialog } = useDialog();
+  const { alert: alertDialog, confirm: confirmDialog } = useDialog();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
-  const { screenToFlowPosition } = useReactFlow();
-  const { confirm: confirmDialog } = useDialog();
+  const { screenToFlowPosition, getNodes } = useReactFlow();
 
   // Handle delete operation
   const handleDeleteOperation = useCallback(async (operationId: string, operationName: string) => {
@@ -161,6 +285,132 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
       });
     }
   }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
+
+  // Handle class drop on response
+  const handleClassDropOnResponse = useCallback(async (responseId: string, classData: any) => {
+    if (!selectedPathId || !classData.classId) return;
+
+    try {
+      // Get class name from classes
+      const classesResponse = await getClassesWithPropertiesAndTags(selectedVersionId || '');
+      const classesData: any[] = JSON.parse(classesResponse as string);
+      const classInfo = classesData.find((c: any) => c.id === classData.classId);
+
+      if (!classInfo) {
+        await alertDialog({
+          title: 'Error',
+          message: 'Class not found',
+          variant: 'error',
+        });
+        return;
+      }
+
+      // Update response data with class reference
+      const schemaData = {
+        content: {
+          'application/json': {
+            schema: {
+              $ref: `#/components/schemas/${classInfo.name}`,
+            },
+          },
+        },
+      };
+
+      const result = await updateSharedPathResponse(responseId, {
+        data: schemaData,
+      });
+
+      const parsed = JSON.parse(result);
+      
+      if (parsed.success) {
+        // Refresh canvas to show updated connections
+        if (onRefresh) {
+          onRefresh();
+        }
+        
+        // Also trigger a small delay to ensure database is updated
+        // This helps the properties panel reload the data
+        setTimeout(() => {
+          if (onRefresh) {
+            onRefresh();
+          }
+        }, 500);
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to attach class to response',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error attaching class to response:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to attach class to response',
+        variant: 'error',
+      });
+    }
+  }, [selectedPathId, selectedVersionId, alertDialog, onRefresh]);
+
+  // Handle delete class from canvas (remove from all responses using it)
+  const handleDeleteClassFromCanvas = useCallback(async (classId: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Remove Class from Canvas',
+      message: 'This will remove the class reference from all responses using it. The class itself will not be deleted.',
+      variant: 'warning',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      // Get all responses for this path
+      const responsesResponse = await getSharedPathResponses(selectedPathId || '');
+      const responsesData = JSON.parse(responsesResponse);
+
+      if (responsesData.success && responsesData.responses) {
+        // Get class name
+        const classesResponse = await getClassesWithPropertiesAndTags(selectedVersionId || '');
+        const classesData: any[] = JSON.parse(classesResponse as string);
+        const classInfo = classesData.find((c: any) => c.id === classId);
+
+        if (classInfo) {
+          // Remove class reference from all responses that use it
+          for (const response of responsesData.responses) {
+            if (response.data) {
+              try {
+                const responseData = typeof response.data === 'string' 
+                  ? JSON.parse(response.data) 
+                  : response.data;
+                
+                const schema = responseData?.content?.['application/json']?.schema || responseData?.schema;
+                if (schema?.$ref && schema.$ref.includes(classInfo.name)) {
+                  // Remove the class reference
+                  await updateSharedPathResponse(response.id, {
+                    data: null,
+                  });
+                }
+              } catch (error) {
+                console.error('Error processing response:', error);
+              }
+            }
+          }
+        }
+      }
+
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Error removing class from canvas:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to remove class from canvas',
+        variant: 'error',
+      });
+    }
+  }, [selectedPathId, selectedVersionId, confirmDialog, alertDialog, onRefresh]);
 
   // Handle delete parameter
   const handleDeleteParameter = useCallback(async (parameterId: string, parameterName: string) => {
@@ -255,18 +505,46 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         const operationsResponse = await getOperationsForPath(selectedPathId);
         const operations = JSON.parse(operationsResponse);
 
-        // Convert operations to nodes with delete callback
-        const operationNodes: Node[] = operations.map((op: any, index: number) => ({
-          id: op.id,
-          type: 'operation',
-          position: { x: 100 + (index * 150), y: 100 },
+        // Convert operations to nodes with delete callback and schema drop handler
+        // Arrange operations in a more visually appealing layout
+        const operationNodes: Node[] = operations.map((op: any, index: number) => {
+          const cols = 3; // Number of columns
+          const col = index % cols;
+          const row = Math.floor(index / cols);
+          const spacingX = 280;
+          const spacingY = 200;
+          return {
+            id: op.id,
+            type: 'operation',
+            position: { 
+              x: 150 + (col * spacingX), 
+              y: 150 + (row * spacingY) 
+            },
           data: {
             operation: op.operation,
             color: OPERATION_COLORS[op.operation] || '#64748b',
             dbOperationId: op.id,
             onDelete: () => handleDeleteOperation(op.id, op.operation),
+            onSchemaDrop: async (operationId: string, schemaType: 'request' | 'response', schemaData: any) => {
+              // Handle schema drop - this will be handled by opening the properties panel
+              // For now, we'll select the operation to open the properties panel
+              onOperationSelect({
+                id: operationId,
+                operation: op.operation,
+              });
+              
+              // Show alert to guide user to properties panel
+              await alertDialog({
+                title: 'Schema Added',
+                message: schemaType === 'request' 
+                  ? 'Please configure the request body schema in the Operation Details panel.'
+                  : 'Please configure the response schema in the Response Properties panel.',
+                variant: 'info',
+              });
+            },
           },
-        }));
+          };
+        });
 
         // Load ALL shared parameters for this path (not just linked ones)
         const allParamsResponse = await getSharedPathParameters(selectedPathId);
@@ -284,8 +562,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               id: paramNodeId,
               type: 'parameter',
               position: {
-                x: 400,
-                y: 100 + (paramIndex * 150),
+                x: 600 + (paramIndex % 2) * 250,
+                y: 150 + Math.floor(paramIndex / 2) * 180,
               },
               data: {
                 name: param.name,
@@ -337,32 +615,107 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           }
         }
 
+        // Load classes for this version to map class IDs to names
+        let classesMap = new Map<string, { id: string; name: string; description?: string }>();
+        if (selectedVersionId) {
+          try {
+            const classesResponse = await getClassesWithPropertiesAndTags(selectedVersionId);
+            const classesData: any[] = JSON.parse(classesResponse as string);
+            classesData.forEach((cls: any) => {
+              if (!classesMap.has(cls.id)) {
+                classesMap.set(cls.id, {
+                  id: cls.id,
+                  name: cls.name,
+                  description: cls.description,
+                });
+              }
+            });
+          } catch (error) {
+            console.error('Error loading classes:', error);
+          }
+        }
+
         // Now load responses for all operations and create response nodes
         // Load ALL shared responses for this path (not just linked ones)
         const allResponsesResponse = await getSharedPathResponses(selectedPathId);
         const allResponsesData = JSON.parse(allResponsesResponse);
 
         const allResponseNodes: Node[] = [];
+        const allClassNodes: Node[] = [];
+        const classNodesMap = new Map<string, Node>(); // Track class nodes by classId
 
         if (allResponsesData.success && allResponsesData.responses) {
           // Create nodes for all responses
           allResponsesData.responses.forEach((response: any, responseIndex: number) => {
             const responseNodeId = `response-${response.id}`;
 
+            // Extract class reference from response data
+            let attachedClassId: string | undefined;
+            let attachedClassName: string | undefined;
+            
+            if (response.data) {
+              try {
+                const responseData = typeof response.data === 'string' 
+                  ? JSON.parse(response.data) 
+                  : response.data;
+                
+                // Check for $ref in schema
+                const schema = responseData?.content?.['application/json']?.schema || responseData?.schema;
+                if (schema?.$ref) {
+                  // Extract class name from $ref (format: #/components/schemas/ClassName)
+                  const className = schema.$ref.split('/').pop();
+                  const classEntry = Array.from(classesMap.values()).find(c => c.name === className);
+                  if (classEntry) {
+                    attachedClassId = classEntry.id;
+                    attachedClassName = classEntry.name;
+                  }
+                }
+              } catch (error) {
+                console.error('Error parsing response data:', error);
+              }
+            }
+
             allResponseNodes.push({
               id: responseNodeId,
               type: 'response',
               position: {
-                x: 700,
-                y: 100 + (responseIndex * 150),
+                x: 1100 + (responseIndex % 2) * 250,
+                y: 150 + Math.floor(responseIndex / 2) * 180,
               },
               data: {
                 statusCode: response.status_code,
                 description: response.description,
                 dbResponseId: response.id,
-                // No onDelete - responses are shared, unlink via edges or properties panel
+                attachedClassId,
+                attachedClassName,
+                onClassDrop: handleClassDropOnResponse,
               },
             });
+
+            // Create class node if attached and not already created
+            if (attachedClassId && !classNodesMap.has(attachedClassId)) {
+              const classInfo = classesMap.get(attachedClassId);
+              if (classInfo) {
+                const classNodeId = `class-${attachedClassId}`;
+                const classNode: Node = {
+                  id: classNodeId,
+                  type: 'class',
+                  position: {
+                    x: 1400 + (allClassNodes.length % 2) * 280,
+                    y: 150 + Math.floor(allClassNodes.length / 2) * 200,
+                  },
+                  data: {
+                    className: classInfo.name,
+                    classId: attachedClassId,
+                    description: classInfo.description,
+                    dbClassId: attachedClassId,
+                    onDelete: () => handleDeleteClassFromCanvas(attachedClassId),
+                  },
+                };
+                allClassNodes.push(classNode);
+                classNodesMap.set(attachedClassId, classNode);
+              }
+            }
           });
         }
 
@@ -403,7 +756,49 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           }
         }
 
-        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes]);
+        // Create edges from response nodes to class nodes
+        // Make sure we create edges for ALL responses that have the same class
+        allResponseNodes.forEach((responseNode) => {
+          const responseData = responseNode.data as any;
+          if (responseData.attachedClassId) {
+            const classNodeId = `class-${responseData.attachedClassId}`;
+            const classNode = classNodesMap.get(responseData.attachedClassId);
+            
+            if (classNode) {
+              // Check if edge already exists to avoid duplicates
+              const edgeId = `edge-resp-class-${responseNode.id}-${classNode.id}`;
+              const edgeExists = allEdges.some(e => e.id === edgeId);
+              
+              if (!edgeExists) {
+                const edgeType = edgeRouting === 'straight' ? 'straight'
+                  : edgeRouting === 'bezier' ? 'default'
+                  : edgeRouting === 'smart' ? 'smart'
+                  : 'smoothstep';
+
+                allEdges.push({
+                  id: edgeId,
+                  source: responseNode.id,
+                  sourceHandle: 'response-class-output',
+                  target: classNode.id,
+                  targetHandle: 'class-input',
+                  type: edgeType,
+                  animated: edgeAnimation !== 'none',
+                  style: {
+                    stroke: '#6366f1',
+                    strokeWidth: 2.5,
+                    strokeDasharray: undefined,
+                  },
+                  data: {
+                    sourceNodeId: responseNode.id,
+                    targetNodeId: classNode.id,
+                  },
+                });
+              }
+            }
+          }
+        });
+
+        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes, ...allClassNodes]);
         setEdges(allEdges);
       } catch (error) {
         console.error('Error loading operations and parameters:', error);
@@ -411,7 +806,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleClassDropOnResponse]);
 
   // Detect dark mode
   useEffect(() => {
@@ -518,6 +913,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         const sourceNode = nodes.find(n => n.id === connection.source);
         const targetNode = nodes.find(n => n.id === connection.target);
 
+
         let operationId: string | undefined;
         let parameterId: string | undefined;
         let responseId: string | undefined;
@@ -539,8 +935,43 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           responseId = (sourceNode.data as any)?.dbResponseId;
         }
 
+        // Handle response to class connection (both directions) - check this FIRST before other handlers
+        if (
+          (sourceNode?.type === 'response' && targetNode?.type === 'class') ||
+          (sourceNode?.type === 'class' && targetNode?.type === 'response')
+        ) {
+          // Determine which is the response and which is the class
+          const responseNode = sourceNode?.type === 'response' ? sourceNode : targetNode;
+          const classNode = sourceNode?.type === 'class' ? sourceNode : targetNode;
+          
+          const responseId = (responseNode.data as any)?.dbResponseId;
+          const classId = (classNode.data as any)?.dbClassId;
+          const className = (classNode.data as any)?.className;
+          
+          if (responseId && classId) {
+            try {
+              // handleClassDropOnResponse expects { classId, className }
+              await handleClassDropOnResponse(responseId, { 
+                classId,
+                className: className || 'Unknown',
+                type: 'class'
+              });
+            } catch (error) {
+              console.error('Error connecting response to class:', error);
+              await alertDialog({
+                title: 'Error',
+                message: 'Failed to attach class to response. Please try again.',
+                variant: 'error',
+              });
+              // Remove the edge from UI since DB save failed
+              setEdges((eds) => eds.filter(e =>
+                !(e.source === connection.source && e.target === connection.target)
+              ));
+            }
+          }
+        }
         // Handle parameter linking
-        if (operationId && parameterId) {
+        else if (operationId && parameterId) {
           try {
             const result = await linkParameterToOperation(operationId, parameterId, undefined);
             const parsed = JSON.parse(result);
@@ -603,7 +1034,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         }
       }
     },
-    [setEdges, nodes, alertDialog, edgeRouting, edgeAnimation]
+    [setEdges, nodes, alertDialog, edgeRouting, edgeAnimation, handleClassDropOnResponse, selectedPathId, selectedVersionId]
   );
 
   // Handle deleting edges (unlinking parameters and responses from operations)
@@ -736,14 +1167,173 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           message: 'To add a parameter, click on an operation node and use the "Add Parameter" button in the Operation Details panel on the right.',
           variant: 'info',
         });
+      } else if (dropData.type === 'class') {
+        console.log('PathsCanvasView: Class dropped on canvas', {
+          dropData,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          target: event.target,
+          currentTarget: event.currentTarget,
+        });
+        
+        // Check if we're dropping on a response node
+        // React Flow nodes have data-id attribute on the wrapper
+        // Use elementFromPoint to find the element under the cursor
+        const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
+        console.log('PathsCanvasView: Element at drop point', {
+          element: elementAtPoint,
+          tagName: elementAtPoint?.tagName,
+          className: elementAtPoint?.className,
+          id: elementAtPoint?.id,
+          dataset: elementAtPoint ? Object.keys(elementAtPoint.dataset || {}) : [],
+        });
+        
+        // Try multiple ways to find the response node
+        let responseNodeId: string | null = null;
+        
+        if (elementAtPoint) {
+          // Method 1: Check for data-id attribute (React Flow's node wrapper)
+          const nodeWrapper = elementAtPoint.closest('[data-id]');
+          if (nodeWrapper) {
+            responseNodeId = nodeWrapper.getAttribute('data-id');
+            console.log('PathsCanvasView: Found node via data-id', responseNodeId);
+          }
+          
+          // Method 2: Check parent elements for data-id
+          if (!responseNodeId) {
+            let parent = elementAtPoint.parentElement;
+            let depth = 0;
+            while (parent && depth < 10) {
+              const nodeId = parent.getAttribute('data-id');
+              if (nodeId && nodeId.startsWith('response-')) {
+                responseNodeId = nodeId;
+                console.log('PathsCanvasView: Found node via parent traversal', responseNodeId);
+                break;
+              }
+              parent = parent.parentElement;
+              depth++;
+            }
+          }
+          
+          // Method 3: Use React Flow's getNodes to find node at position
+          if (!responseNodeId) {
+            try {
+              const position = screenToFlowPosition({
+                x: event.clientX,
+                y: event.clientY,
+              });
+              
+              // Get all nodes from React Flow
+              const allNodes = getNodes();
+              console.log('PathsCanvasView: All nodes from React Flow', allNodes.map(n => ({ id: n.id, type: n.type, position: n.position })));
+              
+              // Find response nodes and check if position is within bounds
+              // React Flow nodes are approximately 280x150
+              for (const node of allNodes) {
+                if (node.type === 'response') {
+                  const nodeX = node.position.x || 0;
+                  const nodeY = node.position.y || 0;
+                  const nodeWidth = 280; // Approximate width
+                  const nodeHeight = 150; // Approximate height
+                  
+                  const isWithinBounds = (
+                    position.x >= nodeX - 10 && // Add some padding
+                    position.x <= nodeX + nodeWidth + 10 &&
+                    position.y >= nodeY - 10 &&
+                    position.y <= nodeY + nodeHeight + 10
+                  );
+                  
+                  console.log('PathsCanvasView: Checking node', {
+                    nodeId: node.id,
+                    nodePosition: { x: nodeX, y: nodeY },
+                    dropPosition: position,
+                    isWithinBounds,
+                  });
+                  
+                  if (isWithinBounds) {
+                    responseNodeId = node.id;
+                    console.log('PathsCanvasView: Found node via position calculation', responseNodeId);
+                    break;
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('PathsCanvasView: Error in position calculation', error);
+            }
+          }
+        }
+        
+        if (responseNodeId && responseNodeId.startsWith('response-')) {
+          console.log('PathsCanvasView: Dropped on response node', { responseNodeId });
+          
+          // Find the response node and call its onClassDrop handler
+          const responseNode = nodes.find(n => n.id === responseNodeId && n.type === 'response');
+          if (responseNode && responseNode.data.onClassDrop && responseNode.data.dbResponseId) {
+            try {
+              await responseNode.data.onClassDrop(responseNode.data.dbResponseId, dropData);
+            } catch (error) {
+              console.error('Error in onClassDrop:', error);
+            }
+            return; // Don't create a new class node
+          } else {
+            console.warn('PathsCanvasView: Response node found but missing handler or dbResponseId', {
+              responseNode: !!responseNode,
+              hasOnClassDrop: !!responseNode?.data?.onClassDrop,
+              hasDbResponseId: !!responseNode?.data?.dbResponseId,
+            });
+          }
+        }
+        
+        // Class dropped on empty canvas - create a class node
+        const position = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        // Check if class node already exists
+        const existingClassNode = nodes.find(
+          (n) => n.type === 'class' && (n.data as any).dbClassId === dropData.classId
+        );
+
+        if (existingClassNode) {
+          await alertDialog({
+            title: 'Class Already on Canvas',
+            message: `The class "${dropData.className}" is already on the canvas. You can connect it to responses by dragging it onto them.`,
+            variant: 'info',
+          });
+          return;
+        }
+
+        // Create new class node
+        const classNodeId = `class-${dropData.classId}`;
+        const newNode: Node = {
+          id: classNodeId,
+          type: 'class',
+          position,
+          data: {
+            className: dropData.className,
+            classId: dropData.classId,
+            dbClassId: dropData.classId,
+            onDelete: () => handleDeleteClassFromCanvas(dropData.classId),
+          },
+        };
+
+        setNodes((nds) => [...nds, newNode]);
+      } else if (dropData.type === 'property') {
+        // Property drops are handled by the OperationNode component itself
+        await alertDialog({
+          title: 'Drop on Operation',
+          message: 'Please drop the property directly onto an operation node to add it as a request or response schema.',
+          variant: 'info',
+        });
       }
     },
-    [screenToFlowPosition, setNodes, selectedPathId, alertDialog]
+    [screenToFlowPosition, setNodes, selectedPathId, alertDialog, nodes, handleClassDropOnResponse]
   );
 
   return (
     <div ref={reactFlowWrapper} className="flex-1 flex flex-col h-full">
-      <ReactFlow
+        <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -768,25 +1358,28 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         edgesFocusable={true}
         style={{
           background: isDark
-            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
-            : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)'
+            ? 'radial-gradient(ellipse at top, #1e293b 0%, #0f172a 50%, #020617 100%)'
+            : 'radial-gradient(ellipse at top, #ffffff 0%, #f8fafc 30%, #f1f5f9 100%)'
         }}
       >
         <Background
           variant={backgroundVariant(gridStyle)}
           gap={gridSize}
-          size={1.5}
+          size={1}
           color="currentColor"
           style={{
-            color: 'rgb(99, 102, 241)',
-            opacity: isDark ? 0.25 : 0.15
+            color: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(99, 102, 241, 0.08)',
+            opacity: 1
           }}
         />
         <Controls
-          className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden"
+          className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-xl overflow-hidden"
           style={{
             borderRadius: '12px',
             overflow: 'hidden',
+            boxShadow: isDark 
+              ? '0 4px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+              : '0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
           }}
         />
       </ReactFlow>
