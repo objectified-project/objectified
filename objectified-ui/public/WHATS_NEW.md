@@ -10,6 +10,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added new Application Dashboard landing page - presents all Objectified applications in an organized tile layout.
   - Added interactive quality score cards during import - click on any quality score card for more details.
   - Added Chart View tab in import preview - shows a diagram before importing, showing how classes relate to each other through references.
+  - Various UI/UX improvements and optimizations for better performance and responsiveness.
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
   - Adds SwaggerHub import support.
