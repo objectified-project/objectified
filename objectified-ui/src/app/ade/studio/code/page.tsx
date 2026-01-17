@@ -31,6 +31,25 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
+// Code format options configuration
+const CODE_FORMAT_OPTIONS = [
+  { value: 'openapi', label: 'OpenAPI Specification', group: 'primary' },
+  { value: 'asyncapi', label: 'AsyncAPI Specification', group: 'primary' },
+  { value: 'arazzo', label: 'Arazzo Specification', group: 'primary' },
+  { value: 'jsonschema', label: 'JSON Schema', group: 'primary' },
+  { value: 'graphql', label: 'GraphQL SDL', group: 'secondary' },
+  { value: 'sql', label: 'SQL DDL', group: 'secondary' },
+] as const;
+
+// SQL dialect options configuration
+const SQL_DIALECT_OPTIONS = [
+  { value: 'postgresql', label: 'PostgreSQL' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'sqlserver', label: 'SQL Server' },
+  { value: 'oracle', label: 'Oracle' },
+  { value: 'sqlite', label: 'SQLite' },
+] as const;
+
 interface Project {
   id: string;
   name: string;
@@ -401,43 +420,31 @@ export default function CodePage() {
                   <Select.Portal>
                     <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]">
                       <Select.Viewport className="p-1">
-                        <Select.Item value="openapi" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <Select.ItemText>OpenAPI Specification</Select.ItemText>
-                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                        <Select.Item value="asyncapi" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <Select.ItemText>AsyncAPI Specification</Select.ItemText>
-                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                        <Select.Item value="arazzo" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <Select.ItemText>Arazzo Specification</Select.ItemText>
-                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                        <Select.Item value="jsonschema" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <Select.ItemText>JSON Schema</Select.ItemText>
-                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
+                        {CODE_FORMAT_OPTIONS.filter(opt => opt.group === 'primary').map((option) => (
+                          <Select.Item
+                            key={option.value}
+                            value={option.value}
+                            className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <Select.ItemText>{option.label}</Select.ItemText>
+                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            </Select.ItemIndicator>
+                          </Select.Item>
+                        ))}
                         <Select.Separator className="h-px my-1 mx-2 bg-gray-200 dark:bg-gray-700" />
-                        <Select.Item value="graphql" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <Select.ItemText>GraphQL SDL</Select.ItemText>
-                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                        <Select.Item value="sql" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                          <Select.ItemText>SQL DDL</Select.ItemText>
-                          <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                            <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
+                        {CODE_FORMAT_OPTIONS.filter(opt => opt.group === 'secondary').map((option) => (
+                          <Select.Item
+                            key={option.value}
+                            value={option.value}
+                            className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <Select.ItemText>{option.label}</Select.ItemText>
+                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            </Select.ItemIndicator>
+                          </Select.Item>
+                        ))}
                       </Select.Viewport>
                     </Select.Content>
                   </Select.Portal>
@@ -457,36 +464,18 @@ export default function CodePage() {
                     <Select.Portal>
                       <Select.Content className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]">
                         <Select.Viewport className="p-1">
-                          <Select.Item value="postgresql" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <Select.ItemText>PostgreSQL</Select.ItemText>
-                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            </Select.ItemIndicator>
-                          </Select.Item>
-                          <Select.Item value="mysql" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <Select.ItemText>MySQL</Select.ItemText>
-                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            </Select.ItemIndicator>
-                          </Select.Item>
-                          <Select.Item value="sqlserver" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <Select.ItemText>SQL Server</Select.ItemText>
-                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            </Select.ItemIndicator>
-                          </Select.Item>
-                          <Select.Item value="oracle" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <Select.ItemText>Oracle</Select.ItemText>
-                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            </Select.ItemIndicator>
-                          </Select.Item>
-                          <Select.Item value="sqlite" className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <Select.ItemText>SQLite</Select.ItemText>
-                            <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
-                              <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                            </Select.ItemIndicator>
-                          </Select.Item>
+                          {SQL_DIALECT_OPTIONS.map((option) => (
+                            <Select.Item
+                              key={option.value}
+                              value={option.value}
+                              className="relative flex items-center px-8 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              <Select.ItemText>{option.label}</Select.ItemText>
+                              <Select.ItemIndicator className="absolute left-2 inline-flex items-center">
+                                <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                              </Select.ItemIndicator>
+                            </Select.Item>
+                          ))}
                         </Select.Viewport>
                       </Select.Content>
                     </Select.Portal>
