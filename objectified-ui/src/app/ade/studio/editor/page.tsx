@@ -4,8 +4,38 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from '../StudioContext';
-import { Copy, Download, Check, Settings } from 'lucide-react';
-import * as Switch from '@radix-ui/react-switch';
+import {
+  Copy,
+  Download,
+  Check,
+  Settings,
+  Building2,
+  ChevronRight,
+  Folder,
+  ChevronDown,
+  Tag,
+  Layout,
+  Code2,
+  Sun,
+  Moon,
+  Eye,
+  FileText,
+  Info,
+  Move,
+  Lock,
+  SeparatorHorizontal,
+  SeparatorVertical,
+  AlertTriangle,
+  Save,
+  Upload,
+  ChevronUp,
+  Wand2,
+  Image,
+  FileCode,
+  BarChart3,
+  Network,
+  Zap
+} from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Tooltip from '@radix-ui/react-tooltip';
@@ -3808,19 +3838,7 @@ const StudioContent = () => {
     return (
       <div className="flex flex-col items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
         <div className="text-center max-w-md px-6">
-          <svg
-            className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600 mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-            />
-          </svg>
+          <Building2 className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" />
           <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
             No Tenant Selected
           </h2>
@@ -3831,19 +3849,7 @@ const StudioContent = () => {
             onClick={() => window.location.href = '/ade/dashboard/tenants'}
             className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            <svg
-              className="mr-2 h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            <ChevronRight className="mr-2 h-5 w-5" />
             Go to Tenant Selection
           </button>
         </div>
@@ -3936,14 +3942,10 @@ const StudioContent = () => {
               disabled={isLoadingProjects || !currentTenantId}
             >
               <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2zM4 13a1 1 0 001-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                </svg>
+                <Folder className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <Select.Value placeholder="Select project..." />
                 <Select.Icon className="ml-auto">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
                 </Select.Icon>
               </Select.Trigger>
               <Select.Portal>
@@ -3985,14 +3987,10 @@ const StudioContent = () => {
               disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
             >
               <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
+                <Tag className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <Select.Value placeholder="Select version..." />
                 <Select.Icon className="ml-auto">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
                 </Select.Icon>
               </Select.Trigger>
               <Select.Portal>
@@ -4040,18 +4038,14 @@ const StudioContent = () => {
                   value="canvas"
                   className="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                  </svg>
+                  <Layout className="w-4 h-4" />
                   Canvas
                 </ToggleGroup.Item>
                 <ToggleGroup.Item
                   value="code"
                   className="px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:text-indigo-600 dark:data-[state=on]:text-indigo-400 data-[state=on]:shadow-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
+                  <Code2 className="w-4 h-4" />
                   Code
                 </ToggleGroup.Item>
               </ToggleGroup.Root>
@@ -4062,9 +4056,7 @@ const StudioContent = () => {
                 className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 flex items-center gap-2 shadow-sm hover:shadow-md"
                 title="Manage project tags"
               >
-                <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
+                <Tag className="w-4 h-4 text-amber-500" />
                 <span>Tags</span>
               </button>
 
@@ -4094,16 +4086,12 @@ const StudioContent = () => {
                       >
                         {isDark ? (
                           <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
+                            <Sun className="w-4 h-4" />
                             <span>Light Mode</span>
                           </>
                         ) : (
                           <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                            </svg>
+                            <Moon className="w-4 h-4" />
                             <span>Dark Mode</span>
                           </>
                         )}
@@ -4116,10 +4104,7 @@ const StudioContent = () => {
                         className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
                         onSelect={() => toggleClickToFocus()}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
+                        <Eye className="w-4 h-4" />
                         <span className="flex-1">Click-to-Focus</span>
                         <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
                           {clickToFocusEnabled ? 'ON' : 'OFF'}
@@ -4146,19 +4131,7 @@ const StudioContent = () => {
 
               <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-12 md:p-16 text-center shadow-xl shadow-gray-200/50 dark:shadow-gray-900/50">
                 <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                  <svg
-                    className="h-10 w-10 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+                  <FileText className="h-10 w-10 text-white" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
                   No Project Selected
@@ -4170,9 +4143,7 @@ const StudioContent = () => {
                 {/* Quick tip */}
                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-700/50">
                   <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <Info className="w-4 h-4" />
                     Tip: Drag properties from the sidebar onto classes to add them
                   </p>
                 </div>
@@ -4538,9 +4509,7 @@ const StudioContent = () => {
                     }`}
                     title="Show spacing between nodes"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
+                    <Move className="h-3.5 w-3.5" />
                     <span>Spacing</span>
                   </button>
 
@@ -4554,12 +4523,7 @@ const StudioContent = () => {
                         className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
                         title="Distribute nodes with equal horizontal spacing"
                       >
-                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <rect x="2" y="6" width="4" height="12" rx="1" strokeWidth={2} />
-                          <rect x="10" y="6" width="4" height="12" rx="1" strokeWidth={2} />
-                          <rect x="18" y="6" width="4" height="12" rx="1" strokeWidth={2} />
-                          <path d="M6 12h4M14 12h4" strokeWidth={1.5} strokeDasharray="2 1" />
-                        </svg>
+                        <SeparatorHorizontal className="h-3.5 w-3.5" />
                         <span>Distribute H</span>
                       </button>
 
@@ -4569,12 +4533,7 @@ const StudioContent = () => {
                         className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
                         title="Distribute nodes with equal vertical spacing"
                       >
-                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <rect x="6" y="2" width="12" height="4" rx="1" strokeWidth={2} />
-                          <rect x="6" y="10" width="12" height="4" rx="1" strokeWidth={2} />
-                          <rect x="6" y="18" width="12" height="4" rx="1" strokeWidth={2} />
-                          <path d="M12 6v4M12 14v4" strokeWidth={1.5} strokeDasharray="2 1" />
-                        </svg>
+                        <SeparatorVertical className="h-3.5 w-3.5" />
                         <span>Distribute V</span>
                       </button>
                     </>
@@ -4588,9 +4547,7 @@ const StudioContent = () => {
               <Panel position="top-left" className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-900/30 text-amber-800 dark:text-amber-200 rounded-xl shadow-lg px-4 py-2 border border-amber-200/80 dark:border-amber-700/50 backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <div className="p-1 bg-amber-100 dark:bg-amber-800/50 rounded-lg">
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 002 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
+                    <Lock className="h-4 w-4" />
                   </div>
                   <span className="text-xs font-semibold">Read Only Mode</span>
                 </div>
@@ -4608,9 +4565,7 @@ const StudioContent = () => {
                   className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
                   title="Expand all properties"
                 >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <ChevronDown className="h-3.5 w-3.5" />
                   <span>Expand</span>
                 </button>
                 <button
@@ -4618,9 +4573,7 @@ const StudioContent = () => {
                   className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
                   title="Collapse all properties"
                 >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                  </svg>
+                  <ChevronUp className="h-3.5 w-3.5" />
                   <span>Collapse</span>
                 </button>
                 {/* Manage Tags Button */}
@@ -4630,9 +4583,7 @@ const StudioContent = () => {
                     className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:text-amber-600 dark:hover:text-amber-400 flex items-center gap-1.5 border border-transparent hover:border-amber-200 dark:hover:border-amber-700"
                     title="Manage project tags"
                   >
-                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
+                    <Tag className="h-3.5 w-3.5" />
                     <span>Tags</span>
                   </button>
                 )}
@@ -4646,9 +4597,7 @@ const StudioContent = () => {
                 <Panel position="top-left" className={`bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 text-red-800 dark:text-red-200 rounded-xl shadow-lg px-4 py-2.5 border border-red-200/80 dark:border-red-700/50 backdrop-blur-sm ${isReadOnly ? 'mt-[8rem]' : 'mt-[4.5rem]'}`}>
                   <div className="flex items-center gap-2.5">
                     <div className="p-1 bg-red-100 dark:bg-red-800/50 rounded-lg">
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.6c.75 1.336-.213 3.001-1.742 3.001H3.48c-1.53 0-2.492-1.665-1.743-3.001l6.52-11.6zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v2a1 1 0 01-1 1z" clipRule="evenodd" />
-                      </svg>
+                      <AlertTriangle className="h-4 w-4" />
                     </div>
                     <span className="text-xs font-medium max-w-xs">Missing class references detected. Connect property handles to target classes to resolve.</span>
                   </div>
@@ -4664,9 +4613,7 @@ const StudioContent = () => {
                   className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
                   title="Layout options"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                  </svg>
+                  <Layout className="w-5 h-5" />
                 </button>
 
                 {/* Dropdown Menu */}
@@ -4695,16 +4642,12 @@ const StudioContent = () => {
                           >
                             {layoutSaved ? (
                               <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
+                                <Check className="w-4 h-4" />
                                 <span>Saved</span>
                               </>
                             ) : (
                               <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
+                                <Save className="w-4 h-4" />
                                 <span>Save</span>
                               </>
                             )}
@@ -4719,9 +4662,7 @@ const StudioContent = () => {
                             }`}
                             title={hasExistingLayout ? 'Load saved layout' : 'No saved layout available'}
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                            </svg>
+                            <Upload className="w-4 h-4" />
                             <span>Load</span>
                           </button>
                         </div>
@@ -4744,9 +4685,7 @@ const StudioContent = () => {
                           className="w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border border-teal-200 dark:border-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Automatically arrange classes in a hierarchical layout"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                          </svg>
+                          <Wand2 className="w-4 h-4" />
                           <span>Auto-arrange</span>
                         </button>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -4770,9 +4709,7 @@ const StudioContent = () => {
                   className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
                   title="Export canvas"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
+                  <Download className="w-5 h-5" />
                 </button>
 
                 {/* Dropdown Menu */}
@@ -4786,46 +4723,35 @@ const StudioContent = () => {
                         onClick={handleExportPng}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                        <Image className="w-4 h-4" />
                         <span>PNG Image</span>
                       </button>
                       <button
                         onClick={handleExportJpeg}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                        <Image className="w-4 h-4" />
                         <span>JPEG Image</span>
                       </button>
                       <button
                         onClick={handleExportSvg}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
+                        <FileCode className="w-4 h-4" />
                         <span>SVG Image</span>
                       </button>
                       <button
                         onClick={handleExportPdf}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <FileText className="w-4 h-4" />
                         <span>PDF Document</span>
                       </button>
                       <button
                         onClick={handleExportJson}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 3v6a1 1 0 001 1h6" />
-                        </svg>
+                        <FileCode className="w-4 h-4" />
                         <span>JSON Data</span>
                       </button>
                       <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
@@ -4833,36 +4759,28 @@ const StudioContent = () => {
                         onClick={handleExportMermaid}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2v-6a2 2 0 00-2-2h-2a2 2 0 00-2 2v6z" />
-                        </svg>
+                        <BarChart3 className="w-4 h-4" />
                         <span>Mermaid Diagram</span>
                       </button>
                       <button
                         onClick={handleExportPlantUml}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                        </svg>
+                        <Layout className="w-4 h-4" />
                         <span>PlantUML Diagram</span>
                       </button>
                       <button
                         onClick={handleExportGraphMl}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                        </svg>
+                        <Network className="w-4 h-4" />
                         <span>GraphML Graph</span>
                       </button>
                       <button
                         onClick={handleExportDot}
                         className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
+                        <Zap className="w-4 h-4" />
                         <span>DOT (GraphViz)</span>
                       </button>
                     </div>
@@ -4880,9 +4798,7 @@ const StudioContent = () => {
                 <div className="flex items-center gap-5">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg shadow-indigo-500/25">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                      </svg>
+                      <Code2 className="w-5 h-5 text-white" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">
