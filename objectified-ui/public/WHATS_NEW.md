@@ -28,6 +28,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Fixed JSON Schema refs, was #/components/schemas, but this needs to be #/$defs according to the spec.
   - Fixed Canvas Layout option so that Load is only available if a previous layout has been saved.
   - Fixed issue with system theming not applying properly on initial load.
+  - Compacted the look and feel of the Class nodes to reduce visual clutter and improve readability.
   - Class Template Library now shows the schema preview.
   - Properties and Class Template Form now includes a "close" button
   - Properties now allow multiple properties to be added without closing the form.

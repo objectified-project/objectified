@@ -460,20 +460,21 @@ function ClassNode({ id, data, selected }: NodeProps) {
       onDrop={handleDrop}
       onDoubleClick={handleDoubleClick}
       style={{
-        borderRadius: '12px',
-        border: `2px solid ${borderColor}`,
+        borderRadius: '10px',
+        border: `1.5px solid ${borderColor}`,
         background: backgroundColor,
-        minWidth: '260px',
-        maxWidth: '400px',
+        minWidth: '280px',
+        maxWidth: '420px',
         boxShadow: selected
-          ? `0 0 0 2px ${borderColor}, 0 10px 40px -10px rgba(99, 102, 241, 0.4), 0 4px 20px -4px rgba(0, 0, 0, 0.1)`
+          ? `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(99, 102, 241, 0.35)`
           : dragTarget === 'node'
-          ? '0 0 0 2px #10b981, 0 10px 40px -10px rgba(16, 185, 129, 0.3), 0 4px 20px -4px rgba(0, 0, 0, 0.1)'
-          : '0 4px 24px -4px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.04)',
-        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          ? '0 0 0 2px #10b981, 0 8px 24px -8px rgba(16, 185, 129, 0.25)'
+          : '0 2px 12px -2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04)',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'hidden',
         cursor: 'pointer',
         color: textColor,
+        fontSize: '12px',
       }}
     >
       {/* Target handle at the top */}
@@ -482,11 +483,11 @@ function ClassNode({ id, data, selected }: NodeProps) {
         position={Position.Top}
         style={{
           background: selected ? '#6366f1' : '#94a3b8',
-          width: '10px',
-          height: '10px',
+          width: '8px',
+          height: '8px',
           border: '2px solid white',
           borderRadius: '50%',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
           transition: 'background 0.2s ease',
         }}
         isConnectable={true}
@@ -496,11 +497,11 @@ function ClassNode({ id, data, selected }: NodeProps) {
       <div
         style={{
           background: getHeaderGradient(),
-          padding: '12px 16px',
+          padding: '8px 12px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '10px',
+          gap: '8px',
           position: 'relative',
         }}
       >
@@ -508,33 +509,32 @@ function ClassNode({ id, data, selected }: NodeProps) {
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(circle at 100% 0%, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          background: 'radial-gradient(circle at 100% 0%, rgba(255,255,255,0.08) 0%, transparent 50%)',
           pointerEvents: 'none',
         }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
           {/* Class icon */}
           <div style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(4px)',
+            width: '24px',
+            height: '24px',
+            borderRadius: '6px',
+            background: 'rgba(255, 255, 255, 0.18)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '12px',
+            fontSize: '10px',
             fontWeight: 700,
             color: headerTextColor,
             flexShrink: 0,
-            letterSpacing: '-0.5px',
+            letterSpacing: '-0.3px',
           }}>
             {typedData.name.substring(0, 2).toUpperCase()}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: 600,
               color: headerTextColor,
               letterSpacing: '-0.01em',
@@ -543,6 +543,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
               whiteSpace: 'nowrap',
               textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none',
               opacity: typedData.schema?.deprecated ? 0.7 : 1,
+              lineHeight: 1.3,
             }}>
               {typedData.name}
             </div>
@@ -552,10 +553,10 @@ function ClassNode({ id, data, selected }: NodeProps) {
               <div style={{
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: '4px',
-                marginTop: '4px',
+                gap: '3px',
+                marginTop: '3px',
                 opacity: tagsOpacity,
-                transition: 'opacity 0.3s ease-in-out'
+                transition: 'opacity 0.2s ease'
               }}>
                 {typedData.tags.map((tag) => {
                   const colorMap: Record<string, { bg: string; border: string }> = {
@@ -572,15 +573,15 @@ function ClassNode({ id, data, selected }: NodeProps) {
                     <span
                       key={tag.id}
                       style={{
-                        fontSize: '9px',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
+                        fontSize: '8px',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
                         background: colors.bg,
                         color: 'white',
                         fontWeight: 500,
                         border: `1px solid ${colors.border}`,
                         whiteSpace: 'nowrap',
-                        backdropFilter: 'blur(4px)',
+                        lineHeight: 1.4,
                       }}
                     >
                       {tag.tag_name}
@@ -593,39 +594,38 @@ function ClassNode({ id, data, selected }: NodeProps) {
         </div>
 
         {!typedData.isReadOnly && (
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
             {/* Color picker button using Popover */}
             <Popover.Root open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
               <Popover.Trigger asChild>
                 <button
                   style={{
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '6px',
-                    padding: '6px',
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    border: '1px solid rgba(255, 255, 255, 0.18)',
+                    borderRadius: '5px',
+                    padding: '4px',
                     cursor: 'pointer',
                     color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     lineHeight: 1,
-                    transition: 'all 0.2s ease',
+                    transition: 'all 0.15s ease',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    backdropFilter: 'blur(4px)',
                   }}
                   onClick={(e) => e.stopPropagation()}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.35)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.18)';
                   }}
                   title="Change colors"
                 >
-                  <Palette size={14} />
+                  <Palette size={12} />
                 </button>
               </Popover.Trigger>
               <Popover.Portal>
@@ -653,20 +653,19 @@ function ClassNode({ id, data, selected }: NodeProps) {
             {/* Delete button */}
             <button
               style={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '6px',
-                padding: '6px',
+                background: 'rgba(255, 255, 255, 0.12)',
+                border: '1px solid rgba(255, 255, 255, 0.18)',
+                borderRadius: '5px',
+                padding: '4px',
                 cursor: 'pointer',
                 color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '14px',
+                fontSize: '12px',
                 lineHeight: 1,
-                transition: 'all 0.2s ease',
+                transition: 'all 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                backdropFilter: 'blur(4px)',
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -677,12 +676,12 @@ function ClassNode({ id, data, selected }: NodeProps) {
                 e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.9)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.18)';
               }}
               title="Delete class"
             >
-              <Trash2 size={14} />
+              <Trash2 size={12} />
             </button>
           </div>
         )}
@@ -692,17 +691,17 @@ function ClassNode({ id, data, selected }: NodeProps) {
       {showDescription && (
         <div
           style={{
-            padding: '10px 16px',
-            fontSize: '12px',
+            padding: '6px 12px',
+            fontSize: '11px',
             color: dragTarget === 'node' ? '#059669' : '#64748b',
-            lineHeight: '1.5',
+            lineHeight: '1.4',
             background: dragTarget === 'node'
               ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
-              : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              : '#f8fafc',
             borderBottom: `1px solid ${dragTarget === 'node' ? '#a7f3d0' : '#e2e8f0'}`,
             textAlign: dragTarget === 'node' ? 'center' : 'left',
             fontWeight: dragTarget === 'node' ? 500 : 400,
-            minHeight: '40px',
+            minHeight: '28px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: dragTarget === 'node' ? 'center' : 'flex-start',
@@ -710,25 +709,26 @@ function ClassNode({ id, data, selected }: NodeProps) {
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             opacity: descriptionOpacity,
-            transition: 'all 0.3s ease-in-out',
+            transition: 'all 0.2s ease',
             fontStyle: typedData.description ? 'normal' : 'italic',
           }}
         >
-          {dragTarget === 'node' ? '✨ Drop property here' : (typedData.description || 'No description')}
+          {dragTarget === 'node' ? '✨ Drop here' : (typedData.description || 'No description')}
         </div>
       )}
 
       {/* Properties */}
       {showProperties && (
         <div style={{
-          padding: '4px 0',
+          padding: '0',
           opacity: propertiesOpacity,
-          transition: 'opacity 0.3s ease-in-out'
+          transition: 'opacity 0.2s ease'
         }}>
           {(topLevel.length > 0 ? topLevel : []).length > 0 ? (
           topLevel.flatMap((prop, idx) => {
             let rowIndex = 0;
-            const renderProperty = (p: ClassProperty, depth: number): React.JSX.Element[] => {
+            const totalTopLevel = topLevel.length;
+            const renderProperty = (p: ClassProperty, depth: number, isLast: boolean = false): React.JSX.Element[] => {
               const container = isInlineObjectContainer(p);
               const children = childMap.get(p.id) || [];
               const isExpanded = expandedProperties.has(p.id);
@@ -748,20 +748,19 @@ function ClassNode({ id, data, selected }: NodeProps) {
                   onDrop={container && !typedData.isReadOnly ? (e) => handlePropertyDrop(e, p.id) : undefined}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '20px 1fr auto 44px',
+                    gridTemplateColumns: '16px 1fr auto 36px',
                     alignItems: 'center',
-                    padding: '8px 12px 8px 12px',
-                    paddingLeft: `${12 + depth * 16}px`,
-                    margin: '0 8px',
-                    marginBottom: '2px',
-                    borderRadius: '6px',
+                    padding: '5px 10px',
+                    paddingLeft: `${10 + depth * 14}px`,
                     background: isInDropZone
                       ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
                       : 'transparent',
+                    borderBottom: !isLast ? '1px solid #f1f5f9' : 'none',
                     position: 'relative',
-                    gap: '6px',
-                    transition: 'all 0.15s ease',
+                    gap: '4px',
+                    transition: 'background 0.12s ease',
                     cursor: 'default',
+                    minHeight: '28px',
                   }}
                   onMouseEnter={(e) => {
                     if (!isInDropZone) {
@@ -774,7 +773,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
                     }
                   }}
                 >
-                  <div style={{ width: '16px', display: 'flex', alignItems: 'center' }}>
+                  <div style={{ width: '14px', display: 'flex', alignItems: 'center' }}>
                     {container && (
                       <button
                         onClick={(e) => { e.stopPropagation(); togglePropertyExpansion(p.id); }}
@@ -782,13 +781,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
                           background: 'transparent',
                           border: 'none',
                           cursor: 'pointer',
-                          padding: '2px',
-                          borderRadius: '4px',
+                          padding: '1px',
+                          borderRadius: '3px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: '#94a3b8',
-                          transition: 'all 0.15s ease',
+                          transition: 'all 0.12s ease',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = '#e2e8f0';
@@ -800,7 +799,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
                         }}
                         title={isExpanded ? 'Collapse' : 'Expand'}
                       >
-                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                       </button>
                     )}
                   </div>
@@ -809,13 +808,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
                     style={{
                       fontWeight: 500,
                       color: isDeprecated ? '#94a3b8' : '#1e293b',
-                      fontSize: '12px',
+                      fontSize: '11px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '4px',
                       textDecoration: isDeprecated ? 'line-through' : 'none',
                       letterSpacing: '-0.01em',
                     }}
@@ -824,7 +823,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
                     {isRequired && (
                       <span style={{
                         color: '#ef4444',
-                        fontSize: '14px',
+                        fontSize: '12px',
                         fontWeight: 700,
                         lineHeight: 1,
                       }}>*</span>
@@ -833,11 +832,12 @@ function ClassNode({ id, data, selected }: NodeProps) {
                     {children.length > 0 && (
                       <span style={{
                         color: '#94a3b8',
-                        fontSize: '10px',
+                        fontSize: '9px',
                         fontWeight: 500,
                         background: '#f1f5f9',
-                        padding: '1px 5px',
-                        borderRadius: '10px',
+                        padding: '0px 4px',
+                        borderRadius: '8px',
+                        lineHeight: 1.4,
                       }}>
                         {children.length}
                       </span>
@@ -845,13 +845,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
                   </div>
 
                   <div style={{
-                    fontSize: '10px',
+                    fontSize: '9px',
                     color: '#64748b',
                     fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace',
                     whiteSpace: 'nowrap',
                     background: '#f1f5f9',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
+                    padding: '1px 6px',
+                    borderRadius: '3px',
                     fontWeight: 500,
                     letterSpacing: '-0.02em',
                   }}>
@@ -859,7 +859,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
                   </div>
 
                   {!typedData.isReadOnly && (
-                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '2px', justifyContent: 'flex-end' }}>
                       {typedData.onPropertyEdit && (
                         <button
                           onClick={(e) => { e.stopPropagation(); typedData.onPropertyEdit!(typedData.id, p); }}
@@ -867,13 +867,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '4px',
+                            padding: '3px',
+                            borderRadius: '3px',
                             color: '#94a3b8',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            transition: 'all 0.15s ease',
+                            transition: 'all 0.12s ease',
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.background = '#e0e7ff';
@@ -885,7 +885,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
                           }}
                           title="Edit property"
                         >
-                          <Edit size={12} />
+                          <Edit size={11} />
                         </button>
                       )}
                       {typedData.onPropertyDelete && (
@@ -905,13 +905,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '4px',
+                            padding: '3px',
+                            borderRadius: '3px',
                             color: '#94a3b8',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            transition: 'all 0.15s ease',
+                            transition: 'all 0.12s ease',
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.background = '#fee2e2';
@@ -923,7 +923,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
                           }}
                           title="Remove property from class"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={11} />
                         </button>
                       )}
                     </div>
@@ -937,11 +937,11 @@ function ClassNode({ id, data, selected }: NodeProps) {
                       id={`prop-${p.id}`}
                       style={{
                         background: '#6366f1',
-                        width: '10px',
-                        height: '10px',
+                        width: '8px',
+                        height: '8px',
                         border: '2px solid white',
                         borderRadius: '50%',
-                        boxShadow: '0 2px 4px rgba(99, 102, 241, 0.3)',
+                        boxShadow: '0 1px 3px rgba(99, 102, 241, 0.25)',
                       }}
                       isConnectable={!typedData.isReadOnly}
                     />
@@ -950,23 +950,22 @@ function ClassNode({ id, data, selected }: NodeProps) {
               );
 
               if (container && isExpanded && children.length > 0) {
-                children.forEach((c) => row.push(...renderProperty(c, depth + 1)));
+                children.forEach((c, childIdx) => row.push(...renderProperty(c, depth + 1, childIdx === children.length - 1)));
               }
 
               return row;
             };
 
-            return renderProperty(prop, 0);
+            return renderProperty(prop, 0, idx === totalTopLevel - 1);
           })
         ) : (
           <div style={{
-            padding: '16px 12px',
+            padding: '10px 12px',
             textAlign: 'center',
             color: '#94a3b8',
-            fontSize: '12px',
+            fontSize: '11px',
             fontStyle: 'italic',
-            background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
-            borderRadius: '0 0 12px 12px',
+            background: '#fafafa',
           }}>
             No properties
           </div>
@@ -1003,12 +1002,12 @@ function ClassNode({ id, data, selected }: NodeProps) {
             id="comp-bottom"
             style={{
               background: handleColor,
-              width: '12px',
-              height: '12px',
+              width: '10px',
+              height: '10px',
               border: '2px solid white',
               borderRadius: '50%',
-              boxShadow: `0 2px 6px ${shadowColor}`,
-              transition: 'all 0.2s ease',
+              boxShadow: `0 1px 4px ${shadowColor}`,
+              transition: 'all 0.15s ease',
             }}
             isConnectable={false}
           />
