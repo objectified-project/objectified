@@ -1072,7 +1072,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()} modal={true}>
       <DialogContent
-        className="max-w-4xl h-[90vh] max-h-[900px] p-0 flex flex-col overflow-hidden"
+        className="max-w-7xl h-[90vh] max-h-[900px] p-0 flex flex-col overflow-hidden"
         showCloseButton={true}
         aria-describedby={undefined}
       >
@@ -1100,9 +1100,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           </TabsList>
 
           {/* Edit Tab */}
-          <TabsContent value="edit" className="flex-1 overflow-auto mt-0 p-0">
-            <div className="flex flex-col">
-              {formData.error && <Alert variant="error" className="m-4 mb-0">{formData.error}</Alert>}
+          <TabsContent value="edit" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
+            {formData.error && <Alert variant="error" className="m-4 mb-0">{formData.error}</Alert>}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700 overflow-hidden min-h-0">
+              {/* LEFT COLUMN - Essential/Common Fields */}
+              <div className="flex flex-col overflow-y-auto min-h-0">
 
               {/* SECTION 1: Basic Information */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -1375,6 +1377,181 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </div>
               </div>
 
+              {/* SECTION 3: Composition & Inheritance */}
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-4">
+                  <Layers size={18} className="text-indigo-500" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Composition & Inheritance</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">Define relationships with other classes using OpenAPI composition keywords.</p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* allOf */}
+                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/30 border-indigo-700' : 'bg-indigo-50 border-indigo-200'}`}>
+                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>allOf (Inheritance)</h4>
+                    <MultiSelect
+                      options={availableClasses}
+                      value={formData.allOf}
+                      onChange={(newValue) => setFormData(prev => ({ ...prev, allOf: newValue }))}
+                      placeholder="Select classes..."
+                      disabled={isReadOnly}
+                      colorScheme="indigo"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">Must match ALL listed schemas</p>
+                  </div>
+
+                  {/* anyOf */}
+                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200'}`}>
+                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>anyOf (Alternatives)</h4>
+                    <MultiSelect
+                      options={availableClasses}
+                      value={formData.anyOf}
+                      onChange={(newValue) => setFormData(prev => ({ ...prev, anyOf: newValue }))}
+                      placeholder="Select classes..."
+                      disabled={isReadOnly}
+                      colorScheme="amber"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">Must match AT LEAST one schema</p>
+                  </div>
+
+                  {/* oneOf */}
+                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-purple-900/30 border-purple-700' : 'bg-purple-50 border-purple-200'}`}>
+                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>oneOf (Exclusive)</h4>
+                    <MultiSelect
+                      options={availableClasses}
+                      value={formData.oneOf}
+                      onChange={(newValue) => setFormData(prev => ({ ...prev, oneOf: newValue }))}
+                      placeholder="Select classes..."
+                      disabled={isReadOnly}
+                      colorScheme="purple"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">Must match EXACTLY one schema</p>
+                  </div>
+                </div>
+
+                {/* Discriminator */}
+                {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
+                  <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
+                    <h4 className="text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">Discriminator Configuration</h4>
+                    <p className="text-xs text-gray-500 mb-3">Helps tools understand which schema variant to use for polymorphic types</p>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label>Discriminator Property</Label>
+                        <Input
+                          value={formData.discriminatorProperty}
+                          onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
+                          placeholder="e.g., type, petType, kind"
+                          disabled={isReadOnly}
+                        />
+                      </div>
+                      {formData.discriminatorProperty && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="discriminatorUseAuto"
+                              checked={formData.discriminatorUseAuto}
+                              onCheckedChange={(checked) => setFormData(prev => ({
+                                ...prev,
+                                discriminatorUseAuto: !!checked,
+                                discriminatorMapping: checked ? {} : prev.discriminatorMapping
+                              }))}
+                              disabled={isReadOnly}
+                            />
+                            <label htmlFor="discriminatorUseAuto" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                              Use automatic mapping (based on schema names)
+                            </label>
+                          </div>
+
+                          {/* Custom Mapping UI */}
+                          {!formData.discriminatorUseAuto && (
+                            <div className="mt-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-gray-600">
+                              <h5 className="text-xs font-semibold mb-2 text-gray-700 dark:text-gray-300">Custom Mapping</h5>
+                              <p className="text-xs text-gray-500 mb-3">Map discriminator values to schema references</p>
+
+                              {/* Existing mappings */}
+                              {Object.entries(formData.discriminatorMapping).length > 0 && (
+                                <div className="space-y-2 mb-3">
+                                  {Object.entries(formData.discriminatorMapping).map(([value, schemaName]) => (
+                                    <div key={value} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-slate-800 rounded">
+                                      <code className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded">
+                                        {value}
+                                      </code>
+                                      <ArrowRight size={14} className="text-gray-400" />
+                                      <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                                        #/components/schemas/{schemaName}
+                                      </span>
+                                      {!isReadOnly && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                          onClick={() => {
+                                            const newMapping = { ...formData.discriminatorMapping };
+                                            delete newMapping[value];
+                                            setFormData(prev => ({ ...prev, discriminatorMapping: newMapping }));
+                                          }}
+                                        >
+                                          <X size={14} />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Add new mapping */}
+                              {!isReadOnly && (
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Value (e.g., dog)"
+                                    className="flex-1 text-sm"
+                                    id="newDiscriminatorValue"
+                                  />
+                                  <Select
+                                    onValueChange={(schemaName) => {
+                                      const valueInput = document.getElementById('newDiscriminatorValue') as HTMLInputElement;
+                                      const value = valueInput?.value?.trim();
+                                      if (value && schemaName) {
+                                        setFormData(prev => ({
+                                          ...prev,
+                                          discriminatorMapping: {
+                                            ...prev.discriminatorMapping,
+                                            [value]: schemaName
+                                          }
+                                        }));
+                                        if (valueInput) valueInput.value = '';
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-[180px]">
+                                      <SelectValue placeholder="Select schema..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availableClasses.map((cls) => (
+                                        <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
+
+                              {Object.entries(formData.discriminatorMapping).length === 0 && (
+                                <p className="text-xs text-gray-400 italic mt-2">
+                                  No mappings defined. Enter a discriminator value and select a target schema.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              </div>
+
+              {/* RIGHT COLUMN - Advanced/Optional Fields */}
+              <div className="flex flex-col overflow-y-auto min-h-0">
               {/* ===================== ADVANCED VALIDATION ===================== */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                 <div className="flex items-center gap-3 mb-2">
@@ -1841,349 +2018,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 )}
               </div>
 
-              {/* SECTION 3: Composition & Inheritance */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-4">
-                  <Layers size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Composition & Inheritance</h3>
-                </div>
-                <p className="text-sm text-gray-500 mb-4">Define relationships with other classes using OpenAPI composition keywords.</p>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* allOf */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/30 border-indigo-700' : 'bg-indigo-50 border-indigo-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>allOf (Inheritance)</h4>
-                    <MultiSelect
-                      options={availableClasses}
-                      value={formData.allOf}
-                      onChange={(newValue) => setFormData(prev => ({ ...prev, allOf: newValue }))}
-                      placeholder="Select classes..."
-                      disabled={isReadOnly}
-                      colorScheme="indigo"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">Must match ALL listed schemas</p>
-                  </div>
-
-                  {/* anyOf */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-amber-900/30 border-amber-700' : 'bg-amber-50 border-amber-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>anyOf (Alternatives)</h4>
-                    <MultiSelect
-                      options={availableClasses}
-                      value={formData.anyOf}
-                      onChange={(newValue) => setFormData(prev => ({ ...prev, anyOf: newValue }))}
-                      placeholder="Select classes..."
-                      disabled={isReadOnly}
-                      colorScheme="amber"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">Must match AT LEAST one schema</p>
-                  </div>
-
-                  {/* oneOf */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-purple-900/30 border-purple-700' : 'bg-purple-50 border-purple-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>oneOf (Exclusive)</h4>
-                    <MultiSelect
-                      options={availableClasses}
-                      value={formData.oneOf}
-                      onChange={(newValue) => setFormData(prev => ({ ...prev, oneOf: newValue }))}
-                      placeholder="Select classes..."
-                      disabled={isReadOnly}
-                      colorScheme="purple"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">Must match EXACTLY one schema</p>
-                  </div>
-                </div>
-
-                {/* Discriminator */}
-                {(formData.allOf.length > 0 || formData.anyOf.length > 0 || formData.oneOf.length > 0) && (
-                  <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
-                    <h4 className="text-sm font-semibold mb-2 text-gray-900 dark:text-gray-100">Discriminator Configuration</h4>
-                    <p className="text-xs text-gray-500 mb-3">Helps tools understand which schema variant to use for polymorphic types</p>
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <Label>Discriminator Property</Label>
-                        <Input
-                          value={formData.discriminatorProperty}
-                          onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
-                          placeholder="e.g., type, petType, kind"
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                      {formData.discriminatorProperty && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="discriminatorUseAuto"
-                              checked={formData.discriminatorUseAuto}
-                              onCheckedChange={(checked) => setFormData(prev => ({
-                                ...prev,
-                                discriminatorUseAuto: !!checked,
-                                discriminatorMapping: checked ? {} : prev.discriminatorMapping
-                              }))}
-                              disabled={isReadOnly}
-                            />
-                            <label htmlFor="discriminatorUseAuto" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                              Use automatic mapping (based on schema names)
-                            </label>
-                          </div>
-
-                          {/* Custom Mapping UI */}
-                          {!formData.discriminatorUseAuto && (
-                            <div className="mt-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-gray-600">
-                              <h5 className="text-xs font-semibold mb-2 text-gray-700 dark:text-gray-300">Custom Mapping</h5>
-                              <p className="text-xs text-gray-500 mb-3">Map discriminator values to schema references</p>
-
-                              {/* Existing mappings */}
-                              {Object.entries(formData.discriminatorMapping).length > 0 && (
-                                <div className="space-y-2 mb-3">
-                                  {Object.entries(formData.discriminatorMapping).map(([value, schemaName]) => (
-                                    <div key={value} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-slate-800 rounded">
-                                      <code className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded">
-                                        {value}
-                                      </code>
-                                      <ArrowRight size={14} className="text-gray-400" />
-                                      <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                                        #/components/schemas/{schemaName}
-                                      </span>
-                                      {!isReadOnly && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                          onClick={() => {
-                                            const newMapping = { ...formData.discriminatorMapping };
-                                            delete newMapping[value];
-                                            setFormData(prev => ({ ...prev, discriminatorMapping: newMapping }));
-                                          }}
-                                        >
-                                          <X size={14} />
-                                        </Button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Add new mapping */}
-                              {!isReadOnly && (
-                                <div className="flex gap-2">
-                                  <Input
-                                    placeholder="Value (e.g., dog)"
-                                    className="flex-1 text-sm"
-                                    id="newDiscriminatorValue"
-                                  />
-                                  <Select
-                                    onValueChange={(schemaName) => {
-                                      const valueInput = document.getElementById('newDiscriminatorValue') as HTMLInputElement;
-                                      const value = valueInput?.value?.trim();
-                                      if (value && schemaName) {
-                                        setFormData(prev => ({
-                                          ...prev,
-                                          discriminatorMapping: {
-                                            ...prev.discriminatorMapping,
-                                            [value]: schemaName
-                                          }
-                                        }));
-                                        if (valueInput) valueInput.value = '';
-                                      }
-                                    }}
-                                  >
-                                    <SelectTrigger className="w-[180px]">
-                                      <SelectValue placeholder="Select schema..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {availableClasses.map((cls) => (
-                                        <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-
-                              {Object.entries(formData.discriminatorMapping).length === 0 && (
-                                <p className="text-xs text-gray-400 italic mt-2">
-                                  No mappings defined. Enter a discriminator value and select a target schema.
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Discriminator Configuration */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-4">
-                  <GitBranch size={18} className="text-indigo-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Discriminator Configuration</h3>
-                </div>
-                <p className="text-sm text-gray-500 mb-4">Configure polymorphic type handling for subtype identification.</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* As Base Class - Define discriminator */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-purple-900/20 border-purple-700' : 'bg-purple-50 border-purple-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-                      As Base Class
-                    </h4>
-                    <p className="text-xs text-gray-500 mb-3">
-                      Define a discriminator property for polymorphic subtypes
-                    </p>
-
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Property Name</Label>
-                        <Input
-                          value={formData.discriminatorProperty}
-                          onChange={(e) => setFormData(prev => ({ ...prev, discriminatorProperty: e.target.value }))}
-                          placeholder="e.g., petType, kind, type"
-                          disabled={isReadOnly}
-                          className="text-sm"
-                        />
-                        <p className="text-xs text-gray-400">
-                          The property that identifies the subtype
-                        </p>
-                      </div>
-
-                      {formData.discriminatorProperty && (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="discriminatorUseAutoBase"
-                              checked={formData.discriminatorUseAuto}
-                              onCheckedChange={(checked) => setFormData(prev => ({
-                                ...prev,
-                                discriminatorUseAuto: !!checked,
-                                discriminatorMapping: checked ? {} : prev.discriminatorMapping
-                              }))}
-                              disabled={isReadOnly}
-                            />
-                            <label htmlFor="discriminatorUseAutoBase" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
-                              Auto-map using schema names
-                            </label>
-                          </div>
-
-                          {!formData.discriminatorUseAuto && (
-                            <div className="space-y-2">
-                              <Label className="text-xs">Explicit Mappings</Label>
-                              {Object.entries(formData.discriminatorMapping).map(([value, schemaName]) => (
-                                <div key={value} className="flex items-center gap-1 text-xs">
-                                  <code className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded">
-                                    {value}
-                                  </code>
-                                  <ArrowRight size={12} className="text-gray-400" />
-                                  <span className="text-gray-600 dark:text-gray-400">{schemaName}</span>
-                                  {!isReadOnly && (
-                                    <button
-                                      className="ml-auto text-red-500 hover:text-red-700"
-                                      onClick={() => {
-                                        const newMapping = { ...formData.discriminatorMapping };
-                                        delete newMapping[value];
-                                        setFormData(prev => ({ ...prev, discriminatorMapping: newMapping }));
-                                      }}
-                                    >
-                                      <X size={12} />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-
-                              {!isReadOnly && (
-                                <div className="flex gap-1 mt-2">
-                                  <Input
-                                    placeholder="Value"
-                                    className="flex-1 text-xs h-7"
-                                    id="newMappingValue"
-                                  />
-                                  <Select
-                                    onValueChange={(schemaName) => {
-                                      const valueInput = document.getElementById('newMappingValue') as HTMLInputElement;
-                                      const value = valueInput?.value?.trim();
-                                      if (value && schemaName) {
-                                        setFormData(prev => ({
-                                          ...prev,
-                                          discriminatorMapping: {
-                                            ...prev.discriminatorMapping,
-                                            [value]: schemaName
-                                          }
-                                        }));
-                                        if (valueInput) valueInput.value = '';
-                                      }
-                                    }}
-                                  >
-                                    <SelectTrigger className="w-[120px] h-7 text-xs">
-                                      <SelectValue placeholder="Schema" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {availableClasses.map((cls) => (
-                                        <SelectItem key={cls} value={cls} className="text-xs">{cls}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* As Subtype - Specify discriminator value */}
-                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-teal-900/20 border-teal-700' : 'bg-teal-50 border-teal-200'}`}>
-                    <h4 className={`text-sm font-semibold mb-2 ${isDark ? 'text-teal-300' : 'text-teal-700'}`}>
-                      As Subtype
-                    </h4>
-                    <p className="text-xs text-gray-500 mb-3">
-                      Specify the discriminator value when this class extends a base
-                    </p>
-
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">x-discriminator-value</Label>
-                        <Input
-                          value={(formData.extensions?.['x-discriminator-value'] as string) || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            extensions: {
-                              ...prev.extensions,
-                              'x-discriminator-value': e.target.value || undefined
-                            }
-                          }))}
-                          placeholder="e.g., dog, cat, bird"
-                          disabled={isReadOnly}
-                          className="text-sm"
-                        />
-                        <p className="text-xs text-gray-400">
-                          Value that identifies this subtype
-                        </p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">x-display-name</Label>
-                        <Input
-                          value={(formData.extensions?.['x-display-name'] as string) || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            extensions: {
-                              ...prev.extensions,
-                              'x-display-name': e.target.value || undefined
-                            }
-                          }))}
-                          placeholder="e.g., Domestic Dog"
-                          disabled={isReadOnly}
-                          className="text-sm"
-                        />
-                        <p className="text-xs text-gray-400">
-                          Human-readable name for this subtype
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Conditional Schema */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-4">
@@ -2205,7 +2039,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Documentation & Extensions</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   {/* External Documentation */}
                   <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-3">
@@ -2249,6 +2083,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     />
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </TabsContent>
