@@ -279,11 +279,11 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
 
   // Refs to hold the latest handler functions
   // This prevents stale closures when nodes are moved or canvas is refreshed
-  const handleResponseBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>();
-  const handleResponseBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>();
-  const handleCreateContentTypeWithPropertyRef = useRef<(responseId: string, propertyData: any) => void>();
-  const handleRequestBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>();
-  const handleRequestBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>();
+  const handleResponseBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>(() => {});
+  const handleResponseBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>(() => {});
+  const handleCreateContentTypeWithPropertyRef = useRef<(responseId: string, propertyData: any) => void>(() => {});
+  const handleRequestBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>(() => {});
+  const handleRequestBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>(() => {});
 
   // Handle delete operation
   const handleDeleteOperation = useCallback(async (operationId: string, operationName: string) => {
