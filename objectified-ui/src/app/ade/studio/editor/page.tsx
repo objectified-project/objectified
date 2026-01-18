@@ -2620,7 +2620,7 @@ const StudioContent = () => {
                     fill: 'white',
                     fillOpacity: 0.95
                   },
-                  zIndex: 10 + index
+                  zIndex: 0
                 });
               }
             }
@@ -2809,8 +2809,8 @@ const StudioContent = () => {
                   fill: 'white',
                   fillOpacity: 0.95
                 },
-                // Add Z-index to layer multiple edges
-                zIndex: 10 + index
+                // Add Z-index to layer edges below nodes
+                zIndex: 0
               });
             }
           }
@@ -2853,7 +2853,7 @@ const StudioContent = () => {
                   fill: 'white',
                   fillOpacity: 0.95
                 },
-                zIndex: 10 + index
+                zIndex: 0
               });
             }
           }
@@ -3882,6 +3882,7 @@ const StudioContent = () => {
               edges={edges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
+              defaultEdgeOptions={{ zIndex: 0 }}
               onNodesChange={handleNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}

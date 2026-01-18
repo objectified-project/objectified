@@ -1986,6 +1986,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ zIndex: 0 }}
         snapToGrid={snapToGrid}
         snapGrid={[gridSize, gridSize]}
         fitView

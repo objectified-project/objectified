@@ -83,8 +83,8 @@ structure immediately recognizable.
 - ✅ Tags for API grouping
 - ✅ Summary and description
 - ✅ Request body schema binding
-- 📋 Response definitions (status codes + schemas)
-- 📋 Parameters (query, header, cookie)
+- ✅ Response definitions (status codes + schemas)
+- ✅ Parameters (query, header, cookie)
 - 📋 Security requirements
 - 📋 Deprecated flag
 - 📋 Private flag (unexposed endpoints)
@@ -93,8 +93,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                  |
 |--------|----------------------------------------------------------|
-| #365   | Add response definitions to HTTP Operation               |
-| #366   | Add parameters (query, header, cookie) to HTTP Operation |
 | #367   | Add security requirements to HTTP Operation              |
 | #368   | Add deprecated flag to HTTP Operation                    |
 | #369   | Add private flag to HTTP Operation                       |
@@ -137,7 +135,7 @@ structure immediately recognizable.
 **Configurable Properties**:
 - 📋 Parameter name (with auto-suggest from common patterns)
 - ✅ Location: query, path, header, cookie (fixed from dragged node)
-- 📋 Schema type (string, number, boolean, array, object)
+- ✅ Schema type (string, number, boolean, array, object)
 - 📋 Required flag
 - 📋 Default value
 - 📋 Description
@@ -149,7 +147,6 @@ structure immediately recognizable.
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
 | #377   | Parameter name with auto-suggest from common patterns  |
-| #378   | Schema type should be configurable                     |
 | #379   | Add required flag to parameters                        |
 | #380   | Add default value to parameters                        |
 | #381   | Add description to parameters                          |
@@ -198,7 +195,7 @@ structure immediately recognizable.
 | 5XX Server   | Red    | 500, 502, 503, 504                  |
 
 **Configurable Properties**:
-- 📋 Status code (100-599)
+- ✅ Status code (100-599)
 - 📋 Description (semantic suggestions per status code)
 - 📋 Response headers (name, schema, description)
 - 📋 Content type map with schema bindings
@@ -207,7 +204,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
-| #392   | Status code (100-599)                                  |
 | #393   | Add description to response                            |
 | #394   | Add response headers (name, schema, description)       |
 | #395   | Add content type map with schema bindings              |
@@ -248,7 +244,7 @@ structure immediately recognizable.
 - **Specification Components**:
     - ✅ `info` (title, version, description, contact, license, termsOfService)
     - `servers` (multiple environments with variables)
-    - `paths` (all operations with full configuration)
+    - ✅ `paths` (all operations with full configuration)
     - `components/schemas` (existing schema support)
     - `components/parameters` (reusable parameters)
     - `components/requestBodies` (reusable request bodies)
