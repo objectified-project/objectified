@@ -41,29 +41,104 @@ export async function getOperationsForPath(versionPathId: string): Promise<strin
 
 /**
  * Create a new operation for a path
+ * Also creates a path_operation_description with an auto-generated operationId
  */
 export async function createOperation(
   versionPathId: string,
   operation: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
+  pathPattern?: string // Optional path pattern for generating operationId
 ): Promise<string> {
-  const query = `
+  const operationQuery = `
     INSERT INTO odb.path_operation (version_path_id, operation, metadata)
     VALUES ($1, $2, $3)
     RETURNING id, version_path_id, operation, metadata, created_at, updated_at
   `;
 
   try {
-    const result = await connectionPool.query(query, [
+    const result = await connectionPool.query(operationQuery, [
       versionPathId,
       operation.toUpperCase(),
       metadata ? JSON.stringify(metadata) : null,
     ]);
-    return JSON.stringify(result.rows[0]);
+
+    const createdOperation = result.rows[0];
+
+    // Generate operationId based on method and path
+    // e.g., GET /users/{id} -> getUsersById, POST /users -> createUsers
+    const generatedOperationId = generateOperationId(operation.toUpperCase(), pathPattern);
+
+    // Create the path_operation_description entry
+    const descriptionQuery = `
+      INSERT INTO odb.path_operation_description (path_operation_id, operation_id)
+      VALUES ($1, $2)
+      ON CONFLICT (path_operation_id) DO NOTHING
+    `;
+
+    await connectionPool.query(descriptionQuery, [
+      createdOperation.id,
+      generatedOperationId,
+    ]);
+
+    return JSON.stringify(createdOperation);
   } catch (error) {
     console.error('Error creating operation:', error);
     throw error;
   }
+}
+
+/**
+ * Generate an operationId based on HTTP method and path pattern
+ * Examples:
+ *   GET /users -> getUsers
+ *   POST /users -> createUsers
+ *   GET /users/{userId} -> getUsersById
+ *   PUT /users/{userId} -> updateUsersById
+ *   DELETE /users/{userId} -> deleteUsersById
+ *   PATCH /users/{userId} -> patchUsersById
+ */
+function generateOperationId(method: string, pathPattern?: string): string {
+  // Map HTTP methods to operation prefixes
+  const methodPrefixes: Record<string, string> = {
+    'GET': 'get',
+    'POST': 'create',
+    'PUT': 'update',
+    'DELETE': 'delete',
+    'PATCH': 'patch',
+    'HEAD': 'head',
+    'OPTIONS': 'options',
+  };
+
+  const prefix = methodPrefixes[method] || method.toLowerCase();
+
+  if (!pathPattern) {
+    return `${prefix}Resource`;
+  }
+
+  // Parse the path pattern
+  // Remove leading slash and split by /
+  const parts = pathPattern.replace(/^\//, '').split('/');
+
+  // Convert path parts to camelCase
+  // - Regular segments become capitalized words
+  // - {param} segments become "ById" or "ByParamName"
+  let hasPathParam = false;
+  const nameParts: string[] = [];
+
+  for (const part of parts) {
+    if (part.startsWith('{') && part.endsWith('}')) {
+      // This is a path parameter
+      hasPathParam = true;
+    } else if (part) {
+      // Regular path segment - capitalize first letter
+      nameParts.push(part.charAt(0).toUpperCase() + part.slice(1));
+    }
+  }
+
+  const resourceName = nameParts.join('');
+  const suffix = hasPathParam ? 'ById' : '';
+
+  return `${prefix}${resourceName}${suffix}`;
 }
 
 /**

@@ -27,6 +27,12 @@ import {
   deleteOperation,
 } from '../../../../../../lib/db/helper-path-operations';
 import {
+  getPathById,
+} from '../../../../../../lib/db/helper-paths';
+import {
+  getOperationDescription,
+} from '../../../../../../lib/db/helper-path-operation-descriptions';
+import {
   getLinkedParametersForOperation,
   linkParameterToOperation,
   unlinkParameterFromOperation,
@@ -76,6 +82,8 @@ function OperationNode({ data }: {
     operation: string; 
     color: string; 
     dbOperationId?: string;
+    operationId?: string; // OpenAPI operationId (e.g., "createUser", "listOrders")
+    parameters?: Array<{ id: string; name: string; in: string; required?: boolean }>;
     onDelete?: () => void;
     onSchemaDrop?: (operationId: string, schemaType: 'request' | 'response', schemaData: any) => void;
   } 
@@ -131,23 +139,17 @@ function OperationNode({ data }: {
 
   return (
     <>
-      {/* Input handle at TOP for vertical flow (receives from parameters/request bodies) */}
+      {/* Input handle at TOP */}
       <Handle
         type="target"
         position={Position.Top}
         id="operation-input"
-        className="!w-4 !h-2 !rounded-t-lg !rounded-b-none !border-2 !-top-1"
-        style={{
-          borderColor: data.color,
-          backgroundColor: `${data.color}40`,
-        }}
+        className="!w-3 !h-2 !rounded-t-md !rounded-b-none"
+        style={{ backgroundColor: data.color }}
       />
 
-      <div
-        className="rounded-2xl shadow-2xl relative group min-w-[140px] max-w-[160px] overflow-hidden transition-all duration-200 hover:shadow-3xl hover:scale-[1.02]"
-        style={{
-          background: `linear-gradient(180deg, ${data.color} 0%, ${data.color}cc 100%)`,
-        }}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border-2 shadow-xl min-w-[220px] max-w-[280px] cursor-pointer relative group"
+        style={{ borderColor: data.color }}
       >
         {/* Delete button */}
         {data.onDelete && (
@@ -156,76 +158,96 @@ function OperationNode({ data }: {
               e.stopPropagation();
               data.onDelete?.();
             }}
-            className="absolute top-1 right-1 bg-white/20 hover:bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg hover:scale-110 z-20 backdrop-blur-sm"
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-20"
             title="Delete operation"
           >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
           </button>
         )}
 
-        {/* Operation Header - Prominent verb display */}
-        <div className="px-4 py-4 text-center">
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-2xl font-bold text-white drop-shadow-md tracking-wider">
-              {data.operation}
-            </span>
-            <span className="text-white/70 text-xs font-medium">
-              HTTP Method
-            </span>
-          </div>
+        {/* Header - Only this part has color */}
+        <div
+          className="text-white px-4 py-3 rounded-t-xl"
+          style={{ backgroundColor: data.color }}
+        >
+          <div className="text-xs font-medium opacity-90">HTTP Method</div>
+          <div className="font-bold text-lg">{data.operation}</div>
+          {data.operationId && (
+            <div className="text-xs opacity-80 font-mono mt-1">{data.operationId}</div>
+          )}
         </div>
 
-        {/* Request Body Indicator (for POST/PUT/PATCH) */}
-        {needsRequestBody && (
-          <div
-            onDragOver={(e) => handleDragOver(e, 'request')}
-            onDragLeave={(e) => handleDragLeave(e, 'request')}
-            onDrop={(e) => handleDrop(e, 'request')}
-            className={`mx-2 mb-1 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${
-              dragOverRequest
-                ? 'bg-white/40 ring-2 ring-white/60'
-                : 'bg-white/10 hover:bg-white/20'
-            }`}
-          >
-            <div className="flex items-center justify-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-white/80" />
-              <span className="text-[10px] font-medium text-white/90">
-                {dragOverRequest ? 'Drop here' : 'Request'}
-              </span>
+        {/* Content - White/dark background */}
+        <div className="p-3 space-y-3">
+          {/* Request Body Section (for POST/PUT/PATCH) */}
+          {needsRequestBody && (
+            <div>
+              <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Request</div>
+              <div
+                onDragOver={(e) => handleDragOver(e, 'request')}
+                onDragLeave={(e) => handleDragLeave(e, 'request')}
+                onDrop={(e) => handleDrop(e, 'request')}
+                className={`border rounded-md px-2 py-2 min-h-[32px] transition-all cursor-pointer ${
+                  dragOverRequest
+                    ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/30'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 italic">
+                  {dragOverRequest ? 'Drop schema here' : '(No request body)'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Parameters Section */}
+          <div>
+            <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Parameters</div>
+            <div className="border border-gray-200 dark:border-gray-700 rounded-md px-2 py-2 min-h-[32px] space-y-1">
+              {data.parameters && data.parameters.length > 0 ? (
+                data.parameters.map((param) => (
+                  <div key={param.id} className="flex items-center gap-1.5">
+                    <span className="text-gray-400 dark:text-gray-500 text-[10px] font-mono">
+                      {param.in === 'path' ? ':' : param.in === 'query' ? '?' : param.in === 'header' ? 'H' : '🍪'}
+                    </span>
+                    <span className="text-gray-700 dark:text-gray-300 text-[10px] font-mono">{param.name}</span>
+                    {param.required && <span className="text-red-500 text-[8px]">*</span>}
+                  </div>
+                ))
+              ) : (
+                <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(No parameters)</div>
+              )}
             </div>
           </div>
-        )}
 
-        {/* Response Indicator */}
-        <div
-          onDragOver={(e) => handleDragOver(e, 'response')}
-          onDragLeave={(e) => handleDragLeave(e, 'response')}
-          onDrop={(e) => handleDrop(e, 'response')}
-          className={`mx-2 mb-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${
-            dragOverResponse
-              ? 'bg-white/40 ring-2 ring-white/60'
-              : 'bg-white/10 hover:bg-white/20'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-white/80" />
-            <span className="text-[10px] font-medium text-white/90">
-              {dragOverResponse ? 'Drop here' : 'Response'}
-            </span>
+          {/* Response Section */}
+          <div>
+            <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Responses</div>
+            <div
+              onDragOver={(e) => handleDragOver(e, 'response')}
+              onDragLeave={(e) => handleDragLeave(e, 'response')}
+              onDrop={(e) => handleDrop(e, 'response')}
+              className={`border rounded-md px-2 py-2 min-h-[32px] transition-all cursor-pointer ${
+                dragOverResponse
+                  ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/30'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">
+                {dragOverResponse ? 'Drop schema here' : '(No responses)'}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Output handle at BOTTOM for vertical flow (connects to responses/parameters) */}
+      {/* Output handle at BOTTOM */}
       <Handle
         type="source"
         position={Position.Bottom}
         id="operation-output"
-        className="!w-4 !h-2 !rounded-b-lg !rounded-t-none !border-2 !-bottom-1"
-        style={{
-          borderColor: data.color,
-          backgroundColor: `${data.color}40`,
-        }}
+        className="!w-3 !h-2 !rounded-b-md !rounded-t-none"
+        style={{ backgroundColor: data.color }}
       />
     </>
   );
@@ -245,15 +267,15 @@ const edgeTypes = {
   smart: SmartEdge,
 };
 
-// Operation color mapping
+// Operation color mapping - Updated to match section 9.3.1 specification
 const OPERATION_COLORS: Record<string, string> = {
-  'GET': '#10b981',
-  'POST': '#3b82f6',
-  'PUT': '#f59e0b',
-  'PATCH': '#8b5cf6',
-  'DELETE': '#ef4444',
-  'HEAD': '#6b7280',
-  'OPTIONS': '#64748b',
+  'GET': '#48BB78',
+  'POST': '#4299E1',
+  'PUT': '#ED8936',
+  'PATCH': '#9F7AEA',
+  'DELETE': '#F56565',
+  'HEAD': '#718096',
+  'OPTIONS': '#718096',
 };
 
 interface PathsCanvasInnerProps {
@@ -861,6 +883,37 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         const operationsResponse = await getOperationsForPath(selectedPathId);
         const operations = JSON.parse(operationsResponse);
 
+        // First, load linked parameters and operationId for each operation to include in node data
+        const operationParamsMap = new Map<string, Array<{ id: string; name: string; in: string; required?: boolean }>>();
+        const operationIdMap = new Map<string, string>(); // Maps db operation id to OpenAPI operationId
+
+        for (const op of operations) {
+          // Load linked parameters
+          const paramsResponse = await getLinkedParametersForOperation(op.id);
+          const paramsData = JSON.parse(paramsResponse);
+          if (paramsData.success && paramsData.parameters) {
+            operationParamsMap.set(op.id, paramsData.parameters.map((param: any) => ({
+              id: param.id,
+              name: param.name,
+              in: param.in_location,
+              required: param.data?.required ?? (param.in_location === 'path'),
+            })));
+          } else {
+            operationParamsMap.set(op.id, []);
+          }
+
+          // Load operation description to get operationId
+          try {
+            const descResponse = await getOperationDescription(op.id);
+            const descData = JSON.parse(descResponse);
+            if (descData && descData.operation_id) {
+              operationIdMap.set(op.id, descData.operation_id);
+            }
+          } catch (descError) {
+            console.log('[PathsCanvasView] No description found for operation:', op.id);
+          }
+        }
+
         // Convert operations to nodes with delete callback and schema drop handler
         // Arrange operations HORIZONTALLY at the top for vertical flow
         const operationNodes: Node[] = operations.map((op: any, index: number) => {
@@ -877,6 +930,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             operation: op.operation,
             color: OPERATION_COLORS[op.operation] || '#64748b',
             dbOperationId: op.id,
+            operationId: operationIdMap.get(op.id), // OpenAPI operationId from description
+            parameters: operationParamsMap.get(op.id) || [],
             onDelete: () => handleDeleteOperation(op.id, op.operation),
             onSchemaDrop: async (operationId: string, schemaType: 'request' | 'response', schemaData: any) => {
               // Handle schema drop - this will be handled by opening the properties panel
@@ -1526,7 +1581,40 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             const result = await linkParameterToOperation(operationId, parameterId, undefined);
             const parsed = JSON.parse(result);
 
-            if (!parsed.success) {
+            if (parsed.success) {
+              // Update the operation node's parameters array to reflect the new link
+              const paramNode = sourceNode?.type === 'parameter' ? sourceNode : targetNode;
+              const opNode = sourceNode?.type === 'operation' ? sourceNode : targetNode;
+
+              if (paramNode && opNode) {
+                const paramData = paramNode.data as any;
+                const newParam = {
+                  id: paramData.dbParameterId,
+                  name: paramData.name,
+                  in: paramData.inLocation,
+                  required: paramData.required,
+                };
+
+                // Update the operation node's parameters
+                setNodes((nds) => nds.map((node) => {
+                  if (node.id === opNode.id) {
+                    const currentParams = (node.data as any).parameters || [];
+                    // Check if parameter already exists to avoid duplicates
+                    const paramExists = currentParams.some((p: any) => p.id === newParam.id);
+                    if (!paramExists) {
+                      return {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          parameters: [...currentParams, newParam],
+                        },
+                      };
+                    }
+                  }
+                  return node;
+                }));
+              }
+            } else {
               console.error('Failed to link parameter to operation:', parsed.error);
               await alertDialog({
                 title: 'Error',
@@ -1584,7 +1672,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         }
       }
     },
-    [setEdges, nodes, alertDialog, edgeRouting, edgeAnimation, handleClassDropOnResponse, selectedPathId, selectedVersionId]
+    [setEdges, setNodes, nodes, alertDialog, edgeRouting, edgeAnimation, handleClassDropOnResponse, selectedPathId, selectedVersionId]
   );
 
   // Handle deleting edges (unlinking parameters and responses from operations)
@@ -1621,7 +1709,26 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             const result = await unlinkParameterFromOperation(operationId, parameterId);
             const parsed = JSON.parse(result);
 
-            if (!parsed.success) {
+            if (parsed.success) {
+              // Update the operation node's parameters array to remove the unlinked parameter
+              const opNode = sourceNode?.type === 'operation' ? sourceNode : targetNode;
+
+              if (opNode) {
+                setNodes((nds) => nds.map((node) => {
+                  if (node.id === opNode.id) {
+                    const currentParams = (node.data as any).parameters || [];
+                    return {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        parameters: currentParams.filter((p: any) => p.id !== parameterId),
+                      },
+                    };
+                  }
+                  return node;
+                }));
+              }
+            } else {
               console.error('Failed to unlink parameter from operation:', parsed.error);
               await alertDialog({
                 title: 'Error',
@@ -1653,7 +1760,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         }
       }
     },
-    [nodes, alertDialog]
+    [nodes, alertDialog, setNodes]
   );
 
   // Handle drop
@@ -1779,13 +1886,34 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         });
 
         try {
-          // Save to database
+          // Get path pattern for generating operationId
+          let pathPattern: string | undefined;
+          try {
+            const pathResponse = await getPathById(selectedPathId);
+            const pathData = JSON.parse(pathResponse);
+            pathPattern = pathData?.pathname;
+          } catch (pathError) {
+            console.log('[onDrop] Could not fetch path pattern:', pathError);
+          }
+
+          // Save to database (also creates path_operation_description with operationId)
           const result = await createOperation(
             selectedPathId,
             dropData.operation,
-            { position }
+            { position },
+            pathPattern
           );
           const savedOperation = JSON.parse(result);
+
+          // Get the generated operationId from the description
+          let operationId: string | undefined;
+          try {
+            const descResponse = await getOperationDescription(savedOperation.id);
+            const descData = JSON.parse(descResponse);
+            operationId = descData?.operation_id;
+          } catch (descError) {
+            console.log('[onDrop] Could not fetch operation description:', descError);
+          }
 
           // Add to canvas
           const newNode: Node = {
@@ -1796,6 +1924,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               operation: savedOperation.operation,
               color: dropData.color,
               dbOperationId: savedOperation.id,
+              operationId: operationId,
+              parameters: [],
             },
           };
 

@@ -368,48 +368,6 @@ The PathNode serves as the top-level container for an API endpoint:
      ○ ← Output handle for edge connections
 ```
 
-#### 9.3.1 MethodNode (HTTP Verb Container)
-
-MethodNodes are color-coded and nest inside PathNodes:
-
-```
-GET (Green #48BB78)                    POST (Blue #4299E1)
-┌────────────────────────────┐         ┌────────────────────────────┐
-│ ●━━ GET ━━━━━━━━━━━━━━━━━  │         │ ●━━ POST ━━━━━━━━━━━━━━━━  │
-├────────────────────────────┤         ├────────────────────────────┤
-│ operationId: listUserOrders│         │ operationId: createOrder   │
-│                            │         │                            │
-│ ┌─ Request ──────────────┐ │         │ ┌─ Request ──────────────┐ │
-│ │ (No body for GET)      │ │         │ │ ○ CreateOrderRequest   │←── Schema ref
-│ └────────────────────────┘ │         │ │   application/json     │ │
-│                            │         │ └────────────────────────┘ │
-│ ┌─ Responses ────────────┐ │         │                            │
-│ │ 200 ○ Order[]          │←── Schema │ ┌─ Responses ────────────┐ │
-│ │ 401 ○ ErrorResponse    │ │  refs   │ │ 201 ○ Order            │ │
-│ │ 404 ○ ErrorResponse    │ │         │ │ 400 ○ ValidationError  │ │
-│ └────────────────────────┘ │         │ │ 401 ○ ErrorResponse    │ │
-│                            │         │ └────────────────────────┘ │
-│ 🔐 bearerAuth              │         │                            │
-└────────────────────────────┘         │ 🔐 bearerAuth              │
-                                       └────────────────────────────┘
-
-PUT (Orange #ED8936)                   DELETE (Red #F56565)
-┌────────────────────────────┐         ┌────────────────────────────┐
-│ ●━━ PUT ━━━━━━━━━━━━━━━━━  │         │ ●━━ DELETE ━━━━━━━━━━━━━━  │
-├────────────────────────────┤         ├────────────────────────────┤
-│ operationId: updateOrder   │         │ operationId: deleteOrder   │
-│ ...                        │         │ ...                        │
-└────────────────────────────┘         └────────────────────────────┘
-
-PATCH (Purple #9F7AEA)                 OPTIONS/HEAD (Gray #718096)
-┌────────────────────────────┐         ┌────────────────────────────┐
-│ ●━━ PATCH ━━━━━━━━━━━━━━━  │         │ ●━━ OPTIONS ━━━━━━━━━━━━━  │
-├────────────────────────────┤         ├────────────────────────────┤
-│ operationId: patchOrder    │         │ operationId: orderOptions  │
-│ ...                        │         │ ...                        │
-└────────────────────────────┘         └────────────────────────────┘
-```
-
 #### 9.3.2 SchemaRefNode (Draggable from Library)
 
 When a schema is dragged from the library panel onto the canvas or into a request/response zone:

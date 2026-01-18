@@ -45,15 +45,15 @@ interface PathItem {
   updated_at: string;
 }
 
-// Available HTTP operations for OpenAPI
+// Available HTTP operations for OpenAPI - Updated to match section 9.3.1 specification
 const AVAILABLE_OPERATIONS = [
-  { id: 'GET', label: 'GET', color: '#10b981' },      // green
-  { id: 'POST', label: 'POST', color: '#3b82f6' },    // blue
-  { id: 'PUT', label: 'PUT', color: '#f59e0b' },      // amber
-  { id: 'PATCH', label: 'PATCH', color: '#8b5cf6' },  // purple
-  { id: 'DELETE', label: 'DELETE', color: '#ef4444' }, // red
-  { id: 'HEAD', label: 'HEAD', color: '#6b7280' },    // gray
-  { id: 'OPTIONS', label: 'OPTIONS', color: '#64748b' }, // slate
+  { id: 'GET', label: 'GET', color: '#48BB78' },      // green
+  { id: 'POST', label: 'POST', color: '#4299E1' },    // blue
+  { id: 'PUT', label: 'PUT', color: '#ED8936' },      // orange
+  { id: 'PATCH', label: 'PATCH', color: '#9F7AEA' },  // purple
+  { id: 'DELETE', label: 'DELETE', color: '#F56565' }, // red
+  { id: 'HEAD', label: 'HEAD', color: '#718096' },    // gray
+  { id: 'OPTIONS', label: 'OPTIONS', color: '#718096' }, // gray
 ];
 
 export default function PathsSidebar({
@@ -226,7 +226,7 @@ export default function PathsSidebar({
           const crudOperations = ['GET', 'POST', 'PUT', 'DELETE'];
           for (const operation of crudOperations) {
             try {
-              await createOperation(newPath.id, operation);
+              await createOperation(newPath.id, operation, undefined, newPath.pathname);
             } catch (opError) {
               console.error(`Error creating ${operation} operation:`, opError);
             }
