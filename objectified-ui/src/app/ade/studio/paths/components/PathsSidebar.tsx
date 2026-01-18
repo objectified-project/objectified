@@ -21,6 +21,7 @@ import {
   updatePath,
   deletePath,
 } from '../../../../../../lib/db/helper-paths';
+import { createOperation } from '../../../../../../lib/db/helper-path-operations';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 
 interface ClassItem {
@@ -79,6 +80,7 @@ export default function PathsSidebar({
   const [pathDialogOpen, setPathDialogOpen] = useState(false);
   const [editingPath, setEditingPath] = useState<PathItem | null>(null);
   const [pathNameInput, setPathNameInput] = useState('');
+  const [autoCreateCrud, setAutoCreateCrud] = useState(false);
 
   // Load paths
   useEffect(() => {
@@ -190,6 +192,7 @@ export default function PathsSidebar({
   const handleAddPath = () => {
     setEditingPath(null);
     setPathNameInput('');
+    setAutoCreateCrud(false);
     setPathDialogOpen(true);
   };
 
@@ -217,10 +220,23 @@ export default function PathsSidebar({
         const result = await createPath(selectedVersionId, pathNameInput.trim());
         const newPath: PathItem = JSON.parse(result);
         setPaths(prevPaths => [...prevPaths, newPath].sort((a, b) => a.pathname.localeCompare(b.pathname)));
+
+        // Auto-create CRUD operations if checkbox is selected
+        if (autoCreateCrud) {
+          const crudOperations = ['GET', 'POST', 'PUT', 'DELETE'];
+          for (const operation of crudOperations) {
+            try {
+              await createOperation(newPath.id, operation);
+            } catch (opError) {
+              console.error(`Error creating ${operation} operation:`, opError);
+            }
+          }
+        }
       }
       setPathDialogOpen(false);
       setPathNameInput('');
       setEditingPath(null);
+      setAutoCreateCrud(false);
     } catch (error) {
       console.error('Error saving path:', error);
       alert('Error saving path. Please try again.');
@@ -850,6 +866,25 @@ export default function PathsSidebar({
               >
                 Enter the path (e.g., /api/users, /v1/products/{'{'}id{'}'})
               </p>
+
+              {/* Auto-create CRUD operations checkbox - only shown when adding new path */}
+              {!editingPath && (
+                <label className="flex items-center gap-3 mt-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoCreateCrud}
+                    onChange={(e) => setAutoCreateCrud(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2 cursor-pointer"
+                  />
+                  <span
+                    className={`text-sm ${
+                      isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}
+                  >
+                    Auto-create CRUD operations (GET, POST, PUT, DELETE)
+                  </span>
+                </label>
+              )}
             </div>
 
             <div

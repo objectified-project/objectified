@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Ability to generate class responses based on the defined responses in the path.
     - Ability to link existing classes to path responses.
     - Ability to define class request bodies for operations with class definitions and property definitions.
+    - Ability to create CRUD operations at the time a path is created.
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
   - Adds SwaggerHub import support.
