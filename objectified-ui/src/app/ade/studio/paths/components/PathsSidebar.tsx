@@ -13,6 +13,7 @@ import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
   getClassesWithPropertiesAndTags,
+  getPropertiesForProject,
 } from '../../../../../../lib/db/helper';
 import {
   getPathsForVersion,
@@ -65,7 +66,7 @@ export default function PathsSidebar({
   selectedPathId: string | null;
   onPathSelect: (pathId: string | null, pathname?: string) => void;
 }) {
-  const { selectedVersionId } = useStudio();
+  const { selectedVersionId, selectedProjectId } = useStudio();
   const { confirm: confirmDialog } = useDialog();
   const isDark = useDarkMode();
   const [paths, setPaths] = useState<PathItem[]>([]);
@@ -106,11 +107,10 @@ export default function PathsSidebar({
   useEffect(() => {
     if (!selectedVersionId) {
       setClasses([]);
-      setProperties([]);
       return;
     }
 
-    const loadData = async () => {
+    const loadClasses = async () => {
       setIsLoading(true);
       try {
         const classesResponse = await getClassesWithPropertiesAndTags(selectedVersionId);
@@ -125,51 +125,66 @@ export default function PathsSidebar({
         }, []);
 
         setClasses(uniqueClasses);
-
-        // Extract all unique properties with their full data
-        // Use property_source_data from odb.properties for the actual type definitions
-        const uniqueProperties = new Map<string, PropertyItem>();
-        if (Array.isArray(classesData)) {
-          classesData.forEach((cls: any) => {
-            if (cls.properties && Array.isArray(cls.properties)) {
-              cls.properties.forEach((prop: any) => {
-                if (!uniqueProperties.has(prop.id)) {
-                  // Prefer property_source_data (from odb.properties) for type info,
-                  // fall back to cp.data (class_properties override)
-                  let propData = prop.property_source_data || prop.data;
-                  if (typeof propData === 'string') {
-                    try {
-                      propData = JSON.parse(propData);
-                    } catch {
-                      propData = { type: 'string' };
-                    }
-                  }
-
-                  uniqueProperties.set(prop.id, {
-                    id: prop.id,
-                    name: prop.name,
-                    description: prop.description || undefined,
-                    data: propData || { type: 'string' },
-                  });
-                }
-              });
-            }
-          });
-        }
-
-        // Sort properties A-Z by name and set them
-        const sortedProperties = Array.from(uniqueProperties.values())
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setProperties(sortedProperties);
       } catch (error) {
-        console.error('Error loading classes and properties:', error);
+        console.error('Error loading classes:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadData();
+    loadClasses();
   }, [selectedVersionId]);
+
+  // Load properties separately using the same approach as Canvas editor
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setProperties([]);
+      return;
+    }
+
+    const loadProperties = async () => {
+      setIsLoading(true);
+      try {
+        // Use getPropertiesForProject - same as Canvas editor
+        const result = await getPropertiesForProject(selectedProjectId);
+        const data = JSON.parse(result);
+
+        // Transform to PropertyItem format
+        const transformedProperties: PropertyItem[] = data.map((prop: any) => {
+          // Parse data if it's a string
+          let propData = prop.data;
+          if (typeof propData === 'string') {
+            try {
+              propData = JSON.parse(propData);
+            } catch {
+              propData = { type: 'string' };
+            }
+          }
+
+          return {
+            id: prop.id,
+            name: prop.name,
+            description: prop.description || undefined,
+            data: propData || { type: 'string' },
+          };
+        });
+
+        // Sort properties A-Z by name
+        const sortedProperties = transformedProperties.sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+
+        setProperties(sortedProperties);
+      } catch (error) {
+        console.error('Error loading properties:', error);
+        setProperties([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProperties();
+  }, [selectedProjectId]);
 
   // Handle opening add path dialog
   const handleAddPath = () => {
@@ -361,7 +376,13 @@ export default function PathsSidebar({
         </Tabs>
 
         {/* Content Area */}
-        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        <Box sx={{
+          flex: 1,
+          overflow: activeTab === 'properties' ? 'hidden' : 'auto',
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
@@ -608,9 +629,9 @@ export default function PathsSidebar({
 
               {/* Properties Tab Content */}
               {activeTab === 'properties' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {/* Search Input */}
-                  <Box sx={{ mb: 1 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 0 }}>
+                  {/* Search Input - Fixed at top */}
+                  <Box sx={{ flexShrink: 0, mb: 1.5 }}>
                     <input
                       type="text"
                       placeholder="Search properties..."
@@ -624,39 +645,41 @@ export default function PathsSidebar({
                     />
                   </Box>
 
-                  {properties.length === 0 ? (
-                    <Box
-                      sx={{
-                        py: 3,
-                        px: 2,
-                        textAlign: 'center',
-                        border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                        borderRadius: 1,
-                      }}
-                    >
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        No properties found. Create properties in the main Studio editor.
-                      </span>
-                    </Box>
-                  ) : (
-                    <>
-                      <Box sx={{ px: 0.5, mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Drag to Canvas
-                        </span>
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                          {properties.filter(p =>
-                            p.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
-                            (p.data?.type && p.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
-                          ).length} / {properties.length}
+                  {/* Scrollable properties list */}
+                  <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {properties.length === 0 ? (
+                      <Box
+                        sx={{
+                          py: 3,
+                          px: 2,
+                          textAlign: 'center',
+                          border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          No properties found. Create properties in the main Studio editor.
                         </span>
                       </Box>
-                      {properties
-                        .filter(prop =>
-                          prop.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
-                          (prop.data?.type && prop.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
-                        )
-                        .map((prop) => {
+                    ) : (
+                      <>
+                        <Box sx={{ px: 0.5, mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Drag to Canvas
+                          </span>
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                            {properties.filter(p =>
+                              p.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                              (p.data?.type && p.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
+                            ).length} / {properties.length}
+                          </span>
+                        </Box>
+                        {properties
+                          .filter(prop =>
+                            prop.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                            (prop.data?.type && prop.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
+                          )
+                          .map((prop) => {
                         const handlePropertyDragStart = (e: React.DragEvent) => {
                           e.dataTransfer.effectAllowed = 'copy';
                           e.dataTransfer.setData('application/json', JSON.stringify({
@@ -747,7 +770,8 @@ export default function PathsSidebar({
                     </>
                   )}
                 </Box>
-              )}
+              </Box>
+            )}
             </>
           )}
         </Box>
