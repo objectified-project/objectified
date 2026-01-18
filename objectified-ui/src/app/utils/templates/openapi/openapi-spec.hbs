@@ -2,7 +2,8 @@
   "openapi": "{{openapi}}",
   "info": {{{json info}}},
 {{#if xMetadata}}  "x-metadata": {{{json xMetadata}}},
-{{/if}}  "components": {
+{{/if}}  "paths": {{{json paths}}},
+  "components": {
     "schemas": {
 {{#each schemas}}
       "{{@key}}": {{{json this}}}{{#unless @last}},{{/unless}}

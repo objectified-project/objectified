@@ -11,6 +11,12 @@ We continue to improve the platform based on your feedback with improvements and
   - Added interactive quality score cards during import - click on any quality score card for more details.
   - Added Chart View tab in import preview - shows a diagram before importing, showing how classes relate to each other through references.
   - Various UI/UX improvements and optimizations for better performance and responsiveness.
+- Pathing:
+  - Now implements the ability to create a path:
+    - Create paths with multiple operations (GET, POST, PUT, DELETE, etc.) under the same endpoint.
+    - Support for path parameters, query parameters, headers, and request bodies.
+    - Ability to define responses for each operation with status codes and descriptions.
+    - Visual representation of paths and operations in the Path Canvas.
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
   - Adds SwaggerHub import support.

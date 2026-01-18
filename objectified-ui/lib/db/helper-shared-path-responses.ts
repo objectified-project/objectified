@@ -32,7 +32,7 @@ export async function getSharedPathResponses(versionPathId: string): Promise<str
 }
 
 /**
- * Get linked responses for an operation
+ * Get linked responses for an operation with content types
  */
 export async function getLinkedResponsesForOperation(operationId: string): Promise<string> {
   const query = `
@@ -42,12 +42,33 @@ export async function getLinkedResponsesForOperation(operationId: string): Promi
       spr.status_code,
       spr.description,
       spr.data,
+      spr.class_id,
+      c.name as class_name,
+      spr.inline_schema,
       spr.created_at,
       spr.updated_at,
-      porl.metadata as link_metadata
+      porl.metadata as link_metadata,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', rc.id,
+            'media_type', rc.media_type,
+            'class_id', rc.class_id,
+            'class_name', rc_class.name,
+            'inline_schema', rc.inline_schema,
+            'examples', rc.examples
+          )
+        ) FILTER (WHERE rc.id IS NOT NULL),
+        '[]'
+      ) as content_types
     FROM odb.shared_path_response spr
     JOIN odb.path_operation_response_link porl ON spr.id = porl.shared_path_response_id
+    LEFT JOIN odb.classes c ON spr.class_id = c.id
+    LEFT JOIN odb.shared_path_response_content rc ON spr.id = rc.shared_path_response_id
+    LEFT JOIN odb.classes rc_class ON rc.class_id = rc_class.id
     WHERE porl.path_operation_id = $1
+    GROUP BY spr.id, spr.version_path_id, spr.status_code, spr.description, spr.data, 
+             spr.class_id, c.name, spr.inline_schema, spr.created_at, spr.updated_at, porl.metadata
     ORDER BY spr.status_code ASC
   `;
 

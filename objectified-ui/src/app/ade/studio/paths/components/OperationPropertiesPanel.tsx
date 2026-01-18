@@ -31,6 +31,7 @@ import {
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
 import SchemaBuilder from './SchemaBuilder';
+import ResponseSection from './ResponseSection';
 
 interface OperationPropertiesPanelProps {
   operationId: string | null;
@@ -1069,49 +1070,50 @@ export default function OperationPropertiesPanel({
                     </span>
                   </Box>
                 ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {responses.map((response) => (
                       <Box
                         key={response.id}
                         sx={{
-                          p: 1.5,
                           border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
                           borderRadius: 1,
-                          backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'start',
+                          overflow: 'hidden',
                         }}
                       >
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                            {response.status_code}
-                          </div>
-                          {response.description && (
-                            <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-                              {response.description}
-                            </div>
-                          )}
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box
-                            sx={{
-                              px: 1,
-                              py: 0.5,
-                              borderRadius: 0.5,
-                              fontSize: '0.625rem',
-                              fontWeight: 600,
-                              color: '#fff',
-                              backgroundColor:
-                                response.status_code.startsWith('2') ? '#10b981' :
-                                response.status_code.startsWith('3') ? '#3b82f6' :
-                                response.status_code.startsWith('4') ? '#f59e0b' :
-                                '#ef4444',
-                            }}
-                          >
-                            {response.status_code.startsWith('2') ? '✓' :
-                             response.status_code.startsWith('3') ? '→' :
-                             response.status_code.startsWith('4') ? '!' : '✗'}
+                        {/* Response Header */}
+                        <Box
+                          sx={{
+                            p: 1.5,
+                            backgroundColor: isDark ? '#0f172a' : '#f9fafb',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              sx={{
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                color: '#fff',
+                                backgroundColor:
+                                  response.status_code.startsWith('2') ? '#10b981' :
+                                  response.status_code.startsWith('3') ? '#3b82f6' :
+                                  response.status_code.startsWith('4') ? '#f59e0b' :
+                                  '#ef4444',
+                              }}
+                            >
+                              {response.status_code}
+                            </Box>
+                            {response.description && (
+                              <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+                                {response.description}
+                              </Box>
+                            )}
                           </Box>
                           <IconButton
                             size="small"
@@ -1124,6 +1126,26 @@ export default function OperationPropertiesPanel({
                           >
                             <Delete sx={{ fontSize: 14 }} />
                           </IconButton>
+                        </Box>
+
+                        {/* Response Schema Section */}
+                        <Box sx={{ p: 2, backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                          <ResponseSection
+                            response={response}
+                            onUpdate={async () => {
+                              // Reload responses when content types are updated
+                              if (!operationId) return;
+                              try {
+                                const result = await getLinkedResponsesForOperation(operationId);
+                                const data = JSON.parse(result);
+                                if (data.success) {
+                                  setResponses(data.responses || []);
+                                }
+                              } catch (error) {
+                                console.error('Error reloading responses:', error);
+                              }
+                            }}
+                          />
                         </Box>
                       </Box>
                     ))}

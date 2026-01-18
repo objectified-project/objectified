@@ -44,10 +44,31 @@ import {
 import PathParameterNode from './PathParameterNode';
 import PathResponseNode from './PathResponseNode';
 import PathClassNode, { PathClassNodeData } from './PathClassNode';
+import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
+import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import { Trash2 } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
+import {
+  getSharedPathRequestBodies,
+  getLinkedRequestBodyForOperation,
+  createSharedPathRequestBody,
+  linkRequestBodyToOperation,
+  unlinkRequestBodyFromOperation,
+  deleteSharedPathRequestBody,
+  addRequestBodyContentType,
+  addPropertyToInlineSchema,
+  updateInlineSchemaProperty,
+  deleteInlineSchemaProperty,
+} from '../../../../../../lib/db/helper-shared-path-request-bodies';
+import {
+  getResponseContentTypes,
+  addResponseContentType,
+  addPropertyToResponseInlineSchema,
+  updateResponseInlineSchemaProperty,
+  deleteResponseInlineSchemaProperty,
+} from '../../../../../../lib/db/helper-shared-path-responses-content';
 
 // Enhanced Operation Node Component with Schema Drop Zones
 function OperationNode({ data }: { 
@@ -210,6 +231,8 @@ const nodeTypes = {
   parameter: PathParameterNode,
   response: PathResponseNode,
   class: PathClassNode,
+  requestBody: PathRequestBodyNode,
+  responseBody: PathResponseBodyNode,
 };
 
 // Define custom edge types
@@ -253,6 +276,14 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
   const { screenToFlowPosition, getNodes } = useReactFlow();
+
+  // Refs to hold the latest handler functions
+  // This prevents stale closures when nodes are moved or canvas is refreshed
+  const handleResponseBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>();
+  const handleResponseBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>();
+  const handleCreateContentTypeWithPropertyRef = useRef<(responseId: string, propertyData: any) => void>();
+  const handleRequestBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>();
+  const handleRequestBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>();
 
   // Handle delete operation
   const handleDeleteOperation = useCallback(async (operationId: string, operationName: string) => {
@@ -388,7 +419,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                 if (schema?.$ref && schema.$ref.includes(classInfo.name)) {
                   // Remove the class reference
                   await updateSharedPathResponse(response.id, {
-                    data: null,
+                    data: {},
                   });
                 }
               } catch (error) {
@@ -491,6 +522,323 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     }
   }, [confirmDialog, alertDialog, onRefresh]);
 
+  // Handle delete request body
+  const handleDeleteRequestBody = useCallback(async (requestBodyId: string, requestBodyName: string) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Request Body',
+      message: `Are you sure you want to delete the request body "${requestBodyName}"? This will unlink it from all operations.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteSharedPathRequestBody(requestBodyId);
+      const parsed = JSON.parse(result);
+
+      if (parsed.success) {
+        // Remove from UI
+        setNodes((nds) => nds.filter((n) => n.id !== `request-body-${requestBodyId}`));
+        setEdges((eds) => eds.filter((e) =>
+          e.target !== `request-body-${requestBodyId}` && e.source !== `request-body-${requestBodyId}`
+        ));
+
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to delete request body',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting request body:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to delete request body',
+        variant: 'error',
+      });
+    }
+  }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
+
+  // Handle request body property drop
+  const handleRequestBodyPropertyDrop = useCallback(async (
+    contentId: string,
+    propertyData: any,
+    parentId?: string
+  ) => {
+    try {
+      // Extract the actual property from the drop data
+      // The sidebar wraps it as { type: 'property', property: {...} }
+      const actualProperty = propertyData.property || propertyData;
+
+      const result = await addPropertyToInlineSchema(
+        contentId,
+        {
+          name: actualProperty.propertyName || actualProperty.name || 'newProperty',
+          description: actualProperty.description,
+          data: actualProperty.data || { type: 'string' },
+        },
+        parentId
+      );
+      const parsed = JSON.parse(result);
+
+      if (parsed.success) {
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to add property',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error adding property to inline schema:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to add property',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
+  // Handle request body property delete
+  const handleRequestBodyPropertyDelete = useCallback(async (
+    contentId: string,
+    propertyId: string
+  ) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Property',
+      message: 'Are you sure you want to delete this property? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteInlineSchemaProperty(contentId, propertyId, true);
+      const parsed = JSON.parse(result);
+
+      if (parsed.success) {
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to delete property',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting inline schema property:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to delete property',
+        variant: 'error',
+      });
+    }
+  }, [confirmDialog, alertDialog, onRefresh]);
+
+  // Handle response body property drop
+  const handleResponseBodyPropertyDrop = useCallback(async (
+    contentId: string,
+    propertyData: any,
+    parentId?: string
+  ) => {
+    console.log('[handleResponseBodyPropertyDrop] Called with:', { contentId, propertyData, parentId });
+
+    try {
+      // Extract the actual property from the drop data
+      // The sidebar wraps it as { type: 'property', property: {...} }
+      const actualProperty = propertyData.property || propertyData;
+      console.log('[handleResponseBodyPropertyDrop] Extracted property:', actualProperty);
+
+      const result = await addPropertyToResponseInlineSchema(
+        contentId,
+        {
+          name: actualProperty.propertyName || actualProperty.name || 'newProperty',
+          description: actualProperty.description,
+          data: actualProperty.data || { type: 'string' },
+          parent_id: parentId || null,
+        }
+      );
+      console.log('[handleResponseBodyPropertyDrop] Result:', result);
+      const parsed = JSON.parse(result);
+
+      if (parsed.success) {
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to add property',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error adding property to response inline schema:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to add property',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
+  // Handle response body property delete
+  const handleResponseBodyPropertyDelete = useCallback(async (
+    contentId: string,
+    propertyId: string
+  ) => {
+    const confirmed = await confirmDialog({
+      title: 'Delete Property',
+      message: 'Are you sure you want to delete this property? This action cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const result = await deleteResponseInlineSchemaProperty(contentId, propertyId, true);
+      const parsed = JSON.parse(result);
+
+      if (parsed.success) {
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to delete property',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting response inline schema property:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to delete property',
+        variant: 'error',
+      });
+    }
+  }, [confirmDialog, alertDialog, onRefresh]);
+
+  // Handle creating content type and adding first property in one operation
+  const handleCreateContentTypeWithProperty = useCallback(async (
+    responseId: string,
+    propertyData: any
+  ) => {
+    console.log('[PathsCanvasView] handleCreateContentTypeWithProperty called');
+    console.log('[PathsCanvasView] responseId:', responseId);
+    console.log('[PathsCanvasView] propertyData:', propertyData);
+
+    try {
+      // First create a default content type (application/json)
+      console.log('[PathsCanvasView] Creating content type for response:', responseId);
+      const createResult = await addResponseContentType(
+        responseId,
+        'application/json',
+        undefined, // no class_id
+        { type: 'object', properties: [] }, // empty inline schema
+        undefined // no examples
+      );
+      console.log('[PathsCanvasView] addResponseContentType result:', createResult);
+      const createParsed = JSON.parse(createResult);
+
+      if (!createParsed.success) {
+        await alertDialog({
+          title: 'Error',
+          message: createParsed.error || 'Failed to create content type',
+          variant: 'error',
+        });
+        return;
+      }
+
+      const contentId = createParsed.content.id;
+
+      // Extract the actual property from the drop data
+      // The sidebar wraps it as { type: 'property', property: {...} }
+      const actualProperty = propertyData.property || propertyData;
+
+      // Now add the property
+      const propResult = await addPropertyToResponseInlineSchema(
+        contentId,
+        {
+          name: actualProperty.propertyName || actualProperty.name || 'newProperty',
+          description: actualProperty.description,
+          data: actualProperty.data || { type: 'string' },
+          parent_id: null,
+        }
+      );
+      console.log('[PathsCanvasView] addPropertyToResponseInlineSchema result:', propResult);
+      const propParsed = JSON.parse(propResult);
+
+      if (propParsed.success) {
+        console.log('[PathsCanvasView] Property added successfully, calling onRefresh');
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: propParsed.error || 'Failed to add property',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error creating content type with property:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to create response schema',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
+  // Keep refs updated with latest handler implementations
+  // Update synchronously (not in useEffect) to avoid render loops
+  handleResponseBodyPropertyDropRef.current = handleResponseBodyPropertyDrop;
+  handleResponseBodyPropertyDeleteRef.current = handleResponseBodyPropertyDelete;
+  handleCreateContentTypeWithPropertyRef.current = handleCreateContentTypeWithProperty;
+  handleRequestBodyPropertyDropRef.current = handleRequestBodyPropertyDrop;
+  handleRequestBodyPropertyDeleteRef.current = handleRequestBodyPropertyDelete;
+
+  // Stable wrapper functions that delegate to refs
+  // These never change identity, so they won't cause node recreation
+  const stableHandleResponseBodyPropertyDrop = useCallback((contentId: string, propertyData: any, parentId?: string) => {
+    console.log('[stableHandleResponseBodyPropertyDrop] Called, delegating to ref');
+    handleResponseBodyPropertyDropRef.current?.(contentId, propertyData, parentId);
+  }, []);
+
+  const stableHandleResponseBodyPropertyDelete = useCallback((contentId: string, propertyId: string) => {
+    handleResponseBodyPropertyDeleteRef.current?.(contentId, propertyId);
+  }, []);
+
+  const stableHandleCreateContentTypeWithProperty = useCallback((responseId: string, propertyData: any) => {
+    console.log('[stableHandleCreateContentTypeWithProperty] Called, delegating to ref');
+    handleCreateContentTypeWithPropertyRef.current?.(responseId, propertyData);
+  }, []);
+
+  const stableHandleRequestBodyPropertyDrop = useCallback((contentId: string, propertyData: any, parentId?: string) => {
+    handleRequestBodyPropertyDropRef.current?.(contentId, propertyData, parentId);
+  }, []);
+
+  const stableHandleRequestBodyPropertyDelete = useCallback((contentId: string, propertyId: string) => {
+    handleRequestBodyPropertyDeleteRef.current?.(contentId, propertyId);
+  }, []);
+
   // Load operations and parameters when path is selected
   useEffect(() => {
     if (!selectedPathId) {
@@ -499,8 +847,11 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
       return;
     }
 
+    console.log('[PathsCanvasView] useEffect triggered - loading nodes. refreshKey:', refreshKey);
+
     const loadOperationsAndParameters = async () => {
       try {
+        console.log('[PathsCanvasView] loadOperationsAndParameters starting...');
         // Load operations
         const operationsResponse = await getOperationsForPath(selectedPathId);
         const operations = JSON.parse(operationsResponse);
@@ -798,7 +1149,200 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           }
         });
 
-        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes, ...allClassNodes]);
+        // =================================================================
+        // LOAD REQUEST BODIES
+        // =================================================================
+        const allRequestBodyNodes: Node[] = [];
+
+        // Load shared request bodies for this path
+        const requestBodiesResponse = await getSharedPathRequestBodies(selectedPathId);
+        const requestBodiesData = JSON.parse(requestBodiesResponse);
+
+        if (requestBodiesData.success && requestBodiesData.requestBodies) {
+          requestBodiesData.requestBodies.forEach((rb: any, rbIndex: number) => {
+            const requestBodyNodeId = `request-body-${rb.id}`;
+
+            // Parse content types
+            const contentTypes = (rb.content_types || []).map((ct: any) => ({
+              id: ct.id,
+              media_type: ct.media_type,
+              class_id: ct.class_id,
+              class_name: ct.class_name,
+              inline_schema: typeof ct.inline_schema === 'string'
+                ? JSON.parse(ct.inline_schema)
+                : ct.inline_schema,
+              encoding: typeof ct.encoding === 'string'
+                ? JSON.parse(ct.encoding)
+                : ct.encoding,
+              examples: typeof ct.examples === 'string'
+                ? JSON.parse(ct.examples)
+                : ct.examples,
+            }));
+
+            allRequestBodyNodes.push({
+              id: requestBodyNodeId,
+              type: 'requestBody',
+              position: {
+                x: -200, // Position to the left of operations
+                y: 150 + rbIndex * 220,
+              },
+              data: {
+                id: rb.id,
+                name: rb.name,
+                description: rb.description,
+                required: rb.required,
+                contentTypes: contentTypes,
+                onDelete: () => handleDeleteRequestBody(rb.id, rb.name),
+                onPropertyDrop: stableHandleRequestBodyPropertyDrop,
+                onPropertyDelete: stableHandleRequestBodyPropertyDelete,
+              } as PathRequestBodyData,
+            });
+          });
+        }
+
+        // Create edges from request body nodes to operations
+        for (const op of operations) {
+          // Only check for request bodies on POST, PUT, PATCH operations
+          if (!['POST', 'PUT', 'PATCH'].includes(op.operation)) continue;
+
+          const linkedRbResponse = await getLinkedRequestBodyForOperation(op.id);
+          const linkedRbData = JSON.parse(linkedRbResponse);
+
+          if (linkedRbData.success && linkedRbData.requestBody) {
+            const rbNodeId = `request-body-${linkedRbData.requestBody.id}`;
+
+            const edgeType = edgeRouting === 'straight' ? 'straight'
+              : edgeRouting === 'bezier' ? 'default'
+              : edgeRouting === 'smart' ? 'smart'
+              : 'smoothstep';
+
+            allEdges.push({
+              id: `edge-rb-op-${linkedRbData.requestBody.id}-${op.id}`,
+              source: rbNodeId,
+              sourceHandle: 'request-body-output',
+              target: op.id,
+              targetHandle: 'operation-input',
+              type: edgeType,
+              animated: edgeAnimation !== 'none',
+              style: {
+                stroke: '#8b5cf6',
+                strokeWidth: 2,
+                strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
+              },
+              data: {
+                sourceNodeId: rbNodeId,
+                targetNodeId: op.id,
+              },
+            });
+          }
+        }
+
+        // =================================================================
+        // LOAD RESPONSE BODIES
+        // =================================================================
+        const allResponseBodyNodes: Node[] = [];
+
+        // Better approach: get all responses across all operations
+        const allResponsesMap = new Map<string, any>();
+
+        for (const op of operations) {
+          const respResponse = await getLinkedResponsesForOperation(op.id);
+          const respData = JSON.parse(respResponse);
+
+          if (respData.success && respData.responses) {
+            for (const resp of respData.responses) {
+              // Use response ID as key to avoid duplicates - include responses with OR without content types
+              if (!allResponsesMap.has(resp.id)) {
+                allResponsesMap.set(resp.id, resp);
+              }
+            }
+          }
+        }
+
+        // Create response body nodes from unique responses (with or without content types)
+        let rbodyIndex = 0;
+        for (const [responseId, resp] of allResponsesMap) {
+          const responseBodyNodeId = `response-body-${responseId}`;
+
+          // Parse content types
+          const contentTypes = (resp.content_types || []).map((ct: any) => ({
+            id: ct.id,
+            media_type: ct.media_type,
+            class_id: ct.class_id,
+            class_name: ct.class_name,
+            inline_schema: typeof ct.inline_schema === 'string'
+              ? JSON.parse(ct.inline_schema)
+              : ct.inline_schema,
+            examples: typeof ct.examples === 'string'
+              ? JSON.parse(ct.examples)
+              : ct.examples,
+          }));
+
+          console.log('[PathsCanvasView] Creating response body node:', responseId);
+          console.log('[PathsCanvasView] Content types:', contentTypes);
+          console.log('[PathsCanvasView] First content type inline_schema:', contentTypes[0]?.inline_schema);
+
+          allResponseBodyNodes.push({
+            id: responseBodyNodeId,
+            type: 'responseBody',
+            position: {
+              x: 600, // Position to the right of operations
+              y: 150 + rbodyIndex * 250,
+            },
+            data: {
+              id: responseId,
+              status_code: resp.status_code,
+              description: resp.description,
+              contentTypes: contentTypes,
+              onPropertyDrop: stableHandleResponseBodyPropertyDrop,
+              onPropertyDelete: stableHandleResponseBodyPropertyDelete,
+              onCreateContentTypeWithProperty: stableHandleCreateContentTypeWithProperty,
+              _refreshKey: refreshKey, // Force React Flow to recognize data change
+            } as PathResponseBodyData,
+          });
+
+          rbodyIndex++;
+        }
+
+        // Create edges from operations to response body nodes
+        for (const op of operations) {
+          const respResponse = await getLinkedResponsesForOperation(op.id);
+          const respData = JSON.parse(respResponse);
+
+          if (respData.success && respData.responses) {
+            for (const resp of respData.responses) {
+              if (resp.content_types && resp.content_types.length > 0) {
+                const rbodyNodeId = `response-body-${resp.id}`;
+
+                const edgeType = edgeRouting === 'straight' ? 'straight'
+                  : edgeRouting === 'bezier' ? 'default'
+                  : edgeRouting === 'smart' ? 'smart'
+                  : 'smoothstep';
+
+                allEdges.push({
+                  id: `edge-op-rbody-${op.id}-${resp.id}`,
+                  source: op.id,
+                  sourceHandle: 'operation-output',
+                  target: rbodyNodeId,
+                  targetHandle: 'response-input',
+                  type: edgeType,
+                  animated: edgeAnimation !== 'none',
+                  style: {
+                    stroke: '#10b981',
+                    strokeWidth: 2,
+                    strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
+                  },
+                  data: {
+                    sourceNodeId: op.id,
+                    targetNodeId: rbodyNodeId,
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes, ...allClassNodes, ...allRequestBodyNodes, ...allResponseBodyNodes]);
         setEdges(allEdges);
       } catch (error) {
         console.error('Error loading operations and parameters:', error);
@@ -806,7 +1350,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleClassDropOnResponse]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleClassDropOnResponse, handleDeleteRequestBody, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleCreateContentTypeWithProperty]);
 
   // Detect dark mode
   useEffect(() => {
@@ -838,6 +1382,10 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
+    // Log occasionally to verify events are reaching canvas
+    if (Math.random() < 0.02) {
+      console.log('[onDragOver] Canvas receiving drag events');
+    }
   }, []);
 
   // Handle node click to show properties in sidebar
@@ -1109,9 +1657,20 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   // Handle drop
   const onDrop = useCallback(
     async (event: React.DragEvent) => {
+      console.log('=== [onDrop] Canvas drop event START ===');
+      console.log('[onDrop] event.clientX:', event.clientX, 'event.clientY:', event.clientY);
       event.preventDefault();
 
+      const data = event.dataTransfer.getData('application/json');
+      console.log('[onDrop] Raw data from dataTransfer:', data);
+
+      if (!data) {
+        console.log('[onDrop] No data in dataTransfer, returning');
+        return;
+      }
+
       if (!selectedPathId) {
+        console.log('[onDrop] No selectedPathId, showing alert');
         await alertDialog({
           title: 'No Path Selected',
           message: 'Please select a path from the sidebar before adding operations to the canvas.',
@@ -1120,10 +1679,96 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         return;
       }
 
-      const data = event.dataTransfer.getData('application/json');
-      if (!data) return;
-
       const dropData = JSON.parse(data);
+      console.log('[onDrop] Parsed dropData:', dropData);
+      console.log('[onDrop] dropData.type:', dropData.type);
+
+      // Handle property drops - check if dropping on a response body node
+      if (dropData.type === 'property') {
+        console.log('[onDrop] Property dropped at canvas level, checking for target node');
+
+        const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
+        let targetNodeId: string | null = null;
+
+        // Check if the drop target is within a drop zone that has its own handler
+        // (like ContentTypePanel) - if so, let that handle it
+        if (elementAtPoint) {
+          // Check if we're dropping on a child element with its own drop handler
+          const hasDropHandler = elementAtPoint.closest('[data-drop-handler]');
+          if (hasDropHandler) {
+            console.log('[onDrop] Drop target has its own handler, letting it handle the drop');
+            return; // Let the child handler process it
+          }
+
+          // Also check for drop zone markers
+          const isInDropZone = elementAtPoint.closest('[data-drop-zone]');
+          if (isInDropZone) {
+            console.log('[onDrop] Drop target is in a drop zone, letting it handle the drop');
+            return; // Let the drop zone handle it
+          }
+
+          // Find the node wrapper
+          const nodeWrapper = elementAtPoint.closest('[data-id]');
+          if (nodeWrapper) {
+            targetNodeId = nodeWrapper.getAttribute('data-id');
+          }
+        }
+
+        console.log('[onDrop] Target node ID:', targetNodeId);
+
+        // Only handle drops on response body nodes if they're on the node wrapper itself,
+        // not on child elements (which should have their own handlers)
+        if (targetNodeId && targetNodeId.startsWith('response-body-')) {
+          // Check if the drop was on the node wrapper itself, not a child
+          const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
+          const nodeWrapper = elementAtPoint?.closest('[data-id]');
+          const isDirectNodeDrop = nodeWrapper && nodeWrapper.getAttribute('data-id') === targetNodeId;
+          
+          // If dropping directly on node wrapper (not a child), handle it as fallback
+          // Otherwise, the child handlers (ContentTypePanel) should have handled it
+          if (isDirectNodeDrop) {
+            const responseBodyNode = nodes.find(n => n.id === targetNodeId);
+            if (responseBodyNode) {
+              const nodeData = responseBodyNode.data as PathResponseBodyData;
+              console.log('[onDrop] Found response body node (fallback handler):', {
+                id: targetNodeId,
+                contentTypesCount: nodeData.contentTypes?.length,
+                hasOnPropertyDrop: !!nodeData.onPropertyDrop,
+                hasOnCreateContentTypeWithProperty: !!nodeData.onCreateContentTypeWithProperty,
+              });
+
+              if (nodeData.contentTypes && nodeData.contentTypes.length > 0) {
+                // Has content types - add property to first content type (fallback)
+                const contentId = nodeData.contentTypes[0].id;
+                console.log('[onDrop] Adding property to existing content type (fallback):', contentId);
+                if (nodeData.onPropertyDrop) {
+                  nodeData.onPropertyDrop(contentId, dropData, undefined);
+                }
+              } else {
+                // No content types - create one with the property
+                console.log('[onDrop] Creating content type with property for response (fallback):', nodeData.id);
+                if (nodeData.onCreateContentTypeWithProperty) {
+                  nodeData.onCreateContentTypeWithProperty(nodeData.id, dropData);
+                }
+              }
+              return; // Don't process further
+            }
+          } else {
+            // Drop was on a child element - it should have been handled by the child handler
+            // If we reach here, the child handler didn't process it, so return silently
+            console.log('[onDrop] Drop was on child element, should have been handled by child handler');
+            return;
+          }
+        }
+
+        // Property dropped on empty canvas - show info message
+        await alertDialog({
+          title: 'Drop Property on Response',
+          message: 'To add a property to a response schema, drag it onto a Response node on the canvas.',
+          variant: 'info',
+        });
+        return;
+      }
 
       if (dropData.type === 'operation') {
         const position = screenToFlowPosition({
@@ -1185,7 +1830,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           tagName: elementAtPoint?.tagName,
           className: elementAtPoint?.className,
           id: elementAtPoint?.id,
-          dataset: elementAtPoint ? Object.keys(elementAtPoint.dataset || {}) : [],
+          dataset: elementAtPoint ? Object.keys((elementAtPoint as HTMLElement).dataset || {}) : [],
         });
         
         // Try multiple ways to find the response node
@@ -1268,9 +1913,10 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           
           // Find the response node and call its onClassDrop handler
           const responseNode = nodes.find(n => n.id === responseNodeId && n.type === 'response');
-          if (responseNode && responseNode.data.onClassDrop && responseNode.data.dbResponseId) {
+          const responseData = responseNode?.data as { onClassDrop?: (responseId: string, classData: unknown) => void; dbResponseId?: string } | undefined;
+          if (responseNode && responseData?.onClassDrop && responseData?.dbResponseId) {
             try {
-              await responseNode.data.onClassDrop(responseNode.data.dbResponseId, dropData);
+              await responseData.onClassDrop(responseData.dbResponseId, dropData);
             } catch (error) {
               console.error('Error in onClassDrop:', error);
             }
@@ -1278,8 +1924,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           } else {
             console.warn('PathsCanvasView: Response node found but missing handler or dbResponseId', {
               responseNode: !!responseNode,
-              hasOnClassDrop: !!responseNode?.data?.onClassDrop,
-              hasDbResponseId: !!responseNode?.data?.dbResponseId,
+              hasOnClassDrop: !!responseData?.onClassDrop,
+              hasDbResponseId: !!responseData?.dbResponseId,
             });
           }
         }
@@ -1319,13 +1965,6 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         };
 
         setNodes((nds) => [...nds, newNode]);
-      } else if (dropData.type === 'property') {
-        // Property drops are handled by the OperationNode component itself
-        await alertDialog({
-          title: 'Drop on Operation',
-          message: 'Please drop the property directly onto an operation node to add it as a request or response schema.',
-          variant: 'info',
-        });
       }
     },
     [screenToFlowPosition, setNodes, selectedPathId, alertDialog, nodes, handleClassDropOnResponse]

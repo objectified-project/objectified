@@ -20,6 +20,8 @@ import {
   getVersionsForProject,
   getClassesWithPropertiesAndTags,
 } from '../../../../../lib/db/helper';
+import { loadPathsForOpenAPIExport } from '../../../../../lib/db/helper-paths-export';
+import { generatePathsForOpenAPI, type PathInfo } from '../../../../../lib/utils/openapi-paths-generator';
 
 // Dynamically import Monaco Editor with SSR disabled
 const Editor = dynamic(() => import('@monaco-editor/react'), {
@@ -188,6 +190,37 @@ export default function CodePage() {
         const result = await getClassesWithPropertiesAndTags(selectedVersionId);
         const classesWithProperties: ClassWithProperties[] = JSON.parse(result);
 
+        // Load paths for OpenAPI export
+        let pathsObject: Record<string, unknown> = {};
+        try {
+          console.log('[Code Tab] Loading paths for version:', selectedVersionId);
+          const pathsResult = await loadPathsForOpenAPIExport(selectedVersionId);
+          console.log('[Code Tab] Raw paths result:', pathsResult);
+
+          const pathsData = JSON.parse(pathsResult);
+          console.log('[Code Tab] Parsed paths data:', pathsData);
+
+          if (pathsData.success && pathsData.paths && pathsData.paths.length > 0) {
+            console.log(`[Code Tab] Found ${pathsData.paths.length} paths`);
+            const pathInfos: PathInfo[] = pathsData.paths;
+            pathsObject = generatePathsForOpenAPI(pathInfos) as Record<string, unknown>;
+            console.log(`[Code Tab] Generated ${Object.keys(pathsObject).length} OpenAPI path entries`);
+            console.log('[Code Tab] Sample path:', Object.keys(pathsObject)[0]);
+          } else if (pathsData.success) {
+            console.warn('[Code Tab] Paths loaded successfully but array is empty');
+            console.warn('[Code Tab] To add paths: Navigate to the Paths tab and create paths with operations');
+            // Add a helpful comment in the paths object
+            pathsObject['x-no-paths-found'] = 'No paths defined for this version. Navigate to the Paths tab to create paths with operations.';
+          } else {
+            console.error('[Code Tab] Failed to load paths:', pathsData.error);
+          }
+        } catch (pathsError) {
+          console.error('[Code Tab] Exception while loading paths:', pathsError);
+          if (pathsError instanceof Error) {
+            console.error('[Code Tab] Error stack:', pathsError.stack);
+          }
+        }
+
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
 
@@ -196,7 +229,7 @@ export default function CodePage() {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
           description: currentVersion?.description || ''
-        });
+        }, pathsObject);
         setOpenApiSpec(openApiContent);
 
         const arazzoContent = await generateArazzoSpec(classesWithProperties, {

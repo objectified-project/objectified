@@ -246,6 +246,7 @@ export function buildClassSchema(classData: any): any {
  * Generates a complete OpenAPI specification from all classes
  * @param classes - Array of class definitions
  * @param options - Optional metadata for the spec
+ * @param paths - Optional paths object (OpenAPI paths section)
  * @returns OpenAPI spec as JSON string
  */
 export async function generateOpenApiSpec(
@@ -269,7 +270,8 @@ export async function generateOpenApiSpec(
         url?: string;
       };
     };
-  }
+  },
+  paths?: Record<string, unknown>
 ): Promise<string> {
   const schemas: any = {};
 
@@ -316,8 +318,14 @@ export async function generateOpenApiSpec(
   const templateData: any = {
     openapi: versionConfig.version,
     info,
-    schemas
+    schemas,
+    paths: paths || {}  // Include paths in template data, default to empty object
   };
+
+  console.log('[OpenAPI Generator] Template data paths count:', Object.keys(paths || {}).length);
+  if (Object.keys(paths || {}).length > 0) {
+    console.log('[OpenAPI Generator] Path keys:', Object.keys(paths || {}).slice(0, 5));
+  }
 
   // Add project metadata to top level as x-metadata extension
   if (options?.metadata && Object.keys(options.metadata).length > 0) {
