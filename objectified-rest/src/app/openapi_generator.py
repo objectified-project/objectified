@@ -1,6 +1,8 @@
 import json
 from typing import Dict, Any, List, Optional, DefaultDict
 from collections import defaultdict
+from .paths_generator import generate_paths_for_openapi
+
 
 
 def parse_json_field(field: Any) -> Any:
@@ -148,13 +150,67 @@ def build_class_openapi_schema(class_data: Dict[str, Any], properties: List[Dict
     return schema
 
 
+def _load_paths_for_version(version_id: str) -> List[Dict[str, Any]]:
+    """Load all paths with full operation details for a version."""
+    # Import db here to avoid circular imports and allow tests to run
+    try:
+        from .database import db
+    except ImportError:
+        return []
+
+    if db is None:
+        return []
+
+    paths_data = db.get_paths_for_version(version_id)
+    paths: List[Dict[str, Any]] = []
+
+    for path_row in paths_data:
+        operations_data = db.get_operations_for_path(path_row['id'])
+        operations: List[Dict[str, Any]] = []
+
+        for op_row in operations_data:
+            # Get operation description
+            op_description = db.get_operation_description(op_row['id'])
+
+            # Get parameters
+            parameters = db.get_parameters_for_operation(op_row['id'])
+
+            # Get request body
+            request_body = db.get_request_body_for_operation(op_row['id'])
+
+            # Get responses
+            responses = db.get_responses_for_operation(op_row['id'])
+
+            operation = {
+                'id': op_row['id'],
+                'operation': op_row['operation'],
+                'description': op_description,
+                'parameters': parameters,
+                'requestBody': request_body,
+                'responses': responses,
+            }
+            operations.append(operation)
+
+        path = {
+            'id': path_row['id'],
+            'pathname': path_row['pathname'],
+            'summary': path_row.get('summary'),
+            'description': path_row.get('description'),
+            'operations': operations,
+        }
+        paths.append(path)
+
+    return paths
+
+
 def generate_openapi_spec(
     tenant_slug: str,
     project_slug: str,
     version_id: str,
     classes: List[Dict[str, Any]],
     all_properties: Dict[str, List[Dict[str, Any]]],
-    project_description: Optional[str] = None
+    project_description: Optional[str] = None,
+    version_db_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """Generate a complete OpenAPI 3.1.0 specification for all classes in a version."""
 
@@ -169,6 +225,17 @@ def generate_openapi_spec(
     # Use project description if provided and not empty, otherwise use default
     description = project_description if project_description and project_description.strip() else "No description provided"
 
+    # Load paths for this version if version_db_id is provided
+    paths: Dict[str, Any] = {}
+    if version_db_id:
+        try:
+            paths_data = _load_paths_for_version(version_db_id)
+            if paths_data:
+                paths = generate_paths_for_openapi(paths_data)
+        except Exception as e:
+            # Log error but continue - paths are optional
+            print(f"Warning: Could not load paths for version {version_id}: {e}")
+
     # Build the OpenAPI specification
     openapi_spec = {
         "openapi": "3.1.0",
@@ -177,7 +244,7 @@ def generate_openapi_spec(
             "version": version_id,
             "description": description
         },
-        "paths": {},
+        "paths": paths,
         "components": {
             "schemas": schemas
         }

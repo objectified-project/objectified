@@ -152,14 +152,15 @@ async def get_version_openapi_spec(
         properties = db.get_properties_for_class(class_id)
         all_properties[class_id] = properties
 
-    # Generate OpenAPI specification
+    # Generate OpenAPI specification with paths
     openapi_spec = generate_openapi_spec(
         tenant_slug,
         project_slug,
         version_slug,
         classes,
         all_properties,
-        version.get('project_description')
+        version.get('project_description'),
+        version_db_id=version['id']  # Pass version database ID to load paths
     )
 
     return JSONResponse(content=openapi_spec)
@@ -297,14 +298,15 @@ async def get_swagger_ui(
         properties = db.get_properties_for_class(class_id)
         all_properties[class_id] = properties
 
-    # Generate OpenAPI specification
+    # Generate OpenAPI specification with paths
     openapi_spec = generate_openapi_spec(
         tenant_slug,
         project_slug,
         version_slug,
         classes,
         all_properties,
-        version.get('project_description')
+        version.get('project_description'),
+        version_db_id=version['id']  # Pass version database ID to load paths
     )
 
     # Create a custom Swagger UI HTML page with the spec embedded

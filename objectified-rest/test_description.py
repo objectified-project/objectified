@@ -29,7 +29,8 @@ def test_description_with_project_description():
         version_id,
         classes,
         all_properties,
-        project_description
+        project_description,
+        version_db_id=None  # not needed for this test
     )
 
     expected_description = "This is my custom project description"
@@ -60,7 +61,8 @@ def test_description_without_project_description():
         version_id,
         classes,
         all_properties,
-        project_description
+        project_description,
+        version_db_id=None  # not needed for this test
     )
 
     expected_description = "No description provided"
@@ -91,7 +93,8 @@ def test_description_with_empty_string():
         version_id,
         classes,
         all_properties,
-        project_description
+        project_description,
+        version_db_id=None  # not needed for this test
     )
 
     expected_description = "No description provided"
@@ -122,7 +125,8 @@ def test_description_with_whitespace():
         version_id,
         classes,
         all_properties,
-        project_description
+        project_description,
+        version_db_id=None  # not needed for this test
     )
 
     expected_description = "No description provided"

@@ -52,7 +52,8 @@ def test_version_spec_with_description():
         version_id,
         classes,
         all_properties,
-        project_description
+        project_description,
+        version_db_id=None  # not needed for this test
     )
 
     # Display results
@@ -103,7 +104,8 @@ def test_version_spec_without_description():
         version_id,
         classes,
         all_properties,
-        project_description
+        project_description,
+        version_db_id=None  # not needed for this test
     )
 
     # Display results

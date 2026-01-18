@@ -265,6 +265,118 @@ class Database:
             conn.rollback()
             raise e
 
+    def get_paths_for_version(self, version_id: str) -> List[Dict[str, Any]]:
+        """Get all paths for a specific version."""
+        query = """
+            SELECT
+                id,
+                pathname,
+                metadata->>'summary' as summary,
+                metadata->>'description' as description
+            FROM odb.version_path
+            WHERE version_id = %s
+            ORDER BY pathname
+        """
+        return self.execute_query(query, (version_id,))
+
+    def get_operations_for_path(self, version_path_id: str) -> List[Dict[str, Any]]:
+        """Get all operations for a specific path."""
+        query = """
+            SELECT id, operation, metadata
+            FROM odb.path_operation
+            WHERE version_path_id = %s
+            ORDER BY CASE operation
+                WHEN 'GET' THEN 1 WHEN 'POST' THEN 2 WHEN 'PUT' THEN 3
+                WHEN 'PATCH' THEN 4 WHEN 'DELETE' THEN 5 ELSE 6
+            END
+        """
+        return self.execute_query(query, (version_path_id,))
+
+    def get_operation_description(self, path_operation_id: str) -> Optional[Dict[str, Any]]:
+        """Get operation description."""
+        query = """
+            SELECT
+                id,
+                summary,
+                description,
+                operation_id,
+                metadata->'tags' as tags,
+                (metadata->>'deprecated')::boolean as deprecated,
+                metadata->'external_docs' as external_docs
+            FROM odb.path_operation_description
+            WHERE path_operation_id = %s
+            LIMIT 1
+        """
+        results = self.execute_query(query, (path_operation_id,))
+        return results[0] if results else None
+
+    def get_parameters_for_operation(self, path_operation_id: str) -> List[Dict[str, Any]]:
+        """Get all parameters linked to an operation."""
+        query = """
+            SELECT spp.id, spp.name, spp.in_location, spp.summary, spp.description, spp.data
+            FROM odb.shared_path_parameter spp
+            INNER JOIN odb.path_operation_parameter_link popl ON spp.id = popl.shared_path_parameter_id
+            WHERE popl.path_operation_id = %s
+            ORDER BY CASE spp.in_location
+                WHEN 'path' THEN 1 WHEN 'query' THEN 2 WHEN 'header' THEN 3 ELSE 4
+            END, spp.name
+        """
+        return self.execute_query(query, (path_operation_id,))
+
+    def get_request_body_for_operation(self, path_operation_id: str) -> Optional[Dict[str, Any]]:
+        """Get request body linked to an operation with content types."""
+        query = """
+            SELECT rb.id, rb.name, rb.description, rb.required,
+                COALESCE(json_agg(json_build_object(
+                    'id', rbc.id, 'media_type', rbc.media_type, 'class_id', rbc.class_id,
+                    'class_name', c.name, 'inline_schema', rbc.inline_schema,
+                    'encoding', rbc.encoding, 'examples', rbc.examples
+                )) FILTER (WHERE rbc.id IS NOT NULL), '[]') as content_types
+            FROM odb.shared_path_request_body rb
+            INNER JOIN odb.path_operation_request_body_link link ON rb.id = link.shared_path_request_body_id
+            LEFT JOIN odb.shared_path_request_body_content rbc ON rb.id = rbc.shared_path_request_body_id
+            LEFT JOIN odb.classes c ON rbc.class_id = c.id
+            WHERE link.path_operation_id = %s
+            GROUP BY rb.id
+        """
+        results = self.execute_query(query, (path_operation_id,))
+        return results[0] if results else None
+
+    def get_responses_for_operation(self, path_operation_id: str) -> List[Dict[str, Any]]:
+        """Get all responses linked to an operation with content types."""
+        query = """
+            SELECT
+                spr.id,
+                spr.status_code,
+                spr.description,
+                spr.data,
+                spr.class_id,
+                c.name as class_name,
+                spr.inline_schema,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', rc.id,
+                            'media_type', rc.media_type,
+                            'class_id', rc.class_id,
+                            'class_name', rc_class.name,
+                            'inline_schema', rc.inline_schema,
+                            'examples', rc.examples
+                        )
+                    ) FILTER (WHERE rc.id IS NOT NULL),
+                    '[]'
+                ) as content_types
+            FROM odb.shared_path_response spr
+            INNER JOIN odb.path_operation_response_link porl ON spr.id = porl.shared_path_response_id
+            LEFT JOIN odb.classes c ON spr.class_id = c.id
+            LEFT JOIN odb.shared_path_response_content rc ON spr.id = rc.shared_path_response_id
+            LEFT JOIN odb.classes rc_class ON rc.class_id = rc_class.id
+            WHERE porl.path_operation_id = %s
+            GROUP BY spr.id, spr.status_code, spr.description, spr.data, spr.class_id, c.name, spr.inline_schema
+            ORDER BY spr.status_code
+        """
+        return self.execute_query(query, (path_operation_id,))
+
 
 # Global database instance
 db = Database()
