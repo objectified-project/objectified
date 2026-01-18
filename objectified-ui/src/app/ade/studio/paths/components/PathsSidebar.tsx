@@ -30,6 +30,8 @@ interface ClassItem {
 interface PropertyItem {
   id: string;
   name: string;
+  description?: string;
+  data?: Record<string, any>; // Contains type, constraints, format, enum values, etc.
 }
 
 interface PathItem {
@@ -70,6 +72,7 @@ export default function PathsSidebar({
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [propertySearch, setPropertySearch] = useState('');
 
   // Dialog state for adding/editing paths
   const [pathDialogOpen, setPathDialogOpen] = useState(false);
@@ -123,16 +126,30 @@ export default function PathsSidebar({
 
         setClasses(uniqueClasses);
 
-        // Extract all unique properties
+        // Extract all unique properties with their full data
+        // Use property_source_data from odb.properties for the actual type definitions
         const uniqueProperties = new Map<string, PropertyItem>();
         if (Array.isArray(classesData)) {
           classesData.forEach((cls: any) => {
             if (cls.properties && Array.isArray(cls.properties)) {
               cls.properties.forEach((prop: any) => {
                 if (!uniqueProperties.has(prop.id)) {
+                  // Prefer property_source_data (from odb.properties) for type info,
+                  // fall back to cp.data (class_properties override)
+                  let propData = prop.property_source_data || prop.data;
+                  if (typeof propData === 'string') {
+                    try {
+                      propData = JSON.parse(propData);
+                    } catch {
+                      propData = { type: 'string' };
+                    }
+                  }
+
                   uniqueProperties.set(prop.id, {
                     id: prop.id,
                     name: prop.name,
+                    description: prop.description || undefined,
+                    data: propData || { type: 'string' },
                   });
                 }
               });
@@ -140,7 +157,10 @@ export default function PathsSidebar({
           });
         }
 
-        setProperties(Array.from(uniqueProperties.values()));
+        // Sort properties A-Z by name and set them
+        const sortedProperties = Array.from(uniqueProperties.values())
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setProperties(sortedProperties);
       } catch (error) {
         console.error('Error loading classes and properties:', error);
       } finally {
@@ -589,6 +609,21 @@ export default function PathsSidebar({
               {/* Properties Tab Content */}
               {activeTab === 'properties' && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {/* Search Input */}
+                  <Box sx={{ mb: 1 }}>
+                    <input
+                      type="text"
+                      placeholder="Search properties..."
+                      value={propertySearch}
+                      onChange={(e) => setPropertySearch(e.target.value)}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                        isDark
+                          ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                      }`}
+                    />
+                  </Box>
+
                   {properties.length === 0 ? (
                     <Box
                       sx={{
@@ -605,20 +640,53 @@ export default function PathsSidebar({
                     </Box>
                   ) : (
                     <>
-                      <Box sx={{ px: 0.5, mb: 0.5 }}>
+                      <Box sx={{ px: 0.5, mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                           Drag to Canvas
                         </span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                          {properties.filter(p =>
+                            p.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                            (p.data?.type && p.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
+                          ).length} / {properties.length}
+                        </span>
                       </Box>
-                      {properties.map((prop) => {
+                      {properties
+                        .filter(prop =>
+                          prop.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                          (prop.data?.type && prop.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
+                        )
+                        .map((prop) => {
                         const handlePropertyDragStart = (e: React.DragEvent) => {
                           e.dataTransfer.effectAllowed = 'copy';
                           e.dataTransfer.setData('application/json', JSON.stringify({
                             type: 'property',
                             propertyId: prop.id,
                             propertyName: prop.name,
+                            description: prop.description,
+                            data: prop.data || { type: 'string' },
                           }));
                         };
+
+                        // Get a display-friendly type name from the property data
+                        const getTypeDisplay = () => {
+                          if (!prop.data) return 'string';
+                          const { type, format, enum: enumValues, items } = prop.data;
+
+                          if (enumValues && Array.isArray(enumValues) && enumValues.length > 0) {
+                            return `enum (${enumValues.length})`;
+                          }
+                          if (type === 'array' && items) {
+                            const itemType = items.type || 'any';
+                            return `${itemType}[]`;
+                          }
+                          if (format) {
+                            return `${type} (${format})`;
+                          }
+                          return type || 'string';
+                        };
+
+                        const typeDisplay = getTypeDisplay();
 
                         return (
                           <Box
@@ -668,8 +736,8 @@ export default function PathsSidebar({
                               />
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <div className="font-medium text-sm truncate">{prop.name}</div>
-                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                                  Property
+                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 font-mono">
+                                  {typeDisplay}
                                 </div>
                               </Box>
                             </Box>

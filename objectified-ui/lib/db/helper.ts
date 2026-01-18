@@ -828,9 +828,10 @@ export async function getClassesWithPropertiesAndTags(versionId: string) {
     const classIds = classes.map((c: any) => c.id);
 
     // Query 2: Get all properties for all classes in one query
+    // Include p.data as property_source_data to get the original type/constraint definitions
     const propertiesResult = await connectionPool.query(
       `SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
-              p.id as property_source_id, p.name as property_source_name
+              p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
        FROM odb.class_properties cp
        LEFT JOIN odb.properties p ON cp.property_id = p.id
        WHERE cp.class_id = ANY($1)
@@ -905,9 +906,10 @@ export async function getClassWithPropertiesAndTags(classId: string) {
     const cls = classResult.rows[0];
 
     // Query 2: Get all properties for this class
+    // Include p.data as property_source_data to get the original type/constraint definitions
     const propertiesResult = await connectionPool.query(
       `SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
-              p.id as property_source_id, p.name as property_source_name
+              p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
        FROM odb.class_properties cp
        LEFT JOIN odb.properties p ON cp.property_id = p.id
        WHERE cp.class_id = $1

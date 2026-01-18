@@ -52,12 +52,13 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
 
   return (
     <>
-      {/* Connection handle - receives FROM operations */}
+      {/* Connection handle at TOP - receives FROM operations for vertical flow */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         id="parameter-input"
-        className="w-3 h-3 bg-gray-400 dark:bg-gray-600"
+        className="!w-3 !h-2 !rounded-t-md !rounded-b-none"
+        style={{ backgroundColor: config.color }}
       />
 
       <div className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${config.borderClass} shadow-lg min-w-[180px] max-w-[280px] cursor-pointer relative group`}>
@@ -115,6 +116,15 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
           </div>
         </div>
       </div>
+
+      {/* Output handle at BOTTOM for vertical flow */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="parameter-output"
+        className="!w-3 !h-2 !rounded-b-md !rounded-t-none"
+        style={{ backgroundColor: config.color }}
+      />
     </>
   );
 }

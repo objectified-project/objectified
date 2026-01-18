@@ -412,12 +412,12 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
 
   return (
     <>
-      {/* Connection handle - source for connecting TO operations */}
+      {/* Input handle at TOP for vertical flow */}
       <Handle
-        type="source"
-        position={Position.Right}
-        id="request-body-output"
-        className="w-3 h-3 bg-indigo-500"
+        type="target"
+        position={Position.Top}
+        id="request-body-input"
+        className="!w-3 !h-2 !rounded-t-md !rounded-b-none bg-indigo-500"
       />
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border-2 border-indigo-500 shadow-xl min-w-[240px] max-w-[320px] cursor-pointer relative group">
@@ -558,6 +558,14 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
           )}
         </div>
       </div>
+
+      {/* Output handle at BOTTOM - connects TO operations for vertical flow */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="request-body-output"
+        className="!w-3 !h-2 !rounded-b-md !rounded-t-none bg-indigo-500"
+      />
     </>
   );
 }

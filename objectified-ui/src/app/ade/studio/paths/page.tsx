@@ -132,7 +132,7 @@ export default function PathsPage() {
                       Select a Path
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      Choose a path from the sidebar to start designing your API endpoints.
+                      Choose a path from the sidebar to start creating endpoints.
                     </p>
                     <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
                       <p>💡 <strong>Tip:</strong> Drag operations from the sidebar to the canvas</p>

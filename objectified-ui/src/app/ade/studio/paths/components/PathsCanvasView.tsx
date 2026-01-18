@@ -70,8 +70,8 @@ import {
   deleteResponseInlineSchemaProperty,
 } from '../../../../../../lib/db/helper-shared-path-responses-content';
 
-// Enhanced Operation Node Component with Schema Drop Zones
-function OperationNode({ data }: { 
+// Enhanced Operation Node Component with Schema Drop Zones - Vertical Layout
+function OperationNode({ data }: {
   data: { 
     operation: string; 
     color: string; 
@@ -131,20 +131,22 @@ function OperationNode({ data }: {
 
   return (
     <>
-      {/* Input handle for parameters */}
+      {/* Input handle at TOP for vertical flow (receives from parameters/request bodies) */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         id="operation-input"
-        className="w-3 h-3 bg-white/80 border-2"
-        style={{ borderColor: data.color }}
+        className="!w-4 !h-2 !rounded-t-lg !rounded-b-none !border-2 !-top-1"
+        style={{
+          borderColor: data.color,
+          backgroundColor: `${data.color}40`,
+        }}
       />
 
       <div
-        className="rounded-xl shadow-xl border-2 relative group min-w-[200px] dark:bg-gray-800/95"
+        className="rounded-2xl shadow-2xl relative group min-w-[140px] max-w-[160px] overflow-hidden transition-all duration-200 hover:shadow-3xl hover:scale-[1.02]"
         style={{
-          borderColor: data.color,
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%)',
+          background: `linear-gradient(180deg, ${data.color} 0%, ${data.color}cc 100%)`,
         }}
       >
         {/* Delete button */}
@@ -154,73 +156,76 @@ function OperationNode({ data }: {
               e.stopPropagation();
               data.onDelete?.();
             }}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-20"
+            className="absolute top-1 right-1 bg-white/20 hover:bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg hover:scale-110 z-20 backdrop-blur-sm"
             title="Delete operation"
           >
-            <Trash2 size={14} />
+            <Trash2 size={12} />
           </button>
         )}
 
-        {/* Operation Header */}
-        <div
-          className="px-4 py-2.5 rounded-t-xl font-bold text-white text-sm"
-          style={{
-            background: `linear-gradient(135deg, ${data.color} 0%, ${data.color}dd 100%)`,
-          }}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <span>{data.operation}</span>
+        {/* Operation Header - Prominent verb display */}
+        <div className="px-4 py-4 text-center">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-2xl font-bold text-white drop-shadow-md tracking-wider">
+              {data.operation}
+            </span>
+            <span className="text-white/70 text-xs font-medium">
+              HTTP Method
+            </span>
           </div>
         </div>
 
-        {/* Request Body Drop Zone (for POST/PUT/PATCH) */}
+        {/* Request Body Indicator (for POST/PUT/PATCH) */}
         {needsRequestBody && (
           <div
             onDragOver={(e) => handleDragOver(e, 'request')}
             onDragLeave={(e) => handleDragLeave(e, 'request')}
             onDrop={(e) => handleDrop(e, 'request')}
-            className={`px-3 py-2 border-t border-b transition-all cursor-pointer ${
+            className={`mx-2 mb-1 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${
               dragOverRequest
-                ? 'bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 border-purple-300 dark:border-purple-600'
-                : 'bg-gray-50/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100/50 dark:hover:bg-gray-700/70'
+                ? 'bg-white/40 ring-2 ring-white/60'
+                : 'bg-white/10 hover:bg-white/20'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-purple-500 opacity-60" />
-              <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                {dragOverRequest ? 'Drop schema here' : 'Request Body'}
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-white/80" />
+              <span className="text-[10px] font-medium text-white/90">
+                {dragOverRequest ? 'Drop here' : 'Request'}
               </span>
             </div>
           </div>
         )}
 
-        {/* Response Drop Zone */}
+        {/* Response Indicator */}
         <div
           onDragOver={(e) => handleDragOver(e, 'response')}
           onDragLeave={(e) => handleDragLeave(e, 'response')}
           onDrop={(e) => handleDrop(e, 'response')}
-          className={`px-3 py-2 rounded-b-xl transition-all cursor-pointer ${
+          className={`mx-2 mb-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${
             dragOverResponse
-              ? 'bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 border-t border-emerald-300 dark:border-emerald-600'
-              : 'bg-gray-50/50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 hover:bg-gray-100/50 dark:hover:bg-gray-700/70'
+              ? 'bg-white/40 ring-2 ring-white/60'
+              : 'bg-white/10 hover:bg-white/20'
           }`}
         >
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 opacity-60" />
-            <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">
-              {dragOverResponse ? 'Drop schema here' : 'Response'}
+          <div className="flex items-center justify-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-white/80" />
+            <span className="text-[10px] font-medium text-white/90">
+              {dragOverResponse ? 'Drop here' : 'Response'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Output handle for responses */}
+      {/* Output handle at BOTTOM for vertical flow (connects to responses/parameters) */}
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         id="operation-output"
-        className="w-3 h-3 bg-white/80 border-2"
-        style={{ borderColor: data.color }}
+        className="!w-4 !h-2 !rounded-b-lg !rounded-t-none !border-2 !-bottom-1"
+        style={{
+          borderColor: data.color,
+          backgroundColor: `${data.color}40`,
+        }}
       />
     </>
   );
@@ -857,19 +862,16 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         const operations = JSON.parse(operationsResponse);
 
         // Convert operations to nodes with delete callback and schema drop handler
-        // Arrange operations in a more visually appealing layout
+        // Arrange operations HORIZONTALLY at the top for vertical flow
         const operationNodes: Node[] = operations.map((op: any, index: number) => {
-          const cols = 3; // Number of columns
-          const col = index % cols;
-          const row = Math.floor(index / cols);
-          const spacingX = 280;
-          const spacingY = 200;
+          const spacingX = 180; // Horizontal spacing between operations
+          const startX = 100; // Starting X position
           return {
             id: op.id,
             type: 'operation',
             position: { 
-              x: 150 + (col * spacingX), 
-              y: 150 + (row * spacingY) 
+              x: startX + (index * spacingX),
+              y: 50 // All operations at the top
             },
           data: {
             operation: op.operation,
@@ -905,7 +907,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         const allEdges: Edge[] = [];
 
         if (allParamsData.success && allParamsData.parameters) {
-          // Create nodes for all parameters
+          // Create nodes for all parameters - positioned BELOW operations
           allParamsData.parameters.forEach((param: any, paramIndex: number) => {
             const paramNodeId = `param-${param.id}`;
 
@@ -913,8 +915,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               id: paramNodeId,
               type: 'parameter',
               position: {
-                x: 600 + (paramIndex % 2) * 250,
-                y: 150 + Math.floor(paramIndex / 2) * 180,
+                x: 100 + (paramIndex * 220), // Horizontal arrangement
+                y: 250, // Below operations
               },
               data: {
                 name: param.name,
@@ -1030,8 +1032,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               id: responseNodeId,
               type: 'response',
               position: {
-                x: 1100 + (responseIndex % 2) * 250,
-                y: 150 + Math.floor(responseIndex / 2) * 180,
+                x: 100 + (responseIndex * 200), // Horizontal arrangement
+                y: 450, // Below parameters
               },
               data: {
                 statusCode: response.status_code,
@@ -1052,8 +1054,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                   id: classNodeId,
                   type: 'class',
                   position: {
-                    x: 1400 + (allClassNodes.length % 2) * 280,
-                    y: 150 + Math.floor(allClassNodes.length / 2) * 200,
+                    x: 100 + (allClassNodes.length * 300), // Horizontal arrangement
+                    y: 650, // Below responses
                   },
                   data: {
                     className: classInfo.name,
@@ -1183,8 +1185,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               id: requestBodyNodeId,
               type: 'requestBody',
               position: {
-                x: -200, // Position to the left of operations
-                y: 150 + rbIndex * 220,
+                x: -150, // Left side for request bodies
+                y: 50 + rbIndex * 220, // Aligned with operations row
               },
               data: {
                 id: rb.id,
@@ -1286,8 +1288,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             id: responseBodyNodeId,
             type: 'responseBody',
             position: {
-              x: 600, // Position to the right of operations
-              y: 150 + rbodyIndex * 250,
+              x: 600 + (rbodyIndex * 320), // Horizontal arrangement, offset from main column
+              y: 250, // Same level as parameters
             },
             data: {
               id: responseId,

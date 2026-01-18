@@ -16,12 +16,12 @@ export interface PathClassNodeData {
 export default function PathClassNode({ data }: { data: PathClassNodeData }) {
   return (
     <>
-      {/* Input handle - receives FROM responses */}
+      {/* Input handle at TOP - receives FROM responses for vertical flow */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         id="class-input"
-        className="w-3 h-3 bg-indigo-500 border-2 border-white dark:border-gray-800"
+        className="!w-3 !h-2 !rounded-t-md !rounded-b-none bg-indigo-500"
       />
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border-2 border-indigo-500 shadow-xl min-w-[200px] max-w-[300px] cursor-pointer relative group">
@@ -64,12 +64,12 @@ export default function PathClassNode({ data }: { data: PathClassNodeData }) {
         </div>
       </div>
 
-      {/* Output handle - can connect TO responses */}
+      {/* Output handle at BOTTOM - for vertical flow consistency */}
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         id="class-output"
-        className="w-3 h-3 bg-indigo-500 border-2 border-white dark:border-gray-800"
+        className="!w-3 !h-2 !rounded-b-md !rounded-t-none bg-indigo-500"
       />
     </>
   );

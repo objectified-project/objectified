@@ -102,12 +102,13 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
 
   return (
     <>
-      {/* Connection handle - receives FROM operations */}
+      {/* Connection handle at TOP - receives FROM operations for vertical flow */}
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         id="response-input"
-        className="w-3 h-3 bg-gray-400 dark:bg-gray-600"
+        className="!w-3 !h-2 !rounded-t-md !rounded-b-none"
+        style={{ backgroundColor: config.color }}
       />
 
       <div 
@@ -186,15 +187,15 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
         </div>
       </div>
 
-      {/* Output handle - connects TO class nodes (always present and connectable) */}
+      {/* Output handle at BOTTOM - connects TO class nodes for vertical flow */}
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         id="response-class-output"
-        className={`w-3 h-3 border-2 ${
+        className={`!w-3 !h-2 !rounded-b-md !rounded-t-none ${
           data.attachedClassId
-            ? 'bg-indigo-500 border-white dark:border-gray-800'
-            : 'bg-indigo-400/50 border-indigo-300 dark:border-indigo-600'
+            ? 'bg-indigo-500'
+            : 'bg-indigo-400/50'
         }`}
         style={{
           opacity: data.attachedClassId ? 1 : 0.6,
