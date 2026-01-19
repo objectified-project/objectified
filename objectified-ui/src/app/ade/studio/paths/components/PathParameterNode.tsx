@@ -1,8 +1,9 @@
 // Path Parameter Node Component for React Flow Canvas
+// Design based on section 9.3.3 of FUTURE_FEATURE_ROADMAP_PATHS.md
 'use client';
 
 import React from 'react';
-import { Hash, HelpCircle, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 
 export interface PathParameterData {
@@ -11,48 +12,59 @@ export interface PathParameterData {
   summary?: string;
   description?: string;
   required?: boolean;
+  type?: string;
+  format?: string;
+  defaultValue?: string | number | boolean;
   dbParameterId?: string;
   operationId?: string;
   onDelete?: () => void;
 }
 
+// Configuration for each parameter location type per 9.3.3 spec
 const LOCATION_CONFIG = {
   path: {
-    color: '#8b5cf6',
-    label: 'Path',
-    icon: '/',
-    bgClass: 'bg-purple-500',
-    borderClass: 'border-purple-500',
+    color: '#22c55e', // Green for path params
+    icon: ':',
+    borderClass: 'border-green-500',
+    textClass: 'text-green-600 dark:text-green-400',
   },
   query: {
-    color: '#3b82f6',
-    label: 'Query',
+    color: '#3b82f6', // Blue for query params
     icon: '?',
-    bgClass: 'bg-blue-500',
     borderClass: 'border-blue-500',
+    textClass: 'text-blue-600 dark:text-blue-400',
   },
   header: {
-    color: '#f59e0b',
-    label: 'Header',
+    color: '#a855f7', // Purple for header params
     icon: 'H',
-    bgClass: 'bg-amber-500',
-    borderClass: 'border-amber-500',
+    borderClass: 'border-purple-500',
+    textClass: 'text-purple-600 dark:text-purple-400',
   },
   cookie: {
-    color: '#10b981',
-    label: 'Cookie',
-    icon: 'C',
-    bgClass: 'bg-emerald-500',
-    borderClass: 'border-emerald-500',
+    color: '#f97316', // Orange for cookie params
+    icon: '🍪',
+    borderClass: 'border-orange-500',
+    textClass: 'text-orange-600 dark:text-orange-400',
   },
 };
 
 export default function PathParameterNode({ data }: { data: PathParameterData }) {
-  const config = LOCATION_CONFIG[data.inLocation] || LOCATION_CONFIG.path;
+  const config = LOCATION_CONFIG[data.inLocation] || LOCATION_CONFIG.query;
+
+  // Build the type string (e.g., "string (uuid)" or "integer")
+  const typeString = data.format
+    ? `${data.type || 'string'} (${data.format})`
+    : (data.type || 'string');
+
+  // Build the required/optional string
+  const requiredString = data.required ? 'required' : 'optional';
+
+  // Check if we have a default value
+  const hasDefault = data.defaultValue !== undefined && data.defaultValue !== null && data.defaultValue !== '';
 
   return (
     <>
-      {/* Connection handle at TOP - receives FROM operations for vertical flow */}
+      {/* Connection handle at TOP */}
       <Handle
         type="target"
         position={Position.Top}
@@ -61,7 +73,7 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
         style={{ backgroundColor: config.color }}
       />
 
-      <div className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${config.borderClass} shadow-lg min-w-[180px] max-w-[280px] cursor-pointer relative group`}>
+      <div className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${config.borderClass} shadow-md min-w-[180px] max-w-[240px] cursor-pointer relative group`}>
         {/* Delete button */}
         {data.onDelete && (
           <button
@@ -76,48 +88,47 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
           </button>
         )}
 
-        {/* Header */}
-        <div className={`${config.bgClass} text-white px-3 py-2 rounded-t-md flex items-center gap-2`}>
-          <div className="w-6 h-6 rounded flex items-center justify-center bg-white/20 font-mono text-xs font-bold">
-            {config.icon}
+        {/* Content - compact chip design per 9.3.3 */}
+        <div className="px-3 py-2">
+          {/* First line: Icon + Parameter name */}
+          <div className="flex items-center gap-2">
+            <span className={`font-mono font-bold text-sm ${config.textClass}`}>
+              {config.icon}
+            </span>
+            <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
+              {data.name}
+            </span>
           </div>
-          <div className="flex-1">
-            <div className="text-xs font-medium opacity-90">{config.label} Parameter</div>
-            <div className="font-bold text-sm truncate">{data.name}</div>
+
+          {/* Second line: type · required/optional */}
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <span className="font-mono">{typeString}</span>
+            <span className="mx-1">·</span>
+            <span className={data.required ? 'text-red-500 dark:text-red-400 font-medium' : ''}>
+              {requiredString}
+            </span>
           </div>
-          {data.required && (
-            <div className="px-1.5 py-0.5 bg-red-500 rounded text-[10px] font-bold">
-              REQ
+
+          {/* Third line: default value (if present) */}
+          {hasDefault && (
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <span>default: </span>
+              <span className="font-mono text-gray-700 dark:text-gray-300">
+                {String(data.defaultValue)}
+              </span>
             </div>
           )}
-        </div>
 
-        {/* Content */}
-        <div className="p-3 space-y-2">
-          {data.summary && (
-            <div className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2">
-              {data.summary}
+          {/* Fourth line: in: location (for non-path params) */}
+          {data.inLocation !== 'path' && (
+            <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              <span>in: {data.inLocation}</span>
             </div>
           )}
-
-          {!data.summary && !data.description && (
-            <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-              <HelpCircle className="w-3 h-3" />
-              <span>No description</span>
-            </div>
-          )}
-
-          {/* Parameter badge */}
-          <div className="flex items-center gap-1 pt-1">
-            <Hash className="w-3 h-3 text-gray-400" />
-            <code className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded font-mono">
-              {data.inLocation}
-            </code>
-          </div>
         </div>
       </div>
 
-      {/* Output handle at BOTTOM for vertical flow */}
+      {/* Output handle at BOTTOM */}
       <Handle
         type="source"
         position={Position.Bottom}

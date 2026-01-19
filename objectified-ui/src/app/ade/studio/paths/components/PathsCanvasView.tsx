@@ -965,6 +965,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           // Create nodes for all parameters - positioned BELOW operations
           allParamsData.parameters.forEach((param: any, paramIndex: number) => {
             const paramNodeId = `param-${param.id}`;
+            const paramData = param.data || {};
 
             allParameterNodes.push({
               id: paramNodeId,
@@ -978,7 +979,10 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                 inLocation: param.in_location,
                 summary: param.summary,
                 description: param.description,
-                required: param.data?.required ?? (param.in_location === 'path'),
+                required: paramData.required ?? (param.in_location === 'path'),
+                type: paramData.type || 'string',
+                format: paramData.format,
+                defaultValue: paramData.default,
                 dbParameterId: param.id,
                 onDelete: () => handleDeleteParameter(param.id, param.name),
               },

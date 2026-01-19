@@ -390,52 +390,6 @@ When a schema is dragged from the library panel onto the canvas or into a reques
   ○ ← Handle for connecting to Request/Response
 ```
 
-#### 9.3.3 ParameterNode
-
-Parameters appear as compact chips that can be attached to operations:
-
-```
-Query Parameter:                    Path Parameter (auto-detected):
-┌─────────────────────────────┐    ┌─────────────────────────────┐
-│ ? limit                     │    │ : userId                    │
-│   integer · optional        │    │   string (uuid) · required  │
-│   default: 20               │    │   in: path                  │
-└─────────────────────────────┘    └─────────────────────────────┘
-
-Header Parameter:                   Cookie Parameter:
-┌─────────────────────────────┐    ┌─────────────────────────────┐
-│ H X-Request-ID              │    │ 🍪 session_id               │
-│   string · optional         │    │   string · required         │
-└─────────────────────────────┘    └─────────────────────────────┘
-```
-
-#### 9.3.4 ResponseNode
-
-Response nodes show status code with color coding:
-
-```
-2XX Success (Green background)      4XX Client Error (Yellow/Orange)
-┌─────────────────────────────┐    ┌─────────────────────────────┐
-│ 200 OK                  ✓   │    │ 400 Bad Request         ⚠️  │
-├─────────────────────────────┤    ├─────────────────────────────┤
-│ Content:                    │    │ Content:                    │
-│ ○ application/json          │    │ ○ application/json          │
-│   └─ { } User               │    │   └─ { } ValidationError    │
-│                             │    │                             │
-│ Headers:                    │    │ Headers:                    │
-│   X-RateLimit-Remaining     │    │   (none)                    │
-└─────────────────────────────┘    └─────────────────────────────┘
-
-5XX Server Error (Red background)   Default Response (Gray)
-┌─────────────────────────────┐    ┌─────────────────────────────┐
-│ 500 Internal Error      ✕   │    │ default                 ∿   │
-├─────────────────────────────┤    ├─────────────────────────────┤
-│ Content:                    │    │ Content:                    │
-│ ○ application/json          │    │ ○ application/json          │
-│   └─ { } ErrorResponse      │    │   └─ { } ErrorResponse      │
-└─────────────────────────────┘    └─────────────────────────────┘
-```
-
 ### 9.4 Complete Canvas Example
 
 Here's how a complete API endpoint design might appear on the canvas:
