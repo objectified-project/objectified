@@ -41,7 +41,7 @@ export interface PropertyTreeNode extends InlineSchemaProperty {
 export function buildPropertyTreeFromInlineSchema(
   inlineSchema: InlineSchema | null
 ): PropertyTreeNode[] {
-  if (!inlineSchema || !inlineSchema.properties || inlineSchema.properties.length === 0) {
+  if (!inlineSchema || !inlineSchema.properties || !Array.isArray(inlineSchema.properties) || inlineSchema.properties.length === 0) {
     return [];
   }
 
@@ -222,7 +222,8 @@ export function buildSchemaFromInlineProperties(
     return { type: 'object' };
   }
 
-  const properties = inlineSchema.properties || [];
+  // Ensure properties is an array (handle legacy data where it might be an object)
+  const properties = Array.isArray(inlineSchema.properties) ? inlineSchema.properties : [];
   const tree = buildPropertyTreeFromInlineSchema(inlineSchema);
 
   // Build the schema from the tree

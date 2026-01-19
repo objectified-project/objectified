@@ -324,7 +324,10 @@ export async function generateOpenApiSpec(
 
   console.log('[OpenAPI Generator] Template data paths count:', Object.keys(paths || {}).length);
   if (Object.keys(paths || {}).length > 0) {
-    console.log('[OpenAPI Generator] Path keys:', Object.keys(paths || {}).slice(0, 5));
+    console.log('[OpenAPI Generator] Path keys:', Object.keys(paths || {}));
+    console.log('[OpenAPI Generator] First path sample:', JSON.stringify(Object.values(paths || {})[0]).substring(0, 300));
+  } else {
+    console.warn('[OpenAPI Generator] WARNING: No paths provided to template!');
   }
 
   // Add project metadata to top level as x-metadata extension

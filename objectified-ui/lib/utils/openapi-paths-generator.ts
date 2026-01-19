@@ -378,10 +378,22 @@ export function generatePathsForOpenAPI(
 
   for (const path of paths) {
     console.log('[Paths Generator] Building path:', path.pathname, 'with', path.operations.length, 'operations');
-    result[path.pathname] = buildPathItemForOpenAPI(path, options);
+
+    if (path.operations.length === 0) {
+      console.warn('[Paths Generator] WARNING: Path has no operations:', path.pathname);
+      continue; // Skip paths with no operations
+    }
+
+    try {
+      result[path.pathname] = buildPathItemForOpenAPI(path, options);
+    } catch (error) {
+      console.error('[Paths Generator] ERROR building path:', path.pathname, error);
+      throw error;
+    }
   }
 
   console.log('[Paths Generator] Generated', Object.keys(result).length, 'OpenAPI path entries');
+  console.log('[Paths Generator] Result keys:', Object.keys(result));
   return result;
 }
 

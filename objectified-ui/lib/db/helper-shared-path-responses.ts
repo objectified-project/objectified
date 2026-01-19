@@ -10,16 +10,37 @@ const connectionPool = require('./db');
 export async function getSharedPathResponses(versionPathId: string): Promise<string> {
   const query = `
     SELECT 
-      id,
-      version_path_id,
-      status_code,
-      description,
-      data,
-      created_at,
-      updated_at
-    FROM odb.shared_path_response
-    WHERE version_path_id = $1
-    ORDER BY status_code ASC
+      spr.id,
+      spr.version_path_id,
+      spr.status_code,
+      spr.description,
+      spr.data,
+      spr.class_id,
+      c.name as class_name,
+      spr.inline_schema,
+      spr.created_at,
+      spr.updated_at,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', rc.id,
+            'media_type', rc.media_type,
+            'class_id', rc.class_id,
+            'class_name', rc_class.name,
+            'inline_schema', rc.inline_schema,
+            'examples', rc.examples
+          )
+        ) FILTER (WHERE rc.id IS NOT NULL),
+        '[]'
+      ) as content_types
+    FROM odb.shared_path_response spr
+    LEFT JOIN odb.classes c ON spr.class_id = c.id
+    LEFT JOIN odb.shared_path_response_content rc ON spr.id = rc.shared_path_response_id
+    LEFT JOIN odb.classes rc_class ON rc.class_id = rc_class.id
+    WHERE spr.version_path_id = $1
+    GROUP BY spr.id, spr.version_path_id, spr.status_code, spr.description, spr.data,
+             spr.class_id, c.name, spr.inline_schema, spr.created_at, spr.updated_at
+    ORDER BY spr.status_code ASC
   `;
 
   try {
@@ -92,7 +113,7 @@ export async function createSharedPathResponse(
 ): Promise<string> {
   // Check if response already exists
   const checkQuery = `
-    SELECT id, version_path_id, status_code, description, data, created_at, updated_at
+    SELECT id, version_path_id, status_code, description, data, inline_schema, class_id, created_at, updated_at
     FROM odb.shared_path_response
     WHERE version_path_id = $1 AND status_code = $2
   `;
@@ -105,18 +126,25 @@ export async function createSharedPathResponse(
     }
 
     // Create new response
+    // The constraint requires at least one of: class_id, inline_schema, or data
+    // If no data is provided, create with an empty inline schema
     const insertQuery = `
       INSERT INTO odb.shared_path_response 
-      (version_path_id, status_code, description, data)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, version_path_id, status_code, description, data, created_at, updated_at
+      (version_path_id, status_code, description, data, inline_schema)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, version_path_id, status_code, description, data, inline_schema, class_id, created_at, updated_at
     `;
+
+    // Use data if provided, otherwise use empty inline_schema to satisfy constraint
+    const hasData = data && Object.keys(data).length > 0;
+    const inlineSchema = hasData ? null : JSON.stringify({ type: 'object', properties: [] });
 
     const result = await connectionPool.query(insertQuery, [
       versionPathId,
       statusCode,
       description || null,
-      data ? JSON.stringify(data) : null,
+      hasData ? JSON.stringify(data) : null,
+      inlineSchema,
     ]);
 
     return JSON.stringify({ success: true, response: result.rows[0], existed: false });

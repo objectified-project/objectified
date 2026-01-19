@@ -917,7 +917,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
         // Convert operations to nodes with delete callback and schema drop handler
         // Arrange operations HORIZONTALLY at the top for vertical flow
         const operationNodes: Node[] = operations.map((op: any, index: number) => {
-          const spacingX = 180; // Horizontal spacing between operations
+          const spacingX = 300; // Horizontal spacing between operations (increased for larger nodes)
           const startX = 100; // Starting X position
           return {
             id: op.id,
@@ -970,8 +970,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               id: paramNodeId,
               type: 'parameter',
               position: {
-                x: 100 + (paramIndex * 220), // Horizontal arrangement
-                y: 250, // Below operations
+                x: 100 + (paramIndex * 250), // Horizontal arrangement (increased spacing)
+                y: 350, // Below operations (increased gap)
               },
               data: {
                 name: param.name,
@@ -1061,7 +1061,11 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             let attachedClassId: string | undefined;
             let attachedClassName: string | undefined;
             
-            if (response.data) {
+            // Check for direct class_id on response
+            if (response.class_id) {
+              attachedClassId = response.class_id;
+              attachedClassName = response.class_name;
+            } else if (response.data) {
               try {
                 const responseData = typeof response.data === 'string' 
                   ? JSON.parse(response.data) 
@@ -1083,12 +1087,38 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               }
             }
 
+            // Parse content types
+            const contentTypes = (response.content_types || []).map((ct: any) => ({
+              id: ct.id,
+              media_type: ct.media_type,
+              class_id: ct.class_id,
+              class_name: ct.class_name,
+              inline_schema: typeof ct.inline_schema === 'string'
+                ? JSON.parse(ct.inline_schema)
+                : ct.inline_schema,
+              examples: typeof ct.examples === 'string'
+                ? JSON.parse(ct.examples)
+                : ct.examples,
+            }));
+
+            // Parse inline_schema from response itself
+            let inlineSchema = null;
+            if (response.inline_schema) {
+              try {
+                inlineSchema = typeof response.inline_schema === 'string'
+                  ? JSON.parse(response.inline_schema)
+                  : response.inline_schema;
+              } catch (error) {
+                console.error('Error parsing inline_schema:', error);
+              }
+            }
+
             allResponseNodes.push({
               id: responseNodeId,
               type: 'response',
               position: {
-                x: 100 + (responseIndex * 200), // Horizontal arrangement
-                y: 450, // Below parameters
+                x: 100 + (responseIndex * 250), // Horizontal arrangement (increased spacing)
+                y: 500, // Below parameters (increased gap)
               },
               data: {
                 statusCode: response.status_code,
@@ -1096,6 +1126,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                 dbResponseId: response.id,
                 attachedClassId,
                 attachedClassName,
+                contentTypes,
+                inlineSchema,
                 onClassDrop: handleClassDropOnResponse,
               },
             });
@@ -1109,8 +1141,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                   id: classNodeId,
                   type: 'class',
                   position: {
-                    x: 100 + (allClassNodes.length * 300), // Horizontal arrangement
-                    y: 650, // Below responses
+                    x: 100 + (allClassNodes.length * 320), // Horizontal arrangement (increased spacing)
+                    y: 700, // Below responses (increased gap)
                   },
                   data: {
                     className: classInfo.name,
@@ -1240,8 +1272,8 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
               id: requestBodyNodeId,
               type: 'requestBody',
               position: {
-                x: -150, // Left side for request bodies
-                y: 50 + rbIndex * 220, // Aligned with operations row
+                x: -200, // Left side for request bodies (moved further left)
+                y: 50 + rbIndex * 280, // Aligned with operations row (increased vertical spacing)
               },
               data: {
                 id: rb.id,
@@ -1294,112 +1326,10 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           }
         }
 
-        // =================================================================
-        // LOAD RESPONSE BODIES
-        // =================================================================
-        const allResponseBodyNodes: Node[] = [];
+        // Response body nodes are now merged into response nodes, so we don't need separate nodes
+        // The schema/content types are shown directly in the PathResponseNode
 
-        // Better approach: get all responses across all operations
-        const allResponsesMap = new Map<string, any>();
-
-        for (const op of operations) {
-          const respResponse = await getLinkedResponsesForOperation(op.id);
-          const respData = JSON.parse(respResponse);
-
-          if (respData.success && respData.responses) {
-            for (const resp of respData.responses) {
-              // Use response ID as key to avoid duplicates - include responses with OR without content types
-              if (!allResponsesMap.has(resp.id)) {
-                allResponsesMap.set(resp.id, resp);
-              }
-            }
-          }
-        }
-
-        // Create response body nodes from unique responses (with or without content types)
-        let rbodyIndex = 0;
-        for (const [responseId, resp] of allResponsesMap) {
-          const responseBodyNodeId = `response-body-${responseId}`;
-
-          // Parse content types
-          const contentTypes = (resp.content_types || []).map((ct: any) => ({
-            id: ct.id,
-            media_type: ct.media_type,
-            class_id: ct.class_id,
-            class_name: ct.class_name,
-            inline_schema: typeof ct.inline_schema === 'string'
-              ? JSON.parse(ct.inline_schema)
-              : ct.inline_schema,
-            examples: typeof ct.examples === 'string'
-              ? JSON.parse(ct.examples)
-              : ct.examples,
-          }));
-
-          console.log('[PathsCanvasView] Creating response body node:', responseId);
-          console.log('[PathsCanvasView] Content types:', contentTypes);
-          console.log('[PathsCanvasView] First content type inline_schema:', contentTypes[0]?.inline_schema);
-
-          allResponseBodyNodes.push({
-            id: responseBodyNodeId,
-            type: 'responseBody',
-            position: {
-              x: 600 + (rbodyIndex * 320), // Horizontal arrangement, offset from main column
-              y: 250, // Same level as parameters
-            },
-            data: {
-              id: responseId,
-              status_code: resp.status_code,
-              description: resp.description,
-              contentTypes: contentTypes,
-              onPropertyDrop: stableHandleResponseBodyPropertyDrop,
-              onPropertyDelete: stableHandleResponseBodyPropertyDelete,
-              onCreateContentTypeWithProperty: stableHandleCreateContentTypeWithProperty,
-              _refreshKey: refreshKey, // Force React Flow to recognize data change
-            } as PathResponseBodyData,
-          });
-
-          rbodyIndex++;
-        }
-
-        // Create edges from operations to response body nodes
-        for (const op of operations) {
-          const respResponse = await getLinkedResponsesForOperation(op.id);
-          const respData = JSON.parse(respResponse);
-
-          if (respData.success && respData.responses) {
-            for (const resp of respData.responses) {
-              if (resp.content_types && resp.content_types.length > 0) {
-                const rbodyNodeId = `response-body-${resp.id}`;
-
-                const edgeType = edgeRouting === 'straight' ? 'straight'
-                  : edgeRouting === 'bezier' ? 'default'
-                  : edgeRouting === 'smart' ? 'smart'
-                  : 'smoothstep';
-
-                allEdges.push({
-                  id: `edge-op-rbody-${op.id}-${resp.id}`,
-                  source: op.id,
-                  sourceHandle: 'operation-output',
-                  target: rbodyNodeId,
-                  targetHandle: 'response-input',
-                  type: edgeType,
-                  animated: edgeAnimation !== 'none',
-                  style: {
-                    stroke: '#10b981',
-                    strokeWidth: 2,
-                    strokeDasharray: edgeAnimation === 'dash' ? '5,5' : undefined,
-                  },
-                  data: {
-                    sourceNodeId: op.id,
-                    targetNodeId: rbodyNodeId,
-                  },
-                });
-              }
-            }
-          }
-        }
-
-        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes, ...allClassNodes, ...allRequestBodyNodes, ...allResponseBodyNodes]);
+        setNodes([...operationNodes, ...allParameterNodes, ...allResponseNodes, ...allClassNodes, ...allRequestBodyNodes]);
         setEdges(allEdges);
       } catch (error) {
         console.error('Error loading operations and parameters:', error);

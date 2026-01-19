@@ -202,10 +202,16 @@ export default function CodePage() {
 
           if (pathsData.success && pathsData.paths && pathsData.paths.length > 0) {
             console.log(`[Code Tab] Found ${pathsData.paths.length} paths`);
+            console.log('[Code Tab] Path details:', pathsData.paths.map((p: any) => ({
+              pathname: p.pathname,
+              operationCount: p.operations?.length || 0,
+              operations: p.operations?.map((op: any) => op.operation) || []
+            })));
             const pathInfos: PathInfo[] = pathsData.paths;
             pathsObject = generatePathsForOpenAPI(pathInfos) as Record<string, unknown>;
             console.log(`[Code Tab] Generated ${Object.keys(pathsObject).length} OpenAPI path entries`);
-            console.log('[Code Tab] Sample path:', Object.keys(pathsObject)[0]);
+            console.log('[Code Tab] Generated path keys:', Object.keys(pathsObject));
+            console.log('[Code Tab] Sample path content:', Object.keys(pathsObject).length > 0 ? JSON.stringify(Object.values(pathsObject)[0]).substring(0, 200) : 'none');
           } else if (pathsData.success) {
             console.warn('[Code Tab] Paths loaded successfully but array is empty');
             console.warn('[Code Tab] To add paths: Navigate to the Paths tab and create paths with operations');
