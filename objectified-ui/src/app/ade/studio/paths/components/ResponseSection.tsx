@@ -367,8 +367,12 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
         data = { type: 'array', items: { type: arrayItemType } };
       } else if (mode === 'object') {
         inlineSchema = { type: 'object', properties: [] };
+      } else if (mode === 'class') {
+        // For 'class' mode, provide a placeholder inline_schema until user selects a class
+        // This satisfies the database constraint that requires at least one of:
+        // class_id, inline_schema, or data to be NOT NULL
+        inlineSchema = { type: 'object', properties: [] };
       }
-      // For 'class' mode, classId will be set separately via handleSetClassReference
 
       const result = await updateSharedPathResponse(response.id, {
         schemaMode: mode,

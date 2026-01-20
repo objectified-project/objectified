@@ -216,6 +216,98 @@ export async function convertResponseClassToInlineSchema(contentId: string): Pro
 }
 
 /**
+ * Copy class properties to a content type's inline schema
+ * This is used when dragging a class onto a response body to copy its properties
+ */
+export async function copyClassPropertiesToContentType(
+  contentId: string,
+  classId: string
+): Promise<string> {
+  try {
+    // Get class info
+    const classQuery = `
+      SELECT c.id, c.name, c.description
+      FROM odb.classes c
+      WHERE c.id = $1
+    `;
+    const classResult = await connectionPool.query(classQuery, [classId]);
+
+    if (classResult.rows.length === 0) {
+      return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    const classInfo = classResult.rows[0];
+
+    // Get class properties
+    const propsQuery = `
+      SELECT id, name, description, data, parent_id
+      FROM odb.class_properties
+      WHERE class_id = $1
+      ORDER BY parent_id NULLS FIRST, name
+    `;
+    const propsResult = await connectionPool.query(propsQuery, [classId]);
+
+    // Generate new UUIDs for the copied properties to avoid conflicts
+    const { v4: uuidv4 } = require('uuid');
+
+    // Map old IDs to new IDs for parent references
+    const idMap = new Map<string, string>();
+    propsResult.rows.forEach((prop: Record<string, unknown>) => {
+      idMap.set(prop.id as string, uuidv4());
+    });
+
+    // Build inline schema with copied properties
+    const inlineSchema: InlineSchema = {
+      type: 'object',
+      description: classInfo.description || `Copied from class: ${classInfo.name}`,
+      properties: propsResult.rows.map((prop: Record<string, unknown>) => {
+        const newId = idMap.get(prop.id as string);
+        const oldParentId = prop.parent_id as string | null;
+        const newParentId = oldParentId ? idMap.get(oldParentId) : null;
+
+        return {
+          id: newId,
+          name: prop.name as string,
+          description: prop.description as string | undefined,
+          data: typeof prop.data === 'string' ? JSON.parse(prop.data as string) : prop.data,
+          parent_id: newParentId || null,
+        };
+      }),
+    };
+
+    // Update the content type with the inline schema
+    const updateQuery = `
+      UPDATE odb.shared_path_response_content
+      SET 
+        inline_schema = $1::jsonb,
+        class_id = NULL
+      WHERE id = $2
+      RETURNING id, shared_path_response_id, media_type, class_id, inline_schema, examples
+    `;
+
+    const result = await connectionPool.query(updateQuery, [
+      JSON.stringify(inlineSchema),
+      contentId
+    ]);
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Content type not found' });
+    }
+
+    return JSON.stringify({
+      success: true,
+      content: result.rows[0],
+      copiedProperties: propsResult.rows.length,
+      fromClass: classInfo.name
+    });
+  } catch (error: unknown) {
+    console.error('Error copying class properties to content type:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return JSON.stringify({ success: false, error: message });
+  }
+}
+
+/**
  * Initialize an empty inline schema for a content type
  */
 export async function initializeResponseInlineSchema(contentId: string): Promise<string> {

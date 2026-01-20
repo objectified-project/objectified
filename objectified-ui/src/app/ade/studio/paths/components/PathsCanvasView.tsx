@@ -46,12 +46,14 @@ import {
   unlinkResponseFromOperation,
   linkResponseToOperation,
   updateSharedPathResponse,
+  copyClassPropertiesToResponseInlineSchema,
 } from '../../../../../../lib/db/helper-shared-path-responses';
 import PathParameterNode from './PathParameterNode';
 import PathResponseNode from './PathResponseNode';
 import PathClassNode, { PathClassNodeData } from './PathClassNode';
 import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
+import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
 import { Trash2 } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
@@ -75,6 +77,8 @@ import {
   updateResponseInlineSchemaProperty,
   deleteResponseInlineSchemaProperty,
   deleteResponseContentType,
+  copyClassPropertiesToContentType,
+  setResponseContentTypeClassReference,
 } from '../../../../../../lib/db/helper-shared-path-responses-content';
 
 // Enhanced Operation Node Component with Schema Drop Zones - Vertical Layout
@@ -305,11 +309,18 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   const [isDark, setIsDark] = useState(false);
   const { screenToFlowPosition, getNodes } = useReactFlow();
 
+  // State for class drop choice dialog
+  const [classDropDialogOpen, setClassDropDialogOpen] = useState(false);
+  const [classDropDialogClassName, setClassDropDialogClassName] = useState('');
+  const [classDropDialogCallback, setClassDropDialogCallback] = useState<((action: 'copy' | 'reference') => void) | null>(null);
+
   // Refs to hold the latest handler functions
   // This prevents stale closures when nodes are moved or canvas is refreshed
   const handleResponseBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>(() => {});
   const handleResponseBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>(() => {});
+  const handleResponseBodyClassDropRef = useRef<(contentId: string, classData: any, action: 'copy' | 'reference') => void>(() => {});
   const handleCreateContentTypeWithPropertyRef = useRef<(responseId: string, propertyData: any) => void>(() => {});
+  const handleCreateContentTypeWithClassRef = useRef<(responseId: string, classData: any, action: 'copy' | 'reference') => void>(() => {});
   const handleRequestBodyPropertyDropRef = useRef<(contentId: string, propertyData: any, parentId?: string) => void>(() => {});
   const handleRequestBodyPropertyDeleteRef = useRef<(contentId: string, propertyId: string) => void>(() => {});
 
@@ -345,71 +356,43 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     }
   }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
 
-  // Handle class drop on response
+  // Handle class drop on response - copies class properties to inline schema
   const handleClassDropOnResponse = useCallback(async (responseId: string, classData: any) => {
     if (!selectedPathId || !classData.classId) return;
 
     try {
-      // Get class name from classes
-      const classesResponse = await getClassesWithPropertiesAndTags(selectedVersionId || '');
-      const classesData: any[] = JSON.parse(classesResponse as string);
-      const classInfo = classesData.find((c: any) => c.id === classData.classId);
-
-      if (!classInfo) {
-        await alertDialog({
-          title: 'Error',
-          message: 'Class not found',
-          variant: 'error',
-        });
-        return;
-      }
-
-      // Update response data with class reference
-      const schemaData = {
-        content: {
-          'application/json': {
-            schema: {
-              $ref: `#/components/schemas/${classInfo.name}`,
-            },
-          },
-        },
-      };
-
-      const result = await updateSharedPathResponse(responseId, {
-        data: schemaData,
-      });
-
+      // Copy class properties to the response's inline schema
+      const result = await copyClassPropertiesToResponseInlineSchema(responseId, classData.classId);
       const parsed = JSON.parse(result);
       
       if (parsed.success) {
-        // Refresh canvas to show updated connections
+        // Show success message with info about copied properties
+        await alertDialog({
+          title: 'Properties Copied',
+          message: `Copied ${parsed.copiedProperties} properties from class "${parsed.fromClass}" to the response schema.`,
+          variant: 'success',
+        });
+
+        // Refresh canvas to show updated schema
         if (onRefresh) {
           onRefresh();
         }
-        
-        // Also trigger a small delay to ensure database is updated
-        // This helps the properties panel reload the data
-        setTimeout(() => {
-          if (onRefresh) {
-            onRefresh();
-          }
-        }, 500);
       } else {
         await alertDialog({
           title: 'Error',
-          message: parsed.error || 'Failed to attach class to response',
+          message: parsed.error || 'Failed to copy class properties to response',
           variant: 'error',
         });
       }
     } catch (error) {
-      console.error('Error attaching class to response:', error);
+      console.error('Error copying class to response:', error);
       await alertDialog({
         title: 'Error',
-        message: 'Failed to attach class to response',
+        message: 'Failed to copy class properties to response',
         variant: 'error',
       });
     }
-  }, [selectedPathId, selectedVersionId, alertDialog, onRefresh]);
+  }, [selectedPathId, alertDialog, onRefresh]);
 
   // Handle unlink class from response
   const handleClassUnlinkFromResponse = useCallback(async (responseId: string) => {
@@ -1048,6 +1031,77 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     }
   }, [confirmDialog, alertDialog, onRefresh]);
 
+  // Handle class drop on response body content type - supports copy or reference
+  const handleResponseBodyClassDrop = useCallback(async (
+    contentId: string,
+    classData: any,
+    action: 'copy' | 'reference'
+  ) => {
+    console.log('[handleResponseBodyClassDrop] Called with:', { contentId, classData, action });
+
+    if (!classData.classId) {
+      console.error('[handleResponseBodyClassDrop] No classId in drop data');
+      return;
+    }
+
+    try {
+      if (action === 'copy') {
+        // Copy class properties to inline schema
+        const result = await copyClassPropertiesToContentType(contentId, classData.classId);
+        console.log('[handleResponseBodyClassDrop] Copy result:', result);
+        const parsed = JSON.parse(result);
+
+        if (parsed.success) {
+          await alertDialog({
+            title: 'Properties Copied',
+            message: `Copied ${parsed.copiedProperties} properties from class "${parsed.fromClass}" to the response schema.`,
+            variant: 'success',
+          });
+
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: parsed.error || 'Failed to copy class properties',
+            variant: 'error',
+          });
+        }
+      } else if (action === 'reference') {
+        // Create a reference to the class
+        const result = await setResponseContentTypeClassReference(contentId, classData.classId);
+        console.log('[handleResponseBodyClassDrop] Reference result:', result);
+        const parsed = JSON.parse(result);
+
+        if (parsed.success) {
+          await alertDialog({
+            title: 'Class Reference Created',
+            message: `Response now references class "${classData.className || 'class'}".`,
+            variant: 'success',
+          });
+
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: parsed.error || 'Failed to set class reference',
+            variant: 'error',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error handling class drop on response content type:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to process class drop',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
   // Handle creating content type and adding first property in one operation
   const handleCreateContentTypeWithProperty = useCallback(async (
     responseId: string,
@@ -1115,6 +1169,110 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
       await alertDialog({
         title: 'Error',
         message: 'Failed to create response schema',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
+  // Handle creating content type with class - supports copy or reference
+  const handleCreateContentTypeWithClass = useCallback(async (
+    responseId: string,
+    classData: any,
+    action: 'copy' | 'reference'
+  ) => {
+    console.log('[PathsCanvasView] handleCreateContentTypeWithClass called');
+    console.log('[PathsCanvasView] responseId:', responseId);
+    console.log('[PathsCanvasView] classData:', classData);
+    console.log('[PathsCanvasView] action:', action);
+
+    if (!classData.classId) {
+      console.error('[PathsCanvasView] No classId in classData');
+      return;
+    }
+
+    try {
+      if (action === 'reference') {
+        // Create content type with class reference directly
+        console.log('[PathsCanvasView] Creating content type with class reference:', responseId);
+        const createResult = await addResponseContentType(
+          responseId,
+          'application/json',
+          classData.classId, // set class_id for reference
+          undefined, // no inline schema
+          undefined // no examples
+        );
+        console.log('[PathsCanvasView] addResponseContentType result:', createResult);
+        const createParsed = JSON.parse(createResult);
+
+        if (createParsed.success) {
+          await alertDialog({
+            title: 'Class Reference Created',
+            message: `Response now references class "${classData.className || 'class'}".`,
+            variant: 'success',
+          });
+
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: createParsed.error || 'Failed to create content type with class reference',
+            variant: 'error',
+          });
+        }
+      } else {
+        // Copy class properties to inline schema
+        console.log('[PathsCanvasView] Creating content type for response:', responseId);
+        const createResult = await addResponseContentType(
+          responseId,
+          'application/json',
+          undefined, // no class_id - we'll copy properties instead
+          { type: 'object', properties: [] }, // empty inline schema
+          undefined // no examples
+        );
+        console.log('[PathsCanvasView] addResponseContentType result:', createResult);
+        const createParsed = JSON.parse(createResult);
+
+        if (!createParsed.success) {
+          await alertDialog({
+            title: 'Error',
+            message: createParsed.error || 'Failed to create content type',
+            variant: 'error',
+          });
+          return;
+        }
+
+        const contentId = createParsed.content.id;
+
+        // Now copy class properties to the content type
+        const copyResult = await copyClassPropertiesToContentType(contentId, classData.classId);
+        console.log('[PathsCanvasView] copyClassPropertiesToContentType result:', copyResult);
+        const copyParsed = JSON.parse(copyResult);
+
+        if (copyParsed.success) {
+          await alertDialog({
+            title: 'Properties Copied',
+            message: `Copied ${copyParsed.copiedProperties} properties from class "${copyParsed.fromClass}" to the response schema.`,
+            variant: 'success',
+          });
+
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: copyParsed.error || 'Failed to copy class properties',
+            variant: 'error',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error creating content type with class:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to create response schema from class',
         variant: 'error',
       });
     }
@@ -1291,7 +1449,9 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   // Update synchronously (not in useEffect) to avoid render loops
   handleResponseBodyPropertyDropRef.current = handleResponseBodyPropertyDrop;
   handleResponseBodyPropertyDeleteRef.current = handleResponseBodyPropertyDelete;
+  handleResponseBodyClassDropRef.current = handleResponseBodyClassDrop;
   handleCreateContentTypeWithPropertyRef.current = handleCreateContentTypeWithProperty;
+  handleCreateContentTypeWithClassRef.current = handleCreateContentTypeWithClass;
   handleRequestBodyPropertyDropRef.current = handleRequestBodyPropertyDrop;
   handleRequestBodyPropertyDeleteRef.current = handleRequestBodyPropertyDelete;
 
@@ -1306,9 +1466,19 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     handleResponseBodyPropertyDeleteRef.current?.(contentId, propertyId);
   }, []);
 
+  const stableHandleResponseBodyClassDrop = useCallback((contentId: string, classData: any, action: 'copy' | 'reference') => {
+    console.log('[stableHandleResponseBodyClassDrop] Called, delegating to ref');
+    handleResponseBodyClassDropRef.current?.(contentId, classData, action);
+  }, []);
+
   const stableHandleCreateContentTypeWithProperty = useCallback((responseId: string, propertyData: any) => {
     console.log('[stableHandleCreateContentTypeWithProperty] Called, delegating to ref');
     handleCreateContentTypeWithPropertyRef.current?.(responseId, propertyData);
+  }, []);
+
+  const stableHandleCreateContentTypeWithClass = useCallback((responseId: string, classData: any, action: 'copy' | 'reference') => {
+    console.log('[stableHandleCreateContentTypeWithClass] Called, delegating to ref');
+    handleCreateContentTypeWithClassRef.current?.(responseId, classData, action);
   }, []);
 
   const stableHandleRequestBodyPropertyDrop = useCallback((contentId: string, propertyData: any, parentId?: string) => {
@@ -1318,6 +1488,26 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   const stableHandleRequestBodyPropertyDelete = useCallback((contentId: string, propertyId: string) => {
     handleRequestBodyPropertyDeleteRef.current?.(contentId, propertyId);
   }, []);
+
+  // Handler to show dialog asking user what action to take when dropping a class
+  const handleShowClassDropDialog = useCallback((
+    classData: any,
+    onConfirm: (action: 'copy' | 'reference') => void
+  ) => {
+    const className = classData.className || 'class';
+    setClassDropDialogClassName(className);
+    setClassDropDialogCallback(() => onConfirm);
+    setClassDropDialogOpen(true);
+  }, []);
+
+  // Handle the choice from the class drop dialog
+  const handleClassDropDialogChoice = useCallback((action: ClassDropAction) => {
+    if (action !== 'cancel' && classDropDialogCallback) {
+      classDropDialogCallback(action);
+    }
+    setClassDropDialogOpen(false);
+    setClassDropDialogCallback(null);
+  }, [classDropDialogCallback]);
 
   // Load operations and parameters when path is selected
   useEffect(() => {
@@ -1708,8 +1898,11 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
                   contentTypes,
                   onDelete: () => handleDeleteSharedResponse(response.id, response.status_code),
                   onPropertyDrop: stableHandleResponseBodyPropertyDrop,
+                  onClassDrop: stableHandleResponseBodyClassDrop,
                   onPropertyDelete: stableHandleResponseBodyPropertyDelete,
                   onCreateContentTypeWithProperty: stableHandleCreateContentTypeWithProperty,
+                  onCreateContentTypeWithClass: stableHandleCreateContentTypeWithClass,
+                  onShowClassDropDialog: handleShowClassDropDialog,
                 } as PathResponseBodyData,
               });
             }
@@ -1919,7 +2112,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleCreateContentTypeWithProperty]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
 
   // Detect dark mode
   useEffect(() => {
@@ -2722,6 +2915,14 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
           }}
         />
       </ReactFlow>
+
+      {/* Class Drop Choice Dialog */}
+      <ClassDropChoiceDialog
+        open={classDropDialogOpen}
+        onOpenChange={setClassDropDialogOpen}
+        className={classDropDialogClassName}
+        onChoice={handleClassDropDialogChoice}
+      />
     </div>
   );
 }

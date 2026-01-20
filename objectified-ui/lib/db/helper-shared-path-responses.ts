@@ -325,6 +325,101 @@ export async function updateSharedPathResponse(
 }
 
 /**
+ * Copy class properties to a response's inline schema
+ * This copies the properties from the class into the response as an inline schema,
+ * rather than creating a reference to the class.
+ */
+export async function copyClassPropertiesToResponseInlineSchema(
+  responseId: string,
+  classId: string
+): Promise<string> {
+  try {
+    // Get class info and properties
+    const classQuery = `
+      SELECT c.id, c.name, c.description
+      FROM odb.classes c
+      WHERE c.id = $1
+    `;
+    const classResult = await connectionPool.query(classQuery, [classId]);
+
+    if (classResult.rows.length === 0) {
+      return JSON.stringify({ success: false, error: 'Class not found' });
+    }
+
+    const classInfo = classResult.rows[0];
+
+    // Get class properties
+    const propsQuery = `
+      SELECT id, name, description, data, parent_id
+      FROM odb.class_properties
+      WHERE class_id = $1
+      ORDER BY parent_id NULLS FIRST, name
+    `;
+    const propsResult = await connectionPool.query(propsQuery, [classId]);
+
+    // Generate new UUIDs for the copied properties to avoid conflicts
+    const { v4: uuidv4 } = require('uuid');
+
+    // Map old IDs to new IDs for parent references
+    const idMap = new Map<string, string>();
+    propsResult.rows.forEach((prop: Record<string, unknown>) => {
+      idMap.set(prop.id as string, uuidv4());
+    });
+
+    // Build inline schema with copied properties
+    const inlineSchema = {
+      type: 'object',
+      description: classInfo.description || `Copied from class: ${classInfo.name}`,
+      properties: propsResult.rows.map((prop: Record<string, unknown>) => {
+        const newId = idMap.get(prop.id as string);
+        const oldParentId = prop.parent_id as string | null;
+        const newParentId = oldParentId ? idMap.get(oldParentId) : null;
+
+        return {
+          id: newId,
+          name: prop.name as string,
+          description: prop.description as string | undefined,
+          data: typeof prop.data === 'string' ? JSON.parse(prop.data as string) : prop.data,
+          parent_id: newParentId || null,
+        };
+      }),
+    };
+
+    // Update the response with the inline schema
+    const updateQuery = `
+      UPDATE odb.shared_path_response
+      SET 
+        inline_schema = $1::jsonb,
+        schema_mode = 'object',
+        class_id = NULL,
+        data = NULL,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, version_path_id, status_code, description, data, inline_schema, class_id, schema_mode, created_at, updated_at
+    `;
+
+    const result = await connectionPool.query(updateQuery, [
+      JSON.stringify(inlineSchema),
+      responseId
+    ]);
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Response not found' });
+    }
+
+    return JSON.stringify({
+      success: true,
+      response: result.rows[0],
+      copiedProperties: propsResult.rows.length,
+      fromClass: classInfo.name
+    });
+  } catch (error: any) {
+    console.error('Error copying class properties to response:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
  * Delete a shared path response (only if not linked to any operations)
  */
 export async function deleteSharedPathResponse(responseId: string): Promise<string> {

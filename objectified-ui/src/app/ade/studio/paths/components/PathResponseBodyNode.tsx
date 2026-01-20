@@ -31,10 +31,13 @@ export interface PathResponseBodyData {
   onDelete?: () => void;
   onEdit?: () => void;
   onPropertyDrop?: (contentId: string, propertyData: any, parentId?: string) => void;
+  onClassDrop?: (contentId: string, classData: any, action: 'copy' | 'reference') => void;
   onPropertyEdit?: (contentId: string, propertyId: string) => void;
   onPropertyDelete?: (contentId: string, propertyId: string) => void;
   onAddContentType?: () => void;
   onCreateContentTypeWithProperty?: (responseId: string, propertyData: any) => void;
+  onCreateContentTypeWithClass?: (responseId: string, classData: any, action: 'copy' | 'reference') => void;
+  onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   [key: string]: unknown; // Index signature for React Flow compatibility
 }
 
@@ -266,6 +269,8 @@ function PropertyTreeItem({
 interface ContentTypePanelProps {
   content: ContentTypeInfo;
   onPropertyDrop?: (propertyData: any, parentId?: string) => void;
+  onClassDrop?: (classData: any, action: 'copy' | 'reference') => void;
+  onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   onPropertyEdit?: (propertyId: string) => void;
   onPropertyDelete?: (propertyId: string) => void;
 }
@@ -273,6 +278,8 @@ interface ContentTypePanelProps {
 function ContentTypePanel({
   content,
   onPropertyDrop,
+  onClassDrop,
+  onShowClassDropDialog,
   onPropertyEdit,
   onPropertyDelete,
 }: ContentTypePanelProps) {
@@ -336,9 +343,10 @@ function ContentTypePanel({
     console.log('[ContentTypePanel.handleDrop] content.id:', content.id);
     console.log('[ContentTypePanel.handleDrop] content.class_id:', content.class_id);
     console.log('[ContentTypePanel.handleDrop] onPropertyDrop defined:', !!onPropertyDrop);
+    console.log('[ContentTypePanel.handleDrop] onClassDrop defined:', !!onClassDrop);
 
-    if (!onPropertyDrop || content.class_id) {
-      console.log('[ContentTypePanel.handleDrop] Early return - no handler or class reference');
+    if (content.class_id) {
+      console.log('[ContentTypePanel.handleDrop] Early return - has class reference');
       return;
     }
 
@@ -352,9 +360,25 @@ function ContentTypePanel({
 
       const dropData = JSON.parse(dataStr);
       console.log('[ContentTypePanel.handleDrop] dropData:', dropData);
-      if (dropData.type === 'property') {
+
+      if (dropData.type === 'property' && onPropertyDrop) {
         console.log('[ContentTypePanel.handleDrop] Calling onPropertyDrop');
         onPropertyDrop(dropData);
+      } else if (dropData.type === 'class') {
+        console.log('[ContentTypePanel.handleDrop] Class drop detected');
+        if (onShowClassDropDialog) {
+          // Show dialog to ask user what action to take
+          onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
+            if (onClassDrop) {
+              onClassDrop(dropData, action);
+            }
+          });
+        } else if (onClassDrop) {
+          // Fallback: default to copy if no dialog handler
+          onClassDrop(dropData, 'copy');
+        }
+      } else {
+        console.log('[ContentTypePanel.handleDrop] Unhandled drop type:', dropData.type);
       }
     } catch (error) {
       console.error('Error parsing dropped data:', error);
@@ -495,11 +519,7 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
     console.log('[PathResponseBodyNode] handleEmptyDrop called');
     console.log('[PathResponseBodyNode] data.id:', data.id);
     console.log('[PathResponseBodyNode] onCreateContentTypeWithProperty:', !!data.onCreateContentTypeWithProperty);
-
-    if (!data.onCreateContentTypeWithProperty) {
-      console.error('[PathResponseBodyNode] onCreateContentTypeWithProperty is not defined!');
-      return;
-    }
+    console.log('[PathResponseBodyNode] onCreateContentTypeWithClass:', !!data.onCreateContentTypeWithClass);
 
     try {
       const dataStr = e.dataTransfer.getData('application/json');
@@ -511,11 +531,31 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
 
       const dropData = JSON.parse(dataStr);
       console.log('[PathResponseBodyNode] Parsed drop data:', dropData);
+
       if (dropData.type === 'property') {
+        if (!data.onCreateContentTypeWithProperty) {
+          console.error('[PathResponseBodyNode] onCreateContentTypeWithProperty is not defined!');
+          return;
+        }
         console.log('[PathResponseBodyNode] Calling onCreateContentTypeWithProperty');
         data.onCreateContentTypeWithProperty(data.id, dropData);
+      } else if (dropData.type === 'class') {
+        console.log('[PathResponseBodyNode] Class drop detected');
+        if (data.onShowClassDropDialog) {
+          // Show dialog to ask user what action to take
+          data.onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
+            if (data.onCreateContentTypeWithClass) {
+              data.onCreateContentTypeWithClass(data.id, dropData, action);
+            }
+          });
+        } else if (data.onCreateContentTypeWithClass) {
+          // Fallback: default to copy if no dialog handler
+          data.onCreateContentTypeWithClass(data.id, dropData, 'copy');
+        } else {
+          console.error('[PathResponseBodyNode] onCreateContentTypeWithClass is not defined!');
+        }
       } else {
-        console.log('[PathResponseBodyNode] Drop data type is not property:', dropData.type);
+        console.log('[PathResponseBodyNode] Unhandled drop data type:', dropData.type);
       }
     } catch (error) {
       console.error('Error parsing dropped data:', error);
@@ -628,6 +668,23 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
                       }
                     : undefined
                 }
+                onClassDrop={
+                  data.onClassDrop
+                    ? (classData, action) => {
+                        console.log('[PathResponseBodyNode] onClassDrop wrapper called');
+                        console.log('[PathResponseBodyNode] data.id:', data.id);
+                        console.log('[PathResponseBodyNode] currentContent.id:', currentContent?.id);
+                        console.log('[PathResponseBodyNode] classData:', classData);
+                        console.log('[PathResponseBodyNode] action:', action);
+                        if (currentContent?.id) {
+                          data.onClassDrop!(currentContent.id, classData, action);
+                        } else {
+                          console.error('[PathResponseBodyNode] currentContent.id is undefined!');
+                        }
+                      }
+                    : undefined
+                }
+                onShowClassDropDialog={data.onShowClassDropDialog}
                 onPropertyEdit={
                   data.onPropertyEdit
                     ? (propertyId) => data.onPropertyEdit!(currentContent.id, propertyId)
