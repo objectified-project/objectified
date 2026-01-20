@@ -1,10 +1,11 @@
 // Path Response Node Component for React Flow Canvas
-// Design based on section 9.3.4 of FUTURE_FEATURE_ROADMAP_PATHS.md
+// Design based on section 9.3.4 of PLANNED_FEATURE_ROADMAP_PATHS.md
 'use client';
 
 import React from 'react';
 import { Check, AlertTriangle, X, Activity, Trash2, Unlink } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
+import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 
 export interface ContentTypeInfo {
   id: string;
@@ -197,20 +198,10 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
     }
   };
 
-  // Get description text - use provided description or generate from status code
+  // Get description text - use provided description or auto-populate from status code
   const getDescription = () => {
     if (data.description) return data.description;
-    const code = data.statusCode;
-    if (code === '200') return 'OK';
-    if (code === '201') return 'Created';
-    if (code === '204') return 'No Content';
-    if (code === '400') return 'Bad Request';
-    if (code === '401') return 'Unauthorized';
-    if (code === '403') return 'Forbidden';
-    if (code === '404') return 'Not Found';
-    if (code === '500') return 'Internal Error';
-    if (code === 'default') return 'Default Response';
-    return '';
+    return getHttpStatusDescription(data.statusCode);
   };
 
   // Determine what content to show

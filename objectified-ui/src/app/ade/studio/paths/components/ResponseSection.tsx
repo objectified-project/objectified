@@ -3,29 +3,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import { Add, Delete, Edit, Refresh } from '@mui/icons-material';
-import { FileJson, Pencil, Plus, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { Add, Refresh } from '@mui/icons-material';
+import { FileJson, Plus, ChevronDown, ChevronRight, Trash2, Wand2 } from 'lucide-react';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useStudio } from '../../StudioContext';
+import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 import {
   getResponseContentTypes,
   addResponseContentType,
-  updateResponseContentType,
   deleteResponseContentType,
   convertResponseClassToInlineSchema,
-  initializeResponseInlineSchema,
   setResponseContentTypeClassReference,
   addPropertyToResponseInlineSchema,
-  updateResponseInlineSchemaProperty,
   deleteResponseInlineSchemaProperty,
 } from '../../../../../../lib/db/helper-shared-path-responses-content';
 import {
@@ -169,6 +170,11 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
   const [arrayItemType, setArrayItemType] = useState<'string' | 'number' | 'integer' | 'boolean'>('string');
   const [isSavingSchemaMode, setIsSavingSchemaMode] = useState(false);
 
+  // Description state - auto-populate from status code or allow custom
+  const [description, setDescription] = useState(response.description || '');
+  const [autoPopulateDescription, setAutoPopulateDescription] = useState(!response.description);
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+
   // Load content types
   const loadContentTypes = useCallback(async () => {
     if (!response.id) return;
@@ -202,6 +208,65 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
     loadContentTypes();
     loadClasses();
   }, [loadContentTypes, loadClasses]);
+
+  // Initialize description from response or auto-populate from status code
+  useEffect(() => {
+    if (response.description) {
+      setDescription(response.description);
+      setAutoPopulateDescription(false);
+    } else {
+      // Auto-populate from status code if no description set
+      const autoDesc = getHttpStatusDescription(response.status_code);
+      setDescription(autoDesc);
+      setAutoPopulateDescription(true);
+    }
+  }, [response.id, response.description, response.status_code]);
+
+  // Handle auto-populate toggle
+  const handleAutoPopulateToggle = async (checked: boolean) => {
+    setAutoPopulateDescription(checked);
+    if (checked) {
+      const autoDesc = getHttpStatusDescription(response.status_code);
+      setDescription(autoDesc);
+      await saveDescription(autoDesc);
+    }
+  };
+
+  // Save description to database
+  const saveDescription = async (newDescription: string) => {
+    setIsSavingDescription(true);
+    try {
+      const result = await updateSharedPathResponse(response.id, {
+        description: newDescription,
+      });
+      const parsed = JSON.parse(result);
+      if (parsed.success) {
+        onUpdate();
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        console.error('Error saving description:', parsed.error);
+      }
+    } catch (error) {
+      console.error('Error saving description:', error);
+    } finally {
+      setIsSavingDescription(false);
+    }
+  };
+
+  // Handle description change (manual editing)
+  const handleDescriptionChange = (value: string) => {
+    setDescription(value);
+    setAutoPopulateDescription(false);
+  };
+
+  // Handle description blur (save on blur)
+  const handleDescriptionBlur = async () => {
+    if (description !== response.description) {
+      await saveDescription(description);
+    }
+  };
 
   // Get current content type
   const currentContentType = contentTypes[selectedContentTypeIndex];
@@ -479,6 +544,53 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
         >
           Add Content Type
         </Button>
+      </Box>
+
+      {/* Description Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ fontSize: '0.875rem', fontWeight: 600 }}>Description</Box>
+          <Tooltip title="Auto-populate description from HTTP status code">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={autoPopulateDescription}
+                  onChange={(e) => handleAutoPopulateToggle(e.target.checked)}
+                  disabled={isSavingDescription}
+                />
+              }
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem' }}>
+                  <Wand2 size={14} />
+                  Auto
+                </Box>
+              }
+              sx={{ mr: 0 }}
+            />
+          </Tooltip>
+        </Box>
+        <TextField
+          fullWidth
+          size="small"
+          placeholder={autoPopulateDescription ? 'Auto-populated from status code' : 'Enter response description...'}
+          value={description}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
+          onBlur={handleDescriptionBlur}
+          disabled={isSavingDescription}
+          InputProps={{
+            sx: {
+              backgroundColor: autoPopulateDescription
+                ? (isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)')
+                : undefined,
+            },
+          }}
+          helperText={
+            autoPopulateDescription
+              ? 'Description is auto-populated from status code. Uncheck "Auto" to customize.'
+              : undefined
+          }
+        />
       </Box>
 
       {/* Content Type Tabs */}

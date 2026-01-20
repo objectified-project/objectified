@@ -196,7 +196,7 @@ structure immediately recognizable.
 
 **Configurable Properties**:
 - ✅ Status code (100-599)
-- 📋 Description (semantic suggestions per status code)
+- ✅ Description (auto-populated from status code, configurable)
 - 📋 Response headers (name, schema, description)
 - 📋 Content type map with schema bindings
 - 📋 Links (HATEOAS navigation)
@@ -204,7 +204,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
-| #393   | Add description to response                            |
 | #394   | Add response headers (name, schema, description)       |
 | #395   | Add content type map with schema bindings              |
 | #396   | Add links (HATEOAS navigation)                         |

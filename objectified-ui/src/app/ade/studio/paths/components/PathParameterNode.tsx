@@ -1,5 +1,5 @@
 // Path Parameter Node Component for React Flow Canvas
-// Design based on section 9.3.3 of FUTURE_FEATURE_ROADMAP_PATHS.md
+// Design based on section 9.3.3 of PLANNED_FEATURE_ROADMAP_PATHS.md
 'use client';
 
 import React from 'react';

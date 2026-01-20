@@ -32,6 +32,7 @@ import {
 import { extractPathParameters } from '../../../../../../lib/utils/path-params';
 import SchemaBuilder from './SchemaBuilder';
 import ResponseSection from './ResponseSection';
+import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 
 interface OperationPropertiesPanelProps {
   operationId: string | null;
@@ -86,6 +87,7 @@ export default function OperationPropertiesPanel({
   // New response form state
   const [newResponseStatusCode, setNewResponseStatusCode] = useState('200');
   const [newResponseDescription, setNewResponseDescription] = useState('');
+  const [newResponseAutoFillDescription, setNewResponseAutoFillDescription] = useState(true);
   const [newResponseSchemaType, setNewResponseSchemaType] = useState<'object' | 'string' | 'number' | 'integer' | 'boolean' | 'array'>('object');
   const [newResponseArrayItemType, setNewResponseArrayItemType] = useState<'string' | 'number' | 'integer' | 'boolean'>('string');
 
@@ -219,9 +221,28 @@ export default function OperationPropertiesPanel({
 
   const resetNewResponseForm = () => {
     setNewResponseStatusCode('200');
-    setNewResponseDescription('');
+    setNewResponseDescription(getHttpStatusDescription('200'));
+    setNewResponseAutoFillDescription(true);
     setNewResponseSchemaType('object');
     setNewResponseArrayItemType('string');
+  };
+
+  // Handle status code change - auto-fill description if checkbox is checked
+  const handleStatusCodeChange = (value: string) => {
+    setNewResponseStatusCode(value);
+    if (newResponseAutoFillDescription) {
+      const autoDesc = getHttpStatusDescription(value);
+      setNewResponseDescription(autoDesc);
+    }
+  };
+
+  // Handle auto-fill checkbox toggle
+  const handleAutoFillToggle = (checked: boolean) => {
+    setNewResponseAutoFillDescription(checked);
+    if (checked) {
+      const autoDesc = getHttpStatusDescription(newResponseStatusCode);
+      setNewResponseDescription(autoDesc);
+    }
   };
 
   const handleSaveOperation = async () => {
@@ -558,7 +579,7 @@ export default function OperationPropertiesPanel({
                   fullWidth
                   size="small"
                   value={newResponseStatusCode}
-                  onChange={(e) => setNewResponseStatusCode(e.target.value)}
+                  onChange={(e) => handleStatusCodeChange(e.target.value)}
                   placeholder="200, 2XX, 404, etc."
                   sx={{
                     '& .MuiInputBase-root': {
@@ -587,18 +608,47 @@ export default function OperationPropertiesPanel({
                   rows={4}
                   size="small"
                   value={newResponseDescription}
-                  onChange={(e) => setNewResponseDescription(e.target.value)}
+                  onChange={(e) => {
+                    setNewResponseDescription(e.target.value);
+                    // If user manually edits, turn off auto-fill
+                    if (newResponseAutoFillDescription) {
+                      setNewResponseAutoFillDescription(false);
+                    }
+                  }}
                   placeholder="Describe when this response is returned..."
                   sx={{
                     '& .MuiInputBase-root': {
                       fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      backgroundColor: newResponseAutoFillDescription
+                        ? (isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)')
+                        : (isDark ? '#0f172a' : '#ffffff'),
                       color: isDark ? '#f1f5f9' : '#0f172a',
                     },
                     '& .MuiOutlinedInput-notchedOutline': {
                       borderColor: isDark ? '#334155' : '#e2e8f0',
                     },
                   }}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={newResponseAutoFillDescription}
+                      onChange={(e) => handleAutoFillToggle(e.target.checked)}
+                      sx={{
+                        color: isDark ? '#64748b' : '#94a3b8',
+                        '&.Mui-checked': {
+                          color: '#6366f1',
+                        },
+                      }}
+                    />
+                  }
+                  label={
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Auto-fill description from status code
+                    </span>
+                  }
+                  sx={{ mt: 0.5 }}
                 />
               </Box>
 
