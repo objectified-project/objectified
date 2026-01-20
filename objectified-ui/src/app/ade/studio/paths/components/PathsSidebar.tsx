@@ -74,6 +74,8 @@ export default function PathsSidebar({
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [properties, setProperties] = useState<PropertyItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [pathSearch, setPathSearch] = useState('');
+  const [classSearch, setClassSearch] = useState('');
   const [propertySearch, setPropertySearch] = useState('');
 
   // Dialog state for adding/editing paths
@@ -464,13 +466,51 @@ export default function PathsSidebar({
                       <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                         Paths
                       </span>
-                    </Box>
-                    {paths.length === 0 ? (
-                      <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
-                        No paths yet. Use the + button below to create one.
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                        {paths.length} total
                       </span>
-                    ) : (
-                    paths.map((path) => (
+                    </Box>
+
+                    {/* Search Input */}
+                    <Box sx={{ mb: 1.5 }}>
+                      <input
+                        type="text"
+                        value={pathSearch}
+                        onChange={(e) => setPathSearch(e.target.value)}
+                        placeholder="Filter paths..."
+                        className={`w-full px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
+                          isDark
+                            ? 'bg-slate-800 border-slate-600 text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                            : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                        }`}
+                      />
+                    </Box>
+
+                    {(() => {
+                      // Filter paths based on search
+                      const filteredPaths = pathSearch.trim()
+                        ? paths.filter(path =>
+                            path.pathname.toLowerCase().includes(pathSearch.toLowerCase())
+                          )
+                        : paths;
+
+                      if (paths.length === 0) {
+                        return (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                            No paths yet. Use the + button below to create one.
+                          </span>
+                        );
+                      }
+
+                      if (filteredPaths.length === 0) {
+                        return (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                            No paths match &quot;{pathSearch}&quot;
+                          </span>
+                        );
+                      }
+
+                      return filteredPaths.map((path) => (
                       <Box
                         key={path.id}
                         onClick={() => onPathSelect(path.id, path.pathname)}
@@ -542,104 +582,149 @@ export default function PathsSidebar({
                           </IconButton>
                         </Box>
                       </Box>
-                    ))
-                  )}
+                    ));
+                    })()}
                   </Box>
                 </Box>
               )}
 
               {/* Classes Tab Content */}
               {activeTab === 'classes' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {classes.length === 0 ? (
-                    <Box
-                      sx={{
-                        py: 3,
-                        px: 2,
-                        textAlign: 'center',
-                        border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                        borderRadius: 1,
-                      }}
-                    >
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        No classes found. Create classes in the main Studio editor.
-                      </span>
-                    </Box>
-                  ) : (
-                    <>
-                      <Box sx={{ px: 0.5, mb: 0.5 }}>
-                        <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Drag to Canvas
-                        </span>
-                      </Box>
-                      {classes.map((cls) => {
-                        const handleClassDragStart = (e: React.DragEvent) => {
-                          e.dataTransfer.effectAllowed = 'copy';
-                          e.dataTransfer.setData('application/json', JSON.stringify({
-                            type: 'class',
-                            classId: cls.id,
-                            className: cls.name,
-                          }));
-                        };
+                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 0 }}>
+                  {/* Header with count */}
+                  {/* Search Input */}
+                  <Box sx={{ flexShrink: 0, mb: 1.5 }}>
+                    <input
+                      type="text"
+                      value={classSearch}
+                      onChange={(e) => setClassSearch(e.target.value)}
+                      placeholder="Filter classes..."
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                        isDark
+                          ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                      }`}
+                    />
+                  </Box>
 
+                  {/* Scrollable classes list */}
+                  <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {(() => {
+                      // Filter classes based on search
+                      const filteredClasses = classSearch.trim()
+                        ? classes.filter(cls =>
+                            cls.name.toLowerCase().includes(classSearch.toLowerCase())
+                          )
+                        : classes;
+
+                      if (classes.length === 0) {
                         return (
                           <Box
-                            key={cls.id}
-                            draggable
-                            onDragStart={handleClassDragStart}
                             sx={{
+                              py: 3,
                               px: 2,
-                              py: 1.5,
-                              borderRadius: 1.5,
-                              border: isDark ? '1px solid #475569' : '1px solid #cbd5e1',
-                              background: isDark
-                                ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
-                                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                              fontSize: '0.875rem',
-                              color: isDark ? '#e2e8f0' : '#1e293b',
-                              cursor: 'grab',
-                              transition: 'all 0.2s ease',
-                              position: 'relative',
-                              boxShadow: isDark
-                                ? '0 1px 3px rgba(0, 0, 0, 0.3)'
-                                : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              '&:hover': {
-                                backgroundColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(241, 245, 249, 1)',
-                                transform: 'translateY(-1px)',
-                                boxShadow: isDark
-                                  ? '0 4px 12px rgba(0, 0, 0, 0.4)'
-                                  : '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                borderColor: isDark ? '#6366f1' : '#818cf8',
-                              },
-                              '&:active': {
-                                cursor: 'grabbing',
-                                transform: 'translateY(0)',
-                              },
+                              textAlign: 'center',
+                              border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
+                              borderRadius: 1,
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <Box
-                                sx={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                                  flexShrink: 0,
-                                  boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)',
-                                }}
-                              />
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <div className="font-semibold text-sm truncate">{cls.name}</div>
-                                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                                  Class Schema
-                                </div>
-                              </Box>
-                            </Box>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              No classes found. Create classes in the main Studio editor.
+                            </span>
                           </Box>
                         );
-                      })}
-                    </>
-                  )}
+                      }
+
+                      if (filteredClasses.length === 0) {
+                        return (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
+                            No classes match &quot;{classSearch}&quot;
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <>
+                          <Box sx={{ px: 0.5, mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Drag to Canvas
+                            </span>
+                            {classSearch.trim() && (
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                {filteredClasses.length} / {classes.length}
+                              </span>
+                            )}
+                          </Box>
+                          {filteredClasses.map((cls) => {
+                            const handleClassDragStart = (e: React.DragEvent) => {
+                              e.dataTransfer.effectAllowed = 'copy';
+                              e.dataTransfer.setData('application/json', JSON.stringify({
+                                type: 'class',
+                                classId: cls.id,
+                                className: cls.name,
+                              }));
+                            };
+
+                            return (
+                              <Box
+                                key={cls.id}
+                                draggable
+                                onDragStart={handleClassDragStart}
+                                sx={{
+                                  px: 2,
+                                  py: 1.5,
+                                  borderRadius: 1.5,
+                                  border: isDark ? '1px solid #475569' : '1px solid #cbd5e1',
+                                  background: isDark
+                                    ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
+                                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
+                                  fontSize: '0.875rem',
+                                  color: isDark ? '#e2e8f0' : '#1e293b',
+                                  cursor: 'grab',
+                                  transition: 'all 0.2s ease',
+                                  position: 'relative',
+                                  boxShadow: isDark
+                                    ? '0 1px 3px rgba(0, 0, 0, 0.3)'
+                                    : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                                  '&:hover': {
+                                    backgroundColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(241, 245, 249, 1)',
+                                    transform: 'translateY(-1px)',
+                                    boxShadow: isDark
+                                      ? '0 4px 12px rgba(0, 0, 0, 0.4)'
+                                      : '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                    borderColor: isDark ? '#6366f1' : '#818cf8',
+                                  },
+                                  '&:active': {
+                                    cursor: 'grabbing',
+                                    transform: 'translateY(0)',
+                                  },
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                  <Box
+                                    sx={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: '50%',
+                                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                      flexShrink: 0,
+                                      boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)',
+                                    }}
+                                  />
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <div className="font-semibold text-sm truncate">{cls.name}</div>
+                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                      Class Schema
+                                    </div>
+                                  </Box>
+                                </Box>
+                              </Box>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+                  </Box>
                 </Box>
               )}
 
