@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "objectified-ui",
-    "objectified-browse"
+    "objectified-browse",
+    "objectified-web"
   ],
   "packageManager": "yarn@4.12.0"
 }
