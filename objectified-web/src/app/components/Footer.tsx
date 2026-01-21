@@ -160,7 +160,7 @@ export function Footer() {
 
         <div className="mt-12 border-t border-zinc-200 pt-8 dark:border-zinc-800">
           <p className="text-center text-sm text-zinc-600 dark:text-zinc-400">
-            © {currentYear} Objectified. All rights reserved.
+            © 2018 - {currentYear} NobuData, LLC. All rights reserved.
           </p>
         </div>
       </div>
