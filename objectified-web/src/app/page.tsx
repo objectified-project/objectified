@@ -118,7 +118,7 @@ export default function Home() {
                 Code Generation
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Generate server stubs, client SDKs, and database migrations from your specifications automatically.
+                Generate DTO stubs, database migrations, and multiple database exports from your specifications automatically.
               </p>
             </div>
 
