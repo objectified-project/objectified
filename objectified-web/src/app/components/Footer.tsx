@@ -30,6 +30,9 @@ export function Footer() {
                 />
               </div>
             </div>
+            <p className="mb-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              Your data: Designed, Defined, Discovered.
+            </p>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               Visual API & Database Design Platform. Build better APIs faster with our intuitive tools.
             </p>

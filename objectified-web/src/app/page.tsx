@@ -22,15 +22,18 @@ export default function Home() {
               <Star className="h-4 w-4" />
               Now in Public Beta
             </div>
-            <h1 className="mb-6 text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl lg:text-7xl">
+            <h1 className="mb-8 text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl lg:text-7xl">
               Design APIs & Databases{" "}
               <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 Visually
               </span>
             </h1>
-            <p className="mb-10 text-xl text-zinc-600 dark:text-zinc-400">
-              The modern platform for creating OpenAPI specifications and database schemas.
-              Build faster with our intuitive visual editor, manage teams, and scale with confidence.
+            <p className="mb-8 text-2xl font-semibold text-zinc-700 dark:text-zinc-300 sm:text-3xl">
+              Your data: Designed, Defined, Discovered.
+            </p>
+            <p className="mb-12 text-xl text-zinc-600 dark:text-zinc-400">
+              The modern platform for creating OpenAPI specifications and database schemas.<br/>
+              Build faster with our intuitive visual editor, publish, and scale with confidence.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
