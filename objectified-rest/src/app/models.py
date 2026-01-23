@@ -79,3 +79,60 @@ class OpenAPIResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PrimitiveSchema(BaseModel):
+    """Pydantic model for a primitive type definition."""
+    id: str
+    tenant_id: str
+    name: str
+    description: Optional[str] = None
+    category: str
+    schema: Dict[str, Any]
+    tags: Optional[List[str]] = None
+    created_by: Optional[str] = None
+    is_system: bool = False
+    is_public: bool = False
+    usage_count: int = 0
+    enabled: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PrimitiveCreateRequest(BaseModel):
+    """Request model for creating a primitive."""
+    name: str
+    description: Optional[str] = None
+    category: str
+    schema: Dict[str, Any]
+    tags: Optional[List[str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PrimitiveUpdateRequest(BaseModel):
+    """Request model for updating a primitive."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    schema: Optional[Dict[str, Any]] = None
+    tags: Optional[List[str]] = None
+    enabled: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PrimitiveImportRequest(BaseModel):
+    """Request model for importing primitives from JSON Schema."""
+    schema: Dict[str, Any]  # Full JSON Schema document
+    import_all: bool = False  # If True, import all definitions; if False, select specific ones
+    selected_definitions: Optional[List[str]] = None  # List of definition keys to import
+
+    class Config:
+        from_attributes = True
+

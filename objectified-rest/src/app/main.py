@@ -11,6 +11,7 @@ from .openapi_generator import generate_openapi_spec, generate_class_openapi_spe
 from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .jsonschema_generator import generate_jsonschema_spec, generate_class_jsonschema_spec
 from .models import OpenAPIResponse
+from .primitives_routes import router as primitives_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(primitives_router)
 
 
 @app.on_event("startup")
@@ -99,7 +103,15 @@ async def root():
             "arazzo_spec": "/v1/arazzo/{tenant-slug}/{project-slug}/{version-slug}",
             "class_arazzo_spec": "/v1/arazzo/{tenant-slug}/{project-slug}/{version-slug}/{class-name}",
             "jsonschema_spec": "/v1/json/{tenant-slug}/{project-slug}/{version-slug}",
-            "class_jsonschema_spec": "/v1/json/{tenant-slug}/{project-slug}/{version-slug}/{class-name}"
+            "class_jsonschema_spec": "/v1/json/{tenant-slug}/{project-slug}/{version-slug}/{class-name}",
+            "primitives": {
+                "list": "/v1/primitives/{tenant-slug}",
+                "get": "/v1/primitives/{tenant-slug}/{primitive-id}",
+                "create": "POST /v1/primitives/{tenant-slug}",
+                "update": "PUT /v1/primitives/{tenant-slug}/{primitive-id}",
+                "delete": "DELETE /v1/primitives/{tenant-slug}/{primitive-id}",
+                "import": "POST /v1/primitives/{tenant-slug}/import"
+            }
         }
     }
 

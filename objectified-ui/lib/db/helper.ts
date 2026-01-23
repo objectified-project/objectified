@@ -3656,3 +3656,394 @@ export async function syncGroupsForVersion(versionId: string, groups: any[], nod
   }
 }
 
+/* ==========================================
+ * PRIMITIVES MANAGEMENT
+ * ========================================== */
+
+export interface Primitive {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  schema: any;
+  tags: string[];
+  created_by: string | null;
+  is_system: boolean;
+  is_public: boolean;
+  usage_count: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Get all primitives for a tenant
+ */
+export async function getPrimitives(tenantId: string, category?: string | null) {
+  try {
+    let query = `
+      SELECT id, tenant_id, name, description, category, schema, tags, created_by,
+             is_system, is_public, usage_count, enabled, created_at, updated_at
+      FROM odb.primitives
+      WHERE tenant_id = $1 AND deleted_at IS NULL AND enabled = true
+    `;
+
+    const params: any[] = [tenantId];
+
+    if (category) {
+      params.push(category);
+      query += ` AND category = $${params.length}`;
+    }
+
+    query += ' ORDER BY category, name';
+
+    const result = await connectionPool.query(query, params);
+    return JSON.stringify({ success: true, primitives: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching primitives:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Get primitive categories for a tenant
+ */
+export async function getPrimitiveCategories(tenantId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT category, COUNT(*) as count
+       FROM odb.primitives
+       WHERE tenant_id = $1 AND deleted_at IS NULL AND enabled = true
+       GROUP BY category
+       ORDER BY category`,
+      [tenantId]
+    );
+    return JSON.stringify({ success: true, categories: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching primitive categories:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Get a specific primitive by ID
+ */
+export async function getPrimitiveById(primitiveId: string, tenantId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, tenant_id, name, description, category, schema, tags, created_by,
+              is_system, is_public, usage_count, enabled, created_at, updated_at
+       FROM odb.primitives
+       WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
+      [primitiveId, tenantId]
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Primitive not found' });
+    }
+
+    return JSON.stringify({ success: true, primitive: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error fetching primitive:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Create a new primitive
+ */
+export async function createPrimitive(
+  tenantId: string,
+  createdBy: string,
+  name: string,
+  description: string | null,
+  category: string,
+  schema: any,
+  tags: string[] = []
+) {
+  try {
+    if (!name || name.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Primitive name is required' });
+    }
+
+    if (!category || category.trim().length === 0) {
+      return JSON.stringify({ success: false, error: 'Category is required' });
+    }
+
+    if (!schema) {
+      return JSON.stringify({ success: false, error: 'Schema is required' });
+    }
+
+    const result = await connectionPool.query(
+      `INSERT INTO odb.primitives 
+       (tenant_id, created_by, name, description, category, schema, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, tenant_id, name, description, category, schema, tags, created_by,
+                 is_system, is_public, usage_count, enabled, created_at, updated_at`,
+      [tenantId, createdBy, name.trim(), description, category.trim(), JSON.stringify(schema), tags]
+    );
+
+    return JSON.stringify({ success: true, primitive: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating primitive:', error);
+
+    if (error.code === '23505') {
+      return JSON.stringify({
+        success: false,
+        error: `A primitive with name "${name}" already exists in category "${category}"`
+      });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Update a primitive
+ */
+export async function updatePrimitive(
+  primitiveId: string,
+  tenantId: string,
+  updates: {
+    name?: string;
+    description?: string;
+    category?: string;
+    schema?: any;
+    tags?: string[];
+    enabled?: boolean;
+  }
+) {
+  try {
+    // Check if primitive exists and is updatable
+    const existing = await connectionPool.query(
+      `SELECT is_system, tenant_id FROM odb.primitives WHERE id = $1 AND deleted_at IS NULL`,
+      [primitiveId]
+    );
+
+    if (existing.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Primitive not found' });
+    }
+
+    if (existing.rows[0].is_system) {
+      return JSON.stringify({ success: false, error: 'System primitives cannot be updated' });
+    }
+
+    if (existing.rows[0].tenant_id !== tenantId) {
+      return JSON.stringify({ success: false, error: 'You can only update primitives owned by your tenant' });
+    }
+
+    const updateFields = [];
+    const params: any[] = [];
+    let paramCount = 1;
+
+    if (updates.name !== undefined) {
+      updateFields.push(`name = $${paramCount}`);
+      params.push(updates.name);
+      paramCount++;
+    }
+
+    if (updates.description !== undefined) {
+      updateFields.push(`description = $${paramCount}`);
+      params.push(updates.description);
+      paramCount++;
+    }
+
+    if (updates.category !== undefined) {
+      updateFields.push(`category = $${paramCount}`);
+      params.push(updates.category);
+      paramCount++;
+    }
+
+    if (updates.schema !== undefined) {
+      updateFields.push(`schema = $${paramCount}`);
+      params.push(JSON.stringify(updates.schema));
+      paramCount++;
+    }
+
+    if (updates.tags !== undefined) {
+      updateFields.push(`tags = $${paramCount}`);
+      params.push(updates.tags);
+      paramCount++;
+    }
+
+    if (updates.enabled !== undefined) {
+      updateFields.push(`enabled = $${paramCount}`);
+      params.push(updates.enabled);
+      paramCount++;
+    }
+
+    if (updateFields.length === 0) {
+      return JSON.stringify({ success: false, error: 'No fields to update' });
+    }
+
+    params.push(primitiveId);
+    params.push(tenantId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.primitives
+       SET ${updateFields.join(', ')}
+       WHERE id = $${paramCount} AND tenant_id = $${paramCount + 1} AND deleted_at IS NULL
+       RETURNING id, tenant_id, name, description, category, schema, tags, created_by,
+                 is_system, is_public, usage_count, enabled, created_at, updated_at`,
+      params
+    );
+
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Primitive not found or update failed' });
+    }
+
+    return JSON.stringify({ success: true, primitive: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error updating primitive:', error);
+
+    if (error.code === '23505') {
+      return JSON.stringify({
+        success: false,
+        error: 'A primitive with that name already exists in the category'
+      });
+    }
+
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Delete a primitive (soft delete)
+ */
+export async function deletePrimitive(primitiveId: string, tenantId: string) {
+  try {
+    // Check if primitive exists and is deletable
+    const existing = await connectionPool.query(
+      `SELECT is_system, tenant_id FROM odb.primitives WHERE id = $1 AND deleted_at IS NULL`,
+      [primitiveId]
+    );
+
+    if (existing.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Primitive not found' });
+    }
+
+    if (existing.rows[0].is_system) {
+      return JSON.stringify({ success: false, error: 'System primitives cannot be deleted' });
+    }
+
+    if (existing.rows[0].tenant_id !== tenantId) {
+      return JSON.stringify({ success: false, error: 'You can only delete primitives owned by your tenant' });
+    }
+
+    await connectionPool.query(
+      `UPDATE odb.primitives SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [primitiveId]
+    );
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting primitive:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Increment usage count when a primitive is used
+ */
+export async function incrementPrimitiveUsage(primitiveId: string) {
+  try {
+    await connectionPool.query(
+      `UPDATE odb.primitives SET usage_count = usage_count + 1 WHERE id = $1`,
+      [primitiveId]
+    );
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('Error incrementing primitive usage:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Import primitives from JSON Schema definitions
+ */
+export async function importPrimitivesFromSchema(
+  tenantId: string,
+  createdBy: string,
+  jsonSchema: any,
+  selectedDefinitions?: string[]
+) {
+  try {
+    // Extract definitions from schema
+    const definitions: Record<string, any> = {
+      ...(jsonSchema.$defs || {}),
+      ...(jsonSchema.definitions || {})
+    };
+
+    if (Object.keys(definitions).length === 0) {
+      return JSON.stringify({
+        success: false,
+        error: 'No definitions found in JSON Schema. Schema must contain $defs or definitions.'
+      });
+    }
+
+    // Filter if specific definitions requested
+    let defsToImport = definitions;
+    if (selectedDefinitions && selectedDefinitions.length > 0) {
+      defsToImport = {};
+      for (const key of selectedDefinitions) {
+        if (definitions[key]) {
+          defsToImport[key] = definitions[key];
+        }
+      }
+    }
+
+    const imported = [];
+    const skipped = [];
+    const errors = [];
+
+    for (const [defName, defSchema] of Object.entries(defsToImport)) {
+      try {
+        // Determine category from schema type
+        let schemaType = defSchema.type || 'object';
+        if (Array.isArray(schemaType)) {
+          schemaType = schemaType[0] || 'object';
+        }
+
+        const result = await connectionPool.query(
+          `INSERT INTO odb.primitives 
+           (tenant_id, created_by, name, description, category, schema, tags)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, name`,
+          [
+            tenantId,
+            createdBy,
+            defName,
+            defSchema.description || null,
+            schemaType,
+            JSON.stringify(defSchema),
+            defSchema.tags || []
+          ]
+        );
+
+        imported.push(result.rows[0].name);
+      } catch (error: any) {
+        if (error.code === '23505') {
+          skipped.push(defName);
+        } else {
+          errors.push({ name: defName, error: error.message });
+        }
+      }
+    }
+
+    return JSON.stringify({
+      success: true,
+      imported,
+      skipped,
+      errors,
+      total_imported: imported.length,
+      total_skipped: skipped.length,
+      total_errors: errors.length
+    });
+  } catch (error: any) {
+    console.error('Error importing primitives from schema:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+

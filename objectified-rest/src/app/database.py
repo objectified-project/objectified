@@ -377,6 +377,158 @@ class Database:
         """
         return self.execute_query(query, (path_operation_id,))
 
+    def get_primitives_for_tenant(self, tenant_id: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all primitives for a specific tenant."""
+        query = """
+            SELECT id, tenant_id, name, description, category, schema, tags,
+                   created_by, is_system, is_public, usage_count, enabled,
+                   created_at, updated_at
+            FROM odb.primitives
+            WHERE tenant_id = %s AND deleted_at IS NULL AND enabled = true
+        """
+        params = [tenant_id]
+
+        if category:
+            query += " AND category = %s"
+            params.append(category)
+
+        query += " ORDER BY category, name"
+        return self.execute_query(query, tuple(params))
+
+    def get_primitive_by_id(self, primitive_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific primitive by ID, ensuring it belongs to the tenant."""
+        query = """
+            SELECT id, tenant_id, name, description, category, schema, tags,
+                   created_by, is_system, is_public, usage_count, enabled,
+                   created_at, updated_at
+            FROM odb.primitives
+            WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
+        """
+        results = self.execute_query(query, (primitive_id, tenant_id))
+        return results[0] if results else None
+
+    def create_primitive(
+        self,
+        tenant_id: str,
+        name: str,
+        category: str,
+        schema: Dict[str, Any],
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        created_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new primitive."""
+        query = """
+            INSERT INTO odb.primitives
+            (tenant_id, name, description, category, schema, tags, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, tenant_id, name, description, category, schema, tags,
+                      created_by, is_system, is_public, usage_count, enabled,
+                      created_at, updated_at
+        """
+
+        import json
+        schema_json = json.dumps(schema)
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (tenant_id, name, description, category, schema_json, tags or [], created_by)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_primitive(
+        self,
+        primitive_id: str,
+        tenant_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update an existing primitive, ensuring it belongs to the tenant."""
+        import json
+
+        # Build dynamic update query
+        update_fields = []
+        params = []
+
+        if 'name' in updates and updates['name'] is not None:
+            update_fields.append("name = %s")
+            params.append(updates['name'])
+        if 'description' in updates and updates['description'] is not None:
+            update_fields.append("description = %s")
+            params.append(updates['description'])
+        if 'category' in updates and updates['category'] is not None:
+            update_fields.append("category = %s")
+            params.append(updates['category'])
+        if 'schema' in updates and updates['schema'] is not None:
+            update_fields.append("schema = %s")
+            params.append(json.dumps(updates['schema']))
+        if 'tags' in updates and updates['tags'] is not None:
+            update_fields.append("tags = %s")
+            params.append(updates['tags'])
+        if 'enabled' in updates and updates['enabled'] is not None:
+            update_fields.append("enabled = %s")
+            params.append(updates['enabled'])
+
+        if not update_fields:
+            # Nothing to update, return current primitive
+            return self.get_primitive_by_id(primitive_id, tenant_id)
+
+        params.extend([primitive_id, tenant_id])
+        query = f"""
+            UPDATE odb.primitives
+            SET {', '.join(update_fields)}
+            WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
+            RETURNING id, tenant_id, name, description, category, schema, tags,
+                      created_by, is_system, is_public, usage_count, enabled,
+                      created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_primitive(self, primitive_id: str, tenant_id: str) -> bool:
+        """Soft delete a primitive, ensuring it belongs to the tenant."""
+        query = """
+            UPDATE odb.primitives
+            SET deleted_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL AND is_system = false
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (primitive_id, tenant_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def increment_primitive_usage(self, primitive_id: str) -> None:
+        """Increment the usage count for a primitive."""
+        query = "UPDATE odb.primitives SET usage_count = usage_count + 1 WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (primitive_id,))
+                conn.commit()
+        except Exception:
+            pass  # Don't fail if we can't increment usage
+
 
 # Global database instance
 db = Database()
