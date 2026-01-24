@@ -21,7 +21,7 @@ type NavItem = { label: string; href: string; enabled?: boolean; opensNewBrowser
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/ade" },
   { label: "Control Panel", href: "/ade/dashboard" },
-  { label: "Studio", href: "/ade/studio" },
+  { label: "Designer", href: "/ade/studio" },
   { label: "Browser", href: "https://browse.objectified.dev", opensNewBrowser: true },
   { label: "Database", href: "/ade/database", enabled: false },
   { label: "ETL", href: "/ade/etl", enabled: false },

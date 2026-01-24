@@ -3545,7 +3545,7 @@ const StudioContent = () => {
             No Tenant Selected
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Please select a tenant to get started with the Studio. You'll need to choose a tenant before you can manage projects, versions, and schemas.
+            Please select a tenant to get started with the Designer. You&apos;ll need to choose a tenant before you can manage projects, versions, and schemas.
           </p>
           <button
             onClick={() => window.location.href = '/ade/dashboard/tenants'}

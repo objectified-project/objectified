@@ -50,7 +50,7 @@ const Ade = () => {
     },
     {
       id: 'studio',
-      name: 'Studio',
+      name: 'Data Designer',
       description: 'Design schemas and API specifications',
       icon: <Palette className="w-8 h-8" />,
       href: '/ade/studio',

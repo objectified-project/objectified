@@ -52,6 +52,11 @@ const DashboardSideNav: React.FC = () => {
       items: [
         { label: 'Tenants', href: '/ade/dashboard/tenants', icon: Building2 },
         { label: 'API Keys', href: '/ade/dashboard/api-keys', icon: Key, disabled: !hasTenant },
+      ],
+    },
+    {
+      header: 'Data Management',
+      items: [
         { label: 'Primitives', href: '/ade/dashboard/primitives', icon: Database, disabled: !hasTenant },
       ],
     },

@@ -61,6 +61,9 @@ export default function PrimitivesManagementClient() {
 
   const currentTenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
 
+  const sortByName = (items: Primitive[]) =>
+    [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
   const loadPrimitives = useCallback(async () => {
     setLoading(true);
     try {
@@ -77,7 +80,7 @@ export default function PrimitivesManagementClient() {
       const data = await response.json();
 
       if (data.success) {
-        setPrimitives(data.primitives || []);
+        setPrimitives(sortByName(data.primitives || []));
       } else {
         showMessage('error', data.error || 'Failed to load primitives');
       }
@@ -113,7 +116,7 @@ export default function PrimitivesManagementClient() {
       );
     }
 
-    setFilteredPrimitives(filtered);
+    setFilteredPrimitives(sortByName(filtered));
   }, [primitives, searchQuery, selectedCategory, showSystemPrimitives]);
 
   useEffect(() => {
