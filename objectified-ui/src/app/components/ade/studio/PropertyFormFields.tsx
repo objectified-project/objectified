@@ -49,6 +49,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { RegexTester } from './RegexTester';
 import { PrefixItemsEditor } from './PrefixItemsEditor';
 import { ExtensionsEditor } from './ExtensionsEditor';
+import { PrimitiveSelector } from './PrimitiveSelector';
 
 export interface PropertyFormData {
   // Basic fields
@@ -986,6 +987,37 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           subtitle="Validation rules for this property"
           badge={`${baseType}${isArray ? '[]' : ''}`}
         />
+
+        {/* Apply Primitive - Quick apply constraints from predefined primitives */}
+        {(baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'array') && !data.tupleMode && (
+          <Box sx={{
+            mb: 2.5,
+            p: 2,
+            bgcolor: isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.04)',
+            border: '1px solid',
+            borderColor: isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.15)',
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', mb: 0.25 }}>
+                Apply from Primitive
+              </Typography>
+              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                Quickly apply format, pattern, and constraints from a predefined primitive type
+              </Typography>
+            </Box>
+            <PrimitiveSelector
+              formData={data}
+              onChange={onChange}
+              propertyType={baseType}
+              size={size}
+            />
+          </Box>
+        )}
 
         {/* Tuple mode message */}
         {data.tupleMode && isArray && (

@@ -13,6 +13,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Various UI/UX improvements and optimizations for better performance and responsiveness.
   - Primitives can now be defined to use as templates for properties when defining property types.
   - System is preloaded with ISO-standard JSON Schema primitives for common data type definitions.
+  - Properties can now apply primitive types to define their data types.
 - Pathing:
   - Now implements the ability to create a path:
     - Create paths with multiple operations (GET, POST, PUT, DELETE, etc.) under the same endpoint.
