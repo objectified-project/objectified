@@ -1,5 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 
 
 class TagSchema(BaseModel):
@@ -95,8 +96,8 @@ class PrimitiveSchema(BaseModel):
     is_public: bool = False
     usage_count: int = 0
     enabled: bool = True
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
 
     class Config:
         from_attributes = True

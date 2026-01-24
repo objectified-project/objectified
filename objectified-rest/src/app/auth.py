@@ -30,16 +30,19 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
         # Decode the JWT
         payload = jwt.decode(
             token,
-            settings.jwt_secret,
+            settings.effective_jwt_secret,
             algorithms=[settings.jwt_algorithm]
         )
 
         return payload
     except jwt.ExpiredSignatureError:
+        print("[AUTH] decode_jwt: Token expired")
         return None
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        print(f"[AUTH] decode_jwt: Invalid token - {e}")
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[AUTH] decode_jwt: Exception - {e}")
         return None
 
 
@@ -66,22 +69,51 @@ def validate_user_tenant_access(user_id: str, tenant_slug: str) -> Optional[Dict
     """
     Validate that a user has access to a specific tenant.
 
+    Logic:
+    1. Look up the tenant by slug to get the tenant_id
+    2. Check if user_id + tenant_id exists in odb.tenant_users
+    3. Return tenant info if access is valid, None otherwise
+
     Args:
-        user_id: The user's ID
-        tenant_slug: The tenant slug to check access for
+        user_id: The user's ID from JWT
+        tenant_slug: The tenant slug from the URL
 
     Returns:
         Tenant information if user has access, None otherwise
     """
-    query = """
-        SELECT t.id as tenant_id, t.slug as tenant_slug, t.name as tenant_name
-        FROM odb.tenants t
-        JOIN odb.tenant_users tu ON t.id = tu.tenant_id
-        WHERE tu.user_id = %s AND t.slug = %s AND t.deleted_at IS NULL
+    print(f"[AUTH] validate_user_tenant_access called with user_id={user_id}, tenant_slug={tenant_slug}")
+
+    # First, get the tenant_id from the slug
+    tenant_query = """
+        SELECT id as tenant_id, slug as tenant_slug, name as tenant_name
+        FROM odb.tenants
+        WHERE slug = %s AND deleted_at IS NULL
         LIMIT 1
     """
-    results = db.execute_query(query, (user_id, tenant_slug))
-    return results[0] if results else None
+    tenant_results = db.execute_query(tenant_query, (tenant_slug,))
+
+    if not tenant_results:
+        print(f"[AUTH] Tenant not found: {tenant_slug}")
+        return None
+
+    tenant = tenant_results[0]
+    tenant_id = tenant['tenant_id']
+
+    # Now check if user has access to this tenant via tenant_users
+    access_query = """
+        SELECT 1
+        FROM odb.tenant_users
+        WHERE user_id = %s AND tenant_id = %s
+        LIMIT 1
+    """
+    access_results = db.execute_query(access_query, (user_id, tenant_id))
+
+    if not access_results:
+        print(f"[AUTH] User {user_id} does not have access to tenant {tenant_id}")
+        return None
+
+    print("[AUTH] Authorized.")
+    return tenant
 
 
 def validate_authentication(

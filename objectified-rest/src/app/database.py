@@ -14,7 +14,7 @@ class Database:
         """Establish database connection."""
         if not self.connection or self.connection.closed:
             self.connection = psycopg2.connect(
-                settings.database_url,
+                settings.effective_database_url,
                 cursor_factory=RealDictCursor
             )
         return self.connection

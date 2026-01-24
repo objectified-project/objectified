@@ -81,6 +81,14 @@ export async function getTenantsForUser(userId: string) {
   return JSON.stringify(result.rows);
 }
 
+export async function getTenantById(tenantId: string) {
+  const result = await connectionPool.query(
+    'SELECT id, name, slug, description, enabled FROM odb.tenants WHERE id = $1 AND deleted_at IS NULL',
+    [tenantId]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
 export async function getTenantsAdministratedByUser(userId: string) {
   const result = await connectionPool.query(
     `SELECT a.id, a.tenant_id, a.user_id, b.name, b.email FROM odb.tenant_administrators a, odb.users b 
