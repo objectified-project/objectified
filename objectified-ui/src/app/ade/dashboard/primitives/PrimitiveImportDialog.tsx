@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Upload, AlertCircle, CheckCircle, FileCode, FileJson, X } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle, FileCode, FileJson, X, Link } from 'lucide-react';
 import { Button } from '@/app/components/ui/Button';
 import { Label } from '@/app/components/ui/Label';
+import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/app/components/ui/Dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/app/components/ui/Tabs';
@@ -25,10 +26,12 @@ export default function PrimitiveImportDialog({ onClose, onComplete, onMessage }
   const [selectedDefs, setSelectedDefs] = useState<Set<string>>(new Set());
   const [parseError, setParseError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [importMethod, setImportMethod] = useState<'file' | 'paste'>('file');
+  const [importMethod, setImportMethod] = useState<'file' | 'url' | 'paste'>('file');
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [isLoadingUrl, setIsLoadingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSchemaChange = (value: string | undefined) => {
@@ -254,6 +257,82 @@ export default function PrimitiveImportDialog({ onClose, onComplete, onMessage }
     }
   };
 
+  const handleUrlFetch = async () => {
+    if (!urlInput.trim()) {
+      setParseError('Please enter a URL');
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(urlInput);
+    } catch {
+      setParseError('Please enter a valid URL');
+      return;
+    }
+
+    setIsLoadingUrl(true);
+    setParseError(null);
+
+    try {
+      const response = await fetch(urlInput);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const content = await response.text();
+      const parsed = parseSchemaContent(content);
+
+      if (!parsed) {
+        setParseError('Failed to parse response. Please ensure the URL returns valid JSON or YAML.');
+        return;
+      }
+
+      // Convert to formatted JSON for the editor
+      const jsonString = JSON.stringify(parsed, null, 2);
+      setSchemaJson(jsonString);
+
+      // Check if this is a standalone primitive schema
+      if (isStandalonePrimitiveSchema(parsed)) {
+        // Extract a name for this primitive from the URL or schema
+        const urlPath = new URL(urlInput).pathname;
+        const urlFilename = urlPath.split('/').pop() || '';
+        const primitiveName = extractPrimitiveNameFromSchema(parsed, urlFilename);
+
+        // Use the entire schema as the definition
+        const defs = {
+          [primitiveName]: parsed
+        };
+
+        setDefinitions(defs as Record<string, Record<string, unknown>>);
+        setSelectedDefs(new Set([primitiveName]));
+        setShowPreview(true);
+        return;
+      }
+
+      // Otherwise, look for $defs or definitions
+      const defs = {
+        ...((parsed.$defs as Record<string, unknown>) || {}),
+        ...((parsed.definitions as Record<string, unknown>) || {})
+      };
+
+      if (Object.keys(defs).length === 0) {
+        setParseError('No definitions found. The URL must return a schema with $defs, definitions, or be a standalone type definition.');
+        return;
+      }
+
+      setDefinitions(defs as Record<string, Record<string, unknown>>);
+      setSelectedDefs(new Set(Object.keys(defs)));
+      setShowPreview(true);
+    } catch (err) {
+      const error = err as Error;
+      setParseError(`Failed to fetch from URL: ${error.message}`);
+    } finally {
+      setIsLoadingUrl(false);
+    }
+  };
+
   const handleParseSchema = () => {
     try {
       const parsed = JSON.parse(schemaJson);
@@ -373,11 +452,15 @@ export default function PrimitiveImportDialog({ onClose, onComplete, onMessage }
 
         <div className="space-y-4 py-4">
           {!showPreview ? (
-            <Tabs value={importMethod} onValueChange={(v) => setImportMethod(v as 'file' | 'paste')}>
-              <TabsList className="grid w-full grid-cols-2 mb-4">
+            <Tabs value={importMethod} onValueChange={(v) => setImportMethod(v as 'file' | 'url' | 'paste')}>
+              <TabsList className="grid w-full grid-cols-3 mb-4">
                 <TabsTrigger value="file" className="flex items-center gap-2">
                   <FileJson className="w-4 h-4" />
                   Upload File
+                </TabsTrigger>
+                <TabsTrigger value="url" className="flex items-center gap-2">
+                  <Link className="w-4 h-4" />
+                  From URL
                 </TabsTrigger>
                 <TabsTrigger value="paste" className="flex items-center gap-2">
                   <FileCode className="w-4 h-4" />
@@ -452,6 +535,49 @@ export default function PrimitiveImportDialog({ onClose, onComplete, onMessage }
                       <span>{parseError}</span>
                     </Alert>
                   )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="url">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Schema URL</Label>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Enter the URL of a JSON Schema file to import primitives from
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="url"
+                        placeholder="https://example.com/schema.json"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        className="flex-1"
+                        disabled={isLoadingUrl}
+                      />
+                      <Button
+                        onClick={handleUrlFetch}
+                        disabled={!urlInput.trim() || isLoadingUrl}
+                      >
+                        {isLoadingUrl ? 'Fetching...' : 'Fetch'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {parseError && (
+                    <Alert variant="error">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{parseError}</span>
+                    </Alert>
+                  )}
+
+                  <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                    <p className="font-medium">Supported formats:</p>
+                    <ul className="list-disc list-inside pl-2">
+                      <li>JSON Schema with $defs or definitions</li>
+                      <li>Standalone type definitions (e.g., ISO primitives)</li>
+                      <li>JSON or YAML format</li>
+                    </ul>
+                  </div>
                 </div>
               </TabsContent>
 
@@ -569,8 +695,12 @@ export default function PrimitiveImportDialog({ onClose, onComplete, onMessage }
                 setShowPreview(false);
                 setDefinitions({});
                 setSelectedDefs(new Set());
+                setParseError(null);
                 if (importMethod === 'file') {
                   clearFile();
+                } else if (importMethod === 'url') {
+                  setUrlInput('');
+                  setSchemaJson('');
                 }
               }}
             >

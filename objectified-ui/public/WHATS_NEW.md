@@ -11,9 +11,11 @@ We continue to improve the platform based on your feedback with improvements and
   - Added interactive quality score cards during import - click on any quality score card for more details.
   - Added Chart View tab in import preview - shows a diagram before importing, showing how classes relate to each other through references.
   - Various UI/UX improvements and optimizations for better performance and responsiveness.
+- Primitives:
   - Primitives can now be defined to use as templates for properties when defining property types.
   - System is preloaded with ISO-standard JSON Schema primitives for common data type definitions.
   - Properties can now apply primitive types to define their data types.
+  - Importing from files and URLs are supported.
 - Pathing:
   - Now implements the ability to create a path:
     - Create paths with multiple operations (GET, POST, PUT, DELETE, etc.) under the same endpoint.

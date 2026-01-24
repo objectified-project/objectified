@@ -624,4 +624,120 @@ $defs:
       expect(firstOption['x-name-french']).toBe('afro-asiatiques, langues');
     });
   });
+
+  describe('URL Import Support', () => {
+    // Helper to extract primitive name from URL
+    const extractNameFromUrl = (url: string, schema: Record<string, unknown>): string => {
+      // First try to extract from schema
+      const schemaName = extractPrimitiveNameFromSchema(schema);
+      if (schemaName !== 'imported_primitive') {
+        return schemaName;
+      }
+
+      // Fall back to URL path
+      try {
+        const urlPath = new URL(url).pathname;
+        const urlFilename = urlPath.split('/').pop() || '';
+        return extractPrimitiveNameFromSchema(schema, urlFilename);
+      } catch {
+        return 'imported_primitive';
+      }
+    };
+
+    it('should validate URL format', () => {
+      const validUrls = [
+        'https://example.com/schema.json',
+        'http://localhost:8000/api/schema',
+        'https://raw.githubusercontent.com/user/repo/main/schema.json'
+      ];
+
+      const invalidUrls = [
+        'not-a-url',
+        'just some text'
+      ];
+
+      validUrls.forEach(url => {
+        expect(() => new URL(url)).not.toThrow();
+      });
+
+      invalidUrls.forEach(url => {
+        expect(() => new URL(url)).toThrow();
+      });
+    });
+
+    it('should extract primitive name from URL path when schema has no $id', () => {
+      const schema = {
+        type: 'string',
+        format: 'email'
+      };
+      const url = 'https://example.com/schemas/email-address.json';
+
+      const name = extractNameFromUrl(url, schema);
+      expect(name).toBe('email_address');
+    });
+
+    it('should prefer schema $id over URL path for name extraction', () => {
+      const schema = {
+        $id: 'https://schemas.example.com/percentage',
+        type: 'number'
+      };
+      const url = 'https://cdn.example.com/random-file-name.json';
+
+      const name = extractNameFromUrl(url, schema);
+      expect(name).toBe('percentage');
+    });
+
+    it('should handle URL with no file extension', () => {
+      const schema = {
+        type: 'string'
+      };
+      const url = 'https://api.example.com/schemas/phone-number';
+
+      const name = extractNameFromUrl(url, schema);
+      expect(name).toBe('phone_number');
+    });
+
+    it('should handle URL response parsing for JSON', () => {
+      const jsonContent = JSON.stringify({
+        $defs: {
+          Email: { type: 'string', format: 'email' }
+        }
+      });
+
+      const parsed = parseSchemaContent(jsonContent);
+      expect(parsed).not.toBeNull();
+
+      const defs = extractDefinitions(parsed!);
+      expect(Object.keys(defs)).toContain('Email');
+    });
+
+    it('should handle URL response parsing for YAML', () => {
+      const yamlContent = `
+$defs:
+  PhoneNumber:
+    type: string
+    pattern: "^\\\\+[1-9]"
+`;
+
+      const parsed = parseSchemaContent(yamlContent);
+      expect(parsed).not.toBeNull();
+
+      const defs = extractDefinitions(parsed!);
+      expect(Object.keys(defs)).toContain('PhoneNumber');
+    });
+
+    it('should handle standalone schema from URL', () => {
+      const standaloneSchema = {
+        "$id": "https://schemas.sourcemeta.com/iso/percentage",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      };
+
+      expect(isStandalonePrimitiveSchema(standaloneSchema)).toBe(true);
+
+      const name = extractPrimitiveNameFromSchema(standaloneSchema);
+      expect(name).toBe('percentage');
+    });
+  });
 });
