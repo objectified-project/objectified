@@ -16,12 +16,27 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [currentTheme, setCurrentTheme] = useState<Theme>(getDefaultTheme());
   const [isSystemTheme, setIsSystemTheme] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const mountedRef = useRef(false);
   const { setTheme: setNextTheme, resolvedTheme, theme: nextTheme } = useNextTheme();
 
+  // Mark as mounted after hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Get the effective theme for system preference
   const getSystemPreferredTheme = useCallback(() => {
-    const prefersDark = resolvedTheme === 'dark';
+    // First try resolvedTheme from next-themes, then fall back to matchMedia
+    let prefersDark = resolvedTheme === 'dark';
+
+    // If resolvedTheme is undefined or not set, check system preference directly
+    if (resolvedTheme === undefined || resolvedTheme === null) {
+      if (typeof window !== 'undefined') {
+        prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+    }
+
     return prefersDark ? getThemeById('dark') || getDefaultTheme() : getThemeById('light') || getDefaultTheme();
   }, [resolvedTheme]);
 
@@ -67,8 +82,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     body.style.color = effectiveTheme.colors.foreground;
   }, [getSystemPreferredTheme, setNextTheme]);
 
-  // Initialize theme from localStorage or system preference (only runs once on mount)
+  // Initialize theme from localStorage or system preference
   useEffect(() => {
+    if (!mounted) return;
     if (mountedRef.current) return;
 
     mountedRef.current = true;
@@ -103,19 +119,104 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('app-theme', 'system');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mounted]);
+
+  // Listen for system preference changes via matchMedia
+  useEffect(() => {
+    if (!mounted || !isSystemTheme) return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      const effectiveTheme = e.matches
+        ? getThemeById('dark') || getDefaultTheme()
+        : getThemeById('light') || getDefaultTheme();
+
+      const html = document.documentElement;
+      const body = document.body;
+
+      // Remove existing theme classes
+      themes.forEach(t => {
+        html.classList.remove(t.cssClass);
+        body.classList.remove(t.cssClass);
+      });
+
+      // Set data-theme attribute
+      html.setAttribute('data-theme', effectiveTheme.id);
+      body.setAttribute('data-theme', effectiveTheme.id);
+
+      // Set dark class based on system preference
+      if (e.matches) {
+        html.classList.add('dark');
+        setNextTheme('dark');
+      } else {
+        html.classList.remove('dark');
+        setNextTheme('light');
+      }
+
+      // Add theme class
+      html.classList.add(effectiveTheme.cssClass);
+      body.classList.add(effectiveTheme.cssClass);
+
+      // Set CSS custom properties
+      html.style.setProperty('--background', effectiveTheme.colors.background);
+      html.style.setProperty('--foreground', effectiveTheme.colors.foreground);
+      body.style.backgroundColor = effectiveTheme.colors.background;
+      body.style.color = effectiveTheme.colors.foreground;
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [mounted, isSystemTheme, setNextTheme]);
 
   // Listen for resolved theme changes from next-themes
   useEffect(() => {
     if (!mountedRef.current) return;
 
+    // When resolvedTheme changes and we're using system theme, reapply
     if (isSystemTheme && resolvedTheme) {
       const systemTheme = getThemeById('system');
       if (systemTheme) {
-        applyTheme(systemTheme, true);
+        // Get the actual theme to apply based on system preference
+        const effectiveTheme = getSystemPreferredTheme();
+
+        // Apply the dark class correctly based on system preference
+        const html = document.documentElement;
+        const body = document.body;
+
+        // Remove existing theme classes
+        themes.forEach(t => {
+          html.classList.remove(t.cssClass);
+          body.classList.remove(t.cssClass);
+        });
+
+        // Set data-theme attribute
+        html.setAttribute('data-theme', effectiveTheme.id);
+        body.setAttribute('data-theme', effectiveTheme.id);
+
+        // Determine if dark mode should be applied
+        const darkThemes = ['dark', 'high-contrast', 'blueprint', 'solarized', 'nord', 'darcula'];
+        const isDarkBased = darkThemes.includes(effectiveTheme.id);
+
+        // Use next-themes to properly set the dark class
+        if (isDarkBased) {
+          setNextTheme('dark');
+        } else {
+          setNextTheme('light');
+        }
+
+        // Add theme class
+        html.classList.add(effectiveTheme.cssClass);
+        body.classList.add(effectiveTheme.cssClass);
+
+        // Set CSS custom properties
+        html.style.setProperty('--background', effectiveTheme.colors.background);
+        html.style.setProperty('--foreground', effectiveTheme.colors.foreground);
+        body.style.backgroundColor = effectiveTheme.colors.background;
+        body.style.color = effectiveTheme.colors.foreground;
       }
     }
-  }, [isSystemTheme, resolvedTheme, applyTheme]);
+  }, [isSystemTheme, resolvedTheme, getSystemPreferredTheme, setNextTheme]);
 
   // Sync with next-themes when it changes
   useEffect(() => {
