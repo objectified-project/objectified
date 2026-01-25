@@ -31,6 +31,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Common classes: Money, Coordinates, DateRange, FileUpload, Pagination, SortOptions, AuditTimestamps
   - Content classes: MediaGallery, COntentTag, ContentComment, Rating, Article, FAQ
   - Integrations classes: WebhookEvent, APICredential, OAuthToken, EmailTemplate
+  - Notifications classes: PushNotification, EmailNotification, SMSNotification, NotificationPreference
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
   - Adds SwaggerHub import support.
