@@ -375,6 +375,19 @@ export async function permanentDeleteProject(projectId: string) {
 
 // Version Management Functions
 
+/**
+ * @deprecated This function has been replaced by REST API calls.
+ * Use `/api/versions?projectId=${projectId}` endpoint instead.
+ * 
+ * Example:
+ * const response = await fetch(`/api/versions?projectId=${projectId}`);
+ * const data = await response.json();
+ * if (data.success && data.versions) {
+ *   // Use data.versions
+ * }
+ * 
+ * This function is kept for backward compatibility and testing purposes only.
+ */
 export async function getVersionsForProject(projectId: string) {
   try {
     const result = await connectionPool.query(

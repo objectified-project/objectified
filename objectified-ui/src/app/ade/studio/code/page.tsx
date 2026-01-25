@@ -16,7 +16,6 @@ import { generateGraphQLSchema } from '../../../utils/graphql';
 import { generateSQL, SQLDialect } from '../../../utils/sql-generator';
 import { generateAsyncAPISpec } from '../../../utils/asyncapi-generator';
 import {
-  getVersionsForProject,
   getClassesWithPropertiesAndTags,
 } from '../../../../../lib/db/helper';
 import { loadPathsForOpenAPIExport } from '../../../../../lib/db/helper-paths-export';
@@ -168,11 +167,19 @@ export default function CodePage() {
     const loadVersions = async () => {
       if (!selectedProjectId) return;
       try {
-        const result = await getVersionsForProject(selectedProjectId);
-        const data = JSON.parse(result);
-        setVersions(data);
+        const response = await fetch(`/api/versions?projectId=${selectedProjectId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch versions: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (result.success && result.versions) {
+          setVersions(result.versions);
+        } else {
+          throw new Error(result.error || 'Failed to load versions');
+        }
       } catch (error) {
         console.error('Failed to load versions:', error);
+        setVersions([]);
       }
     };
     loadVersions();

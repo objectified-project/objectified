@@ -8,7 +8,6 @@ import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useStudio } from '../StudioContext';
 import {
-  getVersionsForProject,
   getTagsForProject
 } from '../../../../../lib/db/helper';
 import CanvasSettingsDialog from './CanvasSettingsDialog';
@@ -162,16 +161,23 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       }
       setIsLoadingVersions(true);
       try {
-        const result = await getVersionsForProject(localProjectId);
-        const data = JSON.parse(result);
-        setVersions(data);
+        const response = await fetch(`/api/versions?projectId=${localProjectId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch versions: ${response.statusText}`);
+        }
+        const result = await response.json();
+        if (result.success && result.versions) {
+          setVersions(result.versions);
 
-        // Auto-select the most recent version (first in the list)
-        if (data.length > 0) {
-          const mostRecentVersion = data[0];
-          setLocalVersionId(mostRecentVersion.id);
-          setContextVersionId(mostRecentVersion.id);
-          setIsReadOnly(mostRecentVersion.published ?? false);
+          // Auto-select the most recent version (first in the list)
+          if (result.versions.length > 0) {
+            const mostRecentVersion = result.versions[0];
+            setLocalVersionId(mostRecentVersion.id);
+            setContextVersionId(mostRecentVersion.id);
+            setIsReadOnly(mostRecentVersion.published ?? false);
+          }
+        } else {
+          throw new Error(result.error || 'Failed to load versions');
         }
       } catch (error) {
         console.error('Failed to load versions:', error);

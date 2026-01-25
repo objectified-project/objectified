@@ -69,7 +69,6 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  getVersionsForProject,
   getClassesWithPropertiesAndTags,
   getClassWithPropertiesAndTags,
   addPropertyToClass,
@@ -3281,18 +3280,26 @@ const StudioContent = () => {
   const loadVersions = async (projectId: string) => {
     setIsLoadingVersions(true);
     try {
-      const result = await getVersionsForProject(projectId);
-      const versionsData = JSON.parse(result);
-      setVersions(versionsData);
+      const response = await fetch(`/api/versions?projectId=${projectId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch versions: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.success && data.versions) {
+        setVersions(data.versions);
 
-      // Auto-select the first version if available
-      if (versionsData.length > 0) {
-        const firstVersion = versionsData[0];
-        setSelectedVersionId(firstVersion.id);
-        setIsReadOnly(firstVersion.published || false);
+        // Auto-select the first version if available
+        if (data.versions.length > 0) {
+          const firstVersion = data.versions[0];
+          setSelectedVersionId(firstVersion.id);
+          setIsReadOnly(firstVersion.published || false);
+        }
+      } else {
+        throw new Error(data.error || 'Failed to load versions');
       }
     } catch (error) {
       console.error('Failed to load versions:', error);
+      setVersions([]);
     } finally {
       setIsLoadingVersions(false);
     }

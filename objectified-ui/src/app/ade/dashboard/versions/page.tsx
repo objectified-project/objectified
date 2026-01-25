@@ -21,7 +21,6 @@ import { Badge } from '../../../components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import {
-  getVersionsForProject,
   createVersion,
   updateVersion,
   deleteVersion,
@@ -158,9 +157,20 @@ const Versions = () => {
   const loadVersions = async () => {
     if (!selectedProjectId) return;
     try {
-      const result = await getVersionsForProject(selectedProjectId);
-      setVersions(JSON.parse(result));
-    } catch (error) { console.error('Failed to load versions:', error); }
+      const response = await fetch(`/api/versions?projectId=${selectedProjectId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch versions: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.success && data.versions) {
+        setVersions(data.versions);
+      } else {
+        throw new Error(data.error || 'Failed to load versions');
+      }
+    } catch (error) {
+      console.error('Failed to load versions:', error);
+      setVersions([]);
+    }
   };
 
   const calculateNextVersion = (strategy: 'patch' | 'minor' = 'patch'): string => {
