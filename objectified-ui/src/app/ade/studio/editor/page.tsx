@@ -69,7 +69,6 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  getProjectsForTenant,
   getVersionsForProject,
   getClassesWithPropertiesAndTags,
   getClassWithPropertiesAndTags,
@@ -3261,11 +3260,19 @@ const StudioContent = () => {
 
     setIsLoadingProjects(true);
     try {
-      const result = await getProjectsForTenant(currentTenantId);
-      const projectsData = JSON.parse(result);
-      setProjects(projectsData);
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.success && data.projects) {
+        setProjects(data.projects);
+      } else {
+        throw new Error(data.error || 'Failed to load projects');
+      }
     } catch (error) {
       console.error('Failed to load projects:', error);
+      setProjects([]);
     } finally {
       setIsLoadingProjects(false);
     }

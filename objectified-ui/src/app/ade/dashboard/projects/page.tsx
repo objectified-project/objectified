@@ -17,7 +17,7 @@ import { Alert } from '../../../components/ui/Alert';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
-import { getProjectsForTenant, createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
+import { createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
@@ -91,10 +91,19 @@ const Projects = () => {
   const loadProjects = async () => {
     if (!currentTenantId) return;
     try {
-      const result = await getProjectsForTenant(currentTenantId);
-      setProjects(JSON.parse(result));
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.success && data.projects) {
+        setProjects(data.projects);
+      } else {
+        throw new Error(data.error || 'Failed to load projects');
+      }
     } catch (error) {
       console.error('Failed to load projects:', error);
+      setProjects([]);
     }
   };
 

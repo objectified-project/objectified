@@ -8,7 +8,6 @@ import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useStudio } from '../StudioContext';
 import {
-  getProjectsForTenant,
   getVersionsForProject,
   getTagsForProject
 } from '../../../../../lib/db/helper';
@@ -134,9 +133,16 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
       }
       setIsLoadingProjects(true);
       try {
-        const result = await getProjectsForTenant(currentTenantId);
-        const data = JSON.parse(result);
-        setProjects(data);
+        const response = await fetch('/api/projects');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch projects: ${response.statusText}`);
+        }
+        const data = await response.json();
+        if (data.success && data.projects) {
+          setProjects(data.projects);
+        } else {
+          throw new Error(data.error || 'Failed to load projects');
+        }
       } catch (error) {
         console.error('Failed to load projects:', error);
         setProjects([]);

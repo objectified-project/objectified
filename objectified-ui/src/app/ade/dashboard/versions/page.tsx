@@ -21,7 +21,6 @@ import { Badge } from '../../../components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import {
-  getProjectsForTenant,
   getVersionsForProject,
   createVersion,
   updateVersion,
@@ -139,11 +138,21 @@ const Versions = () => {
   const loadProjects = async () => {
     if (!currentTenantId) return;
     try {
-      const result = await getProjectsForTenant(currentTenantId);
-      const projectsData = JSON.parse(result);
-      setProjects(projectsData);
-      if (projectsData.length > 0 && !selectedProjectId) setSelectedProjectId(projectsData[0].id);
-    } catch (error) { console.error('Failed to load projects:', error); }
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.success && data.projects) {
+        setProjects(data.projects);
+        if (data.projects.length > 0 && !selectedProjectId) setSelectedProjectId(data.projects[0].id);
+      } else {
+        throw new Error(data.error || 'Failed to load projects');
+      }
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+      setProjects([]);
+    }
   };
 
   const loadVersions = async () => {

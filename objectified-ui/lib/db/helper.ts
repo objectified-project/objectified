@@ -234,6 +234,20 @@ export async function updateUserPassword(userId: string, currentPassword: string
 
 // Project Management Functions
 
+/**
+ * @deprecated This function has been replaced with REST API calls.
+ * Use `/api/projects` endpoint instead for fetching projects.
+ * This function is kept for backward compatibility but should not be used in new code.
+ * 
+ * To fetch projects, use:
+ * ```typescript
+ * const response = await fetch('/api/projects');
+ * const data = await response.json();
+ * if (data.success && data.projects) {
+ *   // Use data.projects
+ * }
+ * ```
+ */
 export async function getProjectsForTenant(tenantId: string) {
   try {
     const result = await connectionPool.query(

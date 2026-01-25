@@ -16,7 +16,6 @@ import { generateGraphQLSchema } from '../../../utils/graphql';
 import { generateSQL, SQLDialect } from '../../../utils/sql-generator';
 import { generateAsyncAPISpec } from '../../../utils/asyncapi-generator';
 import {
-  getProjectsForTenant,
   getVersionsForProject,
   getClassesWithPropertiesAndTags,
 } from '../../../../../lib/db/helper';
@@ -146,11 +145,19 @@ export default function CodePage() {
     const loadProjects = async () => {
       if (!currentTenantId) return;
       try {
-        const result = await getProjectsForTenant(currentTenantId);
-        const data = JSON.parse(result);
-        setProjects(data);
+        const response = await fetch('/api/projects');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch projects: ${response.statusText}`);
+        }
+        const data = await response.json();
+        if (data.success && data.projects) {
+          setProjects(data.projects);
+        } else {
+          throw new Error(data.error || 'Failed to load projects');
+        }
       } catch (error) {
         console.error('Failed to load projects:', error);
+        setProjects([]);
       }
     };
     loadProjects();
