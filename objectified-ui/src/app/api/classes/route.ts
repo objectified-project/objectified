@@ -1,14 +1,13 @@
 /**
- * API Proxy for Version Publish Operations
+ * API Proxy for Class Creation
  *
- * Proxies requests to the REST API with JWT authentication.
- * Handles publish operations for specific versions.
+ * Proxies POST requests to the REST API with JWT authentication.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import jwt from 'jsonwebtoken';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { authOptions } from '../auth/[...nextauth]/route';
 import { getTenantById } from '@lib/db/helper';
 
 const REST_API_BASE_URL = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
@@ -72,15 +71,11 @@ async function handleRestResponse(response: Response, defaultError: string): Pro
 }
 
 /**
- * POST /api/versions/[versionId]/publish
- * Publish a version
+ * POST /api/classes
+ * Create a new class
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ versionId: string }> }
-) {
+export async function POST(request: NextRequest) {
   try {
-    const { versionId } = await params;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
@@ -110,14 +105,6 @@ export async function POST(
 
     const tenantSlug = tenant.slug;
     const body = await request.json();
-    const { projectId, visibility } = body;
-
-    if (!projectId) {
-      return NextResponse.json(
-        { success: false, error: 'Project ID is required' },
-        { status: 400 }
-      );
-    }
 
     const headers = createAuthHeaders({
       user_id: user.user_id,
@@ -126,21 +113,21 @@ export async function POST(
       current_tenant_id: tenantId,
     });
 
-    const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}/publish`, {
+    const response = await fetch(`${REST_API_BASE_URL}/classes/${tenantSlug}`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ visibility: visibility || 'private' }),
+      body: JSON.stringify(body),
     });
 
-    const { data, error, status } = await handleRestResponse(response, 'Failed to publish version');
+    const { data, error, status } = await handleRestResponse(response, 'Failed to create class');
 
     if (error) {
       return NextResponse.json({ success: false, error }, { status });
     }
 
-    return NextResponse.json({ success: true, version: data });
+    return NextResponse.json({ success: true, class: data });
   } catch (error) {
-    console.error('Error publishing version:', error);
+    console.error('Error creating class:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { success: false, error: errorMessage },

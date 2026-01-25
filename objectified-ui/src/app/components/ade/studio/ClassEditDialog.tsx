@@ -22,7 +22,8 @@ import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Setting
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
-import { createClass, updateClass, assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
+import { assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
+import { createClassWithSession, updateClassWithSession } from '../../../../../lib/api/rest-client';
 import { ExtensionsEditor } from './ExtensionsEditor';
 import ConditionalSchemaBuilder, {
   ConditionalRule,
@@ -733,12 +734,12 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       // Build schema from form data
       const schema = buildSchemaFromFormData();
 
-      let result: string;
+      let response: { success: boolean; class?: any; error?: string };
       let classId: string;
 
       if (editingClassData) {
-        // Update existing class
-        result = await updateClass(
+        // Update existing class via REST API
+        response = await updateClassWithSession(
           editingClassData.id,
           formData.name,
           formData.description || null,
@@ -746,14 +747,13 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         );
         classId = editingClassData.id;
       } else {
-        // Create new class
-        result = await createClass(
+        // Create new class via REST API
+        response = await createClassWithSession(
           versionId!,
           formData.name,
           formData.description || null,
           schema
         );
-        const response = JSON.parse(result);
         if (response.success && response.class) {
           classId = response.class.id;
         } else {
@@ -763,7 +763,6 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         }
       }
 
-      const response = JSON.parse(result);
       if (!response.success) {
         setFormData(prev => ({ ...prev, error: response.error || 'Failed to save class' }));
         setSaving(false);

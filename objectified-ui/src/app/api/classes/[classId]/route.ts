@@ -1,14 +1,14 @@
 /**
- * API Proxy for Version Publish Operations
+ * API Proxy for Individual Class Operations
  *
  * Proxies requests to the REST API with JWT authentication.
- * Handles publish operations for specific versions.
+ * Handles DELETE and PUT operations for specific classes.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import jwt from 'jsonwebtoken';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { authOptions } from '../../auth/[...nextauth]/route';
 import { getTenantById } from '@lib/db/helper';
 
 const REST_API_BASE_URL = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
@@ -72,15 +72,83 @@ async function handleRestResponse(response: Response, defaultError: string): Pro
 }
 
 /**
- * POST /api/versions/[versionId]/publish
- * Publish a version
+ * DELETE /api/classes/[classId]
+ * Delete a specific class
  */
-export async function POST(
+export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ versionId: string }> }
+  { params }: { params: Promise<{ classId: string }> }
 ) {
   try {
-    const { versionId } = await params;
+    const { classId } = await params;
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const user = session.user as { current_tenant_id?: string; user_id?: string };
+    const tenantId = user.current_tenant_id;
+
+    if (!tenantId) {
+      return NextResponse.json(
+        { success: false, error: 'No tenant selected' },
+        { status: 400 }
+      );
+    }
+
+    const tenant = await getTenantById(tenantId);
+    if (!tenant || !tenant.slug) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant not found' },
+        { status: 404 }
+      );
+    }
+
+    const tenantSlug = tenant.slug;
+
+    const headers = createAuthHeaders({
+      user_id: user.user_id,
+      email: session.user.email,
+      name: session.user.name,
+      current_tenant_id: tenantId,
+    });
+
+    const response = await fetch(`${REST_API_BASE_URL}/classes/${tenantSlug}/${classId}`, {
+      method: 'DELETE',
+      headers,
+    });
+
+    const { data, error, status } = await handleRestResponse(response, 'Failed to delete class');
+
+    if (error) {
+      return NextResponse.json({ success: false, error }, { status });
+    }
+
+    return NextResponse.json({ success: true, message: data });
+  } catch (error) {
+    console.error('Error deleting class:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT /api/classes/[classId]
+ * Update a specific class
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ classId: string }> }
+) {
+  try {
+    const { classId } = await params;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
@@ -110,14 +178,6 @@ export async function POST(
 
     const tenantSlug = tenant.slug;
     const body = await request.json();
-    const { projectId, visibility } = body;
-
-    if (!projectId) {
-      return NextResponse.json(
-        { success: false, error: 'Project ID is required' },
-        { status: 400 }
-      );
-    }
 
     const headers = createAuthHeaders({
       user_id: user.user_id,
@@ -126,21 +186,21 @@ export async function POST(
       current_tenant_id: tenantId,
     });
 
-    const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}/publish`, {
-      method: 'POST',
+    const response = await fetch(`${REST_API_BASE_URL}/classes/${tenantSlug}/${classId}`, {
+      method: 'PUT',
       headers,
-      body: JSON.stringify({ visibility: visibility || 'private' }),
+      body: JSON.stringify(body),
     });
 
-    const { data, error, status } = await handleRestResponse(response, 'Failed to publish version');
+    const { data, error, status } = await handleRestResponse(response, 'Failed to update class');
 
     if (error) {
       return NextResponse.json({ success: false, error }, { status });
     }
 
-    return NextResponse.json({ success: true, version: data });
+    return NextResponse.json({ success: true, class: data });
   } catch (error) {
-    console.error('Error publishing version:', error);
+    console.error('Error updating class:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { success: false, error: errorMessage },

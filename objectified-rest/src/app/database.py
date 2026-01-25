@@ -1,5 +1,6 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any
 from .config import settings
 
@@ -77,13 +78,140 @@ class Database:
         """Get all properties for a specific class."""
         query = """
             SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
-                   p.id as property_source_id, p.name as property_source_name
+                   p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
             FROM odb.class_properties cp
             LEFT JOIN odb.properties p ON cp.property_id = p.id
             WHERE cp.class_id = %s
             ORDER BY cp.parent_id NULLS FIRST, cp.name ASC
         """
         return self.execute_query(query, (class_id,))
+
+    def get_classes_with_properties_and_tags_for_version(self, version_id: str) -> List[Dict[str, Any]]:
+        """Get all classes for a version with their properties and tags in bulk."""
+        # Query 1: Get all classes for the version
+        classes_query = """
+            SELECT id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at
+            FROM odb.classes
+            WHERE version_id = %s AND deleted_at IS NULL
+            ORDER BY name ASC
+        """
+        classes = self.execute_query(classes_query, (version_id,))
+
+        if not classes:
+            return []
+
+        class_ids = [c['id'] for c in classes]
+
+        if not class_ids:
+            return []
+
+        # Query 2: Get all properties for all classes
+        # Use IN clause with tuple for proper UUID handling
+        placeholders = ','.join(['%s'] * len(class_ids))
+        properties_query = f"""
+            SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+                   p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
+            FROM odb.class_properties cp
+            LEFT JOIN odb.properties p ON cp.property_id = p.id
+            WHERE cp.class_id IN ({placeholders})
+            ORDER BY cp.class_id, cp.parent_id NULLS FIRST, cp.name ASC
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(properties_query, tuple(class_ids))
+                properties = cursor.fetchall()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+        # Query 3: Get all tags for all classes
+        tags_query = f"""
+            SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+                   t.name as tag_name, t.color as tag_color, t.description as tag_description,
+                   t.project_id
+            FROM odb.class_tags ct
+            JOIN odb.tags t ON ct.tag_id = t.id
+            WHERE ct.class_id IN ({placeholders})
+            ORDER BY ct.class_id, t.name ASC
+        """
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(tags_query, tuple(class_ids))
+                tags = cursor.fetchall()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+        # Group properties and tags by class_id
+        properties_by_class = {}
+        for prop in properties:
+            class_id = prop['class_id']
+            if class_id not in properties_by_class:
+                properties_by_class[class_id] = []
+            properties_by_class[class_id].append(prop)
+
+        tags_by_class = {}
+        for tag in tags:
+            class_id = tag['class_id']
+            if class_id not in tags_by_class:
+                tags_by_class[class_id] = []
+            tags_by_class[class_id].append(tag)
+
+        # Combine classes with their properties and tags
+        result = []
+        for cls in classes:
+            result.append({
+                **cls,
+                'properties': properties_by_class.get(cls['id'], []),
+                'tags': tags_by_class.get(cls['id'], [])
+            })
+
+        return result
+
+    def get_class_with_properties_and_tags(self, class_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single class with its properties and tags."""
+        # Query 1: Get the class
+        class_query = """
+            SELECT id, version_id, name, description, schema, enabled, canvas_metadata, created_at, updated_at
+            FROM odb.classes
+            WHERE id = %s AND deleted_at IS NULL
+        """
+        classes = self.execute_query(class_query, (class_id,))
+
+        if not classes:
+            return None
+
+        cls = classes[0]
+
+        # Query 2: Get all properties for this class
+        properties_query = """
+            SELECT cp.id, cp.class_id, cp.property_id, cp.name, cp.description, cp.data, cp.parent_id,
+                   p.id as property_source_id, p.name as property_source_name, p.data as property_source_data
+            FROM odb.class_properties cp
+            LEFT JOIN odb.properties p ON cp.property_id = p.id
+            WHERE cp.class_id = %s
+            ORDER BY cp.parent_id NULLS FIRST, cp.name ASC
+        """
+        properties = self.execute_query(properties_query, (class_id,))
+
+        # Query 3: Get all tags for this class
+        tags_query = """
+            SELECT ct.id, ct.class_id, ct.tag_id, ct.created_at,
+                   t.name as tag_name, t.color as tag_color, t.description as tag_description,
+                   t.project_id
+            FROM odb.class_tags ct
+            JOIN odb.tags t ON ct.tag_id = t.id
+            WHERE ct.class_id = %s
+            ORDER BY t.name ASC
+        """
+        tags = self.execute_query(tags_query, (class_id,))
+
+        return {
+            **cls,
+            'properties': properties,
+            'tags': tags
+        }
 
     # ==================== Class CRUD Operations ====================
 
@@ -209,6 +337,9 @@ class Database:
         if 'enabled' in updates and updates['enabled'] is not None:
             update_fields.append("enabled = %s")
             params.append(updates['enabled'])
+        if 'canvas_metadata' in updates and updates['canvas_metadata'] is not None:
+            update_fields.append("canvas_metadata = %s")
+            params.append(json.dumps(updates['canvas_metadata']))
 
         if not update_fields:
             # Nothing to update, return current class
@@ -221,7 +352,7 @@ class Database:
             UPDATE odb.classes
             SET {', '.join(update_fields)}
             WHERE id = %s AND deleted_at IS NULL
-            RETURNING id, version_id, name, description, schema, enabled,
+            RETURNING id, version_id, name, description, schema, enabled, canvas_metadata,
                       created_at, updated_at
         """
 

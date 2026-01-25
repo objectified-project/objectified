@@ -69,21 +69,23 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  getClassesWithPropertiesAndTags,
-  getClassWithPropertiesAndTags,
   addPropertyToClass,
   removePropertyFromClass,
-  deleteClass,
   updateClassPropertyRef,
   getTagsForProject,
   createProperty,
   saveDefaultCanvasLayout,
   getDefaultCanvasLayout,
   getGroupsForVersion,
-  updateClassCanvasMetadata,
   addClassToGroup,
   updateClassPositionInGroup
 } from '../../../../../lib/db/helper';
+import {
+  deleteClassWithSession,
+  updateClassCanvasMetadataWithSession,
+  getClassesWithPropertiesAndTagsWithSession,
+  getClassWithPropertiesAndTagsWithSession
+} from '../../../../../lib/api/rest-client';
 import ClassNode from '../../../components/ade/studio/ClassNode';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
 import SmartEdge from '../../../components/ade/studio/SmartEdge';
@@ -350,9 +352,8 @@ const StudioContent = () => {
         style: theme
       };
 
-      // Save to database
-      const result = await updateClassCanvasMetadata(classId, updatedMetadata);
-      const response = JSON.parse(result);
+      // Save to database via REST API
+      const response = await updateClassCanvasMetadataWithSession(classId, updatedMetadata);
 
       if (response.success) {
         // Update local node data with a completely new object to ensure React detects the change
@@ -471,9 +472,13 @@ const StudioContent = () => {
     setLoadingMessage('Refreshing canvas...');
 
     try {
-      // Bulk load all classes with properties and tags in 3 queries
-      const result = await getClassesWithPropertiesAndTags(selectedVersionId);
-      const classesWithProperties = JSON.parse(result);
+      // Bulk load all classes with properties and tags via REST API
+      const result = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
+      if (!result.success) {
+        console.error('Failed to load classes:', result.error);
+        return;
+      }
+      const classesWithProperties = result.classes || [];
 
       setLoadingMessage('Updating nodes and edges...');
 
@@ -509,14 +514,13 @@ const StudioContent = () => {
     if (!classId) return;
 
     try {
-      // Fetch only the updated class from the database
-      const result = await getClassWithPropertiesAndTags(classId);
-      const classData = JSON.parse(result);
-
-      if (!classData) {
-        console.error('Class not found:', classId);
+      // Fetch only the updated class from the REST API
+      const result = await getClassWithPropertiesAndTagsWithSession(classId);
+      if (!result.success || !result.class) {
+        console.error('Class not found:', classId, result.error);
         return;
       }
+      const classData = result.class;
 
       // Extract theme from canvas_metadata if it exists
       const canvasMetadata = classData.canvas_metadata || {};
@@ -561,10 +565,11 @@ const StudioContent = () => {
       // Update edges that might be affected by property changes (e.g., new $ref properties)
       // This is needed because adding a property with $ref creates new edges
       if (selectedVersionId) {
-        const allClassesResult = await getClassesWithPropertiesAndTags(selectedVersionId);
-        const allClasses = JSON.parse(allClassesResult);
-        const newEdges = createAllEdges(allClasses);
-        setEdges(newEdges);
+        const allClassesResult = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
+        if (allClassesResult.success && allClassesResult.classes) {
+          const newEdges = createAllEdges(allClassesResult.classes);
+          setEdges(newEdges);
+        }
       }
     } catch (error) {
       console.error('Failed to update single class node:', error);
@@ -980,8 +985,7 @@ const StudioContent = () => {
 
     try {
       console.log('Deleting class:', classId, className);
-      const result = await deleteClass(classId);
-      const response = JSON.parse(result);
+      const response = await deleteClassWithSession(classId);
 
       if (response.success) {
         // Reload classes to update the canvas with auto-layout (class deleted)
@@ -2990,9 +2994,13 @@ const StudioContent = () => {
       setLoadingMessage('Loading classes, properties, and tags...');
 
       try {
-        // Bulk load all classes with properties and tags in 3 queries
-        const result = await getClassesWithPropertiesAndTags(selectedVersionId);
-        const classesWithProperties = JSON.parse(result);
+        // Bulk load all classes with properties and tags via REST API
+        const result = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
+        if (!result.success) {
+          console.error('Failed to load classes:', result.error);
+          return;
+        }
+        const classesWithProperties = result.classes || [];
 
         setLoadingMessage('Updating nodes and edges...');
 

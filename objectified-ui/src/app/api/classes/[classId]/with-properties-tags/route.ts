@@ -1,14 +1,13 @@
 /**
- * API Proxy for Version Publish Operations
+ * API Proxy for Getting a Single Class with Properties and Tags
  *
  * Proxies requests to the REST API with JWT authentication.
- * Handles publish operations for specific versions.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import jwt from 'jsonwebtoken';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { authOptions } from '../../auth/[...nextauth]/route';
 import { getTenantById } from '@lib/db/helper';
 
 const REST_API_BASE_URL = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
@@ -72,15 +71,15 @@ async function handleRestResponse(response: Response, defaultError: string): Pro
 }
 
 /**
- * POST /api/versions/[versionId]/publish
- * Publish a version
+ * GET /api/classes/[classId]/with-properties-tags
+ * Get a single class with its properties and tags
  */
-export async function POST(
+export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ versionId: string }> }
+  { params }: { params: Promise<{ classId: string }> }
 ) {
   try {
-    const { versionId } = await params;
+    const { classId } = await params;
     const session = await getServerSession(authOptions);
 
     if (!session?.user) {
@@ -109,15 +108,6 @@ export async function POST(
     }
 
     const tenantSlug = tenant.slug;
-    const body = await request.json();
-    const { projectId, visibility } = body;
-
-    if (!projectId) {
-      return NextResponse.json(
-        { success: false, error: 'Project ID is required' },
-        { status: 400 }
-      );
-    }
 
     const headers = createAuthHeaders({
       user_id: user.user_id,
@@ -126,21 +116,20 @@ export async function POST(
       current_tenant_id: tenantId,
     });
 
-    const response = await fetch(`${REST_API_BASE_URL}/versions/${tenantSlug}/${projectId}/${versionId}/publish`, {
-      method: 'POST',
+    const response = await fetch(`${REST_API_BASE_URL}/classes/${tenantSlug}/${classId}/with-properties-tags`, {
+      method: 'GET',
       headers,
-      body: JSON.stringify({ visibility: visibility || 'private' }),
     });
 
-    const { data, error, status } = await handleRestResponse(response, 'Failed to publish version');
+    const { data, error, status } = await handleRestResponse(response, 'Failed to fetch class with properties and tags');
 
     if (error) {
       return NextResponse.json({ success: false, error }, { status });
     }
 
-    return NextResponse.json({ success: true, version: data });
+    return NextResponse.json({ success: true, class: data });
   } catch (error) {
-    console.error('Error publishing version:', error);
+    console.error('Error fetching class with properties and tags:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { success: false, error: errorMessage },

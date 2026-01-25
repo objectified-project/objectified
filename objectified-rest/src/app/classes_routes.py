@@ -260,3 +260,72 @@ async def get_class_properties(
 
     properties = db.get_properties_for_class(class_id)
     return properties
+
+
+@router.get("/{tenant_slug}/version/{version_id}/with-properties-tags")
+async def get_classes_with_properties_and_tags(
+    tenant_slug: str,
+    version_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> List[Dict[str, Any]]:
+    """
+    Get all classes for a version with their properties and tags.
+
+    Supports authentication via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug
+        version_id: The version ID
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        List of classes with properties and tags
+    """
+    # Verify version belongs to tenant
+    version = db.get_version_for_tenant(auth_data['tenant_id'], version_id)
+    if not version:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {version_id}"
+        )
+
+    classes = db.get_classes_with_properties_and_tags_for_version(version_id)
+    return classes
+
+
+@router.get("/{tenant_slug}/{class_id}/with-properties-tags")
+async def get_class_with_properties_and_tags(
+    tenant_slug: str,
+    class_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> Dict[str, Any]:
+    """
+    Get a single class with its properties and tags.
+
+    Supports authentication via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug
+        class_id: The class ID
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        Class with properties and tags
+    """
+    # First verify the class exists and belongs to tenant
+    class_data = db.get_class_by_id(class_id, auth_data['tenant_id'])
+
+    if not class_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class not found: {class_id}"
+        )
+
+    class_with_data = db.get_class_with_properties_and_tags(class_id)
+    if not class_with_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class not found: {class_id}"
+        )
+
+    return class_with_data

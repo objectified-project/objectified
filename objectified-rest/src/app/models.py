@@ -64,6 +64,7 @@ class ClassUpdateRequest(BaseModel):
     description: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
     enabled: Optional[bool] = None
+    canvas_metadata: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True
