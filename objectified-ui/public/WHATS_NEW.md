@@ -30,7 +30,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Address classes: BillingAddress, ShippingAddress, AddressValidation
   - Analytics classes: PageView, AnalyticsEvent, Conversion, ABTest
   - Common classes: Money, Coordinates, DateRange, FileUpload, Pagination, SortOptions, AuditTimestamps
-  - Content classes: MediaGallery, COntentTag, ContentComment, Rating, Article, FAQ
+  - Communication classes: Message, Thread, MessageAttachment, ChatRoom
+  - Content classes: MediaGallery, ContentTag, ContentComment, Rating, Article, FAQ
   - Integrations classes: WebhookEvent, APICredential, OAuthToken, EmailTemplate
   - Notifications classes: PushNotification, EmailNotification, SMSNotification, NotificationPreference
   - Orders classes: Cart, EnhancedOrderItem, Refund, Shipment, Invoice
