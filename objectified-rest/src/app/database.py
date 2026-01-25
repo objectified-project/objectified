@@ -698,6 +698,159 @@ class Database:
         except Exception:
             pass  # Don't fail if we can't increment usage
 
+    # ==================== Project CRUD Operations ====================
+
+    def get_projects_for_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """Get all projects for a tenant."""
+        query = """
+            SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
+                   p.enabled, p.metadata, p.created_at, p.updated_at,
+                   u.name as creator_name, u.email as creator_email
+            FROM odb.projects p
+            LEFT JOIN odb.users u ON p.creator_id = u.id
+            WHERE p.tenant_id = %s AND p.deleted_at IS NULL
+            ORDER BY p.created_at DESC
+        """
+        return self.execute_query(query, (tenant_id,))
+
+    def get_project_by_id(self, project_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific project by ID, ensuring it belongs to the tenant."""
+        query = """
+            SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
+                   p.enabled, p.metadata, p.created_at, p.updated_at,
+                   u.name as creator_name, u.email as creator_email
+            FROM odb.projects p
+            LEFT JOIN odb.users u ON p.creator_id = u.id
+            WHERE p.id = %s AND p.tenant_id = %s AND p.deleted_at IS NULL
+        """
+        results = self.execute_query(query, (project_id, tenant_id))
+        return results[0] if results else None
+
+    def get_project_by_slug(self, slug: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific project by slug, ensuring it belongs to the tenant."""
+        query = """
+            SELECT p.id, p.tenant_id, p.creator_id, p.name, p.description, p.slug,
+                   p.enabled, p.metadata, p.created_at, p.updated_at,
+                   u.name as creator_name, u.email as creator_email
+            FROM odb.projects p
+            LEFT JOIN odb.users u ON p.creator_id = u.id
+            WHERE p.slug = %s AND p.tenant_id = %s AND p.deleted_at IS NULL
+        """
+        results = self.execute_query(query, (slug, tenant_id))
+        return results[0] if results else None
+
+    def create_project(
+        self,
+        tenant_id: str,
+        creator_id: Optional[str],
+        name: str,
+        slug: str,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a new project."""
+        import json
+        query = """
+            INSERT INTO odb.projects
+            (tenant_id, creator_id, name, description, slug, metadata)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, tenant_id, creator_id, name, description, slug,
+                      enabled, metadata, created_at, updated_at
+        """
+        metadata_json = json.dumps(metadata) if metadata else '{}'
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (tenant_id, creator_id, name, description, slug.lower(), metadata_json)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_project(
+        self,
+        project_id: str,
+        tenant_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update an existing project, ensuring it belongs to the tenant."""
+        import json
+
+        # First verify the project belongs to the tenant
+        existing = self.get_project_by_id(project_id, tenant_id)
+        if not existing:
+            return None
+
+        # Build dynamic update query
+        update_fields = []
+        params = []
+
+        if 'name' in updates and updates['name'] is not None:
+            update_fields.append("name = %s")
+            params.append(updates['name'])
+        if 'description' in updates:
+            update_fields.append("description = %s")
+            params.append(updates['description'])
+        if 'slug' in updates and updates['slug'] is not None:
+            update_fields.append("slug = %s")
+            params.append(updates['slug'].lower())
+        if 'enabled' in updates and updates['enabled'] is not None:
+            update_fields.append("enabled = %s")
+            params.append(updates['enabled'])
+        if 'metadata' in updates:
+            update_fields.append("metadata = %s")
+            params.append(json.dumps(updates['metadata']) if updates['metadata'] else '{}')
+
+        if not update_fields:
+            # Nothing to update, return current project
+            return existing
+
+        # Always update updated_at
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+
+        params.extend([project_id, tenant_id])
+        query = f"""
+            UPDATE odb.projects
+            SET {', '.join(update_fields)}
+            WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
+            RETURNING id, tenant_id, creator_id, name, description, slug,
+                      enabled, metadata, created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_project(self, project_id: str, tenant_id: str) -> bool:
+        """Soft delete a project, ensuring it belongs to the tenant."""
+        query = """
+            UPDATE odb.projects
+            SET enabled = false, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (project_id, tenant_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
 
 # Global database instance
 db = Database()

@@ -160,3 +160,48 @@ class PrimitiveImportRequest(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ==================== Project Models ====================
+
+class ProjectSchema(BaseModel):
+    """Pydantic model for a project."""
+    id: str
+    tenant_id: str
+    creator_id: Optional[str] = None
+    name: str
+    description: Optional[str] = None
+    slug: str
+    enabled: bool = True
+    metadata: Optional[Dict[str, Any]] = None
+    creator_name: Optional[str] = None
+    creator_email: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectCreateRequest(BaseModel):
+    """Request model for creating a project."""
+    name: str
+    description: Optional[str] = None
+    slug: str
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectUpdateRequest(BaseModel):
+    """Request model for updating a project."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    slug: Optional[str] = None
+    enabled: Optional[bool] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
