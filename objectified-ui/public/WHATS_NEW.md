@@ -41,6 +41,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Products classes: ProductVariant, Inventory, ProductCategory, ProductReview, ProductPrice
   - Scheduling classes: Appointment, Availability, Calendar, Reminder
   - Security classes: Session, APIKeyAuth, SecurityEvent, IPWhiteList, RateLimit
+  - Support classes: Ticket, TicketComment, SLA, KnowledgeBase
   - User/Auth classes: EnhancedUserProfile, Role, Permission, TwoFactorAuth, PasswordReset
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
