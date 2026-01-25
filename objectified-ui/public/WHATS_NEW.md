@@ -34,6 +34,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Notifications classes: PushNotification, EmailNotification, SMSNotification, NotificationPreference
   - Orders classes: Cart, EnhancedOrderItem, Refund, Shipment, Invoice
   - Payments classes: PaymentIntent, PaymentMethod, Subscription, Transaction, Payout
+  - Products classes: ProductVariant, Inventory, ProductCategory, ProductReview, ProductPrice
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
   - Adds SwaggerHub import support.
