@@ -214,7 +214,7 @@ VALUES (
                 "type": ["object", "null"],
                 "description": "Billing address associated with payment method",
                 "additionalProperties": true,
-                "examples": [{"name": "John Doe", "email": "john@example.com", "address": {...}}, null]
+                "examples": [{"name": "John Doe", "email": "john@example.com", "address": {"street": "123 Main St", "city": "New York", "state": "NY", "zip": "10001"}}, null]
             },
             "metadata": {
                 "type": ["object", "null"],
