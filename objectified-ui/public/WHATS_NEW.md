@@ -31,6 +31,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Analytics classes: PageView, AnalyticsEvent, Conversion, ABTest
   - Common classes: Money, Coordinates, DateRange, FileUpload, Pagination, SortOptions, AuditTimestamps
   - Communication classes: Message, Thread, MessageAttachment, ChatRoom
+  - Compliance classes: GDPRConsent, DataRetention, AuditTrail, PrivacySettings
   - Content classes: MediaGallery, ContentTag, ContentComment, Rating, Article, FAQ
   - Integrations classes: WebhookEvent, APICredential, OAuthToken, EmailTemplate
   - Notifications classes: PushNotification, EmailNotification, SMSNotification, NotificationPreference
