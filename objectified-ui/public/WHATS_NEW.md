@@ -28,6 +28,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Ability to create CRUD operations at the time a path is created.
 - Template Improvements:
   - Address classes: BillingAddress, ShippingAddress, AddressValidation
+  - Analytics classes: PageView, AnalyticsEvent, Conversion, ABTest
   - Common classes: Money, Coordinates, DateRange, FileUpload, Pagination, SortOptions, AuditTimestamps
   - Content classes: MediaGallery, COntentTag, ContentComment, Rating, Article, FAQ
   - Integrations classes: WebhookEvent, APICredential, OAuthToken, EmailTemplate
