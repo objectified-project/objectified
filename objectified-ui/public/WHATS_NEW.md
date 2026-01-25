@@ -34,6 +34,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Compliance classes: GDPRConsent, DataRetention, AuditTrail, PrivacySettings
   - Content classes: MediaGallery, ContentTag, ContentComment, Rating, Article, FAQ
   - Integrations classes: WebhookEvent, APICredential, OAuthToken, EmailTemplate
+  - Marketplace classes: Vendor, Commission, Dispute, Escrow
   - Notifications classes: PushNotification, EmailNotification, SMSNotification, NotificationPreference
   - Orders classes: Cart, EnhancedOrderItem, Refund, Shipment, Invoice
   - Payments classes: PaymentIntent, PaymentMethod, Subscription, Transaction, Payout
