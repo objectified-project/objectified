@@ -85,6 +85,179 @@ class Database:
         """
         return self.execute_query(query, (class_id,))
 
+    # ==================== Class CRUD Operations ====================
+
+    def get_version_for_tenant(self, tenant_id: str, version_id: str) -> Optional[Dict[str, Any]]:
+        """Get a version by ID, ensuring it belongs to the tenant."""
+        query = """
+            SELECT v.id, v.version_id, v.project_id, v.visibility, v.published,
+                   p.name as project_name, p.slug as project_slug
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE v.id = %s
+              AND p.tenant_id = %s
+              AND v.deleted_at IS NULL
+              AND p.deleted_at IS NULL
+        """
+        results = self.execute_query(query, (version_id, tenant_id))
+        return results[0] if results else None
+
+    def get_versions_for_tenant(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """Get all versions for a tenant."""
+        query = """
+            SELECT v.id, v.version_id, v.project_id, v.visibility, v.published,
+                   p.name as project_name, p.slug as project_slug
+            FROM odb.versions v
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE p.tenant_id = %s
+              AND v.deleted_at IS NULL
+              AND p.deleted_at IS NULL
+            ORDER BY p.name, v.version_id
+        """
+        return self.execute_query(query, (tenant_id,))
+
+    def get_class_by_id(self, class_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific class by ID, ensuring it belongs to the tenant."""
+        query = """
+            SELECT c.id, c.version_id, c.name, c.description, c.schema, c.enabled,
+                   c.created_at, c.updated_at
+            FROM odb.classes c
+            JOIN odb.versions v ON c.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE c.id = %s
+              AND p.tenant_id = %s
+              AND c.deleted_at IS NULL
+        """
+        results = self.execute_query(query, (class_id, tenant_id))
+        return results[0] if results else None
+
+    def get_classes_for_tenant_version(self, tenant_id: str, version_id: str) -> List[Dict[str, Any]]:
+        """Get all classes for a specific version, ensuring it belongs to the tenant."""
+        query = """
+            SELECT c.id, c.version_id, c.name, c.description, c.schema, c.enabled,
+                   c.created_at, c.updated_at
+            FROM odb.classes c
+            JOIN odb.versions v ON c.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE c.version_id = %s
+              AND p.tenant_id = %s
+              AND c.deleted_at IS NULL
+            ORDER BY c.name ASC
+        """
+        return self.execute_query(query, (version_id, tenant_id))
+
+    def create_class(
+        self,
+        version_id: str,
+        name: str,
+        schema: Dict[str, Any],
+        description: Optional[str] = None,
+        enabled: bool = True
+    ) -> Dict[str, Any]:
+        """Create a new class."""
+        import json
+        query = """
+            INSERT INTO odb.classes
+            (version_id, name, description, schema, enabled)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, version_id, name, description, schema, enabled,
+                      created_at, updated_at
+        """
+        schema_json = json.dumps(schema)
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (version_id, name, description, schema_json, enabled)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_class(
+        self,
+        class_id: str,
+        tenant_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update an existing class, ensuring it belongs to the tenant."""
+        import json
+
+        # First verify the class belongs to the tenant
+        existing = self.get_class_by_id(class_id, tenant_id)
+        if not existing:
+            return None
+
+        # Build dynamic update query
+        update_fields = []
+        params = []
+
+        if 'name' in updates and updates['name'] is not None:
+            update_fields.append("name = %s")
+            params.append(updates['name'])
+        if 'description' in updates and updates['description'] is not None:
+            update_fields.append("description = %s")
+            params.append(updates['description'])
+        if 'schema' in updates and updates['schema'] is not None:
+            update_fields.append("schema = %s")
+            params.append(json.dumps(updates['schema']))
+        if 'enabled' in updates and updates['enabled'] is not None:
+            update_fields.append("enabled = %s")
+            params.append(updates['enabled'])
+
+        if not update_fields:
+            # Nothing to update, return current class
+            return existing
+
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(class_id)
+
+        query = f"""
+            UPDATE odb.classes
+            SET {', '.join(update_fields)}
+            WHERE id = %s AND deleted_at IS NULL
+            RETURNING id, version_id, name, description, schema, enabled,
+                      created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_class(self, class_id: str, tenant_id: str) -> bool:
+        """Delete a class (soft delete), ensuring it belongs to the tenant."""
+        # First verify the class belongs to the tenant
+        existing = self.get_class_by_id(class_id, tenant_id)
+        if not existing:
+            return False
+
+        query = """
+            UPDATE odb.classes
+            SET deleted_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND deleted_at IS NULL
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (class_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     def validate_api_key(self, api_key: str) -> Optional[Dict[str, Any]]:
         """
         Validate an API key and return tenant information.

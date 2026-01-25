@@ -12,6 +12,7 @@ from .arazzo_generator import generate_arazzo_spec, generate_class_arazzo_spec
 from .jsonschema_generator import generate_jsonschema_spec, generate_class_jsonschema_spec
 from .models import OpenAPIResponse
 from .primitives_routes import router as primitives_router
+from .classes_routes import router as classes_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -34,6 +35,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(primitives_router)
+app.include_router(classes_router)
 
 
 @app.on_event("startup")

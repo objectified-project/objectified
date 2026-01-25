@@ -150,16 +150,16 @@ CREATE TABLE path_operation_schema (
     description TEXT,
     data JSONB NOT NULL,
 
-    -- Ensure property names are unique within each class
-    CONSTRAINT path_path_operation_schema_unique UNIQUE (path_parameter_id, name)
+    -- Ensure property names are unique within each operation
+    CONSTRAINT path_operation_schema_unique UNIQUE (path_operation_id, name)
 );
 
 -- Table comment
-COMMENT ON TABLE path_parameter_schema IS 'Schema definitions for path parameters using class-property structure';
+COMMENT ON TABLE path_operation_schema IS 'Schema definitions for path operations using class-property structure';
 
 -- Column comments
-COMMENT ON COLUMN path_operation_schema.id IS 'Unique identifier for the path parameter schema record';
-COMMENT ON COLUMN path_operation_schema.path_parameter_id IS 'Foreign key reference to the parent path parameter (cascades on deletion)';
+COMMENT ON COLUMN path_operation_schema.id IS 'Unique identifier for the path operation schema record';
+COMMENT ON COLUMN path_operation_schema.path_operation_id IS 'Foreign key reference to the parent path operation (cascades on deletion)';
 COMMENT ON COLUMN path_operation_schema.class_id IS 'Foreign key reference to the associated class (cascades on deletion) - if null, this is a freeform property';
 COMMENT ON COLUMN path_operation_schema.property_id IS 'Foreign key reference to the associated property';
 COMMENT ON COLUMN path_operation_schema.name IS 'The name of the schema element';

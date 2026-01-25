@@ -39,6 +39,31 @@ class ClassSchema(BaseModel):
     schema: Optional[Dict[str, Any]] = None
     enabled: bool = True
     tags: Optional[List[TagSchema]] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ClassCreateRequest(BaseModel):
+    """Request model for creating a class."""
+    version_id: str
+    name: str
+    description: Optional[str] = None
+    schema: Dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class ClassUpdateRequest(BaseModel):
+    """Request model for updating a class."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    schema: Optional[Dict[str, Any]] = None
+    enabled: Optional[bool] = None
 
     class Config:
         from_attributes = True
