@@ -438,23 +438,40 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                       <div className="space-y-2">
                         {Object.entries(selectedTemplate.schema.properties).map(([name, prop]: [string, any]) => {
                           const isRequired = selectedTemplate.schema.required?.includes(name);
+                          const typeArr = Array.isArray(prop.type) ? prop.type : (prop.type ? [prop.type] : []);
+                          const hasNull = typeArr.includes('null');
+                          const isOptional = hasNull;
+                          const nonNull = typeArr.filter((t: string) => t !== 'null');
+                          const displayType = nonNull.length
+                            ? nonNull.join(' | ')
+                            : (hasNull ? 'null' : (typeof prop.type === 'string' ? prop.type : '—'));
                           return (
                             <div
                               key={name}
                               className="px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
                             >
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                                   {name}
                                 </span>
                                 {isRequired && (
                                   <span className="text-xs text-red-500">*</span>
                                 )}
+                                {isOptional && (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                    optional
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {prop.type}
+                                {displayType}
                                 {prop.format && ` (${prop.format})`}
                               </div>
+                              {prop.description && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {prop.description}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
