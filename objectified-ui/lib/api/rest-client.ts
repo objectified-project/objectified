@@ -10,7 +10,9 @@
 /**
  * Delete a class via REST API (proxied through Next.js API route)
  */
-async function deleteClass(classId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteClassWithSession(
+  classId: string
+): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await fetch(`/api/classes/${classId}`, {
       method: 'DELETE',
@@ -74,15 +76,6 @@ async function updateClassCanvasMetadata(
     console.error('Error updating class canvas metadata via REST API:', error);
     return { success: false, error: error.message || 'Failed to update class canvas metadata' };
   }
-}
-
-/**
- * Delete a class (convenience wrapper)
- */
-export async function deleteClassWithSession(
-  classId: string
-): Promise<{ success: boolean; error?: string }> {
-  return deleteClass(classId);
 }
 
 /**

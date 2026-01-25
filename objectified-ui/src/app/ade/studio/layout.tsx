@@ -17,7 +17,8 @@ import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
 import ClassTemplateBrowserDialog from '@/app/components/ade/studio/ClassTemplateBrowserDialog';
 import TagManager from '@/app/components/ade/studio/TagManager';
-import { getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
+import { getClassesForVersion, getTagsForProject } from '../../../../lib/db/helper';
+import { deleteClassWithSession } from '../../../../lib/api/rest-client';
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
 
 // Helper function to check permissions
@@ -260,9 +261,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     try {
       let response;
       if (deleteDialog.target.type === 'class') {
-        const result = await deleteClass(deleteDialog.target.id);
-        const parsed = JSON.parse(result);
-        response = { success: parsed.success, error: parsed.error };
+        response = await deleteClassWithSession(deleteDialog.target.id);
       } else {
         // Delete property via REST API
         const apiResponse = await fetch(`/api/properties/${selectedProjectId}/${deleteDialog.target.id}`, {

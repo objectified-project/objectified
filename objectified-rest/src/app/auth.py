@@ -4,12 +4,15 @@ Authentication module for JWT and API Key validation.
 Supports both JWT tokens (from NextAuth) and API keys for authentication.
 """
 
+import logging
 import jwt
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Header
 
 from .config import settings
 from .database import db
+
+logger = logging.getLogger(__name__)
 
 
 def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
@@ -36,13 +39,13 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
 
         return payload
     except jwt.ExpiredSignatureError:
-        print("[AUTH] decode_jwt: Token expired")
+        logger.warning("decode_jwt: Token expired")
         return None
     except jwt.InvalidTokenError as e:
-        print(f"[AUTH] decode_jwt: Invalid token - {e}")
+        logger.warning(f"decode_jwt: Invalid token - {e}")
         return None
     except Exception as e:
-        print(f"[AUTH] decode_jwt: Exception - {e}")
+        logger.error(f"decode_jwt: Exception - {e}", exc_info=True)
         return None
 
 
@@ -81,8 +84,6 @@ def validate_user_tenant_access(user_id: str, tenant_slug: str) -> Optional[Dict
     Returns:
         Tenant information if user has access, None otherwise
     """
-    print(f"[AUTH] validate_user_tenant_access called with user_id={user_id}, tenant_slug={tenant_slug}")
-
     # First, get the tenant_id from the slug
     tenant_query = """
         SELECT id as tenant_id, slug as tenant_slug, name as tenant_name
@@ -93,7 +94,7 @@ def validate_user_tenant_access(user_id: str, tenant_slug: str) -> Optional[Dict
     tenant_results = db.execute_query(tenant_query, (tenant_slug,))
 
     if not tenant_results:
-        print(f"[AUTH] Tenant not found: {tenant_slug}")
+        logger.warning(f"Tenant not found: {tenant_slug}")
         return None
 
     tenant = tenant_results[0]
@@ -109,10 +110,10 @@ def validate_user_tenant_access(user_id: str, tenant_slug: str) -> Optional[Dict
     access_results = db.execute_query(access_query, (user_id, tenant_id))
 
     if not access_results:
-        print(f"[AUTH] User {user_id} does not have access to tenant {tenant_id}")
+        logger.warning(f"User {user_id} does not have access to tenant {tenant_id}")
         return None
 
-    print("[AUTH] Authorized.")
+    logger.debug(f"validate_user_tenant_access called with user_id={user_id}, tenant_slug={tenant_slug} - Authorized")
     return tenant
 
 
