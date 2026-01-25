@@ -33,6 +33,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Integrations classes: WebhookEvent, APICredential, OAuthToken, EmailTemplate
   - Notifications classes: PushNotification, EmailNotification, SMSNotification, NotificationPreference
   - Orders classes: Cart, EnhancedOrderItem, Refund, Shipment, Invoice
+  - Payments classes: PaymentIntent, PaymentMethod, Subscription, Transaction, Payout
 - Import Improvements:
   - Adds AI Assistant to help create an OpenAPI specification from a natural language query.
   - Adds SwaggerHub import support.
