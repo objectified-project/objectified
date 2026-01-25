@@ -489,7 +489,8 @@ export async function generateClassOpenApiSpec(
   const templateData: any = {
     openapi: versionConfig.version,
     info,
-    schemas
+    schemas,
+    paths: {}  // Include paths in template data, default to empty object
   };
 
   // Add project metadata to top level as x-metadata extension
