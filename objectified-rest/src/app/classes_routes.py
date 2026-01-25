@@ -262,6 +262,209 @@ async def get_class_properties(
     return properties
 
 
+@router.post("/{tenant_slug}/{class_id}/properties")
+async def add_property_to_class(
+    tenant_slug: str,
+    class_id: str,
+    request: Dict[str, Any],
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> Dict[str, Any]:
+    """
+    Add a property to a class.
+
+    Supports authentication via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug
+        class_id: The class ID
+        request: Property data containing:
+            - property_id: Optional library property ID
+            - name: Property name (required)
+            - description: Optional property description
+            - data: Property schema data (required)
+            - parent_id: Optional parent property ID for nested properties
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        The created class property
+    """
+    # First verify the class exists and belongs to tenant
+    class_data = db.get_class_by_id(class_id, auth_data['tenant_id'])
+
+    if not class_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class not found: {class_id}"
+        )
+
+    # Validate required fields
+    if not request.get('name') or not request['name'].strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Property name is required"
+        )
+
+    if not request.get('data'):
+        raise HTTPException(
+            status_code=400,
+            detail="Property data is required"
+        )
+
+    try:
+        property_data = db.add_property_to_class(
+            class_id=class_id,
+            property_id=request.get('property_id'),
+            name=request['name'],
+            description=request.get('description'),
+            data=request['data'],
+            parent_id=request.get('parent_id')
+        )
+
+        return property_data
+    except ValueError as e:
+        # Handle validation errors
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Check for unique constraint violation
+        if "unique constraint" in str(e).lower() or "23505" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail="A property with this name already exists at this level"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{tenant_slug}/{class_id}/properties/{class_property_id}")
+async def update_class_property(
+    tenant_slug: str,
+    class_id: str,
+    class_property_id: str,
+    request: Dict[str, Any],
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> Dict[str, Any]:
+    """
+    Update a property in a class.
+
+    Supports authentication via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug
+        class_id: The class ID
+        class_property_id: The class property ID
+        request: Property update data containing:
+            - name: Optional property name
+            - description: Optional property description
+            - data: Optional property schema data
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        The updated class property
+    """
+    # First verify the class exists and belongs to tenant
+    class_data = db.get_class_by_id(class_id, auth_data['tenant_id'])
+
+    if not class_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class not found: {class_id}"
+        )
+
+    # Validate name if provided
+    if 'name' in request and request['name'] is not None and not request['name'].strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Property name cannot be empty"
+        )
+
+    try:
+        # Build updates dict from request
+        updates = {}
+        if 'name' in request:
+            updates['name'] = request['name']
+        if 'description' in request:
+            updates['description'] = request['description']
+        if 'data' in request:
+            updates['data'] = request['data']
+
+        property_data = db.update_class_property(
+            class_property_id=class_property_id,
+            class_id=class_id,
+            tenant_id=auth_data['tenant_id'],
+            updates=updates
+        )
+
+        if not property_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Class property not found: {class_property_id}"
+            )
+
+        return property_data
+    except ValueError as e:
+        # Handle validation errors
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        # Check for unique constraint violation
+        if "unique constraint" in str(e).lower() or "23505" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail="A property with this name already exists at this level"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{tenant_slug}/{class_id}/properties/{class_property_id}")
+async def delete_class_property(
+    tenant_slug: str,
+    class_id: str,
+    class_property_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> Dict[str, str]:
+    """
+    Delete a property from a class.
+
+    Supports authentication via JWT token or API key.
+
+    Args:
+        tenant_slug: The tenant slug
+        class_id: The class ID
+        class_property_id: The class property ID
+        auth_data: Authentication data (injected by dependency)
+
+    Returns:
+        Success message
+    """
+    # First verify the class exists and belongs to tenant
+    class_data = db.get_class_by_id(class_id, auth_data['tenant_id'])
+
+    if not class_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class not found: {class_id}"
+        )
+
+    # Delete the property
+    success = db.delete_class_property(
+        class_property_id,
+        class_id,
+        auth_data['tenant_id']
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Class property not found: {class_property_id}"
+        )
+
+    return {"message": "Class property deleted successfully"}
+
+
 @router.get("/{tenant_slug}/version/{version_id}/with-properties-tags")
 async def get_classes_with_properties_and_tags(
     tenant_slug: str,

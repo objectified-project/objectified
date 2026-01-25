@@ -731,110 +731,9 @@ export async function deleteVersion(versionRecordId: string) {
 }
 
 // Property Management Functions
-
-export async function getPropertiesForProject(projectId: string) {
-  try {
-    const result = await connectionPool.query(
-      `SELECT id, project_id, name, description, data, enabled, created_at, updated_at
-       FROM odb.properties
-       WHERE project_id = $1 AND deleted_at IS NULL
-       ORDER BY name ASC`,
-      [projectId]
-    );
-
-    return JSON.stringify(result.rows);
-  } catch (error: any) {
-    console.error('Error fetching properties:', error);
-    return JSON.stringify([]);
-  }
-}
-
-export async function createProperty(projectId: string, name: string, description: string | null, data: any) {
-  try {
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Property name is required' });
-    }
-
-    if (!data) {
-      return JSON.stringify({ success: false, error: 'Property data is required' });
-    }
-
-    const result = await connectionPool.query(
-      `INSERT INTO odb.properties (project_id, name, description, data)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, project_id, name, description, data, enabled, created_at, updated_at`,
-      [projectId, name.trim(), description, JSON.stringify(data)]
-    );
-
-    return JSON.stringify({ success: true, property: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error creating property:', error);
-
-    // Handle unique constraint violation (duplicate name in same project)
-    if (error.code === '23505') {
-      return JSON.stringify({ success: false, error: 'A property with this name already exists in this project' });
-    }
-
-    return JSON.stringify({ success: false, error: error.message });
-  }
-}
-
-export async function updateProperty(propertyId: string, name: string, description: string | null, data: any) {
-  try {
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Property name is required' });
-    }
-
-    if (!data) {
-      return JSON.stringify({ success: false, error: 'Property data is required' });
-    }
-
-    const result = await connectionPool.query(
-      `UPDATE odb.properties
-       SET name = $1, description = $2, data = $3, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4 AND deleted_at IS NULL
-       RETURNING id, project_id, name, description, data, enabled, created_at, updated_at`,
-      [name.trim(), description, JSON.stringify(data), propertyId]
-    );
-
-    if (result.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'Property not found' });
-    }
-
-    return JSON.stringify({ success: true, property: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error updating property:', error);
-
-    // Handle unique constraint violation
-    if (error.code === '23505') {
-      return JSON.stringify({ success: false, error: 'A property with this name already exists in this project' });
-    }
-
-    return JSON.stringify({ success: false, error: error.message });
-  }
-}
-
-export async function deleteProperty(propertyId: string) {
-  try {
-    // Soft delete - set deleted_at timestamp
-    const result = await connectionPool.query(
-      `UPDATE odb.properties
-       SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id`,
-      [propertyId]
-    );
-
-    if (result.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'Property not found' });
-    }
-
-    return JSON.stringify({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting property:', error);
-    return JSON.stringify({ success: false, error: error.message });
-  }
-}
+// NOTE: Property CRUD operations have been moved to REST API endpoints.
+// Use /api/properties/[projectId] for GET and POST operations.
+// Use /api/properties/[projectId]/[propertyId] for GET, PUT, and DELETE operations.
 
 // Class Management Functions
 
@@ -1500,61 +1399,10 @@ export async function addPropertyToClass(classId: string, propertyId: string | n
   }
 }
 
-export async function updateClassProperty(classPropertyId: string, name: string, description: string | null, data: any) {
-  try {
-
-    if (!name || name.trim().length === 0) {
-      return JSON.stringify({ success: false, error: 'Property name is required' });
-    }
-
-    if (!data) {
-      return JSON.stringify({ success: false, error: 'Property data is required' });
-    }
-
-    const result = await connectionPool.query(
-      `UPDATE odb.class_properties
-       SET name = $1, description = $2, data = $3
-       WHERE id = $4
-       RETURNING id, class_id, property_id, name, description, data, parent_id`,
-      [name.trim(), description, JSON.stringify(data), classPropertyId]
-    );
-
-    if (result.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'Class property relationship not found' });
-    }
-
-    return JSON.stringify({ success: true, classProperty: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error updating class property:', error);
-
-    // Handle unique constraint violation
-    if (error.code === '23505') {
-      return JSON.stringify({ success: false, error: 'A property with this name already exists at this level' });
-    }
-
-    return JSON.stringify({ success: false, error: error.message });
-  }
-}
-
-export async function removePropertyFromClass(classPropertyId: string) {
-  try {
-    const result = await connectionPool.query(
-      `DELETE FROM odb.class_properties
-       WHERE id = $1
-       RETURNING id`,
-      [classPropertyId]
-    );
-
-    if (result.rowCount === 0) {
-      return JSON.stringify({ success: false, error: 'Class property relationship not found' });
-    }
-
-    return JSON.stringify({ success: true });
-  } catch (error: any) {
-    console.error('Error removing property from class:', error);
-    return JSON.stringify({ success: false, error: error.message });
-  }
-}
+// Class Property Management Functions
+// NOTE: Class property CRUD operations have been moved to REST API endpoints.
+// Use /api/classes/[classId]/properties for POST operations (add property).
+// Use /api/classes/[classId]/properties/[classPropertyId] for PUT (update) and DELETE (delete) operations.
 
 // OpenAPI Import Functions
 

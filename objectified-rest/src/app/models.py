@@ -261,3 +261,41 @@ class VersionPublishRequest(BaseModel):
         from_attributes = True
 
 
+# ==================== Project Property Models ====================
+
+class ProjectPropertySchema(BaseModel):
+    """Pydantic model for a project property (library property)."""
+    id: str
+    project_id: str
+    name: str
+    description: Optional[str] = None
+    data: Dict[str, Any]
+    enabled: bool = True
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectPropertyCreateRequest(BaseModel):
+    """Request model for creating a project property."""
+    name: str
+    description: Optional[str] = None
+    data: Dict[str, Any]
+
+    class Config:
+        from_attributes = True
+
+
+class ProjectPropertyUpdateRequest(BaseModel):
+    """Request model for updating a project property."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+    enabled: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+

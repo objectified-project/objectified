@@ -17,7 +17,7 @@ import ClassImportDialog from '@/app/components/ade/studio/ClassImportDialog';
 import PropertyTemplateBrowserDialog from '@/app/components/ade/studio/PropertyTemplateBrowserDialog';
 import ClassTemplateBrowserDialog from '@/app/components/ade/studio/ClassTemplateBrowserDialog';
 import TagManager from '@/app/components/ade/studio/TagManager';
-import { getPropertiesForProject, createProperty, updateProperty, deleteProperty, getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
+import { getClassesForVersion, deleteClass, getTagsForProject } from '../../../../lib/db/helper';
 import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
 
 // Helper function to check permissions
@@ -106,8 +106,12 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       }
       setIsLoadingProperties(true);
       try {
-        const result = await getPropertiesForProject(selectedProjectId);
-        const data = JSON.parse(result);
+        const response = await fetch(`/api/properties/${selectedProjectId}`);
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to load properties');
+        }
+        const data = result.properties || [];
         const transformedProperties: PropertyItem[] = data.map((prop: any) => ({
           id: prop.id, name: prop.name, description: prop.description, ...prop.data
         }));
@@ -210,18 +214,43 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const handlePropertySubmit = async (propertyData: { name: string; description: string | null; data: any }) => {
     if (!selectedProjectId) throw new Error('No project selected');
 
-    let result;
-    if (propertyDialog.mode === 'add') {
-      result = await createProperty(selectedProjectId, propertyData.name, propertyData.description, propertyData.data);
-    } else if (propertyDialog.selectedProperty) {
-      result = await updateProperty(propertyDialog.selectedProperty.id, propertyData.name, propertyData.description, propertyData.data);
+    try {
+      let response;
+      if (propertyDialog.mode === 'add') {
+        response = await fetch(`/api/properties/${selectedProjectId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: propertyData.name,
+            description: propertyData.description,
+            data: propertyData.data,
+          }),
+        });
+      } else if (propertyDialog.selectedProperty) {
+        response = await fetch(`/api/properties/${selectedProjectId}/${propertyDialog.selectedProperty.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: propertyData.name,
+            description: propertyData.description,
+            data: propertyData.data,
+          }),
+        });
+      } else {
+        throw new Error('No property selected for update');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save property');
+      }
+
+      setPropertyDialog({ open: false, mode: 'add', selectedProperty: null });
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error saving property:', error);
+      throw error;
     }
-
-    const response = JSON.parse(result!);
-    if (!response.success) throw new Error(response.error || 'Failed to save property');
-
-    setPropertyDialog({ open: false, mode: 'add', selectedProperty: null });
-    setRefreshKey(prev => prev + 1);
   };
 
   // Delete handler
@@ -229,11 +258,19 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     if (!deleteDialog.target) return;
 
     try {
-      const result = deleteDialog.target.type === 'class'
-        ? await deleteClass(deleteDialog.target.id)
-        : await deleteProperty(deleteDialog.target.id);
+      let response;
+      if (deleteDialog.target.type === 'class') {
+        const result = await deleteClass(deleteDialog.target.id);
+        const parsed = JSON.parse(result);
+        response = { success: parsed.success, error: parsed.error };
+      } else {
+        // Delete property via REST API
+        const apiResponse = await fetch(`/api/properties/${selectedProjectId}/${deleteDialog.target.id}`, {
+          method: 'DELETE',
+        });
+        response = await apiResponse.json();
+      }
 
-      const response = JSON.parse(result);
       if (!response.success) {
         await alertDialog({ message: response.error || `Failed to delete ${deleteDialog.target.type}`, variant: 'error' });
         return;

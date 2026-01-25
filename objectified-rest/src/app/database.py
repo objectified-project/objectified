@@ -1,4 +1,5 @@
 import psycopg2
+import json
 from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any
@@ -383,6 +384,160 @@ class Database:
         try:
             with conn.cursor() as cursor:
                 cursor.execute(query, (class_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def add_property_to_class(
+        self,
+        class_id: str,
+        property_id: Optional[str],
+        name: str,
+        description: Optional[str],
+        data: Dict[str, Any],
+        parent_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Add a property to a class."""
+        import json
+        
+        if not name or not name.strip():
+            raise ValueError('Property name is required')
+        
+        # Validate: either property_id must be set, or data must contain $ref
+        has_ref = data and (data.get('$ref') or (data.get('type') == 'array' and data.get('items', {}).get('$ref')))
+        if not property_id and not has_ref:
+            raise ValueError('Property must have either a library reference (property_id) or a schema $ref')
+        
+        query = """
+            INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, class_id, property_id, name, description, data, parent_id
+        """
+        
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (class_id, property_id, name.strip(), description, json.dumps(data), parent_id)
+                )
+                result = cursor.fetchone()
+                conn.commit()
+                # Parse JSON data if it's a string
+                if result and isinstance(result.get('data'), str):
+                    result['data'] = json.loads(result['data'])
+                return result
+        except Exception as e:
+            conn.rollback()
+            # Check for unique constraint violation
+            if "unique constraint" in str(e).lower() or "23505" in str(e):
+                raise ValueError('A property with this name already exists at this level')
+            raise e
+
+    def update_class_property(
+        self,
+        class_property_id: str,
+        class_id: str,
+        tenant_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update a class property, ensuring it belongs to the class and tenant."""
+        import json
+        
+        # First verify the class property belongs to a class that belongs to the tenant
+        verify_query = """
+            SELECT cp.id, cp.class_id
+            FROM odb.class_properties cp
+            JOIN odb.classes c ON cp.class_id = c.id
+            JOIN odb.versions v ON c.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE cp.id = %s
+              AND c.id = %s
+              AND p.tenant_id = %s
+        """
+        verify_result = self.execute_query(verify_query, (class_property_id, class_id, tenant_id))
+        if not verify_result:
+            return None
+        
+        # Build dynamic update query
+        update_fields = []
+        params = []
+        
+        if 'name' in updates and updates['name'] is not None:
+            update_fields.append("name = %s")
+            params.append(updates['name'].strip())
+        if 'description' in updates:
+            update_fields.append("description = %s")
+            params.append(updates['description'])
+        if 'data' in updates and updates['data'] is not None:
+            update_fields.append("data = %s")
+            params.append(json.dumps(updates['data']))
+        
+        if not update_fields:
+            # Nothing to update, return current property
+            return self.execute_query(
+                "SELECT id, class_id, property_id, name, description, data, parent_id FROM odb.class_properties WHERE id = %s",
+                (class_property_id,)
+            )[0] if self.execute_query("SELECT id FROM odb.class_properties WHERE id = %s", (class_property_id,)) else None
+        
+        params.append(class_property_id)
+        
+        query = f"""
+            UPDATE odb.class_properties
+            SET {', '.join(update_fields)}
+            WHERE id = %s
+            RETURNING id, class_id, property_id, name, description, data, parent_id
+        """
+        
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                if result and isinstance(result.get('data'), str):
+                    result['data'] = json.loads(result['data'])
+                return result
+        except Exception as e:
+            conn.rollback()
+            # Check for unique constraint violation
+            if "unique constraint" in str(e).lower() or "23505" in str(e):
+                raise ValueError('A property with this name already exists at this level')
+            raise e
+
+    def delete_class_property(
+        self,
+        class_property_id: str,
+        class_id: str,
+        tenant_id: str
+    ) -> bool:
+        """Delete a class property, ensuring it belongs to the class and tenant."""
+        # First verify the class property belongs to a class that belongs to the tenant
+        verify_query = """
+            SELECT cp.id
+            FROM odb.class_properties cp
+            JOIN odb.classes c ON cp.class_id = c.id
+            JOIN odb.versions v ON c.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE cp.id = %s
+              AND c.id = %s
+              AND p.tenant_id = %s
+        """
+        verify_result = self.execute_query(verify_query, (class_property_id, class_id, tenant_id))
+        if not verify_result:
+            return False
+        
+        query = """
+            DELETE FROM odb.class_properties
+            WHERE id = %s
+        """
+        
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (class_property_id,))
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
@@ -1285,6 +1440,113 @@ class Database:
         except Exception as e:
             conn.rollback()
             return {"success": False, "error": str(e)}
+
+    # ==================== Project Properties Methods ====================
+
+    def get_properties_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        """Get all properties for a project."""
+        query = """
+            SELECT id, project_id, name, description, data, enabled, created_at, updated_at
+            FROM odb.properties
+            WHERE project_id = %s AND deleted_at IS NULL
+            ORDER BY name ASC
+        """
+        return self.execute_query(query, (project_id,))
+
+    def get_property_by_id(self, property_id: str, project_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific property by ID, ensuring it belongs to the project."""
+        query = """
+            SELECT id, project_id, name, description, data, enabled, created_at, updated_at
+            FROM odb.properties
+            WHERE id = %s AND project_id = %s AND deleted_at IS NULL
+        """
+        results = self.execute_query(query, (property_id, project_id))
+        return results[0] if results else None
+
+    def create_property(self, project_id: str, name: str, description: Optional[str], data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new property for a project."""
+        query = """
+            INSERT INTO odb.properties (project_id, name, description, data)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, project_id, name, description, data, enabled, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (project_id, name.strip(), description, json.dumps(data) if isinstance(data, dict) else data))
+                result = cursor.fetchone()
+                conn.commit()
+                # Parse JSON data if it's a string
+                if result and isinstance(result.get('data'), str):
+                    result['data'] = json.loads(result['data'])
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_property(self, property_id: str, project_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a property, ensuring it belongs to the project."""
+        # Build dynamic update query
+        set_clauses = []
+        params = []
+
+        if 'name' in updates:
+            set_clauses.append("name = %s")
+            params.append(updates['name'].strip() if updates['name'] else None)
+        if 'description' in updates:
+            set_clauses.append("description = %s")
+            params.append(updates['description'])
+        if 'data' in updates:
+            set_clauses.append("data = %s")
+            data_value = updates['data']
+            params.append(json.dumps(data_value) if isinstance(data_value, dict) else data_value)
+        if 'enabled' in updates:
+            set_clauses.append("enabled = %s")
+            params.append(updates['enabled'])
+
+        if not set_clauses:
+            # No updates provided
+            return self.get_property_by_id(property_id, project_id)
+
+        set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+
+        query = f"""
+            UPDATE odb.properties
+            SET {', '.join(set_clauses)}
+            WHERE id = %s AND project_id = %s AND deleted_at IS NULL
+            RETURNING id, project_id, name, description, data, enabled, created_at, updated_at
+        """
+        params.extend([property_id, project_id])
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                if result and isinstance(result.get('data'), str):
+                    result['data'] = json.loads(result['data'])
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_property(self, property_id: str, project_id: str) -> bool:
+        """Soft delete a property, ensuring it belongs to the project."""
+        query = """
+            UPDATE odb.properties
+            SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s AND project_id = %s AND deleted_at IS NULL
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (property_id, project_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
 
 
 # Global database instance

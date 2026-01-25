@@ -15,6 +15,7 @@ from .primitives_routes import router as primitives_router
 from .classes_routes import router as classes_router
 from .projects_routes import router as projects_router
 from .versions_routes import router as versions_router
+from .properties_routes import router as properties_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -40,6 +41,7 @@ app.include_router(primitives_router)
 app.include_router(classes_router)
 app.include_router(projects_router)
 app.include_router(versions_router)
+app.include_router(properties_router)
 
 
 @app.on_event("startup")

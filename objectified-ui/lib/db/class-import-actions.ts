@@ -1,7 +1,8 @@
 'use server';
 
-import { createClass, addPropertyToClass, createProperty } from './helper';
+import { createClass, addPropertyToClass } from './helper';
 import { getImporter, NormalizedClass } from '../importers';
+import { cookies } from 'next/headers';
 
 export interface ImportClassesInput {
   versionId: string;
@@ -115,14 +116,44 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
       collectProperties(cls.properties || []);
     }
 
-    // Create properties in the library
+    // Create properties in the library via REST API (through Next.js API route)
+    const cookieStore = await cookies();
+    // Build cookie header string from cookies
+    const cookieHeader = cookieStore.getAll()
+      .map(cookie => `${cookie.name}=${cookie.value}`)
+      .join('; ');
+    
+    // Get the base URL for API calls - use internal URL for server-side calls
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    
     for (const [sig, entry] of propertyMap.entries()) {
       const primaryName = Array.from(entry.names).sort()[0];
-      const res = JSON.parse(await createProperty(projectId, primaryName, entry.description || null, entry.data));
-      if (res.success) {
-        propertyIdMap.set(sig, res.property.id);
-      } else {
-        console.warn(`Failed to create property "${primaryName}": ${res.error}`);
+      try {
+        // Call the Next.js API route which handles authentication via session
+        const headers: Record<string, string> = { 
+          'Content-Type': 'application/json',
+        };
+        if (cookieHeader) {
+          headers['Cookie'] = cookieHeader; // Forward cookies for session authentication
+        }
+        
+        const response = await fetch(`${baseUrl}/api/properties/${projectId}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            name: primaryName,
+            description: entry.description || null,
+            data: entry.data,
+          }),
+        });
+        const res = await response.json();
+        if (res.success && res.property) {
+          propertyIdMap.set(sig, res.property.id);
+        } else {
+          console.warn(`Failed to create property "${primaryName}": ${res.error || 'Unknown error'}`);
+        }
+      } catch (error: any) {
+        console.warn(`Failed to create property "${primaryName}": ${error.message || 'Unknown error'}`);
       }
     }
 

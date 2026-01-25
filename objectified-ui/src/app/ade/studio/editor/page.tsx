@@ -69,11 +69,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  addPropertyToClass,
-  removePropertyFromClass,
   updateClassPropertyRef,
   getTagsForProject,
-  createProperty,
   saveDefaultCanvasLayout,
   getDefaultCanvasLayout,
   getGroupsForVersion,
@@ -627,14 +624,22 @@ const StudioContent = () => {
     }
 
     try {
-      // Create the property in the library
-      const result = await createProperty(projectId, name, description, data);
-      const response = JSON.parse(result);
-      if (response.success) {
-        return response.property.id;
+      // Create the property in the library via REST API
+      const response = await fetch(`/api/properties/${projectId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description,
+          data,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        return result.property.id;
       } else {
         // Property might already exist with this name, which is fine
-        console.warn(`Could not create library property "${name}": ${response.error}`);
+        console.warn(`Could not create library property "${name}": ${result.error}`);
         return null;
       }
     } catch (error) {
@@ -666,22 +671,25 @@ const StudioContent = () => {
       cleanedData.items = cleanedItems;
     }
 
-    // Add the main property
-    const result = await addPropertyToClass(
-      classId,
-      propertyId,
-      name,
-      description,
-      cleanedData,
-      parentId
-    );
+    // Add the main property via REST API
+    const response = await fetch(`/api/classes/${classId}/properties`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        property_id: propertyId,
+        name,
+        description,
+        data: cleanedData,
+        parent_id: parentId,
+      }),
+    });
 
-    const response = JSON.parse(result);
-    if (!response.success) {
-      return { success: false, error: response.error };
+    const result = await response.json();
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to add property to class' };
     }
 
-    const newClassPropertyId = response.classProperty.id;
+    const newClassPropertyId = result.classProperty.id;
 
     // Extract and recursively add inline children
     const inlineChildren = extractInlineProperties(data);
@@ -779,14 +787,17 @@ const StudioContent = () => {
     try {
       console.log('Removing property from class:', classId, classPropertyId);
 
-      const result = await removePropertyFromClass(classPropertyId);
-      const response = JSON.parse(result);
+      const response = await fetch(`/api/classes/${classId}/properties/${classPropertyId}`, {
+        method: 'DELETE',
+      });
 
-      if (response.success) {
+      const result = await response.json();
+
+      if (result.success) {
         await updateSingleClassNode(classId); // Only update the affected class node
       } else {
         await alertDialog({
-          message: response.error || 'Failed to remove property from class',
+          message: result.error || 'Failed to remove property from class',
           variant: 'error',
         });
       }
@@ -880,24 +891,27 @@ const StudioContent = () => {
       const parentId: string | null = (window as any).__refParentId || null;
       (window as any).__refParentId = null;
 
-      // Add reference property to class (property_id is null since this is not from the property library)
-      const result = await addPropertyToClass(
-        referenceTargetClassId,
-        null as any, // No property_id - direct class property
-        referenceData.name,
-        referenceData.description,
-        data,
-        parentId // Parent can be null for top-level or specific for nested
-      );
+      // Add reference property to class via REST API (property_id is null since this is not from the property library)
+      const response = await fetch(`/api/classes/${referenceTargetClassId}/properties`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: null, // No property_id - direct class property
+          name: referenceData.name,
+          description: referenceData.description,
+          data,
+          parent_id: parentId, // Parent can be null for top-level or specific for nested
+        }),
+      });
 
-      const response = JSON.parse(result);
-      if (response.success) {
+      const result = await response.json();
+      if (result.success) {
         await reloadClasses();
         triggerSidebarRefresh();
         setReferenceDialogOpen(false);
       } else {
         await alertDialog({
-          message: response.error || 'Failed to create reference',
+          message: result.error || 'Failed to create reference',
           variant: 'error',
         });
       }

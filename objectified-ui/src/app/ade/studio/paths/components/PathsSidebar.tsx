@@ -13,7 +13,6 @@ import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
   getClassesWithPropertiesAndTags,
-  getPropertiesForProject,
 } from '../../../../../../lib/db/helper';
 import {
   getPathsForVersion,
@@ -139,7 +138,7 @@ export default function PathsSidebar({
     loadClasses();
   }, [selectedVersionId]);
 
-  // Load properties separately using the same approach as Canvas editor
+  // Load properties separately using REST API
   useEffect(() => {
     if (!selectedProjectId) {
       setProperties([]);
@@ -149,9 +148,12 @@ export default function PathsSidebar({
     const loadProperties = async () => {
       setIsLoading(true);
       try {
-        // Use getPropertiesForProject - same as Canvas editor
-        const result = await getPropertiesForProject(selectedProjectId);
-        const data = JSON.parse(result);
+        const response = await fetch(`/api/properties/${selectedProjectId}`);
+        const result = await response.json();
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to load properties');
+        }
+        const data = result.properties || [];
 
         // Transform to PropertyItem format
         const transformedProperties: PropertyItem[] = data.map((prop: any) => {

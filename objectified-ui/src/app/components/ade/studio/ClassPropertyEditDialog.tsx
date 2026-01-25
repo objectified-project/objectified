@@ -11,7 +11,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
-import { updateClassProperty } from '../../../../../lib/db/helper';
 import { PropertyFormFields, PropertyFormData } from './PropertyFormFields';
 import ExtractToClassDialog from './ExtractToClassDialog';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
@@ -661,20 +660,24 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         delete updatedData.externalDocs;
       }
 
-      const result = await updateClassProperty(
-        editingClassProperty.id,
-        editPropName.trim(),
-        formData.description || null,
-        updatedData
-      );
+      // Update via REST API
+      const response = await fetch(`/api/classes/${editingClassProperty.class_id}/properties/${editingClassProperty.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editPropName.trim(),
+          description: formData.description || null,
+          data: updatedData,
+        }),
+      });
 
-      const response = JSON.parse(result);
-      if (response.success) {
+      const result = await response.json();
+      if (result.success) {
         // Notify parent to reload
         if (onSaved) await onSaved();
         onClose();
       } else {
-        setEditPropertyError(response.error || 'Failed to update property');
+        setEditPropertyError(result.error || 'Failed to update property');
       }
     } catch (error) {
       console.error('Error updating class property:', error);
