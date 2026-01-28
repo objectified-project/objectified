@@ -69,6 +69,8 @@ export default function UserManagementClient() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [openSignupDropdown, setOpenSignupDropdown] = useState<string | null>(null);
   const [openUserDropdown, setOpenUserDropdown] = useState<string | null>(null);
+  const [signupDropdownPos, setSignupDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const [userDropdownPos, setUserDropdownPos] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -412,19 +414,32 @@ export default function UserManagementClient() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative inline-block">
                           <button
-                            onClick={() => setOpenSignupDropdown(openSignupDropdown === signup.email_address ? null : signup.email_address)}
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setSignupDropdownPos({
+                                top: rect.bottom + 4,
+                                right: window.innerWidth - rect.right
+                              });
+                              setOpenSignupDropdown(openSignupDropdown === signup.email_address ? null : signup.email_address);
+                            }}
                             className="p-2 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
 
-                          {openSignupDropdown === signup.email_address && (
+                          {openSignupDropdown === signup.email_address && signupDropdownPos && (
                             <>
                               <div
-                                className="fixed inset-0 z-10"
+                                className="fixed inset-0 z-[100]"
                                 onClick={() => setOpenSignupDropdown(null)}
                               />
-                              <div className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20">
+                              <div
+                                className="fixed w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-[101]"
+                                style={{
+                                  top: `${signupDropdownPos.top}px`,
+                                  right: `${signupDropdownPos.right}px`
+                                }}
+                              >
                                 <div className="py-1">
                                   <button
                                     onClick={() => {
@@ -540,19 +555,32 @@ export default function UserManagementClient() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative inline-block">
                           <button
-                            onClick={() => setOpenUserDropdown(openUserDropdown === user.id ? null : user.id)}
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setUserDropdownPos({
+                                top: rect.bottom + 4,
+                                right: window.innerWidth - rect.right
+                              });
+                              setOpenUserDropdown(openUserDropdown === user.id ? null : user.id);
+                            }}
                             className="p-2 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
 
-                          {openUserDropdown === user.id && (
+                          {openUserDropdown === user.id && userDropdownPos && (
                             <>
                               <div
-                                className="fixed inset-0 z-10"
+                                className="fixed inset-0 z-[100]"
                                 onClick={() => setOpenUserDropdown(null)}
                               />
-                              <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20">
+                              <div
+                                className="fixed w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-[101]"
+                                style={{
+                                  top: `${userDropdownPos.top}px`,
+                                  right: `${userDropdownPos.right}px`
+                                }}
+                              >
                                 <div className="py-1">
                                   <button
                                     onClick={() => {

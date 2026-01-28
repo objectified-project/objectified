@@ -14,7 +14,7 @@ import { getTenantsForUser } from '../../../../lib/db/helper';
 import packageJson from '../../../../package.json';
 
 // Import version from package.json
-const APP_VERSION = `02-2026-v${packageJson.version}`;
+const APP_VERSION = `03-2026-v${packageJson.version}`;
 
 type NavItem = { label: string; href: string; enabled?: boolean; opensNewBrowser?: boolean };
 
