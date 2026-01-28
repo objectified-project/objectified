@@ -8,6 +8,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 - New Features:
 - Bug fixes:
+  - Fixed AI generation bug when creating $ref objects: was referring to properties, not the object itself.
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

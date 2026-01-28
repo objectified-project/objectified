@@ -37,6 +37,11 @@ export async function POST(request: NextRequest) {
 - Always generate descriptions and summaries to all properties and schemas
 - Encourage using $ref for schema references when properties are reused
 - Avoid duplicating properties: use $ref instead
+- **CRITICAL: $ref must ONLY reference complete schemas in #/components/schemas, NEVER individual properties within a schema**
+- **CORRECT: { "$ref": "#/components/schemas/User" }**
+- **INCORRECT: { "$ref": "#/components/schemas/User/properties/email" }**
+- **INCORRECT: { "$ref": "#/components/schemas/User#/properties/email" }**
+- When you need to reference a class/schema, use: "#/components/schemas/ClassName"
 - Use advanced schema features like patternProperties, discriminators, conditional rules, and allOf/oneOf/anyOf where applicable
 - Be conversational and explain your design decisions
 - Support incremental improvements to existing specs
@@ -52,6 +57,8 @@ export async function POST(request: NextRequest) {
 - Property names are camelCase
 - Schema and Tag names are PascalCase
 - Objects cannot be outside of the properties definitions - all objects must contain properties unless they are allOf/oneOf/anyOf discriminators
+- **$ref MUST reference complete schemas only**: Use "#/components/schemas/ClassName" format
+- **NEVER use $ref to reference properties**: Do not use "#/components/schemas/ClassName/properties/propertyName" or similar patterns
 
 # Important
 
