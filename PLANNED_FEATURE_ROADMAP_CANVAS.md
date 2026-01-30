@@ -12,11 +12,13 @@
 ### 1. Canvas Layout & Organization
 
 #### Save & Load Layouts ✅ IMPLEMENTED (Basic), 📋 PLANNED (Advanced)
-- 📋 **Auto Layout Algorithms**: 8 algorithms (hierarchical TB/LR/BT/RL, force-directed, circular, grid, layered)
+- ✅ **Auto Layout Algorithms**: Top-to-Bottom (TB) and Left-to-Right (LR) hierarchical layouts implemented
+- ✅ Top-to-Bottom and Left-to-Right auto-layout algorithms
 - ✅ Save current canvas arrangement
 - ✅ Save and load groups with layouts
 - ✅ **Layout Controls**: Compact button with dropdown menu
 - ✅ **Database Table**: Create a database table to store layouts
+- ✅ **Auto-load Layout on First Load**: Automatically applies saved layout when canvas loads for the first time
 - 📋 Multiple saved layouts per version:
     - "Development Layout" - organized for development work
     - "Presentation Layout" - clean arrangement for stakeholder demos
@@ -31,7 +33,6 @@
 
 | Ticket | Feature                                       |
 |--------|-----------------------------------------------|
-| #564   | Re-introduce canvas auto-layout algorithms    |
 | #163   | Multiple saved layouts per version            |
 | #164   | Auto-save layout changes (tuneable interval)  |
 | #165   | Version control for layouts                   |

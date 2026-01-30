@@ -6,7 +6,8 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## New Features and Improvements
 
-- New Features:
+- Canvas Improvements:
+  - Added top-to-bottom and left-to-right layout options 
 - Bug fixes:
   - Fixed AI generation bug when creating $ref objects: was referring to properties, not the object itself.
   - Fixed $ref editing in classes - was opening a blank editing panel, now corrected.

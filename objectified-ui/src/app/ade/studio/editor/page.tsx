@@ -34,7 +34,9 @@ import {
   FileCode,
   BarChart3,
   Network,
-  Zap
+  Zap,
+  MoveVertical,
+  MoveHorizontal
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -2388,21 +2390,21 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setViewport, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh, updateNodeInternals]);
 
-  // Auto-arrange nodes using hierarchical layout algorithm
-  const handleAutoArrange = useCallback(() => {
+  // Auto-arrange nodes using hierarchical layout algorithm with specified direction
+  const handleAutoArrangeWithDirection = useCallback((direction: 'TB' | 'LR') => {
     if (nodes.length === 0) return;
 
-    setLoadingMessage('Arranging nodes...');
+    setLoadingMessage(`Arranging nodes (${direction === 'TB' ? 'Top to Bottom' : 'Left to Right'})...`);
     setIsLoadingCanvas(true);
 
     // Use setTimeout to allow the loading state to render
     setTimeout(() => {
       try {
-        // Apply auto-layout algorithm
+        // Apply auto-layout algorithm with specified direction
         const layoutedNodes = applyAutoLayout(nodes, edges, {
-          nodeSpacingX: 100,
-          nodeSpacingY: 150,
-          direction: 'TB', // Top to bottom
+          nodeSpacingX: direction === 'LR' ? 150 : 100,
+          nodeSpacingY: direction === 'LR' ? 100 : 150,
+          direction: direction,
           padding: 80,
           centerNodes: true,
           minimizeCrossings: true,
@@ -2448,6 +2450,21 @@ const StudioContent = () => {
       }
     }, 50);
   }, [nodes, edges, groups, setNodes, setGroups, fitView]);
+
+  // Auto-arrange Top to Bottom
+  const handleAutoArrangeTB = useCallback(() => {
+    handleAutoArrangeWithDirection('TB');
+  }, [handleAutoArrangeWithDirection]);
+
+  // Auto-arrange Left to Right
+  const handleAutoArrangeLR = useCallback(() => {
+    handleAutoArrangeWithDirection('LR');
+  }, [handleAutoArrangeWithDirection]);
+
+  // Legacy handler - defaults to Top to Bottom
+  const handleAutoArrange = useCallback(() => {
+    handleAutoArrangeWithDirection('TB');
+  }, [handleAutoArrangeWithDirection]);
 
   // ============================================================================
   // END LAYOUT SAVE/LOAD HANDLERS
@@ -4475,15 +4492,24 @@ const StudioContent = () => {
                         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                           Auto Layout
                         </h4>
-                        <button
-                          onClick={handleAutoArrange}
-                          disabled={nodes.filter(n => n.type !== 'groupNode').length === 0}
-                          className="w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border border-teal-200 dark:border-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Automatically arrange classes in a hierarchical layout"
-                        >
-                          <Wand2 className="w-4 h-4" />
-                          <span>Auto-arrange</span>
-                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={handleAutoArrangeTB}
+                            disabled={nodes.filter(n => n.type !== 'groupNode').length === 0}
+                            className="px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border border-teal-200 dark:border-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Arrange classes top to bottom"
+                          >
+                            <MoveVertical className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={handleAutoArrangeLR}
+                            disabled={nodes.filter(n => n.type !== 'groupNode').length === 0}
+                            className="px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 border border-teal-200 dark:border-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Arrange classes left to right"
+                          >
+                            <MoveHorizontal className="w-4 h-4" />
+                          </button>
+                        </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Automatically arrange classes hierarchically based on relationships
                         </p>
