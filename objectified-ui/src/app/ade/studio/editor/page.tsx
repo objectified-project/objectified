@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 import { useStudio } from '../StudioContext';
@@ -36,7 +36,9 @@ import {
   Network,
   Zap,
   MoveVertical,
-  MoveHorizontal
+  MoveHorizontal,
+  Search,
+  X
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -296,6 +298,11 @@ const StudioContent = () => {
   const exportDropdownRef = useRef<HTMLDivElement>(null);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Canvas search state
+  const [canvasSearchQuery, setCanvasSearchQuery] = useState('');
+  const [canvasSearchOpen, setCanvasSearchOpen] = useState(false);
+  const canvasSearchInputRef = useRef<HTMLInputElement>(null);
+
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -429,6 +436,109 @@ const StudioContent = () => {
     // Also reflect immediately into node data
     setNodes((prev) => prev.map((n) => ({ ...n, data: { ...(n.data as any), expandedProperties: empty } })));
   }, []);
+
+  // Canvas search - compute matching node IDs
+  const matchingNodeIds = useMemo(() => {
+    if (!canvasSearchQuery.trim()) return new Set<string>();
+    const query = canvasSearchQuery.toLowerCase().trim();
+    const matching = new Set<string>();
+    nodes.forEach(node => {
+      if (node.type === 'groupNode') return; // Skip group nodes
+      const nodeData = node.data as any;
+      const name = nodeData?.name?.toLowerCase() || '';
+      const description = nodeData?.description?.toLowerCase() || '';
+      if (name.includes(query) || description.includes(query)) {
+        matching.add(node.id);
+      }
+    });
+    return matching;
+  }, [canvasSearchQuery, nodes]);
+
+  // Handle opening canvas search
+  const openCanvasSearch = useCallback(() => {
+    setCanvasSearchOpen(true);
+    // Focus the input after a short delay to allow render
+    setTimeout(() => {
+      canvasSearchInputRef.current?.focus();
+    }, 50);
+  }, []);
+
+  // Handle closing canvas search
+  const closeCanvasSearch = useCallback(() => {
+    setCanvasSearchOpen(false);
+    setCanvasSearchQuery('');
+  }, []);
+
+  // Keyboard shortcut for canvas search (Cmd+F or Ctrl+F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle in canvas view mode
+      if (viewMode !== 'canvas') return;
+
+      // Cmd+F or Ctrl+F to open search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        openCanvasSearch();
+      }
+
+      // Escape to close search
+      if (e.key === 'Escape' && canvasSearchOpen) {
+        closeCanvasSearch();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, canvasSearchOpen, openCanvasSearch, closeCanvasSearch]);
+
+  // Compute nodes with search styling applied
+  const displayNodes = useMemo(() => {
+    // If no search is active, return nodes as-is
+    if (!canvasSearchQuery.trim() || !canvasSearchOpen) {
+      return nodes;
+    }
+
+    // Apply search classes to nodes
+    return nodes.map(node => {
+      if (node.type === 'groupNode') {
+        // Dim groups if none of their nodes match
+        return node;
+      }
+
+      const isMatch = matchingNodeIds.has(node.id);
+      const existingClassName = node.className || '';
+      const searchClass = isMatch ? 'search-highlighted' : 'search-dimmed';
+
+      return {
+        ...node,
+        className: `${existingClassName} ${searchClass}`.trim()
+      };
+    });
+  }, [nodes, canvasSearchQuery, canvasSearchOpen, matchingNodeIds]);
+
+  // Compute edges with search styling applied
+  const displayEdges = useMemo(() => {
+    // If no search is active, return edges as-is
+    if (!canvasSearchQuery.trim() || !canvasSearchOpen) {
+      return edges;
+    }
+
+    // Dim edges that don't connect to matching nodes
+    return edges.map(edge => {
+      const sourceMatch = matchingNodeIds.has(edge.source);
+      const targetMatch = matchingNodeIds.has(edge.target);
+      const isConnectedToMatch = sourceMatch || targetMatch;
+
+      if (!isConnectedToMatch) {
+        const existingClassName = edge.className || '';
+        return {
+          ...edge,
+          className: `${existingClassName} search-dimmed`.trim()
+        };
+      }
+      return edge;
+    });
+  }, [edges, canvasSearchQuery, canvasSearchOpen, matchingNodeIds]);
 
   // Handle zoom to class when selected in sidebar
   const zoomToClass = useCallback((classId: string) => {
@@ -3729,6 +3839,24 @@ const StudioContent = () => {
               stroke-dashoffset: 0;
             }
           }
+
+          /* Canvas search - dim non-matching nodes */
+          .react-flow__node.search-dimmed {
+            opacity: 0.25 !important;
+            filter: grayscale(50%) !important;
+            transition: opacity 0.2s ease, filter 0.2s ease !important;
+          }
+          .react-flow__node.search-highlighted {
+            opacity: 1 !important;
+            filter: none !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 0 20px rgba(99, 102, 241, 0.3) !important;
+            transition: opacity 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease !important;
+          }
+          /* Also dim edges connected to dimmed nodes */
+          .react-flow__edge.search-dimmed path {
+            opacity: 0.15 !important;
+            transition: opacity 0.2s ease !important;
+          }
         `}</style>
 
       {/* Header with Project and Version Selectors - spans full width including over sidebar */}
@@ -3988,8 +4116,8 @@ const StudioContent = () => {
             )}
 
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
+              nodes={displayNodes}
+              edges={displayEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               defaultEdgeOptions={{ zIndex: 0 }}
@@ -4389,6 +4517,15 @@ const StudioContent = () => {
                   <ChevronUp className="h-3.5 w-3.5" />
                   <span>Collapse</span>
                 </button>
+                {/* Search Button */}
+                <button
+                  onClick={openCanvasSearch}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-700"
+                  title="Search classes (Cmd+F)"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span>Search</span>
+                </button>
                 {/* Manage Tags Button */}
                 {!isReadOnly && (
                   <button
@@ -4402,6 +4539,39 @@ const StudioContent = () => {
                 )}
               </div>
             </Panel>
+
+            {/* Canvas Search Panel */}
+            {canvasSearchOpen && (
+              <Panel
+                position="top-center"
+                className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
+              >
+                <div className="flex items-center gap-2 p-2">
+                  <Search className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                  <input
+                    ref={canvasSearchInputRef}
+                    type="text"
+                    value={canvasSearchQuery}
+                    onChange={(e) => setCanvasSearchQuery(e.target.value)}
+                    placeholder="Search classes..."
+                    className="w-64 px-2 py-1 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    autoFocus
+                  />
+                  {canvasSearchQuery && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+                      {matchingNodeIds.size} found
+                    </span>
+                  )}
+                  <button
+                    onClick={closeCanvasSearch}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Close search (Esc)"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </Panel>
+            )}
 
             {/* Dangling $ref warning */}
             {(() => {
