@@ -285,6 +285,9 @@ const StudioContent = () => {
   const [layoutSaved, setLayoutSaved] = useState(false);
   const [hasExistingLayout, setHasExistingLayout] = useState(false);
 
+  // Track whether this is the first load for a given version (to apply saved layout only once)
+  const initialLayoutAppliedRef = useRef<string | null>(null);
+
   // Export dropdown state
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
@@ -3004,6 +3007,9 @@ const StudioContent = () => {
         return;
       }
 
+      // Check if this is the first load for this version
+      const isFirstLoad = initialLayoutAppliedRef.current !== selectedVersionId;
+
       setIsLoadingCanvas(true);
       setLoadingMessage('Loading classes, properties, and tags...');
 
@@ -3127,7 +3133,7 @@ const StudioContent = () => {
         }
 
         // Apply class positions from groups if available
-        const finalNodes = newNodes.map(node => {
+        let finalNodes = newNodes.map(node => {
           if (classPositionsInGroups[node.id]) {
             const savedPos = classPositionsInGroups[node.id];
             if (savedPos.x !== null && savedPos.y !== null) {
@@ -3139,6 +3145,55 @@ const StudioContent = () => {
           }
           return node;
         });
+
+        // On first load, check if there's a saved layout and apply it
+        if (isFirstLoad && currentUserId) {
+          try {
+            setLoadingMessage('Checking for saved layout...');
+            const layoutResult = await getDefaultCanvasLayout(selectedVersionId, currentUserId);
+            const layoutResponse = JSON.parse(layoutResult);
+
+            if (layoutResponse.success && layoutResponse.layout) {
+              const savedLayout = layoutResponse.layout;
+              setLoadingMessage('Applying saved layout...');
+
+              // Apply saved viewport
+              if (savedLayout.viewport) {
+                setViewport(
+                  { x: savedLayout.viewport.x, y: savedLayout.viewport.y, zoom: savedLayout.viewport.zoom },
+                  { duration: 250 }
+                );
+              }
+
+              // Apply saved node positions
+              if (savedLayout.nodes && Array.isArray(savedLayout.nodes)) {
+                const savedPositions = new Map(savedLayout.nodes.map((n: any) => [n.id, n.position]));
+                finalNodes = finalNodes.map(node => {
+                  // First check if position is in classPositionsInGroups (groups take priority)
+                  if (classPositionsInGroups[node.id]) {
+                    const savedPos = classPositionsInGroups[node.id];
+                    if (savedPos.x !== null && savedPos.y !== null) {
+                      return node; // Already has group position
+                    }
+                  }
+                  // Otherwise apply saved layout position
+                  const savedPos = savedPositions.get(node.id);
+                  if (savedPos) {
+                    return { ...node, position: savedPos };
+                  }
+                  return node;
+                });
+              }
+
+              setHasExistingLayout(true);
+            }
+          } catch (error) {
+            console.error('Error loading saved layout on first load:', error);
+          }
+
+          // Mark that initial layout has been applied for this version
+          initialLayoutAppliedRef.current = selectedVersionId;
+        }
 
         // Set nodes with group nodes first (behind class nodes due to zIndex: -1)
         setNodes([...groupNodes, ...finalNodes]);
@@ -3164,7 +3219,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly, updateNodeInternals]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly, updateNodeInternals, setViewport]);
 
   // Check if a saved layout exists when version changes
   useEffect(() => {
