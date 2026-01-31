@@ -4,6 +4,15 @@ These are the features to do later.
 
 ---
 
+### 1. Looks
+
+#### Navigation & Controls ✅ PARTIALLY COMPLETE
+- **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
+- **Canvas Layers**: Background, Node, Edge, Annotation, UI layers with toggle/lock
+- **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
+
+---
+
 ### 6. Undo/Redo System
 
 #### Comprehensive Undo Buffer 📋 PLANNED

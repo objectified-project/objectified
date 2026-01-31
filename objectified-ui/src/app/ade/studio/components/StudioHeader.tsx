@@ -52,6 +52,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setSnapToGrid,
     gridStyle,
     setGridStyle,
+    canvasBackground,
+    setCanvasBackground,
     smartGuidesEnabled,
     setSmartGuidesEnabled,
     edgeStyling,
@@ -84,6 +86,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     smartGuidesEnabled: boolean;
     gridSize: number;
     gridStyle: 'dots' | 'lines' | 'cross';
+    canvasBackground: typeof canvasBackground;
     edgeStyling: typeof edgeStyling;
     edgeRouting: typeof edgeRouting;
     edgeAnimation: typeof edgeAnimation;
@@ -103,6 +106,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setGridStyle(settings.gridStyle);
     localStorage.setItem('gridStyle', settings.gridStyle);
 
+    setCanvasBackground(settings.canvasBackground);
+    localStorage.setItem('canvasBackground', JSON.stringify(settings.canvasBackground));
+
     setEdgeStyling(settings.edgeStyling);
     localStorage.setItem('edgeStyling', JSON.stringify(settings.edgeStyling));
 
@@ -111,7 +117,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
     setEdgeAnimation(settings.edgeAnimation);
     localStorage.setItem('edgeAnimation', settings.edgeAnimation);
-  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setGridSize, setGridStyle, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
+  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
   // Sync local state with context
   React.useEffect(() => {
@@ -390,6 +396,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               smartGuidesEnabled={smartGuidesEnabled}
               gridSize={gridSize}
               gridStyle={gridStyle}
+              canvasBackground={canvasBackground}
               edgeStyling={edgeStyling}
               edgeRouting={edgeRouting}
               edgeAnimation={edgeAnimation}

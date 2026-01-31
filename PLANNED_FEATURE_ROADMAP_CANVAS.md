@@ -75,31 +75,6 @@
 | #177   | Layout comments and annotations               |
 | #178   | Layout versioning with diff viewer            |
 
-#### Navigation & Controls ✅ PARTIALLY COMPLETE
-- ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
-- ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)
-  - ✅ Zoom to selection (fit selected nodes)
-  - ✅ Zoom presets: 25%, 50%, 100%, 150%, 200%
-  - ✅ Zoom slider in toolbar
-- ✅ **Pan & Drag**: Middle-click or space+drag, smooth panning
-  - ✅ Pan with middle mouse button or space+drag
-  - ✅ Pan to edges on node drag
-- ✅ **Canvas Search** (Cmd+F): Search for classes with highlighting
-  - ✅ Search box opens with Cmd+F / Ctrl+F keyboard shortcut
-  - ✅ Type to filter - matching nodes highlighted
-  - ✅ Non-matching nodes dimmed (search focus mode)
-  - ✅ Shows count of matching nodes
-  - ✅ Close with Escape key or X button
-- 📋 **Search Focus Mode**: Dim everything except search results
-- **Canvas Bookmarks**: Named bookmarks with thumbnails, keyboard shortcuts (Cmd+1-9)
-- **Canvas Layers**: Background, Node, Edge, Annotation, UI layers with toggle/lock
-- **Node Visibility**: Hide/show nodes, "ghosts mode" for hidden nodes
-- 📋 **Focus Mode**: Isolate selected classes and relationships, blur non-focused
-
-| Ticket | Feature Description                                          |
-|--------|--------------------------------------------------------------|
-| #318   | Canvas search focus mode                                     |
-
 ---
 
 ### 2. Canvas Navigation & Controls
@@ -283,7 +258,6 @@
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
-| #329   | ✅ Add background options to the canvas |
 | #330   | Add background opacity and blur      |
 
 ---
@@ -296,9 +270,9 @@
 - Rating system for suggestions (thumbs up/down to improve)
 - Machine learning from user preferences
 
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #471   | Preview layout suggestions before applying       |
+| Ticket | Feature Description                        |
+|--------|--------------------------------------------|
+| #471   | Preview layout suggestions before applying |
 
 **Canvas Analysis** ✅ PARTIALLY IMPLEMENTED
 - **Schema Metrics**:
@@ -458,7 +432,6 @@
 
 | Ticket | Feature Description                        |
 |--------|--------------------------------------------|
-| #402   | ✅ Adds resolution specifications for exports |
 | #403   | Export the current viewport                |
 | #404   | Export specific groups                     |
 | #405   | Export entire canvas                       |
@@ -589,3 +562,21 @@
 - ✅ Visual theme preview with color swatches
 - ✅ Persistent theme selection (localStorage)
 - ✅ Automatic system preference detection
+
+#### Navigation & Controls ✅ IMPLEMENTED
+- ✅ **Minimap**: Bird's-eye view with viewport highlighting (bottom-right)
+- ✅ **Zoom Controls**: Mouse wheel, zoom to fit, zoom presets (25%-200%)
+  - ✅ Zoom to selection (fit selected nodes)
+  - ✅ Zoom presets: 25%, 50%, 100%, 150%, 200%
+  - ✅ Zoom slider in toolbar
+- ✅ **Pan & Drag**: Middle-click or space+drag, smooth panning
+  - ✅ Pan with middle mouse button or space+drag
+  - ✅ Pan to edges on node drag
+- ✅ **Canvas Search** (Cmd+F): Search for classes with highlighting
+  - ✅ Search box opens with Cmd+F / Ctrl+F keyboard shortcut
+  - ✅ Type to filter - matching nodes highlighted
+  - ✅ Non-matching nodes dimmed (search focus mode)
+  - ✅ Shows count of matching nodes
+  - ✅ Close with Escape key or X button
+- ✅ **Search Focus Mode**: Dim everything except search results
+- ✅ **Focus Mode**: Isolate selected classes and relationships, blur non-focused

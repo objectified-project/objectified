@@ -10,7 +10,9 @@ import {
   DialogTitle,
 } from '../../../components/ui/Dialog';
 import { EDGE_COLORS_4X4 } from '../../../utils/color-themes';
+import { getCanvasBackgroundStyle, normalizeHex } from '../../../utils/canvas-background-style';
 import type {
+  CanvasBackgroundOptions,
   EdgeStylingOptions,
   EdgeRoutingType,
   EdgeAnimationType,
@@ -39,6 +41,29 @@ function isColorDark(hexColor: string | undefined): boolean {
   const b = parseInt(hex.substr(4, 2), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance < 0.5;
+}
+
+// Custom color row: native color picker + hex input for any color
+function CustomColorRow({ value, onChange, label = 'Custom' }: { value: string; onChange: (hex: string) => void; label?: string }) {
+  return (
+    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 w-12">{label}</span>
+      <input
+        type="color"
+        value={normalizeHex(value)}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-9 h-9 rounded cursor-pointer border border-gray-300 dark:border-gray-600 p-0.5 bg-white"
+        title="Pick any color"
+      />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 min-w-0 px-2 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
+        placeholder="#ffffff"
+      />
+    </div>
+  );
 }
 
 // Preview node component for the settings dialog
@@ -74,19 +99,20 @@ const nodeTypes = {
 
 // Separate component for the preview canvas to ensure proper remounting
 interface PreviewCanvasProps {
+  canvasBackground: CanvasBackgroundOptions;
   gridStyle: 'dots' | 'lines' | 'cross';
   gridSize: number;
   nodes: Node[];
   edges: Edge[];
 }
 
-function PreviewCanvas({ gridStyle, gridSize, nodes, edges }: PreviewCanvasProps) {
+function PreviewCanvas({ canvasBackground, gridStyle, gridSize, nodes, edges }: PreviewCanvasProps) {
   const [renderKey, setRenderKey] = React.useState(0);
 
-  // Force re-render when grid style changes
+  // Force re-render when background or grid changes
   React.useEffect(() => {
     setRenderKey(prev => prev + 1);
-  }, [gridStyle, gridSize]);
+  }, [gridStyle, gridSize, canvasBackground.type, canvasBackground.solidColor, canvasBackground.gradientFrom, canvasBackground.gradientTo, canvasBackground.gradientDirection, canvasBackground.imageUrl, canvasBackground.textureType, canvasBackground.textureColor, canvasBackground.textureOpacity]);
 
   const backgroundVariant = React.useMemo(() => {
     switch (gridStyle) {
@@ -111,6 +137,11 @@ function PreviewCanvas({ gridStyle, gridSize, nodes, edges }: PreviewCanvasProps
     return () => observer.disconnect();
   }, []);
 
+  const backgroundStyle = React.useMemo(
+    () => getCanvasBackgroundStyle(canvasBackground, isDark),
+    [canvasBackground, isDark]
+  );
+
   return (
     <ReactFlowProvider key={`flow-provider-${renderKey}`}>
       <div style={{ width: '100%', height: '100%' }}>
@@ -131,18 +162,21 @@ function PreviewCanvas({ gridStyle, gridSize, nodes, edges }: PreviewCanvasProps
           minZoom={0.5}
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}
+          style={backgroundStyle}
         >
-          <Background
-            key={`bg-${renderKey}`}
-            variant={backgroundVariant}
-            gap={gridSize}
-            size={1.5}
-            color="currentColor"
-            style={{
-              color: isDark ? 'rgb(148, 163, 184)' : 'rgb(99, 102, 241)',
-              opacity: isDark ? 0.3 : 0.2
-            }}
-          />
+          {canvasBackground.type === 'grid' && (
+            <Background
+              key={`bg-${renderKey}`}
+              variant={backgroundVariant}
+              gap={gridSize}
+              size={1.5}
+              color="currentColor"
+              style={{
+                color: canvasBackground.gridColor || (isDark ? 'rgb(148, 163, 184)' : 'rgb(99, 102, 241)'),
+                opacity: canvasBackground.gridOpacity ?? (isDark ? 0.3 : 0.2),
+              }}
+            />
+          )}
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
@@ -159,6 +193,7 @@ interface CanvasSettingsDialogProps {
   smartGuidesEnabled: boolean;
   gridSize: number;
   gridStyle: 'dots' | 'lines' | 'cross';
+  canvasBackground: CanvasBackgroundOptions;
   edgeStyling: EdgeStylingOptions;
   edgeRouting: EdgeRoutingType;
   edgeAnimation: EdgeAnimationType;
@@ -169,11 +204,28 @@ interface CanvasSettingsDialogProps {
     smartGuidesEnabled: boolean;
     gridSize: number;
     gridStyle: 'dots' | 'lines' | 'cross';
+    canvasBackground: CanvasBackgroundOptions;
     edgeStyling: EdgeStylingOptions;
     edgeRouting: EdgeRoutingType;
     edgeAnimation: EdgeAnimationType;
   }) => void;
 }
+
+const DEFAULT_CANVAS_BACKGROUND: CanvasBackgroundOptions = {
+  type: 'grid',
+  solidColor: '#f8fafc',
+  gridColor: '#6366f1',
+  gridOpacity: 0.15,
+  imageUrl: '',
+  imageOpacity: 0.5,
+  imageFit: 'cover',
+  gradientFrom: '#f8fafc',
+  gradientTo: '#e2e8f0',
+  gradientDirection: 'to-br',
+  textureType: 'noise',
+  textureOpacity: 0.1,
+  textureColor: '#64748b',
+};
 
 export default function CanvasSettingsDialog({
   open,
@@ -183,6 +235,7 @@ export default function CanvasSettingsDialog({
   smartGuidesEnabled,
   gridSize,
   gridStyle,
+  canvasBackground,
   edgeStyling,
   edgeRouting,
   edgeAnimation,
@@ -194,6 +247,7 @@ export default function CanvasSettingsDialog({
   const [localSmartGuides, setLocalSmartGuides] = React.useState(smartGuidesEnabled);
   const [localGridSize, setLocalGridSize] = React.useState(gridSize);
   const [localGridStyle, setLocalGridStyle] = React.useState(gridStyle);
+  const [localCanvasBackground, setLocalCanvasBackground] = React.useState<CanvasBackgroundOptions>(() => ({ ...DEFAULT_CANVAS_BACKGROUND, ...canvasBackground }));
   const [localEdgeStyling, setLocalEdgeStyling] = React.useState(edgeStyling);
   const [localEdgeRouting, setLocalEdgeRouting] = React.useState(edgeRouting);
   const [localEdgeAnimation, setLocalEdgeAnimation] = React.useState(edgeAnimation);
@@ -206,11 +260,12 @@ export default function CanvasSettingsDialog({
       setLocalSmartGuides(smartGuidesEnabled);
       setLocalGridSize(gridSize);
       setLocalGridStyle(gridStyle);
+      setLocalCanvasBackground({ ...DEFAULT_CANVAS_BACKGROUND, ...canvasBackground });
       setLocalEdgeStyling(edgeStyling);
       setLocalEdgeRouting(edgeRouting);
       setLocalEdgeAnimation(edgeAnimation);
     }
-  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, gridSize, gridStyle, edgeStyling, edgeRouting, edgeAnimation]);
+  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, gridSize, gridStyle, canvasBackground, edgeStyling, edgeRouting, edgeAnimation]);
 
   const handleSave = () => {
     onSave({
@@ -219,6 +274,7 @@ export default function CanvasSettingsDialog({
       smartGuidesEnabled: localSmartGuides,
       gridSize: localGridSize,
       gridStyle: localGridStyle,
+      canvasBackground: localCanvasBackground,
       edgeStyling: localEdgeStyling,
       edgeRouting: localEdgeRouting,
       edgeAnimation: localEdgeAnimation,
@@ -472,6 +528,258 @@ export default function CanvasSettingsDialog({
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Background Section */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Background
+                </h3>
+                <div className="space-y-3">
+                  {/* Background type */}
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <span className="text-sm text-gray-700 dark:text-gray-300 block mb-2">Type</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'solid', label: 'Solid color' },
+                        { value: 'grid', label: 'Grid pattern' },
+                        { value: 'image', label: 'Custom image' },
+                        { value: 'gradient', label: 'Gradient' },
+                        { value: 'texture', label: 'Textures' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setLocalCanvasBackground((b) => ({ ...b, type: opt.value as CanvasBackgroundOptions['type'] }))}
+                          className={`px-3 py-2 rounded-md text-xs font-medium transition-all ${
+                            localCanvasBackground.type === opt.value
+                              ? 'bg-indigo-500 text-white shadow-sm'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Solid color */}
+                  {localCanvasBackground.type === 'solid' && (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                      <span className="text-sm text-gray-700 dark:text-gray-300 block mb-2">Color</span>
+                      <Popover.Root>
+                        <Popover.Trigger asChild>
+                          <button
+                            className="w-full h-9 rounded-lg border-2 border-gray-300 dark:border-gray-600 flex items-center gap-2 px-3"
+                            style={{ backgroundColor: localCanvasBackground.solidColor }}
+                          >
+                            <Palette className="w-4 h-4" style={{ color: isColorDark(localCanvasBackground.solidColor) ? 'white' : 'black' }} />
+                            <span className="text-xs" style={{ color: isColorDark(localCanvasBackground.solidColor) ? 'white' : 'black' }}>{localCanvasBackground.solidColor}</span>
+                          </button>
+                        </Popover.Trigger>
+                        <Popover.Portal>
+                          <Popover.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]" sideOffset={5}>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {EDGE_COLORS_4X4.map((color) => (
+                                <button
+                                  key={color.hex}
+                                  onClick={() => setLocalCanvasBackground((b) => ({ ...b, solidColor: color.hex }))}
+                                  className="w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 border-gray-200 dark:border-gray-700"
+                                  style={{ backgroundColor: color.hex }}
+                                  title={color.name}
+                                />
+                              ))}
+                            </div>
+                            <CustomColorRow value={localCanvasBackground.solidColor} onChange={(hex) => setLocalCanvasBackground((b) => ({ ...b, solidColor: hex }))} />
+                          </Popover.Content>
+                        </Popover.Portal>
+                      </Popover.Root>
+                    </div>
+                  )}
+
+                  {/* Grid: base color + grid color/opacity (grid style/size are in Grid section) */}
+                  {localCanvasBackground.type === 'grid' && (
+                    <div className="space-y-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                      <span className="text-sm text-gray-700 dark:text-gray-300 block">Base &amp; grid color</span>
+                      <div className="flex gap-2 items-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-16">Base</span>
+                        <Popover.Root>
+                          <Popover.Trigger asChild>
+                            <button className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" style={{ backgroundColor: localCanvasBackground.solidColor }} title="Base color" />
+                          </Popover.Trigger>
+                          <Popover.Portal>
+                            <Popover.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]" sideOffset={5}>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {EDGE_COLORS_4X4.map((color) => (
+                                  <button key={color.hex} onClick={() => setLocalCanvasBackground((b) => ({ ...b, solidColor: color.hex }))} className="w-7 h-7 rounded-full hover:scale-110 border-2 border-gray-200 dark:border-gray-700" style={{ backgroundColor: color.hex }} title={color.name} />
+                                ))}
+                              </div>
+                              <CustomColorRow value={localCanvasBackground.solidColor} onChange={(hex) => setLocalCanvasBackground((b) => ({ ...b, solidColor: hex }))} label="Base" />
+                            </Popover.Content>
+                          </Popover.Portal>
+                        </Popover.Root>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-16">Grid</span>
+                        <Popover.Root>
+                          <Popover.Trigger asChild>
+                            <button className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" style={{ backgroundColor: localCanvasBackground.gridColor }} title="Grid color" />
+                          </Popover.Trigger>
+                          <Popover.Portal>
+                            <Popover.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]" sideOffset={5}>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {EDGE_COLORS_4X4.map((color) => (
+                                  <button key={color.hex} onClick={() => setLocalCanvasBackground((b) => ({ ...b, gridColor: color.hex }))} className="w-7 h-7 rounded-full hover:scale-110 border-2 border-gray-200 dark:border-gray-700" style={{ backgroundColor: color.hex }} title={color.name} />
+                                ))}
+                              </div>
+                              <CustomColorRow value={localCanvasBackground.gridColor} onChange={(hex) => setLocalCanvasBackground((b) => ({ ...b, gridColor: hex }))} label="Grid" />
+                            </Popover.Content>
+                          </Popover.Portal>
+                        </Popover.Root>
+                        <div className="flex-1 flex items-center gap-2">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Opacity</span>
+                          <input
+                            type="range"
+                            min="0.05"
+                            max="0.5"
+                            step="0.05"
+                            value={localCanvasBackground.gridOpacity}
+                            onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, gridOpacity: Number(e.target.value) }))}
+                            className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom image */}
+                  {localCanvasBackground.type === 'image' && (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-2">
+                      <span className="text-sm text-gray-700 dark:text-gray-300 block">Image URL</span>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={localCanvasBackground.imageUrl}
+                        onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, imageUrl: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 block">Fit</span>
+                      <select
+                        value={localCanvasBackground.imageFit}
+                        onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, imageFit: e.target.value as CanvasBackgroundOptions['imageFit'] }))}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      >
+                        <option value="cover">Cover</option>
+                        <option value="contain">Contain</option>
+                        <option value="tile">Tile</option>
+                        <option value="center">Center</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Gradient */}
+                  {localCanvasBackground.type === 'gradient' && (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-2">
+                      <div className="flex gap-2 items-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-12">From</span>
+                        <Popover.Root>
+                          <Popover.Trigger asChild>
+                            <button className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" style={{ backgroundColor: localCanvasBackground.gradientFrom }} />
+                          </Popover.Trigger>
+                          <Popover.Portal>
+                            <Popover.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]" sideOffset={5}>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {EDGE_COLORS_4X4.map((color) => (
+                                  <button key={color.hex} onClick={() => setLocalCanvasBackground((b) => ({ ...b, gradientFrom: color.hex }))} className="w-7 h-7 rounded-full hover:scale-110 border-2 border-gray-200 dark:border-gray-700" style={{ backgroundColor: color.hex }} title={color.name} />
+                                ))}
+                              </div>
+                              <CustomColorRow value={localCanvasBackground.gradientFrom} onChange={(hex) => setLocalCanvasBackground((b) => ({ ...b, gradientFrom: hex }))} label="From" />
+                            </Popover.Content>
+                          </Popover.Portal>
+                        </Popover.Root>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-12">To</span>
+                        <Popover.Root>
+                          <Popover.Trigger asChild>
+                            <button className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" style={{ backgroundColor: localCanvasBackground.gradientTo }} />
+                          </Popover.Trigger>
+                          <Popover.Portal>
+                            <Popover.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]" sideOffset={5}>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {EDGE_COLORS_4X4.map((color) => (
+                                  <button key={color.hex} onClick={() => setLocalCanvasBackground((b) => ({ ...b, gradientTo: color.hex }))} className="w-7 h-7 rounded-full hover:scale-110 border-2 border-gray-200 dark:border-gray-700" style={{ backgroundColor: color.hex }} title={color.name} />
+                                ))}
+                              </div>
+                              <CustomColorRow value={localCanvasBackground.gradientTo} onChange={(hex) => setLocalCanvasBackground((b) => ({ ...b, gradientTo: hex }))} label="To" />
+                            </Popover.Content>
+                          </Popover.Portal>
+                        </Popover.Root>
+                      </div>
+                      <span className="text-sm text-gray-700 dark:text-gray-300 block">Direction</span>
+                      <select
+                        value={localCanvasBackground.gradientDirection}
+                        onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, gradientDirection: e.target.value as CanvasBackgroundOptions['gradientDirection'] }))}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      >
+                        <option value="to-r">Right</option>
+                        <option value="to-l">Left</option>
+                        <option value="to-t">Top</option>
+                        <option value="to-b">Bottom</option>
+                        <option value="to-tr">Top Right</option>
+                        <option value="to-tl">Top Left</option>
+                        <option value="to-br">Bottom Right</option>
+                        <option value="to-bl">Bottom Left</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Textures */}
+                  {localCanvasBackground.type === 'texture' && (
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-2">
+                      <span className="text-sm text-gray-700 dark:text-gray-300 block">Texture</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['noise', 'paper', 'fabric', 'carbon', 'concrete', 'wood'] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setLocalCanvasBackground((b) => ({ ...b, textureType: t }))}
+                            className={`px-2 py-1.5 rounded text-xs font-medium ${
+                              localCanvasBackground.textureType === t ? 'bg-indigo-500 text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+                            }`}
+                          >
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Color</span>
+                        <Popover.Root>
+                          <Popover.Trigger asChild>
+                            <button className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" style={{ backgroundColor: localCanvasBackground.textureColor }} />
+                          </Popover.Trigger>
+                          <Popover.Portal>
+                            <Popover.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 z-[10000]" sideOffset={5}>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {EDGE_COLORS_4X4.map((color) => (
+                                  <button key={color.hex} onClick={() => setLocalCanvasBackground((b) => ({ ...b, textureColor: color.hex }))} className="w-7 h-7 rounded-full hover:scale-110 border-2 border-gray-200 dark:border-gray-700" style={{ backgroundColor: color.hex }} title={color.name} />
+                                ))}
+                              </div>
+                              <CustomColorRow value={localCanvasBackground.textureColor} onChange={(hex) => setLocalCanvasBackground((b) => ({ ...b, textureColor: hex }))} label="Color" />
+                            </Popover.Content>
+                          </Popover.Portal>
+                        </Popover.Root>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Opacity</span>
+                        <input
+                          type="range"
+                          min="0.05"
+                          max="0.4"
+                          step="0.05"
+                          value={localCanvasBackground.textureOpacity}
+                          onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, textureOpacity: Number(e.target.value) }))}
+                          className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -801,9 +1109,10 @@ export default function CanvasSettingsDialog({
               </svg>
               Preview
             </h3>
-            <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 min-h-0">
               <PreviewCanvas
-                key={`preview-${localGridStyle}-${localGridSize}-${localEdgeRouting}-${localEdgeAnimation}-${JSON.stringify(localEdgeStyling)}`}
+                key={`preview-${localCanvasBackground.type}-${localGridStyle}-${localGridSize}-${localEdgeRouting}-${localEdgeAnimation}-${JSON.stringify(localEdgeStyling)}-${JSON.stringify(localCanvasBackground)}`}
+                canvasBackground={localCanvasBackground}
                 gridStyle={localGridStyle}
                 gridSize={localGridSize}
                 nodes={previewNodes}
