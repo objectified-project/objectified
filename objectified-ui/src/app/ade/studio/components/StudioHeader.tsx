@@ -52,6 +52,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setSnapToGrid,
     gridStyle,
     setGridStyle,
+    showGrid,
+    setShowGrid,
     canvasBackground,
     setCanvasBackground,
     smartGuidesEnabled,
@@ -84,6 +86,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     clickToFocusEnabled: boolean;
     snapToGrid: boolean;
     smartGuidesEnabled: boolean;
+    showGrid: boolean;
     gridSize: number;
     gridStyle: 'dots' | 'lines' | 'cross';
     canvasBackground: typeof canvasBackground;
@@ -99,6 +102,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
     setSmartGuidesEnabled(settings.smartGuidesEnabled);
     localStorage.setItem('smartGuidesEnabled', JSON.stringify(settings.smartGuidesEnabled));
+
+    setShowGrid(settings.showGrid);
+    localStorage.setItem('showGrid', JSON.stringify(settings.showGrid));
 
     setGridSize(settings.gridSize);
     localStorage.setItem('gridSize', String(settings.gridSize));
@@ -117,7 +123,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
     setEdgeAnimation(settings.edgeAnimation);
     localStorage.setItem('edgeAnimation', settings.edgeAnimation);
-  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
+  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setShowGrid, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
   // Sync local state with context
   React.useEffect(() => {
@@ -394,6 +400,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               clickToFocusEnabled={clickToFocusEnabled}
               snapToGrid={snapToGrid}
               smartGuidesEnabled={smartGuidesEnabled}
+              showGrid={showGrid}
               gridSize={gridSize}
               gridStyle={gridStyle}
               canvasBackground={canvasBackground}

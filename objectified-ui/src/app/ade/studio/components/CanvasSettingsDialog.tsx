@@ -100,19 +100,20 @@ const nodeTypes = {
 // Separate component for the preview canvas to ensure proper remounting
 interface PreviewCanvasProps {
   canvasBackground: CanvasBackgroundOptions;
+  showGrid: boolean;
   gridStyle: 'dots' | 'lines' | 'cross';
   gridSize: number;
   nodes: Node[];
   edges: Edge[];
 }
 
-function PreviewCanvas({ canvasBackground, gridStyle, gridSize, nodes, edges }: PreviewCanvasProps) {
+function PreviewCanvas({ canvasBackground, showGrid, gridStyle, gridSize, nodes, edges }: PreviewCanvasProps) {
   const [renderKey, setRenderKey] = React.useState(0);
 
   // Force re-render when background or grid changes
   React.useEffect(() => {
     setRenderKey(prev => prev + 1);
-  }, [gridStyle, gridSize, canvasBackground.type, canvasBackground.solidColor, canvasBackground.gradientFrom, canvasBackground.gradientTo, canvasBackground.gradientDirection, canvasBackground.imageUrl, canvasBackground.textureType, canvasBackground.textureColor, canvasBackground.textureOpacity]);
+  }, [showGrid, gridStyle, gridSize, canvasBackground.type, canvasBackground.solidColor, canvasBackground.gradientFrom, canvasBackground.gradientTo, canvasBackground.gradientDirection, canvasBackground.imageUrl, canvasBackground.textureType, canvasBackground.textureColor, canvasBackground.textureOpacity]);
 
   const backgroundVariant = React.useMemo(() => {
     switch (gridStyle) {
@@ -164,7 +165,7 @@ function PreviewCanvas({ canvasBackground, gridStyle, gridSize, nodes, edges }: 
           proOptions={{ hideAttribution: true }}
           style={backgroundStyle}
         >
-          {canvasBackground.type === 'grid' && (
+          {canvasBackground.type === 'grid' && showGrid && (
             <Background
               key={`bg-${renderKey}`}
               variant={backgroundVariant}
@@ -191,6 +192,7 @@ interface CanvasSettingsDialogProps {
   clickToFocusEnabled: boolean;
   snapToGrid: boolean;
   smartGuidesEnabled: boolean;
+  showGrid: boolean;
   gridSize: number;
   gridStyle: 'dots' | 'lines' | 'cross';
   canvasBackground: CanvasBackgroundOptions;
@@ -202,6 +204,7 @@ interface CanvasSettingsDialogProps {
     clickToFocusEnabled: boolean;
     snapToGrid: boolean;
     smartGuidesEnabled: boolean;
+    showGrid: boolean;
     gridSize: number;
     gridStyle: 'dots' | 'lines' | 'cross';
     canvasBackground: CanvasBackgroundOptions;
@@ -233,6 +236,7 @@ export default function CanvasSettingsDialog({
   clickToFocusEnabled,
   snapToGrid,
   smartGuidesEnabled,
+  showGrid,
   gridSize,
   gridStyle,
   canvasBackground,
@@ -245,6 +249,7 @@ export default function CanvasSettingsDialog({
   const [localClickToFocus, setLocalClickToFocus] = React.useState(clickToFocusEnabled);
   const [localSnapToGrid, setLocalSnapToGrid] = React.useState(snapToGrid);
   const [localSmartGuides, setLocalSmartGuides] = React.useState(smartGuidesEnabled);
+  const [localShowGrid, setLocalShowGrid] = React.useState(showGrid);
   const [localGridSize, setLocalGridSize] = React.useState(gridSize);
   const [localGridStyle, setLocalGridStyle] = React.useState(gridStyle);
   const [localCanvasBackground, setLocalCanvasBackground] = React.useState<CanvasBackgroundOptions>(() => ({ ...DEFAULT_CANVAS_BACKGROUND, ...canvasBackground }));
@@ -258,6 +263,7 @@ export default function CanvasSettingsDialog({
       setLocalClickToFocus(clickToFocusEnabled);
       setLocalSnapToGrid(snapToGrid);
       setLocalSmartGuides(smartGuidesEnabled);
+      setLocalShowGrid(showGrid);
       setLocalGridSize(gridSize);
       setLocalGridStyle(gridStyle);
       setLocalCanvasBackground({ ...DEFAULT_CANVAS_BACKGROUND, ...canvasBackground });
@@ -265,13 +271,14 @@ export default function CanvasSettingsDialog({
       setLocalEdgeRouting(edgeRouting);
       setLocalEdgeAnimation(edgeAnimation);
     }
-  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, gridSize, gridStyle, canvasBackground, edgeStyling, edgeRouting, edgeAnimation]);
+  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, showGrid, gridSize, gridStyle, canvasBackground, edgeStyling, edgeRouting, edgeAnimation]);
 
   const handleSave = () => {
     onSave({
       clickToFocusEnabled: localClickToFocus,
       snapToGrid: localSnapToGrid,
       smartGuidesEnabled: localSmartGuides,
+      showGrid: localShowGrid,
       gridSize: localGridSize,
       gridStyle: localGridStyle,
       canvasBackground: localCanvasBackground,
@@ -454,6 +461,22 @@ export default function CanvasSettingsDialog({
                   Grid
                 </h3>
                 <div className="space-y-3">
+                  {/* Show Grid */}
+                  <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                      </svg>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Show Grid</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={localShowGrid}
+                      onChange={(e) => setLocalShowGrid(e.target.checked)}
+                      className="w-4 h-4 text-indigo-500 rounded focus:ring-indigo-500"
+                    />
+                  </label>
+
                   {/* Snap to Grid */}
                   <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                     <div className="flex items-center gap-3">
@@ -1111,8 +1134,9 @@ export default function CanvasSettingsDialog({
             </h3>
             <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 min-h-0">
               <PreviewCanvas
-                key={`preview-${localCanvasBackground.type}-${localGridStyle}-${localGridSize}-${localEdgeRouting}-${localEdgeAnimation}-${JSON.stringify(localEdgeStyling)}-${JSON.stringify(localCanvasBackground)}`}
+                key={`preview-${localShowGrid}-${localCanvasBackground.type}-${localGridStyle}-${localGridSize}-${localEdgeRouting}-${localEdgeAnimation}-${JSON.stringify(localEdgeStyling)}-${JSON.stringify(localCanvasBackground)}`}
                 canvasBackground={localCanvasBackground}
+                showGrid={localShowGrid}
                 gridStyle={localGridStyle}
                 gridSize={localGridSize}
                 nodes={previewNodes}

@@ -192,6 +192,7 @@ const StudioContent = () => {
     gridSize,
     snapToGrid,
     gridStyle,
+    showGrid,
     smartGuidesEnabled,
     setSmartGuidesEnabled,
     canvasBackground,
@@ -4205,7 +4206,7 @@ const StudioContent = () => {
                 })}
               </defs>
             </svg>
-            {canvasBackground.type === 'grid' && (
+            {canvasBackground.type === 'grid' && showGrid && (
               <Background
                 variant={
                   gridStyle === 'dots'

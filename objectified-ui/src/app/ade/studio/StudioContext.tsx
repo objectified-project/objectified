@@ -107,6 +107,8 @@ interface StudioContextType {
   setSnapToGrid: (enabled: boolean) => void;
   gridStyle: 'dots' | 'lines' | 'cross';
   setGridStyle: (style: 'dots' | 'lines' | 'cross') => void;
+  showGrid: boolean;
+  setShowGrid: (visible: boolean) => void;
   // Smart guides
   smartGuidesEnabled: boolean;
   setSmartGuidesEnabled: (enabled: boolean) => void;
@@ -181,6 +183,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       return (saved as 'dots' | 'lines' | 'cross') || 'dots'; // Default to dots
     }
     return 'dots';
+  });
+
+  const [showGrid, setShowGrid] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('showGrid');
+      return saved ? JSON.parse(saved) : true; // Default to visible
+    }
+    return true;
   });
 
   const [smartGuidesEnabled, setSmartGuidesEnabled] = useState<boolean>(() => {
@@ -303,6 +313,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      localStorage.setItem('showGrid', JSON.stringify(showGrid));
+    }
+  }, [showGrid]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
       localStorage.setItem('smartGuidesEnabled', JSON.stringify(smartGuidesEnabled));
     }
   }, [smartGuidesEnabled]);
@@ -399,6 +415,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setSnapToGrid,
       gridStyle,
       setGridStyle,
+      showGrid,
+      setShowGrid,
       smartGuidesEnabled,
       setSmartGuidesEnabled,
       edgeStyling,

@@ -296,6 +296,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
   const {
     gridSize,
     gridStyle,
+    showGrid,
     snapToGrid,
     edgeRouting,
     edgeAnimation,
@@ -2894,16 +2895,18 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             : 'radial-gradient(ellipse at top, #ffffff 0%, #f8fafc 30%, #f1f5f9 100%)'
         }}
       >
-        <Background
-          variant={backgroundVariant(gridStyle)}
-          gap={gridSize}
-          size={1}
-          color="currentColor"
-          style={{
-            color: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(99, 102, 241, 0.08)',
-            opacity: 1
-          }}
-        />
+        {showGrid && (
+          <Background
+            variant={backgroundVariant(gridStyle)}
+            gap={gridSize}
+            size={1}
+            color="currentColor"
+            style={{
+              color: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(99, 102, 241, 0.08)',
+              opacity: 1
+            }}
+          />
+        )}
         <Controls
           className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-xl overflow-hidden"
           style={{

@@ -12,6 +12,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added export form for exporting canvas diagrams with multiple output options
   - Added ability to switch connection types for edges in the canvas
   - Added background configurations to the canvas
+  - Added ability to enable/disable grid
 - Bug fixes:
   - Fixed AI generation bug when creating $ref objects: was referring to properties, not the object itself.
   - Fixed $ref editing in classes - was opening a blank editing panel, now corrected.

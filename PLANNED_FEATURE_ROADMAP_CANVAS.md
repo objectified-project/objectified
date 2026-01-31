@@ -101,8 +101,8 @@
 | #186   | Clicking a class in the sidebar focuses it on canvas |
 | #187   | Regex search support                                 |
 | #188   | Search within property names/descriptions            |
-| #194   | ✅ Search highlighting on canvas                     |
-| #195   | ✅ Focus mode - dim non-matching results             |
+| #194   | Search highlighting on canvas                        |
+| #195   | Focus mode - dim non-matching results                |
 | #196   | Search history with clear option                     |
 
 #### Node Visibility Controls 📋 PLANNED
