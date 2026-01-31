@@ -30,6 +30,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CodeIcon from '@mui/icons-material/Code';
 import Collapse from '@mui/material/Collapse';
+import Autocomplete from '@mui/material/Autocomplete';
 import {
   DndContext,
   closestCenter,
@@ -129,6 +130,21 @@ export interface PropertyFormData {
   // External Documentation
   externalDocsUrl?: string;
   externalDocsDescription?: string;
+
+  // XML Object (OpenAPI 3.1) - for XML serialization
+  xmlName?: string; // Replaces element/attribute name
+  xmlNamespace?: string; // URI of namespace definition
+  xmlPrefix?: string; // Prefix for the name
+  xmlAttribute?: boolean; // Property becomes XML attribute instead of element
+  xmlWrapped?: boolean; // For arrays: wrapped vs unwrapped serialization
+
+  // Content Media Type (OpenAPI 3.1) - for binary string properties
+  contentMediaType?: string; // Media type (e.g., application/octet-stream, image/png)
+  contentEncoding?: string; // Encoding (e.g., base64, base32)
+  contentSchema?: string; // JSON string of schema for decoded content
+
+  // Schema Metadata (JSON Schema 2020-12)
+  $comment?: string; // Internal comments for schema authors
 }
 
 interface SortableEnumItemProps {
@@ -368,6 +384,42 @@ export interface PropertyFormFieldsProps {
   // Available class names for schema references
   availableClasses?: string[];
 }
+
+// OpenAPI 3.1 format options by type
+const FORMAT_OPTIONS: Record<string, { value: string; label: string; description: string }[]> = {
+  string: [
+    { value: 'date', label: 'date', description: 'Full date (RFC 3339)' },
+    { value: 'date-time', label: 'date-time', description: 'Date and time (RFC 3339)' },
+    { value: 'time', label: 'time', description: 'Time only (RFC 3339)' },
+    { value: 'duration', label: 'duration', description: 'Duration (ISO 8601)' },
+    { value: 'email', label: 'email', description: 'Email address (RFC 5321)' },
+    { value: 'idn-email', label: 'idn-email', description: 'Internationalized email' },
+    { value: 'hostname', label: 'hostname', description: 'Internet hostname' },
+    { value: 'idn-hostname', label: 'idn-hostname', description: 'Internationalized hostname' },
+    { value: 'ipv4', label: 'ipv4', description: 'IPv4 address' },
+    { value: 'ipv6', label: 'ipv6', description: 'IPv6 address' },
+    { value: 'uri', label: 'uri', description: 'Uniform Resource Identifier' },
+    { value: 'uri-reference', label: 'uri-reference', description: 'URI or relative reference' },
+    { value: 'iri', label: 'iri', description: 'Internationalized URI' },
+    { value: 'iri-reference', label: 'iri-reference', description: 'IRI or relative reference' },
+    { value: 'uri-template', label: 'uri-template', description: 'URI Template (RFC 6570)' },
+    { value: 'uuid', label: 'uuid', description: 'UUID (RFC 4122)' },
+    { value: 'json-pointer', label: 'json-pointer', description: 'JSON Pointer (RFC 6901)' },
+    { value: 'relative-json-pointer', label: 'relative-json-pointer', description: 'Relative JSON Pointer' },
+    { value: 'regex', label: 'regex', description: 'Regular expression' },
+    { value: 'password', label: 'password', description: 'Password (UI hint to obscure)' },
+    { value: 'byte', label: 'byte', description: 'Base64-encoded binary' },
+    { value: 'binary', label: 'binary', description: 'Binary data (any octets)' },
+  ],
+  integer: [
+    { value: 'int32', label: 'int32', description: 'Signed 32-bit integer' },
+    { value: 'int64', label: 'int64', description: 'Signed 64-bit integer (long)' },
+  ],
+  number: [
+    { value: 'float', label: 'float', description: 'Single-precision float' },
+    { value: 'double', label: 'double', description: 'Double-precision float' },
+  ],
+};
 
 export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                                                         baseType,
@@ -1097,18 +1149,42 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             </Typography>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-              <TextField
-                label="Format"
+              <Autocomplete
+                freeSolo
                 size={size}
-                fullWidth
                 value={data.format || ''}
-                onChange={(e) => onChange('format', e.target.value)}
-                placeholder="date, email, uri, uuid..."
-                helperText="Standard format hint"
-                sx={{
-                  bgcolor: isDark ? '#0f172a' : 'white',
-                  '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                onChange={(_, newValue) => onChange('format', newValue || '')}
+                onInputChange={(_, newInputValue) => onChange('format', newInputValue)}
+                options={FORMAT_OPTIONS.string?.map(opt => opt.value) || []}
+                renderOption={(props, option) => {
+                  const formatOption = FORMAT_OPTIONS.string?.find(o => o.value === option);
+                  return (
+                    <li {...props} key={option}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                          {option}
+                        </Typography>
+                        {formatOption && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {formatOption.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    </li>
+                  );
                 }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Format"
+                    placeholder="Select or enter custom format..."
+                    helperText="Standard format hint (select or type custom)"
+                    sx={{
+                      bgcolor: isDark ? '#0f172a' : 'white',
+                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    }}
+                  />
+                )}
               />
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
@@ -1158,6 +1234,94 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             />
 
             <RegexTester pattern={data.pattern || ''} />
+
+            {/* Content Media Type Fields (for binary/byte strings) */}
+            {(data.format === 'binary' || data.format === 'byte') && (
+              <Box sx={{
+                mt: 2.5,
+                p: 2,
+                bgcolor: isDark ? '#0f172a' : '#fefce8',
+                borderRadius: 2,
+                border: isDark ? '1px solid #475569' : '1px solid #fde047',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#fde047' : '#854d0e', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box component="span" sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: '#eab308',
+                    }} />
+                    Binary Content Settings
+                  </Typography>
+                  <Typography variant="caption" sx={{
+                    px: 1,
+                    py: 0.25,
+                    bgcolor: 'rgba(234, 179, 8, 0.2)',
+                    color: '#ca8a04',
+                    borderRadius: 1,
+                    fontWeight: 600,
+                    fontSize: '0.65rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}>
+                    OpenAPI 3.1
+                  </Typography>
+                </Box>
+                <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#713f12', display: 'block', mb: 2 }}>
+                  Configure how binary content is interpreted and validated.
+                </Typography>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
+                  <TextField
+                    label="Content Media Type"
+                    size={size}
+                    fullWidth
+                    value={data.contentMediaType || ''}
+                    onChange={(e) => onChange('contentMediaType', e.target.value)}
+                    placeholder="e.g., image/png, application/pdf"
+                    helperText="MIME type of the binary content"
+                    sx={{
+                      bgcolor: isDark ? '#1e293b' : 'white',
+                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                      '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                    }}
+                  />
+                  <TextField
+                    label="Content Encoding"
+                    size={size}
+                    fullWidth
+                    value={data.contentEncoding || ''}
+                    onChange={(e) => onChange('contentEncoding', e.target.value)}
+                    placeholder="e.g., base64, base32"
+                    helperText="Encoding used for the content"
+                    sx={{
+                      bgcolor: isDark ? '#1e293b' : 'white',
+                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                      '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                    }}
+                  />
+                </Box>
+
+                <TextField
+                  label="Content Schema"
+                  size={size}
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={data.contentSchema || ''}
+                  onChange={(e) => onChange('contentSchema', e.target.value)}
+                  placeholder='{"type": "object", "properties": {...}}'
+                  helperText="JSON Schema for the decoded content (optional)"
+                  sx={{
+                    bgcolor: isDark ? '#1e293b' : 'white',
+                    '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.8rem' },
+                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+                  }}
+                />
+              </Box>
+            )}
           </Box>
         )}
 
@@ -1181,6 +1345,47 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               Numeric Constraints
               {isArray && <Typography component="span" variant="caption" sx={{ color: '#64748b', ml: 1 }}>(per item)</Typography>}
             </Typography>
+
+            {/* Numeric Format */}
+            <Box sx={{ mb: 2.5 }}>
+              <Autocomplete
+                freeSolo
+                size={size}
+                value={data.format || ''}
+                onChange={(_, newValue) => onChange('format', newValue || '')}
+                onInputChange={(_, newInputValue) => onChange('format', newInputValue)}
+                options={FORMAT_OPTIONS[baseType]?.map(opt => opt.value) || []}
+                renderOption={(props, option) => {
+                  const formatOption = FORMAT_OPTIONS[baseType]?.find(o => o.value === option);
+                  return (
+                    <li {...props} key={option}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                          {option}
+                        </Typography>
+                        {formatOption && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {formatOption.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    </li>
+                  );
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Format"
+                    placeholder={baseType === 'integer' ? 'int32, int64' : 'float, double'}
+                    helperText={`Numeric format hint (${baseType === 'integer' ? 'int32 = 32-bit, int64 = 64-bit' : 'float = single, double = double precision'})`}
+                    sx={{
+                      bgcolor: isDark ? '#0f172a' : 'white',
+                      '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                    }}
+                  />
+                )}
+              />
+            </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
               {/* Minimum */}
@@ -2879,6 +3084,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       baseType === 'number' ? '3.14' : 'value'
                 }
                 disabled={!!data.enum && data.enum.length > 0}
+                helperText={data.enum && data.enum.length > 0 ? 'Cannot use const when enum values are defined (mutually exclusive)' : 'Mutually exclusive with enum values'}
                 sx={{
                   '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace' },
                   '& .MuiOutlinedInput-root': { borderRadius: 2 },
@@ -3148,6 +3354,225 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
           </Box>
+        </Box>
+
+        {/* XML Object (OpenAPI 3.1) */}
+        <Box sx={{
+          mt: 3,
+          p: 2.5,
+          bgcolor: isDark ? '#0f172a' : 'white',
+          borderRadius: 2.5,
+          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            mb: 2,
+            pb: 1.5,
+            borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
+          }}>
+            <Box sx={{
+              p: 0.75,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(234, 88, 12, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <CodeIcon sx={{ color: '#ea580c', fontSize: 16 }} />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                XML Representation
+              </Typography>
+              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                Control XML serialization for this property
+              </Typography>
+            </Box>
+            <Typography variant="caption" sx={{
+              px: 1,
+              py: 0.25,
+              bgcolor: 'rgba(234, 88, 12, 0.1)',
+              color: '#ea580c',
+              borderRadius: 1,
+              fontWeight: 600,
+              fontSize: '0.65rem',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}>
+              OpenAPI 3.1
+            </Typography>
+          </Box>
+
+          <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', display: 'block', mb: 2 }}>
+            Configure how this property is represented when serialized to XML format. These settings are useful for APIs that support both JSON and XML content types.
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2, mb: 2 }}>
+            <TextField
+              label="XML Name"
+              size={size}
+              fullWidth
+              value={data.xmlName || ''}
+              onChange={(e) => onChange('xmlName', e.target.value)}
+              placeholder="e.g., customName"
+              helperText="Replaces element/attribute name"
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+              }}
+            />
+            <TextField
+              label="Namespace"
+              size={size}
+              fullWidth
+              value={data.xmlNamespace || ''}
+              onChange={(e) => onChange('xmlNamespace', e.target.value)}
+              placeholder="e.g., http://example.com/ns"
+              helperText="URI of namespace"
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+              }}
+            />
+            <TextField
+              label="Prefix"
+              size={size}
+              fullWidth
+              value={data.xmlPrefix || ''}
+              onChange={(e) => onChange('xmlPrefix', e.target.value)}
+              placeholder="e.g., ns1"
+              helperText="Prefix for the name"
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+              }}
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.xmlAttribute || false}
+                  onChange={(e) => onChange('xmlAttribute', e.target.checked)}
+                  size="small"
+                  sx={{ '&.Mui-checked': { color: '#ea580c' } }}
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2" sx={{ color: isDark ? '#e2e8f0' : '#334155' }}>
+                    Attribute
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Render as XML attribute instead of element
+                  </Typography>
+                </Box>
+              }
+              sx={{ m: 0, alignItems: 'flex-start' }}
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={data.xmlWrapped || false}
+                  onChange={(e) => onChange('xmlWrapped', e.target.checked)}
+                  size="small"
+                  disabled={!isArray}
+                  sx={{ '&.Mui-checked': { color: '#ea580c' } }}
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body2" sx={{ color: isDark ? '#e2e8f0' : '#334155', opacity: isArray ? 1 : 0.5 }}>
+                    Wrapped
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', opacity: isArray ? 1 : 0.5 }}>
+                    Wrap array items in container element {!isArray && '(arrays only)'}
+                  </Typography>
+                </Box>
+              }
+              sx={{ m: 0, alignItems: 'flex-start' }}
+            />
+          </Box>
+
+          {(data.xmlName || data.xmlNamespace || data.xmlPrefix || data.xmlAttribute || data.xmlWrapped) && (
+            <Box sx={{
+              mt: 2,
+              p: 1.5,
+              bgcolor: 'rgba(234, 88, 12, 0.06)',
+              borderRadius: 1.5,
+              border: '1px solid rgba(234, 88, 12, 0.2)',
+            }}>
+              <Typography variant="caption" sx={{ color: '#ea580c', fontFamily: '"JetBrains Mono", monospace', display: 'block' }}>
+                XML Output Preview:
+              </Typography>
+              <Typography variant="caption" sx={{ color: isDark ? '#e2e8f0' : '#334155', fontFamily: '"JetBrains Mono", monospace', display: 'block', mt: 0.5 }}>
+                {data.xmlAttribute
+                  ? `<parent ${data.xmlPrefix ? `${data.xmlPrefix}:` : ''}${data.xmlName || 'propertyName'}="value" />`
+                  : data.xmlWrapped && isArray
+                    ? `<${data.xmlPrefix ? `${data.xmlPrefix}:` : ''}${data.xmlName || 'propertyName'}><item>...</item></${data.xmlPrefix ? `${data.xmlPrefix}:` : ''}${data.xmlName || 'propertyName'}>`
+                    : `<${data.xmlPrefix ? `${data.xmlPrefix}:` : ''}${data.xmlName || 'propertyName'}${data.xmlNamespace ? ` xmlns="${data.xmlNamespace}"` : ''}>value</${data.xmlPrefix ? `${data.xmlPrefix}:` : ''}${data.xmlName || 'propertyName'}>`
+                }
+              </Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Schema Metadata (JSON Schema 2020-12) */}
+        <Box sx={{
+          mt: 3,
+          p: 2.5,
+          bgcolor: isDark ? '#0f172a' : 'white',
+          borderRadius: 2.5,
+          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            mb: 2,
+            pb: 1.5,
+            borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
+          }}>
+            <Box sx={{
+              p: 0.75,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(99, 102, 241, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <InfoOutlinedIcon sx={{ color: '#6366f1', fontSize: 16 }} />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
+                Schema Comment
+              </Typography>
+              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                Internal notes for schema authors
+              </Typography>
+            </Box>
+          </Box>
+
+          <TextField
+            label="$comment"
+            size={size}
+            fullWidth
+            multiline
+            rows={2}
+            value={data.$comment || ''}
+            onChange={(e) => onChange('$comment', e.target.value)}
+            placeholder="Internal notes about this property (not for end users)"
+            helperText="JSON Schema $comment - visible only to schema authors, not API consumers"
+            sx={{
+              '& .MuiOutlinedInput-root': { borderRadius: 2 },
+              '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
+            }}
+          />
         </Box>
 
         {/* Extensions */}

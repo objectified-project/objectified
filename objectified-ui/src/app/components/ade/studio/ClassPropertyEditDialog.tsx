@@ -290,6 +290,21 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
       // External Documentation
       externalDocsUrl: propData.externalDocs?.url || '',
       externalDocsDescription: propData.externalDocs?.description || '',
+
+      // XML Object (OpenAPI 3.1)
+      xmlName: propData.xml?.name || '',
+      xmlNamespace: propData.xml?.namespace || '',
+      xmlPrefix: propData.xml?.prefix || '',
+      xmlAttribute: propData.xml?.attribute || false,
+      xmlWrapped: propData.xml?.wrapped || false,
+
+      // Content Media Type (for binary/byte strings)
+      contentMediaType: propData.contentMediaType || '',
+      contentEncoding: propData.contentEncoding || '',
+      contentSchema: propData.contentSchema ? JSON.stringify(propData.contentSchema, null, 2) : '',
+
+      // Schema Metadata
+      $comment: propData.$comment || '',
     });
 
     // Initialize reference-specific fields
@@ -751,6 +766,47 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
         updatedData.items = targetSchema;
         // Ensure additionalProperties isn't left on the array level
         delete updatedData.additionalProperties;
+      }
+
+      // Handle XML Object (OpenAPI 3.1)
+      const hasXml = formData.xmlName || formData.xmlNamespace || formData.xmlPrefix || formData.xmlAttribute || formData.xmlWrapped;
+      if (hasXml) {
+        updatedData.xml = {};
+        if (formData.xmlName) updatedData.xml.name = formData.xmlName;
+        if (formData.xmlNamespace) updatedData.xml.namespace = formData.xmlNamespace;
+        if (formData.xmlPrefix) updatedData.xml.prefix = formData.xmlPrefix;
+        if (formData.xmlAttribute) updatedData.xml.attribute = formData.xmlAttribute;
+        if (formData.xmlWrapped) updatedData.xml.wrapped = formData.xmlWrapped;
+      } else {
+        delete updatedData.xml;
+      }
+
+      // Handle Content Media Type fields (for binary/byte strings)
+      if (formData.contentMediaType) {
+        updatedData.contentMediaType = formData.contentMediaType;
+      } else {
+        delete updatedData.contentMediaType;
+      }
+      if (formData.contentEncoding) {
+        updatedData.contentEncoding = formData.contentEncoding;
+      } else {
+        delete updatedData.contentEncoding;
+      }
+      if (formData.contentSchema && formData.contentSchema.trim()) {
+        try {
+          updatedData.contentSchema = JSON.parse(formData.contentSchema);
+        } catch (e) {
+          updatedData.contentSchema = { type: formData.contentSchema };
+        }
+      } else {
+        delete updatedData.contentSchema;
+      }
+
+      // Handle $comment (JSON Schema 2020-12)
+      if (formData.$comment) {
+        updatedData.$comment = formData.$comment;
+      } else {
+        delete updatedData.$comment;
       }
 
       // Handle extensions (x- prefixed properties)

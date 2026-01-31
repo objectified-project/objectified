@@ -13,6 +13,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Added ability to switch connection types for edges in the canvas
   - Added background configurations to the canvas
   - Added ability to enable/disable grid
+- OpenAPI Support:
+  - Now at 100% support for class and properties definitions
 - Bug fixes:
   - Fixed AI generation bug when creating $ref objects: was referring to properties, not the object itself.
   - Fixed $ref editing in classes - was opening a blank editing panel, now corrected.

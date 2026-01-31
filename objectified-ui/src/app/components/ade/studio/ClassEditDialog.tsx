@@ -211,6 +211,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     externalDocsUrl: '',
     externalDocsDescription: '',
     conditionalRules: [] as ConditionalRule[],
+    // Object constraints (OpenAPI 3.1)
+    minProperties: '',
+    maxProperties: '',
+    examples: [] as string[], // JSON Schema examples at class level
+    // XML Object (OpenAPI 3.1) - class-level defaults
+    xmlName: '',
+    xmlNamespace: '',
+    xmlPrefix: '',
+    // Schema metadata (JSON Schema 2020-12)
+    schemaId: '', // $id
+    schemaAnchor: '', // $anchor
+    schemaComment: '', // $comment
     error: ''
   });
 
@@ -376,6 +388,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               externalDocsUrl: schema.externalDocs?.url || '',
               externalDocsDescription: schema.externalDocs?.description || '',
               conditionalRules,
+              // Object constraints
+              minProperties: schema.minProperties?.toString() || '',
+              maxProperties: schema.maxProperties?.toString() || '',
+              examples: schema.examples ? schema.examples.map((ex: any) => JSON.stringify(ex)) : [],
+              // XML Object
+              xmlName: schema.xml?.name || '',
+              xmlNamespace: schema.xml?.namespace || '',
+              xmlPrefix: schema.xml?.prefix || '',
+              // Schema metadata
+              schemaId: schema.$id || '',
+              schemaAnchor: schema.$anchor || '',
+              schemaComment: schema.$comment || '',
               error: ''
             });
           } catch (error) {
@@ -474,6 +498,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               externalDocsUrl: schema.externalDocs?.url || '',
               externalDocsDescription: schema.externalDocs?.description || '',
               conditionalRules,
+              // Object constraints
+              minProperties: schema.minProperties?.toString() || '',
+              maxProperties: schema.maxProperties?.toString() || '',
+              examples: schema.examples ? schema.examples.map((ex: any) => JSON.stringify(ex)) : [],
+              // XML Object
+              xmlName: schema.xml?.name || '',
+              xmlNamespace: schema.xml?.namespace || '',
+              xmlPrefix: schema.xml?.prefix || '',
+              // Schema metadata
+              schemaId: schema.$id || '',
+              schemaAnchor: schema.$anchor || '',
+              schemaComment: schema.$comment || '',
               error: ''
             });
           }
@@ -509,6 +545,18 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           externalDocsUrl: '',
           externalDocsDescription: '',
           conditionalRules: [],
+          // Object constraints
+          minProperties: '',
+          maxProperties: '',
+          examples: [],
+          // XML Object
+          xmlName: '',
+          xmlNamespace: '',
+          xmlPrefix: '',
+          // Schema metadata
+          schemaId: '',
+          schemaAnchor: '',
+          schemaComment: '',
           error: ''
         });
       }
@@ -612,6 +660,51 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       if (formData.deprecationMessage.trim()) {
         schema.deprecationMessage = formData.deprecationMessage.trim();
       }
+    }
+
+    // Add object constraints (OpenAPI 3.1)
+    if (formData.minProperties.trim()) {
+      const val = parseInt(formData.minProperties.trim(), 10);
+      if (!isNaN(val) && val >= 0) {
+        schema.minProperties = val;
+      }
+    }
+    if (formData.maxProperties.trim()) {
+      const val = parseInt(formData.maxProperties.trim(), 10);
+      if (!isNaN(val) && val >= 0) {
+        schema.maxProperties = val;
+      }
+    }
+
+    // Add examples array (JSON Schema)
+    if (formData.examples.length > 0) {
+      schema.examples = formData.examples.map((ex: string) => {
+        try {
+          return JSON.parse(ex);
+        } catch {
+          return ex;
+        }
+      });
+    }
+
+    // Add XML Object (OpenAPI 3.1)
+    const hasXml = formData.xmlName.trim() || formData.xmlNamespace.trim() || formData.xmlPrefix.trim();
+    if (hasXml) {
+      schema.xml = {};
+      if (formData.xmlName.trim()) schema.xml.name = formData.xmlName.trim();
+      if (formData.xmlNamespace.trim()) schema.xml.namespace = formData.xmlNamespace.trim();
+      if (formData.xmlPrefix.trim()) schema.xml.prefix = formData.xmlPrefix.trim();
+    }
+
+    // Add schema metadata (JSON Schema 2020-12)
+    if (formData.schemaId.trim()) {
+      schema.$id = formData.schemaId.trim();
+    }
+    if (formData.schemaAnchor.trim()) {
+      schema.$anchor = formData.schemaAnchor.trim();
+    }
+    if (formData.schemaComment.trim()) {
+      schema.$comment = formData.schemaComment.trim();
     }
 
     // Add externalDocs if URL is provided
@@ -2039,6 +2132,177 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 </div>
 
                 <div className="space-y-4">
+                  {/* Object Constraints */}
+                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Settings size={16} className="text-indigo-500" />
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Object Constraints</h4>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">OpenAPI 3.1</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label>Min Properties</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={formData.minProperties}
+                          onChange={(e) => setFormData(prev => ({ ...prev, minProperties: e.target.value }))}
+                          placeholder="e.g., 1"
+                          disabled={isReadOnly}
+                        />
+                        <p className="text-xs text-gray-500">Minimum number of properties required</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Max Properties</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={formData.maxProperties}
+                          onChange={(e) => setFormData(prev => ({ ...prev, maxProperties: e.target.value }))}
+                          placeholder="e.g., 10"
+                          disabled={isReadOnly}
+                        />
+                        <p className="text-xs text-gray-500">Maximum number of properties allowed</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Class Examples */}
+                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Code size={16} className="text-indigo-500" />
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Examples</h4>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">JSON Schema</Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">Add example instances of this class schema (JSON format)</p>
+                    <div className="space-y-2">
+                      {formData.examples.map((example, index) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={example}
+                            onChange={(e) => {
+                              const newExamples = [...formData.examples];
+                              newExamples[index] = e.target.value;
+                              setFormData(prev => ({ ...prev, examples: newExamples }));
+                            }}
+                            placeholder='{"id": 1, "name": "Example"}'
+                            disabled={isReadOnly}
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              const newExamples = formData.examples.filter((_, i) => i !== index);
+                              setFormData(prev => ({ ...prev, examples: newExamples }));
+                            }}
+                            disabled={isReadOnly}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFormData(prev => ({ ...prev, examples: [...prev.examples, ''] }))}
+                        disabled={isReadOnly}
+                      >
+                        <Plus size={16} className="mr-1" /> Add Example
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* XML Object */}
+                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-orange-200 dark:border-orange-900">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Code size={16} className="text-orange-500" />
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">XML Representation</h4>
+                      </div>
+                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">OpenAPI 3.1</Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">Configure how this class is serialized to XML format</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label>XML Name</Label>
+                        <Input
+                          value={formData.xmlName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, xmlName: e.target.value }))}
+                          placeholder="e.g., CustomName"
+                          disabled={isReadOnly}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Namespace</Label>
+                        <Input
+                          value={formData.xmlNamespace}
+                          onChange={(e) => setFormData(prev => ({ ...prev, xmlNamespace: e.target.value }))}
+                          placeholder="http://example.com/ns"
+                          disabled={isReadOnly}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Prefix</Label>
+                        <Input
+                          value={formData.xmlPrefix}
+                          onChange={(e) => setFormData(prev => ({ ...prev, xmlPrefix: e.target.value }))}
+                          placeholder="e.g., ns1"
+                          disabled={isReadOnly}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Schema Metadata */}
+                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-indigo-500" />
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Schema Metadata</h4>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">JSON Schema 2020-12</Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">Advanced schema identification and documentation</p>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label>$id</Label>
+                        <Input
+                          value={formData.schemaId}
+                          onChange={(e) => setFormData(prev => ({ ...prev, schemaId: e.target.value }))}
+                          placeholder="https://example.com/schemas/myschema.json"
+                          disabled={isReadOnly}
+                        />
+                        <p className="text-xs text-gray-500">Unique identifier URI for this schema</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>$anchor</Label>
+                        <Input
+                          value={formData.schemaAnchor}
+                          onChange={(e) => setFormData(prev => ({ ...prev, schemaAnchor: e.target.value }))}
+                          placeholder="e.g., myAnchor"
+                          disabled={isReadOnly}
+                        />
+                        <p className="text-xs text-gray-500">Define a reusable anchor within the schema</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>$comment</Label>
+                        <Textarea
+                          value={formData.schemaComment}
+                          onChange={(e) => setFormData(prev => ({ ...prev, schemaComment: e.target.value }))}
+                          placeholder="Internal notes for schema authors..."
+                          disabled={isReadOnly}
+                          rows={2}
+                        />
+                        <p className="text-xs text-gray-500">Comments for schema authors (not shown to API consumers)</p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* External Documentation */}
                   <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-3">
