@@ -1673,7 +1673,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                             const classId = schemaData.id || schemaData.classId;
                             if (classId) {
                               // Update content to have class_id first
-                              await updateRequestBodyContentType(contentParsed.content.id, classId, undefined);
+                              await updateRequestBodyContentType(contentParsed.content.id, { classId });
                               // Then convert to inline schema
                               await convertClassToInlineSchema(contentParsed.content.id);
                             }
