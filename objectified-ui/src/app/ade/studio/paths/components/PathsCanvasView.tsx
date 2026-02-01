@@ -69,6 +69,8 @@ import {
   addPropertyToInlineSchema,
   updateInlineSchemaProperty,
   deleteInlineSchemaProperty,
+  convertClassToInlineSchema,
+  updateRequestBodyContentType,
 } from '../../../../../../lib/db/helper-shared-path-request-bodies';
 import {
   getResponseContentTypes,
@@ -1578,21 +1580,108 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
             parameters: operationParamsMap.get(op.id) || [],
             onDelete: () => handleDeleteOperation(op.id, op.operation),
             onSchemaDrop: async (operationId: string, schemaType: 'request' | 'response', schemaData: any) => {
-              // Handle schema drop - this will be handled by opening the properties panel
-              // For now, we'll select the operation to open the properties panel
-              onOperationSelect({
-                id: operationId,
-                operation: op.operation,
-              });
-              
-              // Show alert to guide user to properties panel
-              await alertDialog({
-                title: 'Schema Added',
-                message: schemaType === 'request' 
-                  ? 'Please configure the request body schema in the Operation Details panel.'
-                  : 'Please configure the response schema in the Response Properties panel.',
-                variant: 'info',
-              });
+              // Handle class drops with dialog for copy vs reference
+              if (schemaData.type === 'class') {
+                handleShowClassDropDialog(
+                  { className: schemaData.name || schemaData.className || 'class', classId: schemaData.id || schemaData.classId },
+                  async (action: 'copy' | 'reference') => {
+                    if (schemaType === 'request') {
+                      // Handle request body creation with class
+                      try {
+                        // Create request body with a default name
+                        const rbResult = await createSharedPathRequestBody(
+                          selectedPathId!,
+                          `${op.operation} Request Body`
+                        );
+                        const rbParsed = JSON.parse(rbResult);
+                        if (rbParsed.success && rbParsed.requestBody) {
+                          const rbId = rbParsed.requestBody.id;
+                          
+                          // Add content type with class reference or copy
+                          const contentResult = await addRequestBodyContentType(
+                            rbId,
+                            'application/json',
+                            action === 'reference' ? schemaData.id || schemaData.classId : undefined,
+                            action === 'copy' ? { type: 'object', properties: [] } : undefined
+                          );
+                          const contentParsed = JSON.parse(contentResult);
+                          
+                          if (action === 'copy' && contentParsed.success && contentParsed.content) {
+                            // For copy: first set class_id, then convert to inline schema
+                            const classId = schemaData.id || schemaData.classId;
+                            if (classId) {
+                              // Update content to have class_id first
+                              await updateRequestBodyContentType(contentParsed.content.id, classId, undefined);
+                              // Then convert to inline schema
+                              await convertClassToInlineSchema(contentParsed.content.id);
+                            }
+                          }
+                          
+                          // Link request body to operation
+                          await linkRequestBodyToOperation(operationId, rbId);
+                          
+                          if (onRefresh) onRefresh();
+                        }
+                      } catch (error) {
+                        console.error('Error creating request body:', error);
+                        await alertDialog({
+                          title: 'Error',
+                          message: 'Failed to create request body with schema',
+                          variant: 'error',
+                        });
+                      }
+                    } else {
+                      // Handle response creation with class
+                      try {
+                        // Find or create 200 response for this operation
+                        const responsesResult = await getLinkedResponsesForOperation(operationId);
+                        const responsesParsed = JSON.parse(responsesResult);
+                        
+                        if (responsesParsed.success && responsesParsed.responses && responsesParsed.responses.length > 0) {
+                          // Update existing response
+                          const response = responsesParsed.responses[0];
+                          const contentResult = await addResponseContentType(
+                            response.id,
+                            'application/json',
+                            action === 'reference' ? schemaData.id || schemaData.classId : undefined,
+                            action === 'copy' ? { type: 'object', properties: [] } : undefined
+                          );
+                          const contentParsed = JSON.parse(contentResult);
+                          
+                          if (action === 'copy' && contentParsed.success && contentParsed.content) {
+                            const classId = schemaData.id || schemaData.classId;
+                            if (classId) {
+                              await copyClassPropertiesToContentType(contentParsed.content.id, classId);
+                            }
+                          }
+                        }
+                        
+                        if (onRefresh) onRefresh();
+                      } catch (error) {
+                        console.error('Error adding class to response:', error);
+                        await alertDialog({
+                          title: 'Error',
+                          message: 'Failed to add class to response',
+                          variant: 'error',
+                        });
+                      }
+                    }
+                  }
+                );
+              } else if (schemaData.type === 'property') {
+                // Handle property drop - open properties panel
+                onOperationSelect({
+                  id: operationId,
+                  operation: op.operation,
+                });
+                await alertDialog({
+                  title: 'Property Added',
+                  message: schemaType === 'request' 
+                    ? 'Please configure the request body property in the Operation Details panel.'
+                    : 'Please configure the response property in the Response Properties panel.',
+                  variant: 'info',
+                });
+              }
             },
           },
           };

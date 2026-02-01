@@ -16,6 +16,7 @@ from .classes_routes import router as classes_router
 from .projects_routes import router as projects_router
 from .versions_routes import router as versions_router
 from .properties_routes import router as properties_router
+from .paths_routes import router as paths_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -42,6 +43,7 @@ app.include_router(classes_router)
 app.include_router(projects_router)
 app.include_router(versions_router)
 app.include_router(properties_router)
+app.include_router(paths_router)
 
 
 @app.on_event("startup")
@@ -119,6 +121,18 @@ async def root():
                 "update": "PUT /v1/primitives/{tenant-slug}/{primitive-id}",
                 "delete": "DELETE /v1/primitives/{tenant-slug}/{primitive-id}",
                 "import": "POST /v1/primitives/{tenant-slug}/import"
+            },
+            "paths": {
+                "list": "/v1/paths/{tenant-slug}/{version-id}",
+                "get": "/v1/paths/{tenant-slug}/{version-id}/{path-id}",
+                "get_full": "/v1/paths/{tenant-slug}/{version-id}/{path-id}/full",
+                "create": "POST /v1/paths/{tenant-slug}/{version-id}",
+                "update": "PUT /v1/paths/{tenant-slug}/{version-id}/{path-id}",
+                "delete": "DELETE /v1/paths/{tenant-slug}/{version-id}/{path-id}",
+                "operations": "/v1/paths/{tenant-slug}/{version-id}/{path-id}/operations",
+                "parameters": "/v1/paths/{tenant-slug}/{version-id}/{path-id}/parameters",
+                "request_bodies": "/v1/paths/{tenant-slug}/{version-id}/{path-id}/request-bodies",
+                "responses": "/v1/paths/{tenant-slug}/{version-id}/{path-id}/responses"
             }
         }
     }

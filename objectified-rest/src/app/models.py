@@ -299,3 +299,214 @@ class ProjectPropertyUpdateRequest(BaseModel):
         from_attributes = True
 
 
+# ==================== Path Models ====================
+
+class PathSchema(BaseModel):
+    """Pydantic model for a path."""
+    id: str
+    version_id: str
+    pathname: str
+    metadata: Optional[Dict[str, Any]] = None
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PathCreateRequest(BaseModel):
+    """Request model for creating a path."""
+    pathname: str
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PathUpdateRequest(BaseModel):
+    """Request model for updating a path."""
+    pathname: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OperationSchema(BaseModel):
+    """Pydantic model for a path operation."""
+    id: str
+    version_path_id: str
+    operation: str
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OperationCreateRequest(BaseModel):
+    """Request model for creating an operation."""
+    operation: str  # GET, POST, PUT, PATCH, DELETE, etc.
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OperationUpdateRequest(BaseModel):
+    """Request model for updating an operation."""
+    operation: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OperationDescriptionSchema(BaseModel):
+    """Pydantic model for operation description."""
+    id: str
+    path_operation_id: str
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    operation_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OperationDescriptionRequest(BaseModel):
+    """Request model for operation description."""
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    operation_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None  # Contains tags, deprecated, externalDocs
+
+    class Config:
+        from_attributes = True
+
+
+class SharedParameterSchema(BaseModel):
+    """Pydantic model for a shared path parameter."""
+    id: str
+    version_path_id: str
+    name: str
+    in_location: str  # path, query, header, cookie
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SharedParameterCreateRequest(BaseModel):
+    """Request model for creating a shared parameter."""
+    name: str
+    in_location: str  # path, query, header, cookie
+    summary: Optional[str] = None
+    description: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SharedRequestBodySchema(BaseModel):
+    """Pydantic model for a shared request body."""
+    id: str
+    version_path_id: str
+    name: str
+    description: Optional[str] = None
+    required: bool = True
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SharedRequestBodyCreateRequest(BaseModel):
+    """Request model for creating a shared request body."""
+    name: str
+    description: Optional[str] = None
+    required: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class RequestBodyContentTypeRequest(BaseModel):
+    """Request model for adding a content type to a request body."""
+    media_type: str  # e.g., application/json
+    class_id: Optional[str] = None  # Reference to existing class
+    inline_schema: Optional[Dict[str, Any]] = None  # Or inline schema
+    encoding: Optional[Dict[str, Any]] = None
+    examples: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SharedResponseSchema(BaseModel):
+    """Pydantic model for a shared response."""
+    id: str
+    version_path_id: str
+    status_code: str
+    description: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+    class_id: Optional[str] = None
+    inline_schema: Optional[Dict[str, Any]] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SharedResponseCreateRequest(BaseModel):
+    """Request model for creating a shared response."""
+    status_code: str
+    description: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+    class_id: Optional[str] = None
+    inline_schema: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ResponseContentTypeRequest(BaseModel):
+    """Request model for adding a content type to a response."""
+    media_type: str
+    class_id: Optional[str] = None
+    inline_schema: Optional[Dict[str, Any]] = None
+    examples: Optional[List[Dict[str, Any]]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LinkOperationRequest(BaseModel):
+    """Request model for linking entities to operations."""
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CopyClassToInlineSchemaRequest(BaseModel):
+    """Request model for copying class properties to inline schema."""
+    class_id: str
+
+    class Config:
+        from_attributes = True
+
+

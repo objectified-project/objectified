@@ -15,12 +15,12 @@ import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
 import {
-  getPathsForVersion,
-  createPath,
-  updatePath,
-  deletePath,
-} from '../../../../../../lib/db/helper-paths';
-import { createOperation } from '../../../../../../lib/db/helper-path-operations';
+  getPathsForVersion as getPathsForVersionRest,
+  createPath as createPathRest,
+  updatePath as updatePathRest,
+  deletePath as deletePathRest,
+  createOperation as createOperationRest,
+} from '../../../../../../lib/api/paths-client';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 
 interface ClassItem {
@@ -93,9 +93,12 @@ export default function PathsSidebar({
     const loadPaths = async () => {
       setIsLoading(true);
       try {
-        const pathsResponse = await getPathsForVersion(selectedVersionId);
-        const pathsData: PathItem[] = JSON.parse(pathsResponse);
-        setPaths(pathsData);
+        const result = await getPathsForVersionRest(selectedVersionId);
+        if (result.success && result.data) {
+          setPaths(result.data as PathItem[]);
+        } else {
+          console.error('Error loading paths:', result.error);
+        }
       } catch (error) {
         console.error('Error loading paths:', error);
       } finally {
@@ -214,27 +217,35 @@ export default function PathsSidebar({
     try {
       if (editingPath) {
         // Update existing path
-        const result = await updatePath(editingPath.id, pathNameInput.trim());
-        const updatedPath: PathItem = JSON.parse(result);
-        setPaths(prevPaths =>
-          prevPaths.map(p => p.id === updatedPath.id ? updatedPath : p)
-        );
+        const result = await updatePathRest(selectedVersionId, editingPath.id, { pathname: pathNameInput.trim() });
+        if (result.success && result.data) {
+          const updatedPath = result.data as PathItem;
+          setPaths(prevPaths =>
+            prevPaths.map(p => p.id === updatedPath.id ? updatedPath : p)
+          );
+        } else {
+          throw new Error(result.error || 'Failed to update path');
+        }
       } else {
         // Create new path
-        const result = await createPath(selectedVersionId, pathNameInput.trim());
-        const newPath: PathItem = JSON.parse(result);
-        setPaths(prevPaths => [...prevPaths, newPath].sort((a, b) => a.pathname.localeCompare(b.pathname)));
+        const result = await createPathRest(selectedVersionId, pathNameInput.trim());
+        if (result.success && result.data) {
+          const newPath = result.data as PathItem;
+          setPaths(prevPaths => [...prevPaths, newPath].sort((a, b) => a.pathname.localeCompare(b.pathname)));
 
-        // Auto-create CRUD operations if checkbox is selected
-        if (autoCreateCrud) {
-          const crudOperations = ['GET', 'POST', 'PUT', 'DELETE'];
-          for (const operation of crudOperations) {
-            try {
-              await createOperation(newPath.id, operation, undefined, newPath.pathname);
-            } catch (opError) {
-              console.error(`Error creating ${operation} operation:`, opError);
+          // Auto-create CRUD operations if checkbox is selected
+          if (autoCreateCrud) {
+            const crudOperations = ['GET', 'POST', 'PUT', 'DELETE'];
+            for (const operation of crudOperations) {
+              try {
+                await createOperationRest(selectedVersionId, newPath.id, operation);
+              } catch (opError) {
+                console.error(`Error creating ${operation} operation:`, opError);
+              }
             }
           }
+        } else {
+          throw new Error(result.error || 'Failed to create path');
         }
       }
       setPathDialogOpen(false);
@@ -249,6 +260,8 @@ export default function PathsSidebar({
 
   // Handle deleting a path
   const handleDeletePath = async (path: PathItem) => {
+    if (!selectedVersionId) return;
+
     const confirmed = await confirmDialog({
       title: 'Delete Path',
       message: `Deleting a path will also delete all of the associated actions and all of the associated schemas for responses and requests. Are you sure you want to delete "${path.pathname}"?`,
@@ -260,8 +273,12 @@ export default function PathsSidebar({
     if (!confirmed) return;
 
     try {
-      await deletePath(path.id);
-      setPaths(prevPaths => prevPaths.filter(p => p.id !== path.id));
+      const result = await deletePathRest(selectedVersionId, path.id);
+      if (result.success) {
+        setPaths(prevPaths => prevPaths.filter(p => p.id !== path.id));
+      } else {
+        throw new Error(result.error || 'Failed to delete path');
+      }
     } catch (error) {
       console.error('Error deleting path:', error);
       alert('Error deleting path. Please try again.');

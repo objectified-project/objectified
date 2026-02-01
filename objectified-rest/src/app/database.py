@@ -1548,6 +1548,702 @@ class Database:
             conn.rollback()
             raise e
 
+    # ==================== Path CRUD Operations ====================
+
+    def get_path_by_id(self, path_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific path by ID, ensuring it belongs to the tenant."""
+        query = """
+            SELECT vp.id, vp.version_id, vp.pathname, vp.metadata,
+                   vp.created_at, vp.updated_at
+            FROM odb.version_path vp
+            JOIN odb.versions v ON vp.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE vp.id = %s AND p.tenant_id = %s
+        """
+        results = self.execute_query(query, (path_id, tenant_id))
+        return results[0] if results else None
+
+    def get_paths_for_version_with_tenant(self, version_id: str, tenant_id: str) -> List[Dict[str, Any]]:
+        """Get all paths for a version, ensuring it belongs to the tenant."""
+        query = """
+            SELECT vp.id, vp.version_id, vp.pathname, vp.metadata,
+                   vp.metadata->>'summary' as summary,
+                   vp.metadata->>'description' as description,
+                   vp.created_at, vp.updated_at
+            FROM odb.version_path vp
+            JOIN odb.versions v ON vp.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE vp.version_id = %s AND p.tenant_id = %s
+            ORDER BY vp.pathname
+        """
+        return self.execute_query(query, (version_id, tenant_id))
+
+    def create_path(
+        self,
+        version_id: str,
+        pathname: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a new path for a version."""
+        query = """
+            INSERT INTO odb.version_path (version_id, pathname, metadata)
+            VALUES (%s, %s, %s)
+            RETURNING id, version_id, pathname, metadata, created_at, updated_at
+        """
+        metadata_json = json.dumps(metadata) if metadata else '{}'
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (version_id, pathname, metadata_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_path(
+        self,
+        path_id: str,
+        tenant_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update a path, ensuring it belongs to the tenant."""
+        # Verify path belongs to tenant
+        existing = self.get_path_by_id(path_id, tenant_id)
+        if not existing:
+            return None
+
+        update_fields = []
+        params = []
+
+        if 'pathname' in updates and updates['pathname'] is not None:
+            update_fields.append("pathname = %s")
+            params.append(updates['pathname'])
+        if 'metadata' in updates:
+            update_fields.append("metadata = %s")
+            params.append(json.dumps(updates['metadata']) if updates['metadata'] else '{}')
+
+        if not update_fields:
+            return existing
+
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(path_id)
+
+        query = f"""
+            UPDATE odb.version_path
+            SET {', '.join(update_fields)}
+            WHERE id = %s
+            RETURNING id, version_id, pathname, metadata, created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_path(self, path_id: str, tenant_id: str) -> bool:
+        """Delete a path, ensuring it belongs to the tenant."""
+        # Verify path belongs to tenant
+        existing = self.get_path_by_id(path_id, tenant_id)
+        if not existing:
+            return False
+
+        query = "DELETE FROM odb.version_path WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    # ==================== Path Operation CRUD ====================
+
+    def get_operation_by_id(self, operation_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific operation by ID, ensuring it belongs to the tenant."""
+        query = """
+            SELECT po.id, po.version_path_id, po.operation, po.metadata,
+                   po.created_at, po.updated_at
+            FROM odb.path_operation po
+            JOIN odb.version_path vp ON po.version_path_id = vp.id
+            JOIN odb.versions v ON vp.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE po.id = %s AND p.tenant_id = %s
+        """
+        results = self.execute_query(query, (operation_id, tenant_id))
+        return results[0] if results else None
+
+    def create_operation(
+        self,
+        version_path_id: str,
+        operation: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a new operation for a path."""
+        query = """
+            INSERT INTO odb.path_operation (version_path_id, operation, metadata)
+            VALUES (%s, %s, %s)
+            RETURNING id, version_path_id, operation, metadata, created_at, updated_at
+        """
+        metadata_json = json.dumps(metadata) if metadata else '{}'
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (version_path_id, operation.upper(), metadata_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_operation(
+        self,
+        operation_id: str,
+        tenant_id: str,
+        updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update an operation, ensuring it belongs to the tenant."""
+        existing = self.get_operation_by_id(operation_id, tenant_id)
+        if not existing:
+            return None
+
+        update_fields = []
+        params = []
+
+        if 'operation' in updates and updates['operation'] is not None:
+            update_fields.append("operation = %s")
+            params.append(updates['operation'].upper())
+        if 'metadata' in updates:
+            update_fields.append("metadata = %s")
+            params.append(json.dumps(updates['metadata']) if updates['metadata'] else '{}')
+
+        if not update_fields:
+            return existing
+
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(operation_id)
+
+        query = f"""
+            UPDATE odb.path_operation
+            SET {', '.join(update_fields)}
+            WHERE id = %s
+            RETURNING id, version_path_id, operation, metadata, created_at, updated_at
+        """
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, tuple(params))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_operation(self, operation_id: str, tenant_id: str) -> bool:
+        """Delete an operation, ensuring it belongs to the tenant."""
+        existing = self.get_operation_by_id(operation_id, tenant_id)
+        if not existing:
+            return False
+
+        query = "DELETE FROM odb.path_operation WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (operation_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    # ==================== Operation Description CRUD ====================
+
+    def create_operation_description(
+        self,
+        path_operation_id: str,
+        summary: Optional[str] = None,
+        description: Optional[str] = None,
+        operation_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create or update operation description."""
+        # Check if description already exists
+        existing_query = "SELECT id FROM odb.path_operation_description WHERE path_operation_id = %s"
+        results = self.execute_query(existing_query, (path_operation_id,))
+
+        metadata_json = json.dumps(metadata) if metadata else '{}'
+
+        if results:
+            # Update existing
+            query = """
+                UPDATE odb.path_operation_description
+                SET summary = %s, description = %s, operation_id = %s, metadata = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE path_operation_id = %s
+                RETURNING id, path_operation_id, summary, description, operation_id, metadata,
+                          created_at, updated_at
+            """
+            conn = self.connect()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(query, (summary, description, operation_id, metadata_json, path_operation_id))
+                    result = cursor.fetchone()
+                    conn.commit()
+                    return result
+            except Exception as e:
+                conn.rollback()
+                raise e
+        else:
+            # Create new
+            query = """
+                INSERT INTO odb.path_operation_description
+                (path_operation_id, summary, description, operation_id, metadata)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, path_operation_id, summary, description, operation_id, metadata,
+                          created_at, updated_at
+            """
+            conn = self.connect()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(query, (path_operation_id, summary, description, operation_id, metadata_json))
+                    result = cursor.fetchone()
+                    conn.commit()
+                    return result
+            except Exception as e:
+                conn.rollback()
+                raise e
+
+    # ==================== Shared Path Parameter CRUD ====================
+
+    def get_shared_parameters_for_path(self, version_path_id: str) -> List[Dict[str, Any]]:
+        """Get all shared parameters for a path."""
+        query = """
+            SELECT id, version_path_id, name, in_location, summary, description, data,
+                   created_at, updated_at
+            FROM odb.shared_path_parameter
+            WHERE version_path_id = %s
+            ORDER BY in_location, name
+        """
+        return self.execute_query(query, (version_path_id,))
+
+    def create_shared_parameter(
+        self,
+        version_path_id: str,
+        name: str,
+        in_location: str,
+        summary: Optional[str] = None,
+        description: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a shared parameter for a path."""
+        query = """
+            INSERT INTO odb.shared_path_parameter
+            (version_path_id, name, in_location, summary, description, data)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, version_path_id, name, in_location, summary, description, data,
+                      created_at, updated_at
+        """
+        data_json = json.dumps(data) if data else '{}'
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (version_path_id, name, in_location, summary, description, data_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def link_parameter_to_operation(self, path_operation_id: str, shared_path_parameter_id: str) -> Dict[str, Any]:
+        """Link a shared parameter to an operation."""
+        query = """
+            INSERT INTO odb.path_operation_parameter_link (path_operation_id, shared_path_parameter_id)
+            VALUES (%s, %s)
+            ON CONFLICT (path_operation_id, shared_path_parameter_id) DO NOTHING
+            RETURNING id, path_operation_id, shared_path_parameter_id, created_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_operation_id, shared_path_parameter_id))
+                result = cursor.fetchone()
+                conn.commit()
+                if result is None:
+                    # Already existed, fetch it
+                    cursor.execute(
+                        """SELECT id, path_operation_id, shared_path_parameter_id, created_at
+                           FROM odb.path_operation_parameter_link
+                           WHERE path_operation_id = %s AND shared_path_parameter_id = %s""",
+                        (path_operation_id, shared_path_parameter_id)
+                    )
+                    result = cursor.fetchone()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def unlink_parameter_from_operation(self, path_operation_id: str, shared_path_parameter_id: str) -> bool:
+        """Unlink a shared parameter from an operation."""
+        query = """
+            DELETE FROM odb.path_operation_parameter_link
+            WHERE path_operation_id = %s AND shared_path_parameter_id = %s
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_operation_id, shared_path_parameter_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_shared_parameter(self, parameter_id: str, tenant_id: str) -> bool:
+        """Delete a shared parameter, ensuring it belongs to the tenant."""
+        verify_query = """
+            SELECT spp.id FROM odb.shared_path_parameter spp
+            JOIN odb.version_path vp ON spp.version_path_id = vp.id
+            JOIN odb.versions v ON vp.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE spp.id = %s AND p.tenant_id = %s
+        """
+        results = self.execute_query(verify_query, (parameter_id, tenant_id))
+        if not results:
+            return False
+
+        query = "DELETE FROM odb.shared_path_parameter WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (parameter_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    # ==================== Shared Request Body CRUD ====================
+
+    def get_shared_request_bodies_for_path(self, version_path_id: str) -> List[Dict[str, Any]]:
+        """Get all shared request bodies for a path."""
+        query = """
+            SELECT id, version_path_id, name, description, required,
+                   created_at, updated_at
+            FROM odb.shared_path_request_body
+            WHERE version_path_id = %s
+            ORDER BY name
+        """
+        return self.execute_query(query, (version_path_id,))
+
+    def create_shared_request_body(
+        self,
+        version_path_id: str,
+        name: str,
+        description: Optional[str] = None,
+        required: bool = True
+    ) -> Dict[str, Any]:
+        """Create a shared request body for a path."""
+        query = """
+            INSERT INTO odb.shared_path_request_body
+            (version_path_id, name, description, required)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, version_path_id, name, description, required, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (version_path_id, name, description, required))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def link_request_body_to_operation(self, path_operation_id: str, shared_request_body_id: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Link a shared request body to an operation."""
+        metadata_json = json.dumps(metadata) if metadata else None
+        query = """
+            INSERT INTO odb.path_operation_request_body_link (path_operation_id, shared_path_request_body_id, metadata)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (path_operation_id) DO UPDATE SET
+                shared_path_request_body_id = EXCLUDED.shared_path_request_body_id,
+                metadata = EXCLUDED.metadata,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, path_operation_id, shared_path_request_body_id, metadata, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_operation_id, shared_request_body_id, metadata_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def unlink_request_body_from_operation(self, path_operation_id: str) -> bool:
+        """Unlink request body from an operation."""
+        query = "DELETE FROM odb.path_operation_request_body_link WHERE path_operation_id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_operation_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def add_request_body_content_type(
+        self,
+        shared_request_body_id: str,
+        media_type: str,
+        class_id: Optional[str] = None,
+        inline_schema: Optional[Dict[str, Any]] = None,
+        encoding: Optional[Dict[str, Any]] = None,
+        examples: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Add a content type to a request body."""
+        query = """
+            INSERT INTO odb.shared_path_request_body_content
+            (shared_path_request_body_id, media_type, class_id, inline_schema, encoding, examples)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (shared_path_request_body_id, media_type) DO UPDATE SET
+                class_id = EXCLUDED.class_id,
+                inline_schema = EXCLUDED.inline_schema,
+                encoding = EXCLUDED.encoding,
+                examples = EXCLUDED.examples,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, shared_path_request_body_id, media_type, class_id, inline_schema,
+                      encoding, examples, created_at, updated_at
+        """
+        inline_schema_json = json.dumps(inline_schema) if inline_schema else None
+        encoding_json = json.dumps(encoding) if encoding else None
+        examples_json = json.dumps(examples) if examples else None
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (shared_request_body_id, media_type, class_id,
+                                       inline_schema_json, encoding_json, examples_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_shared_request_body(self, request_body_id: str, tenant_id: str) -> bool:
+        """Delete a shared request body, ensuring it belongs to the tenant."""
+        verify_query = """
+            SELECT rb.id FROM odb.shared_path_request_body rb
+            JOIN odb.version_path vp ON rb.version_path_id = vp.id
+            JOIN odb.versions v ON vp.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE rb.id = %s AND p.tenant_id = %s
+        """
+        results = self.execute_query(verify_query, (request_body_id, tenant_id))
+        if not results:
+            return False
+
+        query = "DELETE FROM odb.shared_path_request_body WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (request_body_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    # ==================== Shared Response CRUD ====================
+
+    def get_shared_responses_for_path(self, version_path_id: str) -> List[Dict[str, Any]]:
+        """Get all shared responses for a path."""
+        query = """
+            SELECT id, version_path_id, status_code, description, data, class_id, inline_schema,
+                   schema_mode, created_at, updated_at
+            FROM odb.shared_path_response
+            WHERE version_path_id = %s
+            ORDER BY status_code
+        """
+        return self.execute_query(query, (version_path_id,))
+
+    def create_shared_response(
+        self,
+        version_path_id: str,
+        status_code: str,
+        description: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+        class_id: Optional[str] = None,
+        inline_schema: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a shared response for a path."""
+        query = """
+            INSERT INTO odb.shared_path_response
+            (version_path_id, status_code, description, data, class_id, inline_schema)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, version_path_id, status_code, description, data, class_id, inline_schema,
+                      created_at, updated_at
+        """
+        data_json = json.dumps(data) if data else None
+        inline_schema_json = json.dumps(inline_schema) if inline_schema else None
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (version_path_id, status_code, description,
+                                       data_json, class_id, inline_schema_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def link_response_to_operation(self, path_operation_id: str, shared_response_id: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Link a shared response to an operation."""
+        metadata_json = json.dumps(metadata) if metadata else None
+        query = """
+            INSERT INTO odb.path_operation_response_link (path_operation_id, shared_path_response_id, metadata)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (path_operation_id, shared_path_response_id) DO UPDATE SET
+                metadata = EXCLUDED.metadata,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, path_operation_id, shared_path_response_id, metadata, created_at, updated_at
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_operation_id, shared_response_id, metadata_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def unlink_response_from_operation(self, path_operation_id: str, shared_response_id: str) -> bool:
+        """Unlink a shared response from an operation."""
+        query = """
+            DELETE FROM odb.path_operation_response_link
+            WHERE path_operation_id = %s AND shared_path_response_id = %s
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (path_operation_id, shared_response_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def add_response_content_type(
+        self,
+        shared_response_id: str,
+        media_type: str,
+        class_id: Optional[str] = None,
+        inline_schema: Optional[Dict[str, Any]] = None,
+        examples: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Add a content type to a response."""
+        query = """
+            INSERT INTO odb.shared_path_response_content
+            (shared_path_response_id, media_type, class_id, inline_schema, examples)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (shared_path_response_id, media_type) DO UPDATE SET
+                class_id = EXCLUDED.class_id,
+                inline_schema = EXCLUDED.inline_schema,
+                examples = EXCLUDED.examples,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, shared_path_response_id, media_type, class_id, inline_schema,
+                      examples, created_at, updated_at
+        """
+        inline_schema_json = json.dumps(inline_schema) if inline_schema else None
+        examples_json = json.dumps(examples) if examples else None
+
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (shared_response_id, media_type, class_id,
+                                       inline_schema_json, examples_json))
+                result = cursor.fetchone()
+                conn.commit()
+                return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_shared_response(self, response_id: str, tenant_id: str) -> bool:
+        """Delete a shared response, ensuring it belongs to the tenant."""
+        verify_query = """
+            SELECT sr.id FROM odb.shared_path_response sr
+            JOIN odb.version_path vp ON sr.version_path_id = vp.id
+            JOIN odb.versions v ON vp.version_id = v.id
+            JOIN odb.projects p ON v.project_id = p.id
+            WHERE sr.id = %s AND p.tenant_id = %s
+        """
+        results = self.execute_query(verify_query, (response_id, tenant_id))
+        if not results:
+            return False
+
+        query = "DELETE FROM odb.shared_path_response WHERE id = %s"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(query, (response_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def copy_class_properties_to_inline_schema(self, class_id: str) -> Dict[str, Any]:
+        """Copy class properties to create an inline schema structure."""
+        # Get class properties
+        properties = self.get_properties_for_class(class_id)
+
+        # Build inline schema structure
+        inline_properties = []
+        for prop in properties:
+            prop_data = prop.get('data', {})
+            if isinstance(prop_data, str):
+                prop_data = json.loads(prop_data)
+
+            inline_prop = {
+                'id': str(prop['id']),
+                'name': prop['name'],
+                'description': prop.get('description'),
+                'data': prop_data,
+                'parent_id': str(prop['parent_id']) if prop.get('parent_id') else None
+            }
+            inline_properties.append(inline_prop)
+
+        return {
+            'type': 'object',
+            'properties': inline_properties
+        }
+
 
 # Global database instance
 db = Database()
