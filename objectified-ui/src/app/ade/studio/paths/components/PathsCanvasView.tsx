@@ -57,7 +57,7 @@ import PathClassNode, { PathClassNodeData } from './PathClassNode';
 import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
-import { Trash2, Lock } from 'lucide-react';
+import { Trash2, Lock, AlertTriangle } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
@@ -95,6 +95,7 @@ function OperationNode({ data }: {
     operationId?: string; // OpenAPI operationId (e.g., "createUser", "listOrders")
     parameters?: Array<{ id: string; name: string; in: string; required?: boolean }>;
     security?: Array<Record<string, string[]>>; // OpenAPI security requirements
+    deprecated?: boolean; // Whether the operation is deprecated
     onDelete?: () => void;
     onSchemaDrop?: (operationId: string, schemaType: 'request' | 'response', schemaData: any) => void;
   } 
@@ -159,8 +160,11 @@ function OperationNode({ data }: {
         style={{ backgroundColor: data.color }}
       />
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border-2 shadow-xl min-w-[220px] max-w-[280px] cursor-pointer relative group"
-        style={{ borderColor: data.color }}
+      <div 
+        className={`bg-white dark:bg-gray-800 rounded-xl border-2 shadow-xl min-w-[220px] max-w-[280px] cursor-pointer relative group ${
+          data.deprecated ? 'border-dashed opacity-75' : ''
+        }`}
+        style={{ borderColor: data.deprecated ? '#f59e0b' : data.color }}
       >
         {/* Delete button */}
         {data.onDelete && (
@@ -178,13 +182,21 @@ function OperationNode({ data }: {
 
         {/* Header - Only this part has color */}
         <div
-          className="text-white px-4 py-3 rounded-t-xl"
+          className={`text-white px-4 py-3 rounded-t-xl ${data.deprecated ? 'opacity-70' : ''}`}
           style={{ backgroundColor: data.color }}
         >
-          <div className="text-xs font-medium opacity-90">HTTP Method</div>
-          <div className="font-bold text-lg">{data.operation}</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium opacity-90">HTTP Method</div>
+            {data.deprecated && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-400/90 text-amber-900">
+                <AlertTriangle size={10} />
+                Deprecated
+              </span>
+            )}
+          </div>
+          <div className={`font-bold text-lg ${data.deprecated ? 'line-through opacity-80' : ''}`}>{data.operation}</div>
           {data.operationId && (
-            <div className="text-xs opacity-80 font-mono mt-1">{data.operationId}</div>
+            <div className={`text-xs opacity-80 font-mono mt-1 ${data.deprecated ? 'line-through' : ''}`}>{data.operationId}</div>
           )}
         </div>
 
@@ -1691,6 +1703,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         const operationParamsMap = new Map<string, Array<{ id: string; name: string; in: string; required?: boolean }>>();
         const operationIdMap = new Map<string, string>(); // Maps db operation id to OpenAPI operationId
         const operationSecurityMap = new Map<string, Array<Record<string, string[]>>>();
+        const operationDeprecatedMap = new Map<string, boolean>();
 
         for (const op of operations) {
           // Load linked parameters
@@ -1720,6 +1733,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               if (Array.isArray(sec) && sec.length > 0) {
                 operationSecurityMap.set(op.id, sec);
               }
+              if (meta?.deprecated === true) {
+                operationDeprecatedMap.set(op.id, true);
+              }
             }
           } catch (descError) {
             console.log('[PathsCanvasView] No description found for operation:', op.id);
@@ -1745,6 +1761,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             operationId: operationIdMap.get(op.id), // OpenAPI operationId from description
             parameters: operationParamsMap.get(op.id) || [],
             security: operationSecurityMap.get(op.id),
+            deprecated: operationDeprecatedMap.get(op.id),
             onDelete: () => handleDeleteOperation(op.id, op.operation),
             onSchemaDrop: async (operationId: string, schemaType: 'request' | 'response', schemaData: any) => {
               // Handle class drops with dialog for copy vs reference

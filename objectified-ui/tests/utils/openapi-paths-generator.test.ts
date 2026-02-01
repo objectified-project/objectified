@@ -266,6 +266,44 @@ describe('OpenAPI Paths Generator', () => {
 
       expect(result.security).toEqual([{ bearerAuth: [] }, { oauth2: ['read', 'write'] }]);
     });
+
+    it('should include deprecated flag when present', () => {
+      const operation: OperationInfo = {
+        id: 'op-1',
+        operation: 'GET',
+        description: {
+          id: 'd1',
+          summary: 'Old endpoint',
+          operationId: 'getOldUsers',
+          deprecated: true,
+        },
+        parameters: [],
+        responses: [{ id: 'r1', status_code: '200', description: 'OK' }],
+      };
+
+      const result = buildOperationForOpenAPI(operation);
+
+      expect(result.deprecated).toBe(true);
+    });
+
+    it('should not include deprecated flag when false', () => {
+      const operation: OperationInfo = {
+        id: 'op-1',
+        operation: 'GET',
+        description: {
+          id: 'd1',
+          summary: 'Active endpoint',
+          operationId: 'getUsers',
+          deprecated: false,
+        },
+        parameters: [],
+        responses: [{ id: 'r1', status_code: '200', description: 'OK' }],
+      };
+
+      const result = buildOperationForOpenAPI(operation);
+
+      expect(result.deprecated).toBeUndefined();
+    });
   });
 
   describe('buildPathItemForOpenAPI', () => {

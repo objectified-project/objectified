@@ -84,14 +84,13 @@ structure immediately recognizable.
 - ✅ Response definitions (status codes + schemas)
 - ✅ Parameters (query, header, cookie)
 - ✅ Security requirements
-- 📋 Deprecated flag
+- ✅ Deprecated flag
 - 📋 Private flag (unexposed endpoints)
 - 📋 External docs
 - 📋 Custom `x-*` extensions
 
 | Ticket | Feature                                                  | Status   |
 |--------|----------------------------------------------------------|----------|
-| #368   | Add deprecated flag to HTTP Operation                    |          |
 | #369   | Add private flag to HTTP Operation                       |          |
 | #370   | Add external docs to HTTP Operation                      |          |
 | #371   | Add custom x-* extensions to HTTP Operation              |          |
