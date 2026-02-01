@@ -1,0 +1,215 @@
+'use server';
+
+/**
+ * Helper functions for version security schemes (OpenAPI components.securitySchemes)
+ * Supports API Key (header, query, cookie) and future scheme types.
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const connectionPool = require('./db');
+
+export interface SecuritySchemeRecord {
+  id: string;
+  version_id: string;
+  scheme_name: string;
+  scheme_type: string;
+  in_location: string | null;
+  param_name: string | null;
+  http_scheme: string | null;
+  description: string | null;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+/** OpenAPI API Key scheme: in header, query, or cookie */
+export interface ApiKeySchemeInput {
+  scheme_name: string;
+  in_location: 'header' | 'query' | 'cookie';
+  param_name: string;
+  description?: string;
+}
+
+/** OpenAPI security scheme definition for export */
+export interface OpenAPISecurityScheme {
+  type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
+  name?: string;
+  in?: 'header' | 'query' | 'cookie';
+  scheme?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Get all security schemes for a version
+ */
+export async function getSecuritySchemesForVersion(versionId: string): Promise<SecuritySchemeRecord[]> {
+  const result = await connectionPool.query(
+    `SELECT id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at
+     FROM odb.version_security_scheme
+     WHERE version_id = $1
+     ORDER BY scheme_name`,
+    [versionId]
+  );
+  return result.rows.map((r: Record<string, unknown>) => ({
+    id: r.id,
+    version_id: r.version_id,
+    scheme_name: r.scheme_name,
+    scheme_type: r.scheme_type,
+    in_location: r.in_location,
+    param_name: r.param_name,
+    http_scheme: r.http_scheme,
+    description: r.description,
+    data: r.data ? (typeof r.data === 'string' ? JSON.parse(r.data as string) : r.data) : {},
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }));
+}
+
+/**
+ * Create an API Key security scheme (header, query, or cookie)
+ */
+export async function createApiKeySecurityScheme(
+  versionId: string,
+  input: ApiKeySchemeInput
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const result = await connectionPool.query(
+      `INSERT INTO odb.version_security_scheme (version_id, scheme_name, scheme_type, in_location, param_name, description)
+       VALUES ($1, $2, 'apiKey', $3, $4, $5)
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      [
+        versionId,
+        input.scheme_name.trim(),
+        input.in_location,
+        input.param_name.trim(),
+        input.description?.trim() || null,
+      ]
+    );
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data || {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Update an API Key security scheme
+ */
+export async function updateApiKeySecurityScheme(
+  schemeId: string,
+  input: Partial<ApiKeySchemeInput>
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (input.scheme_name !== undefined) {
+      updates.push(`scheme_name = $${idx++}`);
+      values.push(input.scheme_name.trim());
+    }
+    if (input.in_location !== undefined) {
+      updates.push(`in_location = $${idx++}`);
+      values.push(input.in_location);
+    }
+    if (input.param_name !== undefined) {
+      updates.push(`param_name = $${idx++}`);
+      values.push(input.param_name.trim());
+    }
+    if (input.description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(input.description.trim() || null);
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'No updates provided' };
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(schemeId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.version_security_scheme SET ${updates.join(', ')}
+       WHERE id = $${idx} AND scheme_type = 'apiKey'
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Scheme not found or not an API Key scheme' };
+    }
+
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data || {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Delete a security scheme
+ */
+export async function deleteSecurityScheme(schemeId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await connectionPool.query(
+      `DELETE FROM odb.version_security_scheme WHERE id = $1 RETURNING id`,
+      [schemeId]
+    );
+    return { success: result.rows.length > 0 };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Convert security scheme records to OpenAPI components.securitySchemes format
+ */
+export async function securitySchemesToOpenAPI(schemes: SecuritySchemeRecord[]): Promise<Record<string, OpenAPISecurityScheme>> {
+  const result: Record<string, OpenAPISecurityScheme> = {};
+  for (const s of schemes) {
+    if (s.scheme_type === 'apiKey') {
+      result[s.scheme_name] = {
+        type: 'apiKey',
+        name: s.param_name || s.scheme_name,
+        in: (s.in_location as 'header' | 'query' | 'cookie') || 'header',
+        description: s.description || undefined,
+      };
+    }
+    // Future: http, oauth2, openIdConnect, mutualTLS
+  }
+  return result;
+}
