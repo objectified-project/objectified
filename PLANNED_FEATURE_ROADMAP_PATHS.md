@@ -52,14 +52,13 @@ structure immediately recognizable.
 - ✅ External documentation links
 
 **Features**: 📋 PLANNED
-- 📋 Click on `{variable}` to open inline schema editor
+- ✅ Click on `{variable}` to open inline schema editor
 - 📋 Drag schema property onto variable for type binding
 - 📋 Visual validation: invalid paths show red border
 - 📋 Path template preview with sample values
 
 | Ticket | Feature                                                                  |
 |--------|--------------------------------------------------------------------------|
-| #357   | Click on '{variable}' in path to open inline schema editor               |
 | #358   | Add the ability to drag a schema property to a variable for type binding |
 | #359   | Add invalid paths with a red border                                      |
 | #360   | Add path template preview with sample values                             |
