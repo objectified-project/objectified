@@ -16,6 +16,9 @@ import {
 // TYPES
 // =============================================================================
 
+/** OpenAPI Security Requirement: maps scheme name to array of scope names (empty for non-OAuth schemes) */
+export type SecurityRequirement = Record<string, string[]>;
+
 export interface PathOperationDescription {
   id: string;
   summary?: string;
@@ -27,6 +30,8 @@ export interface PathOperationDescription {
     url: string;
     description?: string;
   };
+  /** Operation-level security requirements (OpenAPI security array) */
+  security?: SecurityRequirement[];
 }
 
 export interface PathParameter {
@@ -295,6 +300,10 @@ export function buildOperationForOpenAPI(
     }
     if (operation.description.externalDocs) {
       result.externalDocs = operation.description.externalDocs;
+    }
+    // Add security requirements (OpenAPI Operation.security)
+    if (operation.description.security && operation.description.security.length > 0) {
+      result.security = operation.description.security;
     }
   }
 

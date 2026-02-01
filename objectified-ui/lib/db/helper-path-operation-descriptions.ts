@@ -31,14 +31,16 @@ export async function getOperationDescription(pathOperationId: string): Promise<
 }
 
 /**
- * Create or update a description for a path operation (upsert)
+ * Create or update a description for a path operation (upsert).
+ * When metadata is provided, it is stored in the metadata JSONB column.
+ * Pass merged metadata (e.g. { ...existingMetadata, security }) to preserve other fields.
  */
 export async function upsertOperationDescription(
   pathOperationId: string,
   summary?: string,
   description?: string,
   operationId?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<string> {
   const query = `
     INSERT INTO odb.path_operation_description (path_operation_id, summary, description, operation_id, metadata)
@@ -48,7 +50,7 @@ export async function upsertOperationDescription(
       summary = EXCLUDED.summary,
       description = EXCLUDED.description,
       operation_id = EXCLUDED.operation_id,
-      metadata = EXCLUDED.metadata,
+      metadata = COALESCE(EXCLUDED.metadata, path_operation_description.metadata),
       updated_at = CURRENT_TIMESTAMP
     RETURNING id, path_operation_id, summary, description, operation_id, metadata, created_at, updated_at
   `;
@@ -56,9 +58,9 @@ export async function upsertOperationDescription(
   try {
     const result = await connectionPool.query(query, [
       pathOperationId,
-      summary || null,
-      description || null,
-      operationId || null,
+      summary ?? null,
+      description ?? null,
+      operationId ?? null,
       metadata ? JSON.stringify(metadata) : null,
     ]);
     return JSON.stringify(result.rows[0]);

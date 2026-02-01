@@ -83,19 +83,18 @@ structure immediately recognizable.
 - ✅ Request body schema binding
 - ✅ Response definitions (status codes + schemas)
 - ✅ Parameters (query, header, cookie)
-- 📋 Security requirements
+- ✅ Security requirements
 - 📋 Deprecated flag
 - 📋 Private flag (unexposed endpoints)
 - 📋 External docs
 - 📋 Custom `x-*` extensions
 
-| Ticket | Feature                                                  |
-|--------|----------------------------------------------------------|
-| #367   | Add security requirements to HTTP Operation              |
-| #368   | Add deprecated flag to HTTP Operation                    |
-| #369   | Add private flag to HTTP Operation                       |
-| #370   | Add external docs to HTTP Operation                      |
-| #371   | Add custom x-* extensions to HTTP Operation              |
+| Ticket | Feature                                                  | Status   |
+|--------|----------------------------------------------------------|----------|
+| #368   | Add deprecated flag to HTTP Operation                    |          |
+| #369   | Add private flag to HTTP Operation                       |          |
+| #370   | Add external docs to HTTP Operation                      |          |
+| #371   | Add custom x-* extensions to HTTP Operation              |          |
 
 #### 2.3 Schema Reference Nodes 📋 PLANNED
 

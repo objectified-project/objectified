@@ -247,6 +247,25 @@ describe('OpenAPI Paths Generator', () => {
 
       expect(result.requestBody).toBeUndefined();
     });
+
+    it('should include security requirements when present', () => {
+      const operation: OperationInfo = {
+        id: 'op-1',
+        operation: 'GET',
+        description: {
+          id: 'd1',
+          summary: 'Get user',
+          operationId: 'getUser',
+          security: [{ bearerAuth: [] }, { oauth2: ['read', 'write'] }],
+        },
+        parameters: [],
+        responses: [{ id: 'r1', status_code: '200', description: 'OK' }],
+      };
+
+      const result = buildOperationForOpenAPI(operation);
+
+      expect(result.security).toEqual([{ bearerAuth: [] }, { oauth2: ['read', 'write'] }]);
+    });
   });
 
   describe('buildPathItemForOpenAPI', () => {

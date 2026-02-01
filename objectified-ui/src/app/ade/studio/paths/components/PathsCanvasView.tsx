@@ -57,7 +57,7 @@ import PathClassNode, { PathClassNodeData } from './PathClassNode';
 import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Lock } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
@@ -94,6 +94,7 @@ function OperationNode({ data }: {
     dbOperationId?: string;
     operationId?: string; // OpenAPI operationId (e.g., "createUser", "listOrders")
     parameters?: Array<{ id: string; name: string; in: string; required?: boolean }>;
+    security?: Array<Record<string, string[]>>; // OpenAPI security requirements
     onDelete?: () => void;
     onSchemaDrop?: (operationId: string, schemaType: 'request' | 'response', schemaData: any) => void;
   } 
@@ -248,6 +249,25 @@ function OperationNode({ data }: {
               </div>
             </div>
           </div>
+
+          {/* Security badge */}
+          {data.security && data.security.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {data.security.map((req, i) => {
+                const [scheme] = Object.entries(req)[0] || [];
+                return scheme ? (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                    title={`Security: ${scheme}`}
+                  >
+                    <Lock size={10} />
+                    {scheme}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1670,6 +1690,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         // First, load linked parameters and operationId for each operation to include in node data
         const operationParamsMap = new Map<string, Array<{ id: string; name: string; in: string; required?: boolean }>>();
         const operationIdMap = new Map<string, string>(); // Maps db operation id to OpenAPI operationId
+        const operationSecurityMap = new Map<string, Array<Record<string, string[]>>>();
 
         for (const op of operations) {
           // Load linked parameters
@@ -1686,12 +1707,19 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             operationParamsMap.set(op.id, []);
           }
 
-          // Load operation description to get operationId
+          // Load operation description to get operationId and security
           try {
             const descResponse = await getOperationDescription(op.id);
             const descData = JSON.parse(descResponse);
-            if (descData && descData.operation_id) {
-              operationIdMap.set(op.id, descData.operation_id);
+            if (descData) {
+              if (descData.operation_id) {
+                operationIdMap.set(op.id, descData.operation_id);
+              }
+              const meta = descData.metadata;
+              const sec = meta?.security;
+              if (Array.isArray(sec) && sec.length > 0) {
+                operationSecurityMap.set(op.id, sec);
+              }
             }
           } catch (descError) {
             console.log('[PathsCanvasView] No description found for operation:', op.id);
@@ -1716,6 +1744,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             dbOperationId: op.id,
             operationId: operationIdMap.get(op.id), // OpenAPI operationId from description
             parameters: operationParamsMap.get(op.id) || [],
+            security: operationSecurityMap.get(op.id),
             onDelete: () => handleDeleteOperation(op.id, op.operation),
             onSchemaDrop: async (operationId: string, schemaType: 'request' | 'response', schemaData: any) => {
               // Handle class drops with dialog for copy vs reference

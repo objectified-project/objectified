@@ -70,7 +70,8 @@ export async function loadPathsForOpenAPIExport(versionId: string): Promise<stri
             operation_id, 
             metadata->'tags' as tags,
             (metadata->>'deprecated')::boolean as deprecated,
-            metadata->'external_docs' as external_docs
+            metadata->'external_docs' as external_docs,
+            metadata->'security' as security
           FROM odb.path_operation_description 
           WHERE path_operation_id = $1 
           LIMIT 1
@@ -79,12 +80,21 @@ export async function loadPathsForOpenAPIExport(versionId: string): Promise<stri
         let opDescription: PathOperationDescription | undefined;
         if (descResult.rows.length > 0) {
           const d = descResult.rows[0];
+          const securityRaw = d.security;
+          let security: PathOperationDescription['security'];
+          if (Array.isArray(securityRaw) && securityRaw.length > 0) {
+            security = securityRaw as PathOperationDescription['security'];
+          } else if (securityRaw) {
+            const parsed = typeof securityRaw === 'string' ? JSON.parse(securityRaw) : securityRaw;
+            security = Array.isArray(parsed) ? parsed : [parsed];
+          }
           opDescription = {
             id: d.id, summary: d.summary, description: d.description,
             operationId: d.operation_id,
             tags: d.tags ? (typeof d.tags === 'string' ? JSON.parse(d.tags) : d.tags) : undefined,
             deprecated: d.deprecated,
             externalDocs: d.external_docs ? (typeof d.external_docs === 'string' ? JSON.parse(d.external_docs) : d.external_docs) : undefined,
+            security,
           };
         }
 

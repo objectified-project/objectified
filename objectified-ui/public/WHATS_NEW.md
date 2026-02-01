@@ -16,6 +16,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Paths Improvements:
   - Added inline variable editor that can click parameters in the header of the path studio
   - Added primitives template usage in schema definitions
+  - Added security requirements to HTTP Operation endpoint definitions
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
