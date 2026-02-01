@@ -144,6 +144,7 @@ export default function PathsPage() {
             )}
             <PathsCanvasView
               selectedPathId={selectedPathId}
+              pathname={selectedPath?.pathname ?? null}
               onOperationSelect={handleOperationSelect}
               onParameterSelect={handleParameterSelect}
               onResponseSelect={handleResponseSelect}
@@ -168,7 +169,8 @@ export default function PathsPage() {
           {selectedParameter && selectedPath && (
             <ParameterPropertiesPanel
               parameterId={selectedParameter.id}
-              operationId={selectedParameter.operationId}
+              operationId={selectedParameter.operationId || undefined}
+              versionPathId={selectedPath.id}
               pathname={selectedPath.pathname}
               onClose={() => setSelectedParameter(null)}
               onRefresh={handleCanvasRefresh}

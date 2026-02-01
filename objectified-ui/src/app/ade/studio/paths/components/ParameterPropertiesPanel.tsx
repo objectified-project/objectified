@@ -14,6 +14,7 @@ import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
   getLinkedParametersForOperation,
+  getSharedPathParameters,
   updateSharedPathParameter,
   unlinkParameterFromOperation,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
@@ -52,7 +53,8 @@ const ARRAY_ITEM_TYPES = [
 
 interface ParameterPropertiesPanelProps {
   parameterId: string | null;
-  operationId: string;
+  operationId?: string; // Optional when opened from path variable click
+  versionPathId: string | null;
   pathname: string;
   onClose: () => void;
   onRefresh?: () => void;
@@ -61,6 +63,7 @@ interface ParameterPropertiesPanelProps {
 export default function ParameterPropertiesPanel({
   parameterId,
   operationId,
+  versionPathId,
   pathname,
   onClose,
   onRefresh,
@@ -89,9 +92,9 @@ export default function ParameterPropertiesPanel({
   const [schemaEnum, setSchemaEnum] = useState('');
   const [schemaArrayItemType, setSchemaArrayItemType] = useState<'string' | 'integer' | 'number' | 'boolean'>('string');
 
-  // Load parameter details when parameterId changes
+  // Load parameter details when parameterId changes (from operation link or from path variable click)
   useEffect(() => {
-    if (!parameterId || !operationId) {
+    if (!parameterId) {
       setName('');
       setInLocation('path');
       setSummary('');
@@ -114,45 +117,55 @@ export default function ParameterPropertiesPanel({
     const loadParameter = async () => {
       setIsLoading(true);
       try {
-        const result = await getLinkedParametersForOperation(operationId);
-        const data = JSON.parse(result);
+        let param: any = null;
 
-        if (data.success && data.parameters) {
-          const param = data.parameters.find((p: any) => p.id === parameterId);
-          if (param) {
-            setName(param.name);
-            setInLocation(param.in_location);
-            setSummary(param.summary || '');
-            setDescription(param.description || '');
+        if (operationId) {
+          const result = await getLinkedParametersForOperation(operationId);
+          const data = JSON.parse(result);
+          if (data.success && data.parameters) {
+            param = data.parameters.find((p: any) => p.id === parameterId);
+          }
+        } else if (versionPathId) {
+          const result = await getSharedPathParameters(versionPathId);
+          const data = JSON.parse(result);
+          if (data.success && data.parameters) {
+            param = data.parameters.find((p: any) => p.id === parameterId);
+          }
+        }
 
-            // Load schema from param.data column
-            const schema = param.data;
-            if (schema) {
-              setSchemaType(schema.type || 'string');
-              setSchemaFormat(schema.format || '');
-              setSchemaMinimum(schema.minimum !== undefined ? String(schema.minimum) : '');
-              setSchemaMaximum(schema.maximum !== undefined ? String(schema.maximum) : '');
-              setSchemaMinLength(schema.minLength !== undefined ? String(schema.minLength) : '');
-              setSchemaMaxLength(schema.maxLength !== undefined ? String(schema.maxLength) : '');
-              setSchemaPattern(schema.pattern || '');
-              setSchemaDefault(schema.default !== undefined ? String(schema.default) : '');
-              setSchemaEnum(schema.enum ? schema.enum.join(', ') : '');
-              setSchemaArrayItemType(schema.items?.type || 'string');
-              // Read required from data field
-              setRequired(schema.required ?? (param.in_location === 'path'));
-            } else {
-              // Reset to defaults if no schema
-              setSchemaType('string');
-              setSchemaFormat('');
-              setSchemaMinimum('');
-              setSchemaMaximum('');
-              setSchemaMinLength('');
-              setSchemaMaxLength('');
-              setSchemaPattern('');
-              setSchemaDefault('');
-              setSchemaEnum('');
-              setSchemaArrayItemType('string');
-            }
+        if (param) {
+          setName(param.name);
+          setInLocation(param.in_location);
+          setSummary(param.summary || '');
+          setDescription(param.description || '');
+
+          // Load schema from param.data column
+          const schema = param.data;
+          if (schema) {
+            setSchemaType(schema.type || 'string');
+            setSchemaFormat(schema.format || '');
+            setSchemaMinimum(schema.minimum !== undefined ? String(schema.minimum) : '');
+            setSchemaMaximum(schema.maximum !== undefined ? String(schema.maximum) : '');
+            setSchemaMinLength(schema.minLength !== undefined ? String(schema.minLength) : '');
+            setSchemaMaxLength(schema.maxLength !== undefined ? String(schema.maxLength) : '');
+            setSchemaPattern(schema.pattern || '');
+            setSchemaDefault(schema.default !== undefined ? String(schema.default) : '');
+            setSchemaEnum(schema.enum ? schema.enum.join(', ') : '');
+            setSchemaArrayItemType(schema.items?.type || 'string');
+            // Read required from data field
+            setRequired(schema.required ?? (param.in_location === 'path'));
+          } else {
+            // Reset to defaults if no schema
+            setSchemaType('string');
+            setSchemaFormat('');
+            setSchemaMinimum('');
+            setSchemaMaximum('');
+            setSchemaMinLength('');
+            setSchemaMaxLength('');
+            setSchemaPattern('');
+            setSchemaDefault('');
+            setSchemaEnum('');
+            setSchemaArrayItemType('string');
           }
         }
       } catch (error) {
@@ -163,7 +176,7 @@ export default function ParameterPropertiesPanel({
     };
 
     loadParameter();
-  }, [parameterId, operationId]);
+  }, [parameterId, operationId, versionPathId]);
 
   // Extract available path parameters from pathname
   useEffect(() => {
@@ -812,21 +825,23 @@ export default function ParameterPropertiesPanel({
             >
               {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved ✓' : 'Save Changes'}
             </Button>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={handleDelete}
-              sx={{
-                borderColor: '#ef4444',
-                color: '#ef4444',
-                '&:hover': {
-                  borderColor: '#dc2626',
-                  backgroundColor: 'rgba(239, 68, 68, 0.04)',
-                },
-              }}
-            >
-              Unlink Parameter
-            </Button>
+            {operationId && (
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={handleDelete}
+                sx={{
+                  borderColor: '#ef4444',
+                  color: '#ef4444',
+                  '&:hover': {
+                    borderColor: '#dc2626',
+                    backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                  },
+                }}
+              >
+                Unlink Parameter
+              </Button>
+            )}
           </Box>
         </>
       )}

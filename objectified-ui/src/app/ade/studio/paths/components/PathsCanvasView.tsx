@@ -37,8 +37,10 @@ import {
   linkParameterToOperation,
   unlinkParameterFromOperation,
   getSharedPathParameters,
+  createSharedPathParameter,
   deleteSharedPathParameter,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
+import { extractPathParameters } from '../../../../../../lib/utils/path-params';
 import {
   getLinkedResponsesForOperation,
   getSharedPathResponses,
@@ -285,8 +287,28 @@ const OPERATION_COLORS: Record<string, string> = {
   'OPTIONS': '#718096',
 };
 
+/** Split pathname into segments: literal strings and variable names for clickable variables */
+function parsePathSegments(pathname: string): Array<{ type: 'literal' | 'variable'; value: string }> {
+  const segments: Array<{ type: 'literal' | 'variable'; value: string }> = [];
+  const regex = /\{([^}]+)\}/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(pathname)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'literal', value: pathname.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: 'variable', value: match[1] });
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < pathname.length) {
+    segments.push({ type: 'literal', value: pathname.slice(lastIndex) });
+  }
+  return segments;
+}
+
 interface PathsCanvasInnerProps {
   selectedPathId: string | null;
+  pathname?: string | null;
   onOperationSelect: (operation: { id: string; operation: string } | null) => void;
   onParameterSelect?: (parameter: { id: string; name: string; operationId: string } | null) => void;
   onResponseSelect?: (response: { id: string; statusCode: string; description: string } | null) => void;
@@ -294,7 +316,7 @@ interface PathsCanvasInnerProps {
   onRefresh?: () => void;
 }
 
-function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect, onResponseSelect, refreshKey, onRefresh }: PathsCanvasInnerProps) {
+function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParameterSelect, onResponseSelect, refreshKey, onRefresh }: PathsCanvasInnerProps) {
   const {
     gridSize,
     gridStyle,
@@ -695,6 +717,46 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
       });
     }
   }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
+
+  // Handle click on path variable: create-or-get shared parameter and open schema editor
+  const handlePathVariableClick = useCallback(
+    async (variableName: string) => {
+      if (!selectedPathId || !onParameterSelect) return;
+      try {
+        const result = await createSharedPathParameter(
+          selectedPathId,
+          variableName,
+          'path',
+          undefined,
+          undefined,
+          { type: 'string', required: true }
+        );
+        const parsed = JSON.parse(result);
+        if (parsed.success && parsed.parameter) {
+          onParameterSelect({
+            id: parsed.parameter.id,
+            name: variableName,
+            operationId: '',
+          });
+          if (onRefresh) onRefresh();
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: parsed.error || 'Failed to open parameter schema',
+            variant: 'error',
+          });
+        }
+      } catch (error) {
+        console.error('Error opening parameter for variable:', error);
+        await alertDialog({
+          title: 'Error',
+          message: 'Failed to open parameter schema',
+          variant: 'error',
+        });
+      }
+    },
+    [selectedPathId, onParameterSelect, onRefresh, alertDialog]
+  );
 
   // Handle delete response
   const handleDeleteResponse = useCallback(async (responseId: string, statusCode: string, operationId: string) => {
@@ -2954,6 +3016,35 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
 
   return (
     <div ref={reactFlowWrapper} className="flex-1 flex flex-col h-full">
+      {/* Path header with clickable variables - click a variable to open schema editor */}
+      {selectedPathId && pathname && extractPathParameters(pathname).length > 0 && (
+        <div
+          className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 flex items-center gap-1 flex-wrap font-mono text-sm"
+          title="Click a variable to edit its schema"
+        >
+          <span className="text-gray-500 dark:text-gray-400 mr-1">Path:</span>
+          {parsePathSegments(pathname).map((seg, i) =>
+            seg.type === 'literal' ? (
+              <span key={i} className="text-gray-700 dark:text-gray-300">
+                {seg.value}
+              </span>
+            ) : (
+              <button
+                key={i}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePathVariableClick(seg.value);
+                }}
+                className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 font-medium cursor-pointer transition-colors"
+                title={`Edit schema for ${seg.value}`}
+              >
+                {seg.value}
+              </button>
+            )
+          )}
+        </div>
+      )}
         <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -3021,6 +3112,7 @@ function PathsCanvasInner({ selectedPathId, onOperationSelect, onParameterSelect
 
 export default function PathsCanvasView({
   selectedPathId,
+  pathname,
   onOperationSelect,
   onParameterSelect,
   onResponseSelect,
@@ -3028,6 +3120,7 @@ export default function PathsCanvasView({
   onRefresh,
 }: {
   selectedPathId: string | null;
+  pathname?: string | null;
   onOperationSelect: (operation: { id: string; operation: string } | null) => void;
   onParameterSelect?: (parameter: { id: string; name: string; operationId: string } | null) => void;
   onResponseSelect?: (response: { id: string; statusCode: string; description: string } | null) => void;
@@ -3038,6 +3131,7 @@ export default function PathsCanvasView({
     <ReactFlowProvider>
       <PathsCanvasInner
         selectedPathId={selectedPathId}
+        pathname={pathname}
         onOperationSelect={onOperationSelect}
         onParameterSelect={onParameterSelect}
         onResponseSelect={onResponseSelect}
