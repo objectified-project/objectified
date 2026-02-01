@@ -85,13 +85,12 @@ structure immediately recognizable.
 - ✅ Parameters (query, header, cookie)
 - ✅ Security requirements
 - ✅ Deprecated flag
-- ✅  Private flag (unexposed endpoints)
-- 📋 External docs
+- ✅ Private flag (unexposed endpoints)
+- ✅ External docs
 - 📋 Custom `x-*` extensions
 
 | Ticket | Feature                                                  | Status   |
 |--------|----------------------------------------------------------|----------|
-| #370   | Add external docs to HTTP Operation                      |          |
 | #371   | Add custom x-* extensions to HTTP Operation              |          |
 
 #### 2.3 Schema Reference Nodes 📋 PLANNED

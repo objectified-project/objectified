@@ -300,10 +300,15 @@ def build_operation_for_openapi(operation: Dict[str, Any], options: Optional[Dic
                 result['tags'] = tags
         if description.get('deprecated'):
             result['deprecated'] = True
-        if description.get('externalDocs'):
-            external_docs = parse_json_field(description['externalDocs'])
-            if external_docs:
-                result['externalDocs'] = external_docs
+        # externalDocs: support both camelCase (OpenAPI) and snake_case (DB)
+        external_docs = description.get('externalDocs') or description.get('external_docs')
+        if external_docs:
+            external_docs = parse_json_field(external_docs)
+            if external_docs and external_docs.get('url'):
+                result['externalDocs'] = {
+                    'url': external_docs['url'],
+                    **({'description': external_docs['description']} if external_docs.get('description') else {}),
+                }
 
     # Add parameters
     parameters = operation.get('parameters', [])
