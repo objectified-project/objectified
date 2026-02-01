@@ -85,7 +85,7 @@ structure immediately recognizable.
 - ✅ Parameters (query, header, cookie)
 - ✅ Security requirements
 - ✅ Deprecated flag
-- 📋 Private flag (unexposed endpoints)
+- ✅  Private flag (unexposed endpoints)
 - 📋 External docs
 - 📋 Custom `x-*` extensions
 
