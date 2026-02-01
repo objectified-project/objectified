@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
 import Fab from '@mui/material/Fab';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
@@ -14,6 +14,7 @@ import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
+import SecuritySchemesPanel from './SecuritySchemesPanel';
 import {
   getPathsForVersion as getPathsForVersionRest,
   createPath as createPathRest,
@@ -60,11 +61,13 @@ export default function PathsSidebar({
   onTabChange,
   selectedPathId,
   onPathSelect,
+  onSecurityRefresh,
 }: {
-  activeTab: 'paths' | 'classes' | 'properties';
-  onTabChange: (tab: 'paths' | 'classes' | 'properties') => void;
+  activeTab: 'paths' | 'operations' | 'classes' | 'properties' | 'security';
+  onTabChange: (tab: 'paths' | 'operations' | 'classes' | 'properties' | 'security') => void;
   selectedPathId: string | null;
   onPathSelect: (pathId: string | null, pathname?: string) => void;
+  onSecurityRefresh?: () => void;
 }) {
   const { selectedVersionId, selectedProjectId } = useStudio();
   const { confirm: confirmDialog } = useDialog();
@@ -296,9 +299,17 @@ export default function PathsSidebar({
     }));
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: 'paths' | 'classes' | 'properties') => {
-    onTabChange(newValue);
+  const handleTabChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onTabChange(event.target.value as 'paths' | 'operations' | 'classes' | 'properties' | 'security');
   };
+
+  const TAB_OPTIONS = [
+    { value: 'paths' as const, label: 'Paths' },
+    { value: 'operations' as const, label: 'Operations' },
+    { value: 'classes' as const, label: 'Classes' },
+    { value: 'properties' as const, label: 'Properties' },
+    { value: 'security' as const, label: 'Security' },
+  ];
 
   return (
     <Drawer
@@ -335,82 +346,42 @@ export default function PathsSidebar({
           position: 'relative',
         }}
       >
-        {/* Tabs Navigation */}
-        <Tabs
-          value={activeTab}
-          onChange={handleTabChange}
-          variant="fullWidth"
+        {/* Section Dropdown */}
+        <Box
           sx={{
+            px: 2,
+            py: 1.5,
             borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            minHeight: 44,
-            '& .MuiTabs-indicator': {
-              height: 3,
-              borderRadius: '3px 3px 0 0',
-              background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)',
-            },
-            '& .MuiTabs-flexContainer': {
-              height: 44,
-            },
           }}
         >
-          <Tab
-            label="Paths"
-            value="paths"
+          <TextField
+            select
+            value={activeTab}
+            onChange={handleTabChange}
+            size="small"
+            fullWidth
+            variant="outlined"
             sx={{
-              minHeight: 44,
-              padding: 0,
-              textTransform: 'none',
-              fontWeight: activeTab === 'paths' ? 700 : 500,
-              fontSize: '0.75rem',
-              color: activeTab === 'paths'
-                ? '#6366f1'
-                : (isDark ? '#94a3b8' : '#64748b'),
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                color: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
+              '& .MuiInputBase-root': {
+                fontSize: '0.8125rem',
+                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(249, 250, 251, 1)',
+                color: isDark ? '#e2e8f0' : '#1e293b',
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+              },
+              '& .MuiSelect-select': {
+                py: 1,
               },
             }}
-          />
-          <Tab
-            label="Classes"
-            value="classes"
-            sx={{
-              minHeight: 44,
-              padding: 0,
-              textTransform: 'none',
-              fontWeight: activeTab === 'classes' ? 700 : 500,
-              fontSize: '0.75rem',
-              color: activeTab === 'classes'
-                ? '#6366f1'
-                : (isDark ? '#94a3b8' : '#64748b'),
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                color: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-              },
-            }}
-          />
-          <Tab
-            label="Properties"
-            value="properties"
-            sx={{
-              minHeight: 44,
-              padding: 0,
-              textTransform: 'none',
-              fontWeight: activeTab === 'properties' ? 700 : 500,
-              fontSize: '0.75rem',
-              color: activeTab === 'properties'
-                ? '#6366f1'
-                : (isDark ? '#94a3b8' : '#64748b'),
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                color: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-              },
-            }}
-          />
-        </Tabs>
+          >
+            {TAB_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
 
         {/* Content Area */}
         <Box sx={{
@@ -426,59 +397,64 @@ export default function PathsSidebar({
             </Box>
           ) : (
             <>
+              {/* Operations Tab Content */}
+              {activeTab === 'operations' && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ mb: 1, px: 0.5 }}>
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                      Drag to Canvas
+                    </span>
+                  </Box>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1 px-0.5">
+                    Drag an operation onto a path on the canvas to add it.
+                  </p>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    {AVAILABLE_OPERATIONS.map((operation) => (
+                      <Box
+                        key={operation.id}
+                        draggable
+                        onDragStart={(e) => handleOperationDragStart(e, operation)}
+                        sx={{
+                          px: 1.5,
+                          py: 1,
+                          borderRadius: 1,
+                          border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
+                          backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
+                          cursor: 'grab',
+                          transition: 'all 0.15s ease',
+                          '&:hover': {
+                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          },
+                          '&:active': {
+                            cursor: 'grabbing',
+                          },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              backgroundColor: operation.color,
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span className="text-sm font-medium" style={{ color: operation.color }}>
+                            {operation.label}
+                          </span>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
               {/* Paths Tab Content */}
               {activeTab === 'paths' && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {/* Available Operations Section */}
-                  <Box>
-                    <Box sx={{ mb: 1, px: 0.5 }}>
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                        Available Operations
-                      </span>
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      {AVAILABLE_OPERATIONS.map((operation) => (
-                        <Box
-                          key={operation.id}
-                          draggable
-                          onDragStart={(e) => handleOperationDragStart(e, operation)}
-                          sx={{
-                            px: 1.5,
-                            py: 1,
-                            borderRadius: 1,
-                            border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
-                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
-                            cursor: 'grab',
-                            transition: 'all 0.15s ease',
-                            '&:hover': {
-                              backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
-                              transform: 'translateY(-1px)',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                            },
-                            '&:active': {
-                              cursor: 'grabbing',
-                            },
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box
-                              sx={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: '50%',
-                                backgroundColor: operation.color,
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span className="text-sm font-medium" style={{ color: operation.color }}>
-                              {operation.label}
-                            </span>
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-
                   {/* Paths List Section */}
                   <Box>
                     <Box sx={{ mb: 1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -924,6 +900,11 @@ export default function PathsSidebar({
                 </Box>
               </Box>
             )}
+
+              {/* Security Tab Content */}
+              {activeTab === 'security' && (
+                <SecuritySchemesPanel onRefresh={onSecurityRefresh} />
+              )}
             </>
           )}
         </Box>

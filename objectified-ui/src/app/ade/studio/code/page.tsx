@@ -19,6 +19,10 @@ import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../lib/db/helper';
 import { loadPathsForOpenAPIExport } from '../../../../../lib/db/helper-paths-export';
+import {
+  getSecuritySchemesForVersion,
+  securitySchemesToOpenAPI,
+} from '../../../../../lib/db/helper-security-schemes';
 import { generatePathsForOpenAPI, type PathInfo } from '../../../../../lib/utils/openapi-paths-generator';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -241,6 +245,17 @@ export default function CodePage() {
           }
         }
 
+        // Load security schemes (API Key header/query/cookie)
+        let securitySchemes: Record<string, unknown> = {};
+        try {
+          const schemes = await getSecuritySchemesForVersion(selectedVersionId);
+          if (schemes.length > 0) {
+            securitySchemes = (await securitySchemesToOpenAPI(schemes)) as Record<string, unknown>;
+          }
+        } catch (schemesError) {
+          console.error('[Code Tab] Exception while loading security schemes:', schemesError);
+        }
+
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
 
@@ -249,7 +264,7 @@ export default function CodePage() {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
           description: currentVersion?.description || ''
-        }, pathsObject);
+        }, pathsObject, Object.keys(securitySchemes).length > 0 ? securitySchemes : undefined);
         setOpenApiSpec(openApiContent);
 
         const arazzoContent = await generateArazzoSpec(classesWithProperties, {

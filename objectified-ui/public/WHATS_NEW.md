@@ -14,6 +14,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added background configurations to the canvas
   - Added ability to enable/disable grid
 - Paths Improvements:
+  - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)
   - Added inline variable editor that can click parameters in the header of the path studio
   - Added primitives template usage in schema definitions
   - Added security requirements to HTTP Operation endpoint definitions
@@ -21,6 +22,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Added the ability to mark operations as private (exclusion from Swagger)
   - Added external documentation to operations
   - Added x-* extension tags to HTTP Operation definitions
+  - Added security section:
+    - Adds API Keys for Security options
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions

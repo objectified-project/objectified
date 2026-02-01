@@ -271,7 +271,8 @@ export async function generateOpenApiSpec(
       };
     };
   },
-  paths?: Record<string, unknown>
+  paths?: Record<string, unknown>,
+  securitySchemes?: Record<string, unknown>
 ): Promise<string> {
   const schemas: any = {};
 
@@ -319,7 +320,8 @@ export async function generateOpenApiSpec(
     openapi: versionConfig.version,
     info,
     schemas,
-    paths: paths || {}  // Include paths in template data, default to empty object
+    paths: paths || {},  // Include paths in template data, default to empty object
+    ...(securitySchemes && Object.keys(securitySchemes).length > 0 ? { securitySchemes } : {}),
   };
 
   console.log('[OpenAPI Generator] Template data paths count:', Object.keys(paths || {}).length);

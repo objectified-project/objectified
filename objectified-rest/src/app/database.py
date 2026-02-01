@@ -724,6 +724,16 @@ class Database:
             conn.rollback()
             raise e
 
+    def get_security_schemes_for_version(self, version_id: str) -> List[Dict[str, Any]]:
+        """Get all security schemes for a version (OpenAPI components.securitySchemes)."""
+        query = """
+            SELECT id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data
+            FROM odb.version_security_scheme
+            WHERE version_id = %s
+            ORDER BY scheme_name
+        """
+        return self.execute_query(query, (version_id,))
+
     def get_paths_for_version(self, version_id: str) -> List[Dict[str, Any]]:
         """Get all paths for a specific version."""
         query = """

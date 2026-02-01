@@ -237,6 +237,29 @@ def generate_openapi_spec(
             # Log error but continue - paths are optional
             print(f"Warning: Could not load paths for version {version_id}: {e}")
 
+    # Load security schemes (API Key header/query/cookie, etc.)
+    security_schemes: Dict[str, Any] = {}
+    if version_db_id:
+        try:
+            from .database import db
+            if db:
+                scheme_rows = db.get_security_schemes_for_version(version_db_id)
+                for row in scheme_rows:
+                    if row.get('scheme_type') == 'apiKey':
+                        security_schemes[row['scheme_name']] = {
+                            'type': 'apiKey',
+                            'name': row.get('param_name') or row['scheme_name'],
+                            'in': row.get('in_location') or 'header',
+                            **({'description': row['description']} if row.get('description') else {}),
+                        }
+        except Exception as e:
+            print(f"Warning: Could not load security schemes for version {version_id}: {e}")
+
+    # Build components
+    components: Dict[str, Any] = {"schemas": schemas}
+    if security_schemes:
+        components["securitySchemes"] = security_schemes
+
     # Build the OpenAPI specification
     openapi_spec = {
         "openapi": "3.1.0",
@@ -246,9 +269,7 @@ def generate_openapi_spec(
             "description": description
         },
         "paths": paths,
-        "components": {
-            "schemas": schemas
-        }
+        "components": components
     }
 
     return openapi_spec

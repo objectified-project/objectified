@@ -248,7 +248,7 @@ structure immediately recognizable.
 Define security schemes once, apply to multiple operations:
 
 **Supported Schemes**:
-- 📋 **API Key**: Header, query, or cookie-based keys
+- ✅ **API Key**: Header, query, or cookie-based keys (#410)
 - 📋 **HTTP**: Basic, Bearer, or custom HTTP auth
 - 📋 **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
 - 📋 **OpenID Connect**: Discovery URL with scopes

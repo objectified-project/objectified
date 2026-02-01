@@ -10,7 +10,7 @@ import ResponsePropertiesPanel from './components/ResponsePropertiesPanel';
 
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
-  const [activeTab, setActiveTab] = useState<'paths' | 'classes' | 'properties'>('paths');
+  const [activeTab, setActiveTab] = useState<'paths' | 'operations' | 'classes' | 'properties' | 'security'>('paths');
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<{ id: string; pathname: string } | null>(null);
   const [selectedOperation, setSelectedOperation] = useState<{
@@ -112,9 +112,10 @@ export default function PathsPage() {
           {/* Left Sidebar */}
           <PathsSidebar
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={(tab) => setActiveTab(tab)}
             selectedPathId={selectedPathId}
             onPathSelect={handlePathSelect}
+            onSecurityRefresh={handleCanvasRefresh}
           />
 
           {/* Center Canvas */}

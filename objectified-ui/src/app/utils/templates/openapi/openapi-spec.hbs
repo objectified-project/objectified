@@ -8,6 +8,8 @@
 {{#each schemas}}
       "{{@key}}": {{{json this}}}{{#unless @last}},{{/unless}}
 {{/each}}
-    }
+    }{{#if securitySchemes}},
+    "securitySchemes": {{{json securitySchemes}}}
+{{/if}}
   }
 }

@@ -36,6 +36,8 @@ import ResponseSection from './ResponseSection';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
 import type { SecurityRequirement } from '../../../../../../lib/utils/openapi-paths-generator';
 import { ExtensionsEditor } from '../../../../components/ade/studio/ExtensionsEditor';
+import { useStudio } from '../../StudioContext';
+import { getSecuritySchemesForVersion } from '../../../../../../lib/db/helper-security-schemes';
 
 interface OperationPropertiesPanelProps {
   operationId: string | null;
@@ -57,6 +59,7 @@ export default function OperationPropertiesPanel({
   onClose,
   onRefresh,
 }: OperationPropertiesPanelProps) {
+  const { selectedVersionId } = useStudio();
   const isDark = useDarkMode();
   const { alert: alertDialog, confirm: confirmDialog } = useDialog();
 
@@ -78,6 +81,9 @@ export default function OperationPropertiesPanel({
 
   // Responses list state
   const [responses, setResponses] = useState<any[]>([]);
+
+  // Security schemes (API Key) for dropdown
+  const [securitySchemes, setSecuritySchemes] = useState<{ scheme_name: string; in_location: string | null; param_name: string | null }[]>([]);
   const [responsesLoading, setResponsesLoading] = useState(false);
 
   // New parameter form state
@@ -191,6 +197,21 @@ export default function OperationPropertiesPanel({
 
     loadDescription();
   }, [operationId, pathname, operation]);
+
+  // Load security schemes (API Key) for dropdown
+  useEffect(() => {
+    if (!selectedVersionId) {
+      setSecuritySchemes([]);
+      return;
+    }
+    getSecuritySchemesForVersion(selectedVersionId).then((schemes) => {
+      setSecuritySchemes(schemes.map((s) => ({
+        scheme_name: s.scheme_name,
+        in_location: s.in_location,
+        param_name: s.param_name,
+      })));
+    }).catch(() => setSecuritySchemes([]));
+  }, [selectedVersionId]);
 
   // Load parameters when operationId changes
   useEffect(() => {
@@ -1566,33 +1587,83 @@ export default function OperationPropertiesPanel({
                             gap: 1,
                           }}
                         >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <TextField
-                              size="small"
-                              placeholder="Scheme name (e.g., bearerAuth)"
-                              value={schemeName}
-                              onChange={(e) =>
-                                handleUpdateSecurity(index, e.target.value, scopes || [])
-                              }
-                              sx={{
-                                flex: 1,
-                                mr: 1,
-                                '& .MuiInputBase-root': {
-                                  fontSize: '0.875rem',
-                                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                  color: isDark ? '#f1f5f9' : '#0f172a',
-                                },
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                  borderColor: isDark ? '#334155' : '#e2e8f0',
-                                },
-                              }}
-                            />
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              {securitySchemes.length > 0 ? (
+                                <>
+                                  <TextField
+                                    select
+                                    size="small"
+                                    value={securitySchemes.some(s => s.scheme_name === schemeName) ? schemeName : '__custom__'}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      handleUpdateSecurity(index, v === '__custom__' ? '' : v, scopes || []);
+                                    }}
+                                    sx={{
+                                      '& .MuiInputBase-root': {
+                                        fontSize: '0.875rem',
+                                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                        color: isDark ? '#f1f5f9' : '#0f172a',
+                                      },
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: isDark ? '#334155' : '#e2e8f0',
+                                      },
+                                    }}
+                                  >
+                                    {securitySchemes.map((s) => (
+                                      <MenuItem key={s.scheme_name} value={s.scheme_name}>
+                                        {s.scheme_name} ({s.in_location || 'header'}: {s.param_name || s.scheme_name})
+                                      </MenuItem>
+                                    ))}
+                                    <MenuItem value="__custom__">Other (bearerAuth, oauth2...)</MenuItem>
+                                  </TextField>
+                                  {(!schemeName || !securitySchemes.some(s => s.scheme_name === schemeName)) && (
+                                    <TextField
+                                      size="small"
+                                      placeholder="Custom scheme name"
+                                      value={schemeName}
+                                      onChange={(e) => handleUpdateSecurity(index, e.target.value, scopes || [])}
+                                      sx={{
+                                        '& .MuiInputBase-root': {
+                                          fontSize: '0.75rem',
+                                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                          color: isDark ? '#f1f5f9' : '#0f172a',
+                                        },
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                          borderColor: isDark ? '#334155' : '#e2e8f0',
+                                        },
+                                      }}
+                                    />
+                                  )}
+                                </>
+                              ) : (
+                                <TextField
+                                  size="small"
+                                  placeholder="Scheme name (e.g., apiKey, bearerAuth)"
+                                  value={schemeName}
+                                  onChange={(e) =>
+                                    handleUpdateSecurity(index, e.target.value, scopes || [])
+                                  }
+                                  sx={{
+                                    '& .MuiInputBase-root': {
+                                      fontSize: '0.875rem',
+                                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                      color: isDark ? '#f1f5f9' : '#0f172a',
+                                    },
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                      borderColor: isDark ? '#334155' : '#e2e8f0',
+                                    },
+                                  }}
+                                />
+                              )}
+                            </Box>
                             <IconButton
                               size="small"
                               onClick={() => handleRemoveSecurity(index)}
                               sx={{
                                 color: '#ef4444',
                                 p: 0.5,
+                                flexShrink: 0,
                                 '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
                               }}
                             >
