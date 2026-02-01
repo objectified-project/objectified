@@ -13,6 +13,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Added ability to switch connection types for edges in the canvas
   - Added background configurations to the canvas
   - Added ability to enable/disable grid
+- Paths Improvements:
+  - Added inline variable editor that can click parameters in the header of the path studio
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
 - Bug fixes:
