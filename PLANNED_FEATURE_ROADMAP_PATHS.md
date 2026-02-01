@@ -91,7 +91,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                  | Status   |
 |--------|----------------------------------------------------------|----------|
-| #369   | Add private flag to HTTP Operation                       |          |
 | #370   | Add external docs to HTTP Operation                      |          |
 | #371   | Add custom x-* extensions to HTTP Operation              |          |
 

@@ -96,6 +96,7 @@ function OperationNode({ data }: {
     parameters?: Array<{ id: string; name: string; in: string; required?: boolean }>;
     security?: Array<Record<string, string[]>>; // OpenAPI security requirements
     deprecated?: boolean; // Whether the operation is deprecated
+    xPrivate?: boolean; // Hide from Swagger (x-private)
     onDelete?: () => void;
     onSchemaDrop?: (operationId: string, schemaType: 'request' | 'response', schemaData: any) => void;
   } 
@@ -163,7 +164,7 @@ function OperationNode({ data }: {
       <div 
         className={`bg-white dark:bg-gray-800 rounded-xl border-2 shadow-xl min-w-[220px] max-w-[280px] cursor-pointer relative group ${
           data.deprecated ? 'border-dashed opacity-75' : ''
-        }`}
+        } ${data.xPrivate ? 'ring-2 ring-indigo-400/50 ring-offset-2 ring-offset-white dark:ring-offset-gray-900' : ''}`}
         style={{ borderColor: data.deprecated ? '#f59e0b' : data.color }}
       >
         {/* Delete button */}
@@ -185,14 +186,22 @@ function OperationNode({ data }: {
           className={`text-white px-4 py-3 rounded-t-xl ${data.deprecated ? 'opacity-70' : ''}`}
           style={{ backgroundColor: data.color }}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-1 flex-wrap">
             <div className="text-xs font-medium opacity-90">HTTP Method</div>
-            {data.deprecated && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-400/90 text-amber-900">
-                <AlertTriangle size={10} />
-                Deprecated
-              </span>
-            )}
+            <div className="flex items-center gap-1">
+              {data.xPrivate && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-400/90 text-indigo-900 dark:bg-indigo-300/90 dark:text-indigo-900" title="Hidden from Swagger (x-private)">
+                  <Lock size={10} />
+                  Private
+                </span>
+              )}
+              {data.deprecated && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-400/90 text-amber-900">
+                  <AlertTriangle size={10} />
+                  Deprecated
+                </span>
+              )}
+            </div>
           </div>
           <div className={`font-bold text-lg ${data.deprecated ? 'line-through opacity-80' : ''}`}>{data.operation}</div>
           {data.operationId && (
@@ -1704,6 +1713,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         const operationIdMap = new Map<string, string>(); // Maps db operation id to OpenAPI operationId
         const operationSecurityMap = new Map<string, Array<Record<string, string[]>>>();
         const operationDeprecatedMap = new Map<string, boolean>();
+        const operationPrivateMap = new Map<string, boolean>();
 
         for (const op of operations) {
           // Load linked parameters
@@ -1720,7 +1730,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             operationParamsMap.set(op.id, []);
           }
 
-          // Load operation description to get operationId and security
+          // Load operation description to get operationId, security, deprecated, x-private
           try {
             const descResponse = await getOperationDescription(op.id);
             const descData = JSON.parse(descResponse);
@@ -1735,6 +1745,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               }
               if (meta?.deprecated === true) {
                 operationDeprecatedMap.set(op.id, true);
+              }
+              if (meta?.['x-private'] === true || meta?.x_private === true || descData.x_private === true) {
+                operationPrivateMap.set(op.id, true);
               }
             }
           } catch (descError) {
@@ -1762,6 +1775,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             parameters: operationParamsMap.get(op.id) || [],
             security: operationSecurityMap.get(op.id),
             deprecated: operationDeprecatedMap.get(op.id),
+            xPrivate: operationPrivateMap.get(op.id),
             onDelete: () => handleDeleteOperation(op.id, op.operation),
             onSchemaDrop: async (operationId: string, schemaType: 'request' | 'response', schemaData: any) => {
               // Handle class drops with dialog for copy vs reference

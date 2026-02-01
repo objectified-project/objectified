@@ -761,6 +761,7 @@ class Database:
                 operation_id,
                 metadata->'tags' as tags,
                 (metadata->>'deprecated')::boolean as deprecated,
+                (metadata->>'x-private')::boolean as x_private,
                 metadata->'external_docs' as external_docs
             FROM odb.path_operation_description
             WHERE path_operation_id = %s

@@ -26,6 +26,9 @@ export interface PathOperationDescription {
   operationId?: string;
   tags?: string[];
   deprecated?: boolean;
+  /** When true, hide this operation from Swagger/OpenAPI docs (x-private) */
+  'x-private'?: boolean;
+  x_private?: boolean;
   externalDocs?: {
     url: string;
     description?: string;

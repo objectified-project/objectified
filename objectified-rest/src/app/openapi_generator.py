@@ -226,12 +226,13 @@ def generate_openapi_spec(
     description = project_description if project_description and project_description.strip() else "No description provided"
 
     # Load paths for this version if version_db_id is provided
+    # exclude_private=True so operations marked x-private are hidden from Swagger
     paths: Dict[str, Any] = {}
     if version_db_id:
         try:
             paths_data = _load_paths_for_version(version_db_id)
             if paths_data:
-                paths = generate_paths_for_openapi(paths_data)
+                paths = generate_paths_for_openapi(paths_data, options={"exclude_private": True})
         except Exception as e:
             # Log error but continue - paths are optional
             print(f"Warning: Could not load paths for version {version_id}: {e}")

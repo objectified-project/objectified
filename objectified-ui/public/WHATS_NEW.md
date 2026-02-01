@@ -18,6 +18,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added primitives template usage in schema definitions
   - Added security requirements to HTTP Operation endpoint definitions
   - Added the ability to mark operations as deprecated
+  - Added the ability to mark operations as private (exclusion from Swagger)
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions

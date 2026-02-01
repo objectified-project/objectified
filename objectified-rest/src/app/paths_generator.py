@@ -336,6 +336,7 @@ def build_path_item_for_openapi(path: Dict[str, Any], options: Optional[Dict[str
     """Build OpenAPI path item object from database path record."""
     options = options or {}
     result: Dict[str, Any] = {}
+    exclude_private = options.get('exclude_private', False)
 
     # Add path-level summary and description
     if path.get('summary'):
@@ -343,9 +344,13 @@ def build_path_item_for_openapi(path: Dict[str, Any], options: Optional[Dict[str
     if options.get('includeDescriptions', True) and path.get('description'):
         result['description'] = path['description']
 
-    # Add operations
+    # Add operations (skip those marked x-private when exclude_private is True)
     operations = path.get('operations', [])
     for operation in operations:
+        if exclude_private:
+            description = operation.get('description') or {}
+            if description.get('x_private') or description.get('x-private'):
+                continue
         method = operation.get('operation', 'get').lower()
         result[method] = build_operation_for_openapi(operation, options)
 
