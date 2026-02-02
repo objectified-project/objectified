@@ -29,6 +29,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds OpenID security options
     - Adds TLS security options
     - Adds custom security schema options
+  - Added ability to apply multiple security schemes to HTTP Operations (and/or)
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions

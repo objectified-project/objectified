@@ -271,21 +271,26 @@ function OperationNode({ data }: {
             </div>
           </div>
 
-          {/* Security badge */}
+          {/* Security badges: OR = separate badges; within each, schemes are AND */}
           {data.security && data.security.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 items-center">
               {data.security.map((req, i) => {
-                const [scheme] = Object.entries(req)[0] || [];
-                return scheme ? (
+                const schemes = Object.keys(req).filter(Boolean);
+                if (schemes.length === 0) return null;
+                const label = schemes.join(' + ');
+                const title = schemes.length > 1
+                  ? `Security (AND): ${schemes.join(', ')}`
+                  : `Security: ${schemes[0]}`;
+                return (
                   <span
                     key={i}
                     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                    title={`Security: ${scheme}`}
+                    title={title}
                   >
                     <Lock size={10} />
-                    {scheme}
+                    {label}
                   </span>
-                ) : null;
+                );
               })}
             </div>
           )}

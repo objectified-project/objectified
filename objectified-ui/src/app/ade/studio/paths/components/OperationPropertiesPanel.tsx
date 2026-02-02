@@ -337,8 +337,21 @@ export default function OperationPropertiesPanel({
     setIsSaving(true);
     setSaveStatus('idle');
     try {
+      // Strip placeholder keys (__new__*) so we don't persist them
+      const sanitizedSecurity =
+        security.length > 0
+          ? security
+              .map((req) => {
+                const cleaned: SecurityRequirement = {};
+                for (const [name, scopes] of Object.entries(req)) {
+                  if (!name.startsWith('__new__')) cleaned[name] = scopes;
+                }
+                return cleaned;
+              })
+              .filter((req) => Object.keys(req).length > 0)
+          : undefined;
       const metadata: Record<string, unknown> = {
-        security: security.length > 0 ? security : undefined,
+        security: sanitizedSecurity,
         deprecated: deprecated ? true : false,
         'x-private': xPrivate ? true : false,
         external_docs:
@@ -571,19 +584,69 @@ export default function OperationPropertiesPanel({
     }
   };
 
+  // Add a new OR requirement (one scheme by default)
   const handleAddSecurity = () => {
     setSecurity((prev) => [...prev, { bearerAuth: [] }]);
   };
 
+  // Remove entire OR requirement at index
   const handleRemoveSecurity = (index: number) => {
     setSecurity((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleUpdateSecurity = (index: number, schemeName: string, scopes: string[]) => {
+  // Add another scheme (AND) to the requirement at reqIndex
+  const handleAddSchemeToRequirement = (reqIndex: number) => {
+    setSecurity((prev) => {
+      const next = [...prev];
+      const req = { ...next[reqIndex] };
+      const existing = Object.keys(req);
+      const availableFromList = securitySchemes.find((s) => !existing.includes(s.scheme_name))?.scheme_name;
+      // Use an unused scheme from the list, or a unique placeholder so we always add a new row (user can rename)
+      const newKey = availableFromList ?? `__new__${Date.now()}`;
+      req[newKey] = [];
+      next[reqIndex] = req;
+      return next;
+    });
+  };
+
+  // Remove one scheme from a requirement; remove the requirement if it becomes empty
+  const handleRemoveSchemeFromRequirement = (reqIndex: number, schemeName: string) => {
+    setSecurity((prev) => {
+      const next = [...prev];
+      const req = { ...next[reqIndex] };
+      delete req[schemeName];
+      if (Object.keys(req).length === 0) {
+        next.splice(reqIndex, 1);
+      } else {
+        next[reqIndex] = req;
+      }
+      return next;
+    });
+  };
+
+  // Update scopes for one scheme in a requirement (keep other schemes in that requirement)
+  const handleUpdateSecurity = (reqIndex: number, schemeName: string, scopes: string[]) => {
     setSecurity((prev) => {
       const next = [...prev];
       const key = schemeName.trim() || 'bearerAuth';
-      next[index] = { [key]: scopes };
+      next[reqIndex] = { ...next[reqIndex], [key]: scopes };
+      return next;
+    });
+  };
+
+  // Rename a scheme in a requirement (e.g. dropdown change); keep scopes
+  const handleRenameSecurityScheme = (
+    reqIndex: number,
+    oldName: string,
+    newName: string,
+    scopes: string[]
+  ) => {
+    setSecurity((prev) => {
+      const next = [...prev];
+      const req = { ...next[reqIndex] };
+      delete req[oldName];
+      req[newName.trim() || 'bearerAuth'] = scopes;
+      next[reqIndex] = req;
       return next;
     });
   };
@@ -1536,7 +1599,7 @@ export default function OperationPropertiesPanel({
                 )}
               </Box>
 
-              {/* Security Section */}
+              {/* Security Section: OR = alternative requirements, AND = schemes within a requirement */}
               <Box sx={{ mt: 2, pt: 2, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
@@ -1556,11 +1619,11 @@ export default function OperationPropertiesPanel({
                       },
                     }}
                   >
-                    Add Security
+                    Add requirement (OR)
                   </Button>
                 </Box>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  Authentication schemes required for this operation (e.g., bearerAuth, apiKey, oauth2)
+                  OR = alternative options; within an option, schemes are AND (all required).
                 </p>
                 {security.length === 0 ? (
                   <Box
@@ -1577,34 +1640,122 @@ export default function OperationPropertiesPanel({
                     </span>
                   </Box>
                 ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {security.map((req, index) => {
-                      const [schemeName, scopes] = Object.entries(req)[0] || ['bearerAuth', []];
-                      return (
-                        <Box
-                          key={index}
-                          sx={{
-                            p: 1.5,
-                            border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                            borderRadius: 1,
-                            backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 1,
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              {securitySchemes.length > 0 ? (
-                                <>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {security.map((req, reqIndex) => (
+                      <Box
+                        key={reqIndex}
+                        sx={{
+                          p: 1.5,
+                          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                          borderRadius: 1,
+                          backgroundColor: isDark ? '#0f172a' : '#f9fafb',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                            Option {reqIndex + 1} (OR)
+                          </span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveSecurity(reqIndex)}
+                            sx={{
+                              color: '#ef4444',
+                              p: 0.25,
+                              '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+                            }}
+                            title="Remove this requirement (OR)"
+                          >
+                            <Delete sx={{ fontSize: 14 }} />
+                          </IconButton>
+                        </Box>
+                        {Object.entries(req).map(([schemeName, scopes]) => (
+                          <Box
+                            key={schemeName}
+                            sx={{
+                              pl: 1,
+                              borderLeft: isDark ? '2px solid #334155' : '2px solid #e2e8f0',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1,
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+                              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {securitySchemes.length > 0 ? (
+                                  <>
+                                    <TextField
+                                      select
+                                      size="small"
+                                      value={schemeName.startsWith('__new__') || !securitySchemes.some((s) => s.scheme_name === schemeName) ? '__custom__' : schemeName}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        handleRenameSecurityScheme(
+                                          reqIndex,
+                                          schemeName,
+                                          v === '__custom__' ? '' : v,
+                                          scopes || []
+                                        );
+                                      }}
+                                      sx={{
+                                        '& .MuiInputBase-root': {
+                                          fontSize: '0.875rem',
+                                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                          color: isDark ? '#f1f5f9' : '#0f172a',
+                                        },
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                          borderColor: isDark ? '#334155' : '#e2e8f0',
+                                        },
+                                      }}
+                                    >
+                                      {securitySchemes.map((s) => (
+                                        <MenuItem key={s.scheme_name} value={s.scheme_name}>
+                                          {s.scheme_type === 'http'
+                                            ? `${s.scheme_name} (HTTP: ${s.http_scheme || 'basic'})`
+                                            : s.scheme_type === 'oauth2'
+                                            ? `${s.scheme_name} (OAuth2)`
+                                            : s.scheme_type === 'openIdConnect'
+                                            ? `${s.scheme_name} (OpenID Connect)`
+                                            : s.scheme_type === 'mutualTLS'
+                                            ? `${s.scheme_name} (Mutual TLS)`
+                                            : s.scheme_type === 'custom'
+                                            ? `${s.scheme_name} (Custom)`
+                                            : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
+                                        </MenuItem>
+                                      ))}
+                                      <MenuItem value="__custom__">Other (bearerAuth, oauth2...)</MenuItem>
+                                    </TextField>
+                                    {(schemeName.startsWith('__new__') || !schemeName || !securitySchemes.some((s) => s.scheme_name === schemeName)) && (
+                                      <TextField
+                                        size="small"
+                                        placeholder="Custom scheme name"
+                                        value={schemeName.startsWith('__new__') ? '' : schemeName}
+                                        onChange={(e) =>
+                                          handleRenameSecurityScheme(reqIndex, schemeName, e.target.value, scopes || [])
+                                        }
+                                        sx={{
+                                          '& .MuiInputBase-root': {
+                                            fontSize: '0.75rem',
+                                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                            color: isDark ? '#f1f5f9' : '#0f172a',
+                                          },
+                                          '& .MuiOutlinedInput-notchedOutline': {
+                                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                                          },
+                                        }}
+                                      />
+                                    )}
+                                  </>
+                                ) : (
                                   <TextField
-                                    select
                                     size="small"
-                                    value={securitySchemes.some(s => s.scheme_name === schemeName) ? schemeName : '__custom__'}
-                                    onChange={(e) => {
-                                      const v = e.target.value;
-                                      handleUpdateSecurity(index, v === '__custom__' ? '' : v, scopes || []);
-                                    }}
+                                    placeholder="Scheme name (e.g., apiKey, bearerAuth)"
+                                    value={schemeName.startsWith('__new__') ? '' : schemeName}
+                                    onChange={(e) =>
+                                      handleRenameSecurityScheme(reqIndex, schemeName, e.target.value, scopes || [])
+                                    }
                                     sx={{
                                       '& .MuiInputBase-root': {
                                         fontSize: '0.875rem',
@@ -1615,104 +1766,67 @@ export default function OperationPropertiesPanel({
                                         borderColor: isDark ? '#334155' : '#e2e8f0',
                                       },
                                     }}
-                                  >
-                                    {securitySchemes.map((s) => (
-                                      <MenuItem key={s.scheme_name} value={s.scheme_name}>
-                                        {s.scheme_type === 'http'
-                                          ? `${s.scheme_name} (HTTP: ${s.http_scheme || 'basic'})`
-                                          : s.scheme_type === 'oauth2'
-                                          ? `${s.scheme_name} (OAuth2)`
-                                          : s.scheme_type === 'openIdConnect'
-                                          ? `${s.scheme_name} (OpenID Connect)`
-                                          : s.scheme_type === 'mutualTLS'
-                                          ? `${s.scheme_name} (Mutual TLS)`
-                                          : s.scheme_type === 'custom'
-                                          ? `${s.scheme_name} (Custom)`
-                                          : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
-                                      </MenuItem>
-                                    ))}
-                                    <MenuItem value="__custom__">Other (bearerAuth, oauth2...)</MenuItem>
-                                  </TextField>
-                                  {(!schemeName || !securitySchemes.some(s => s.scheme_name === schemeName)) && (
-                                    <TextField
-                                      size="small"
-                                      placeholder="Custom scheme name"
-                                      value={schemeName}
-                                      onChange={(e) => handleUpdateSecurity(index, e.target.value, scopes || [])}
-                                      sx={{
-                                        '& .MuiInputBase-root': {
-                                          fontSize: '0.75rem',
-                                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                          color: isDark ? '#f1f5f9' : '#0f172a',
-                                        },
-                                        '& .MuiOutlinedInput-notchedOutline': {
-                                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                                        },
-                                      }}
-                                    />
-                                  )}
-                                </>
-                              ) : (
-                                <TextField
-                                  size="small"
-                                  placeholder="Scheme name (e.g., apiKey, bearerAuth)"
-                                  value={schemeName}
-                                  onChange={(e) =>
-                                    handleUpdateSecurity(index, e.target.value, scopes || [])
-                                  }
-                                  sx={{
-                                    '& .MuiInputBase-root': {
-                                      fontSize: '0.875rem',
-                                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                      color: isDark ? '#f1f5f9' : '#0f172a',
-                                    },
-                                    '& .MuiOutlinedInput-notchedOutline': {
-                                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                                    },
-                                  }}
-                                />
-                              )}
+                                  />
+                                )}
+                                {(schemeName === 'oauth2' || schemeName === 'openIdConnect') && (
+                                  <TextField
+                                    size="small"
+                                    placeholder="Scopes (comma-separated)"
+                                    value={(scopes || []).join(', ')}
+                                    onChange={(e) => {
+                                      const scopeList = e.target.value
+                                        .split(',')
+                                        .map((s) => s.trim())
+                                        .filter(Boolean);
+                                      handleUpdateSecurity(reqIndex, schemeName, scopeList);
+                                    }}
+                                    sx={{
+                                      '& .MuiInputBase-root': {
+                                        fontSize: '0.75rem',
+                                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                        color: isDark ? '#f1f5f9' : '#0f172a',
+                                      },
+                                      '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: isDark ? '#334155' : '#e2e8f0',
+                                      },
+                                    }}
+                                  />
+                                )}
+                              </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleRemoveSchemeFromRequirement(reqIndex, schemeName)}
+                                sx={{
+                                  color: '#ef4444',
+                                  p: 0.5,
+                                  flexShrink: 0,
+                                  '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+                                }}
+                                title="Remove this scheme (AND)"
+                              >
+                                <Delete sx={{ fontSize: 14 }} />
+                              </IconButton>
                             </Box>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleRemoveSecurity(index)}
-                              sx={{
-                                color: '#ef4444',
-                                p: 0.5,
-                                flexShrink: 0,
-                                '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                              }}
-                            >
-                              <Delete sx={{ fontSize: 14 }} />
-                            </IconButton>
                           </Box>
-                          {(schemeName === 'oauth2' || schemeName === 'openIdConnect') && (
-                            <TextField
-                              size="small"
-                              placeholder="Scopes (comma-separated, e.g., read, write)"
-                              value={(scopes || []).join(', ')}
-                              onChange={(e) => {
-                                const scopeList = e.target.value
-                                  .split(',')
-                                  .map((s) => s.trim())
-                                  .filter(Boolean);
-                                handleUpdateSecurity(index, schemeName, scopeList);
-                              }}
-                              sx={{
-                                '& .MuiInputBase-root': {
-                                  fontSize: '0.75rem',
-                                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                  color: isDark ? '#f1f5f9' : '#0f172a',
-                                },
-                                '& .MuiOutlinedInput-notchedOutline': {
-                                  borderColor: isDark ? '#334155' : '#e2e8f0',
-                                },
-                              }}
-                            />
-                          )}
-                        </Box>
-                      );
-                    })}
+                        ))}
+                        <Button
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => handleAddSchemeToRequirement(reqIndex)}
+                          sx={{
+                            fontSize: '0.7rem',
+                            textTransform: 'none',
+                            color: '#10b981',
+                            alignSelf: 'flex-start',
+                            '&:hover': {
+                              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)',
+                            },
+                          }}
+                        >
+                          Add scheme (AND)
+                        </Button>
+                      </Box>
+                    ))}
                   </Box>
                 )}
               </Box>
