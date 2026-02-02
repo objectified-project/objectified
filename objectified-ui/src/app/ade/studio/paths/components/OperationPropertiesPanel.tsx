@@ -1624,6 +1624,8 @@ export default function OperationPropertiesPanel({
                                           ? `${s.scheme_name} (OAuth2)`
                                           : s.scheme_type === 'openIdConnect'
                                           ? `${s.scheme_name} (OpenID Connect)`
+                                          : s.scheme_type === 'mutualTLS'
+                                          ? `${s.scheme_name} (Mutual TLS)`
                                           : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
                                       </MenuItem>
                                     ))}

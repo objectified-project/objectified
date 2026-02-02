@@ -69,6 +69,12 @@ export interface OpenIdConnectSchemeInput {
   scopes?: string[];
 }
 
+/** OpenAPI Mutual TLS scheme: certificate-based authentication (type + optional description only in spec) */
+export interface MutualTlsSchemeInput {
+  scheme_name: string;
+  description?: string;
+}
+
 /** OpenAPI security scheme definition for export */
 export interface OpenAPISecurityScheme {
   type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
@@ -616,6 +622,113 @@ export async function updateOpenIdConnectSecurityScheme(
 }
 
 /**
+ * Create a Mutual TLS security scheme (certificate-based authentication)
+ */
+export async function createMutualTlsSecurityScheme(
+  versionId: string,
+  input: MutualTlsSchemeInput
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const name = input.scheme_name.trim();
+    if (!name) {
+      return { success: false, error: 'Scheme name is required.' };
+    }
+    const result = await connectionPool.query(
+      `INSERT INTO odb.version_security_scheme (version_id, scheme_name, scheme_type, description, data)
+       VALUES ($1, $2, 'mutualTLS', $3, '{}'::jsonb)
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      [versionId, name, input.description?.trim() || null]
+    );
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Update a Mutual TLS security scheme
+ */
+export async function updateMutualTlsSecurityScheme(
+  schemeId: string,
+  input: Partial<MutualTlsSchemeInput>
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (input.scheme_name !== undefined) {
+      const name = input.scheme_name.trim();
+      if (!name) {
+        return { success: false, error: 'Scheme name is required.' };
+      }
+      updates.push(`scheme_name = $${idx++}`);
+      values.push(name);
+    }
+    if (input.description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(input.description.trim() || null);
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'No updates provided' };
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(schemeId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.version_security_scheme SET ${updates.join(', ')}
+       WHERE id = $${idx} AND scheme_type = 'mutualTLS'
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Scheme not found or not a Mutual TLS scheme' };
+    }
+
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Delete a security scheme
  */
 export async function deleteSecurityScheme(schemeId: string): Promise<{ success: boolean; error?: string }> {
@@ -671,8 +784,12 @@ export async function securitySchemesToOpenAPI(schemes: SecuritySchemeRecord[]):
           description: s.description || undefined,
         };
       }
+    } else if (s.scheme_type === 'mutualTLS') {
+      result[s.scheme_name] = {
+        type: 'mutualTLS',
+        description: s.description || undefined,
+      };
     }
-    // Future: mutualTLS
   }
   return result;
 }
