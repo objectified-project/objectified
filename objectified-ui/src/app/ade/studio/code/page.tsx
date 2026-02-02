@@ -23,6 +23,7 @@ import {
   getSecuritySchemesForVersion,
   securitySchemesToOpenAPI,
 } from '../../../../../lib/db/helper-security-schemes';
+import { getServersForVersion, serversToOpenAPI } from '../../../../../lib/db/helper-version-servers';
 import { generatePathsForOpenAPI, type PathInfo } from '../../../../../lib/utils/openapi-paths-generator';
 
 // Dynamically import Monaco Editor with SSR disabled
@@ -256,6 +257,17 @@ export default function CodePage() {
           console.error('[Code Tab] Exception while loading security schemes:', schemesError);
         }
 
+        // Load servers (multiple server definitions: url, description)
+        let servers: Array<{ url: string; description?: string }> = [];
+        try {
+          const serverList = await getServersForVersion(selectedVersionId);
+          if (serverList.length > 0) {
+            servers = await serversToOpenAPI(serverList);
+          }
+        } catch (serversError) {
+          console.error('[Code Tab] Exception while loading servers:', serversError);
+        }
+
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
 
@@ -263,7 +275,8 @@ export default function CodePage() {
         const openApiContent = await generateOpenApiSpec(classesWithProperties, {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
-          description: currentVersion?.description || ''
+          description: currentVersion?.description || '',
+          servers: servers.length > 0 ? servers : undefined,
         }, pathsObject, Object.keys(securitySchemes).length > 0 ? securitySchemes : undefined);
         setOpenApiSpec(openApiContent);
 

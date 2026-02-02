@@ -255,13 +255,28 @@ def generate_openapi_spec(
         except Exception as e:
             print(f"Warning: Could not load security schemes for version {version_id}: {e}")
 
+    # Load servers (multiple server definitions: url, description)
+    servers_list: List[Dict[str, Any]] = []
+    if version_db_id:
+        try:
+            from .database import db
+            if db:
+                server_rows = db.get_servers_for_version(version_db_id)
+                for row in server_rows:
+                    s: Dict[str, Any] = {"url": row.get("url") or ""}
+                    if row.get("description"):
+                        s["description"] = row["description"]
+                    servers_list.append(s)
+        except Exception as e:
+            print(f"Warning: Could not load servers for version {version_id}: {e}")
+
     # Build components
     components: Dict[str, Any] = {"schemas": schemas}
     if security_schemes:
         components["securitySchemes"] = security_schemes
 
     # Build the OpenAPI specification
-    openapi_spec = {
+    openapi_spec: Dict[str, Any] = {
         "openapi": "3.1.0",
         "info": {
             "title": f"{project_slug} API",
@@ -271,6 +286,8 @@ def generate_openapi_spec(
         "paths": paths,
         "components": components
     }
+    if servers_list:
+        openapi_spec["servers"] = servers_list
 
     return openapi_spec
 

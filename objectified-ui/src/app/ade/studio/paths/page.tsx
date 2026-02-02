@@ -10,7 +10,7 @@ import ResponsePropertiesPanel from './components/ResponsePropertiesPanel';
 
 export default function PathsPage() {
   const { selectedProjectId, selectedVersionId } = useStudio();
-  const [activeTab, setActiveTab] = useState<'paths' | 'operations' | 'classes' | 'properties' | 'security'>('paths');
+  const [activeTab, setActiveTab] = useState<'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers'>('paths');
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<{ id: string; pathname: string } | null>(null);
   const [selectedOperation, setSelectedOperation] = useState<{

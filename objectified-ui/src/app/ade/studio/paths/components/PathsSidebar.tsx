@@ -15,6 +15,7 @@ import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
 import SecuritySchemesPanel from './SecuritySchemesPanel';
+import ServersPanel from './ServersPanel';
 import {
   getPathsForVersion as getPathsForVersionRest,
   createPath as createPathRest,
@@ -63,8 +64,8 @@ export default function PathsSidebar({
   onPathSelect,
   onSecurityRefresh,
 }: {
-  activeTab: 'paths' | 'operations' | 'classes' | 'properties' | 'security';
-  onTabChange: (tab: 'paths' | 'operations' | 'classes' | 'properties' | 'security') => void;
+  activeTab: 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers';
+  onTabChange: (tab: 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers') => void;
   selectedPathId: string | null;
   onPathSelect: (pathId: string | null, pathname?: string) => void;
   onSecurityRefresh?: () => void;
@@ -300,7 +301,7 @@ export default function PathsSidebar({
   };
 
   const handleTabChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onTabChange(event.target.value as 'paths' | 'operations' | 'classes' | 'properties' | 'security');
+    onTabChange(event.target.value as 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers');
   };
 
   const TAB_OPTIONS = [
@@ -309,6 +310,7 @@ export default function PathsSidebar({
     { value: 'classes' as const, label: 'Classes' },
     { value: 'properties' as const, label: 'Properties' },
     { value: 'security' as const, label: 'Security' },
+    { value: 'servers' as const, label: 'Servers' },
   ];
 
   return (
@@ -904,6 +906,11 @@ export default function PathsSidebar({
               {/* Security Tab Content */}
               {activeTab === 'security' && (
                 <SecuritySchemesPanel onRefresh={onSecurityRefresh} />
+              )}
+
+              {/* Servers Tab Content */}
+              {activeTab === 'servers' && (
+                <ServersPanel onRefresh={onSecurityRefresh} />
               )}
             </>
           )}

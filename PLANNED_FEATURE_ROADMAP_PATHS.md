@@ -260,31 +260,14 @@ Define security schemes once, apply to multiple operations:
 | #418   | Add visual badge to show active schemes on operations |
 | #419   | Scope selector for OAuth2/OIDC                        |
 
-#### 4.2 Operation-Level Security 📋 PLANNED
-
-Each operation can override global defaults:
-
-- ✅ Apply multiple security schemes (AND/OR logic)
-- ✅ Configure required scopes per operation
-- ✅ Mark operation as unsecured (public endpoint)
-- 📋 Add security descriptions for documentation
-
-| Ticket | Feature                                         |
-|--------|-------------------------------------------------|
-| #423   | Add security descriptions for documentation     |
-
 #### 4.3 Server Definitions 📋 PLANNED
 
 **Server Configuration** ✅ PARTIALLY IMPLEMENTED
-- 📋 Multiple server definitions
-- Server variables with enum values
-- Environment-specific servers (dev, staging, prod)
+- ✅ Multiple server definitions
+- 📋 Server variables with enum values
+- 📋 Environment-specific servers (dev, staging, prod)
 - 📋 Server descriptions
 - 📋 Relative server paths
-
-| Ticket | Feature Description                              |
-|--------|--------------------------------------------------|
-| #565   | Add ability to define multiple servers |
 
 ---
 
@@ -767,6 +750,15 @@ DROP TARGET STATE:
 - ✅ **OpenID Connect**: Discovery URL with scopes
 - ✅ **Mutual TLS**: Certificate-based authentication
 - ✅ **Custom security schemes**
+
+#### 4.2 Operation-Level Security ✅ IMPLEMENTED
+
+Each operation can override global defaults:
+
+- ✅ Apply multiple security schemes (AND/OR logic)
+- ✅ Configure required scopes per operation
+- ✅ Mark operation as unsecured (public endpoint)
+- ✅ Add security descriptions for documentation
 
 *This roadmap positions Objectified UI as a comprehensive visual API design platform,
 bridging the gap between schema definition and full OpenAPI specification authoring while
