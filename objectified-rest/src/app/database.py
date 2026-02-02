@@ -737,7 +737,7 @@ class Database:
     def get_servers_for_version(self, version_id: str) -> List[Dict[str, Any]]:
         """Get all server definitions for a version (OpenAPI servers array)."""
         query = """
-            SELECT id, version_id, name, url, description, sort_order, created_at, updated_at
+            SELECT id, version_id, name, url, description, sort_order, variables, environment, created_at, updated_at
             FROM odb.version_server
             WHERE version_id = %s
             ORDER BY sort_order, url

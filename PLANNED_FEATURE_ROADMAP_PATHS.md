@@ -260,14 +260,14 @@ Define security schemes once, apply to multiple operations:
 | #418   | Add visual badge to show active schemes on operations |
 | #419   | Scope selector for OAuth2/OIDC                        |
 
-#### 4.3 Server Definitions 📋 PLANNED
+#### 4.3 Server Definitions ✅ IMPLEMENTED
 
-**Server Configuration** ✅ PARTIALLY IMPLEMENTED
+**Server Configuration** ✅ IMPLEMENTED
 - ✅ Multiple server definitions
-- 📋 Server variables with enum values
-- 📋 Environment-specific servers (dev, staging, prod)
-- 📋 Server descriptions
-- 📋 Relative server paths
+- ✅ Server variables with enum values (OpenAPI Server.variables: default, enum, description)
+- ✅ Environment-specific servers (dev, staging, prod) — optional environment label per server
+- ✅ Server descriptions (per-server description in UI and OpenAPI)
+- ✅ Relative server paths (URL field accepts absolute or relative paths, e.g. /api/v1)
 
 ---
 

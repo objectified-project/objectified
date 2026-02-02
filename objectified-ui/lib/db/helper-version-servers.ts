@@ -2,11 +2,18 @@
 
 /**
  * Helper functions for version server definitions (OpenAPI servers array).
- * Ticket #565: Multiple server definitions with name, url, description.
+ * Section 4.3: Multiple servers, variables (enum), environment (dev/staging/prod), description, relative paths.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const connectionPool = require('./db');
+
+/** OpenAPI Server Variable: default, optional enum, optional description */
+export interface ServerVariable {
+  default: string;
+  enum?: string[];
+  description?: string;
+}
 
 export interface VersionServerRecord {
   id: string;
@@ -15,6 +22,10 @@ export interface VersionServerRecord {
   url: string;
   description: string | null;
   sort_order: number;
+  /** OpenAPI Server variables: { varName: { default, enum?, description? } } */
+  variables: Record<string, ServerVariable> | null;
+  /** Environment label: dev, staging, prod */
+  environment: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +35,8 @@ export interface VersionServerInput {
   url: string;
   description?: string;
   sort_order?: number;
+  variables?: Record<string, ServerVariable> | null;
+  environment?: string | null;
 }
 
 /**
@@ -31,7 +44,7 @@ export interface VersionServerInput {
  */
 export async function getServersForVersion(versionId: string): Promise<VersionServerRecord[]> {
   const result = await connectionPool.query(
-    `SELECT id, version_id, name, url, description, sort_order, created_at, updated_at
+    `SELECT id, version_id, name, url, description, sort_order, variables, environment, created_at, updated_at
      FROM odb.version_server
      WHERE version_id = $1
      ORDER BY sort_order, url`,
@@ -44,6 +57,8 @@ export async function getServersForVersion(versionId: string): Promise<VersionSe
     url: r.url,
     description: r.description,
     sort_order: Number(r.sort_order) || 0,
+    variables: r.variables ? (typeof r.variables === 'string' ? JSON.parse(r.variables as string) : r.variables) : null,
+    environment: r.environment,
     created_at: r.created_at,
     updated_at: r.updated_at,
   }));
@@ -58,36 +73,48 @@ export async function createServer(
 ): Promise<{ success: boolean; server?: VersionServerRecord; error?: string }> {
   try {
     const sortOrder = input.sort_order ?? 0;
+    const variablesJson = input.variables && Object.keys(input.variables).length > 0
+      ? JSON.stringify(input.variables)
+      : null;
+    const environmentVal = input.environment?.trim() || null;
     const result = await connectionPool.query(
-      `INSERT INTO odb.version_server (version_id, name, url, description, sort_order)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, version_id, name, url, description, sort_order, created_at, updated_at`,
+      `INSERT INTO odb.version_server (version_id, name, url, description, sort_order, variables, environment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, version_id, name, url, description, sort_order, variables, environment, created_at, updated_at`,
       [
         versionId,
         input.name?.trim() || null,
         input.url.trim(),
         input.description?.trim() || null,
         sortOrder,
+        variablesJson,
+        environmentVal,
       ]
     );
     const row = result.rows[0];
     return {
       success: true,
-      server: {
-        id: row.id,
-        version_id: row.version_id,
-        name: row.name,
-        url: row.url,
-        description: row.description,
-        sort_order: Number(row.sort_order) || 0,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      },
+      server: rowToServerRecord(row),
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     return { success: false, error: msg };
   }
+}
+
+function rowToServerRecord(row: Record<string, unknown>): VersionServerRecord {
+  return {
+    id: row.id,
+    version_id: row.version_id,
+    name: row.name,
+    url: row.url,
+    description: row.description,
+    sort_order: Number(row.sort_order) || 0,
+    variables: row.variables ? (typeof row.variables === 'string' ? JSON.parse(row.variables as string) : row.variables) as Record<string, ServerVariable> : null,
+    environment: row.environment,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
 }
 
 /**
@@ -118,6 +145,14 @@ export async function updateServer(
       updates.push(`sort_order = $${idx++}`);
       values.push(input.sort_order);
     }
+    if (input.variables !== undefined) {
+      updates.push(`variables = $${idx++}`);
+      values.push(input.variables && Object.keys(input.variables).length > 0 ? JSON.stringify(input.variables) : null);
+    }
+    if (input.environment !== undefined) {
+      updates.push(`environment = $${idx++}`);
+      values.push(input.environment?.trim() || null);
+    }
     if (updates.length === 0) {
       return { success: false, error: 'No fields to update' };
     }
@@ -125,7 +160,7 @@ export async function updateServer(
     values.push(serverId);
 
     const result = await connectionPool.query(
-      `UPDATE odb.version_server SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, version_id, name, url, description, sort_order, created_at, updated_at`,
+      `UPDATE odb.version_server SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, version_id, name, url, description, sort_order, variables, environment, created_at, updated_at`,
       values
     );
     if (result.rows.length === 0) {
@@ -134,16 +169,7 @@ export async function updateServer(
     const row = result.rows[0];
     return {
       success: true,
-      server: {
-        id: row.id,
-        version_id: row.version_id,
-        name: row.name,
-        url: row.url,
-        description: row.description,
-        sort_order: Number(row.sort_order) || 0,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      },
+      server: rowToServerRecord(row),
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -164,15 +190,24 @@ export async function deleteServer(serverId: string): Promise<{ success: boolean
   }
 }
 
+/** OpenAPI Server object: url, description?, variables? */
+export type OpenAPIServerObject = {
+  url: string;
+  description?: string;
+  variables?: Record<string, { default: string; enum?: string[]; description?: string }>;
+};
+
 /**
- * Convert version servers to OpenAPI servers array (url, description).
+ * Convert version servers to OpenAPI servers array (url, description, variables).
  * Async to satisfy Server Action requirement ('use server').
  */
-export async function serversToOpenAPI(servers: VersionServerRecord[]): Promise<Array<{ url: string; description?: string }>> {
+export async function serversToOpenAPI(servers: VersionServerRecord[]): Promise<OpenAPIServerObject[]> {
   return servers
     .filter((s) => s.url?.trim())
-    .map((s) => ({
-      url: s.url.trim(),
-      ...(s.description?.trim() ? { description: s.description.trim() } : {}),
-    }));
+    .map((s) => {
+      const obj: OpenAPIServerObject = { url: s.url.trim() };
+      if (s.description?.trim()) obj.description = s.description.trim();
+      if (s.variables && Object.keys(s.variables).length > 0) obj.variables = s.variables;
+      return obj;
+    });
 }

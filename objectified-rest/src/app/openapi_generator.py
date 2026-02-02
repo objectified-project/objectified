@@ -255,7 +255,7 @@ def generate_openapi_spec(
         except Exception as e:
             print(f"Warning: Could not load security schemes for version {version_id}: {e}")
 
-    # Load servers (multiple server definitions: url, description)
+    # Load servers (multiple server definitions: url, description, variables)
     servers_list: List[Dict[str, Any]] = []
     if version_db_id:
         try:
@@ -266,6 +266,11 @@ def generate_openapi_spec(
                     s: Dict[str, Any] = {"url": row.get("url") or ""}
                     if row.get("description"):
                         s["description"] = row["description"]
+                    variables = row.get("variables")
+                    if variables:
+                        variables = parse_json_field(variables) if isinstance(variables, str) else variables
+                        if isinstance(variables, dict) and variables:
+                            s["variables"] = variables
                     servers_list.append(s)
         except Exception as e:
             print(f"Warning: Could not load servers for version {version_id}: {e}")
