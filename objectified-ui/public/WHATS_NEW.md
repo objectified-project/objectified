@@ -13,6 +13,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added ability to switch connection types for edges in the canvas
   - Added background configurations to the canvas
   - Added ability to enable/disable grid
+  - Canvas changes also apply to the Paths canvas
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)
   - Added inline variable editor that can click parameters in the header of the path studio

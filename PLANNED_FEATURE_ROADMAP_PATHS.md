@@ -9,28 +9,6 @@
 
 ---
 
-## Core Architecture & Implementation
-
-### 1. React Flow Canvas Foundation
-
-The Paths Designer is built on React Flow, providing an infinite canvas workspace optimized for complex API
-specifications. Engineers can design APIs with hundreds of endpoints while maintaining visual clarity through
-zoom, pan, and mini-map navigation.
-
-#### Canvas Features ✅ PARTIALLY IMPLEMENTED
-
-- ✅ **Dedicated Paths Tab**: Third Studio tab with independent React Flow instance
-- ✅ **Infinite Canvas**: Zoom from 10% to 500% with smooth panning
-- ✅ **Mini-Map Navigation**: Bird's-eye view for large API specs (50+ paths)
-- **Node Library Panel**: Draggable node types organized by category
-- **Grid Snapping**: Optional alignment grid with 10/20/50px spacing
-- **Selection Tools**: Multi-select with drag, `Shift+Click`, rubber band selection
-
-| Ticket | Feature                                   |
-|--------|-------------------------------------------|
-
----
-
 ## Visual Node System
 
 ### 2. Node Types & Visual Design

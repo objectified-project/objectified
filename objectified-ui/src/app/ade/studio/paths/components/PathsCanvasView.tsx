@@ -20,6 +20,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
+import { getCanvasBackgroundStyle } from '../../../../utils/canvas-background-style';
 import SmartEdge from '../../../../components/ade/studio/SmartEdge';
 import {
   getOperationsForPath,
@@ -385,6 +386,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     gridStyle,
     showGrid,
     snapToGrid,
+    canvasBackground,
     edgeRouting,
     edgeAnimation,
     selectedVersionId,
@@ -396,6 +398,11 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isDark, setIsDark] = useState(false);
   const { screenToFlowPosition, getNodes } = useReactFlow();
+
+  const canvasBackgroundStyle = React.useMemo(
+    () => getCanvasBackgroundStyle(canvasBackground, isDark),
+    [canvasBackground, isDark]
+  );
 
   // State for class drop choice dialog
   const [classDropDialogOpen, setClassDropDialogOpen] = useState(false);
@@ -3320,21 +3327,17 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         selectionOnDrag={true}
         nodesFocusable={true}
         edgesFocusable={true}
-        style={{
-          background: isDark
-            ? 'radial-gradient(ellipse at top, #1e293b 0%, #0f172a 50%, #020617 100%)'
-            : 'radial-gradient(ellipse at top, #ffffff 0%, #f8fafc 30%, #f1f5f9 100%)'
-        }}
+        style={canvasBackgroundStyle}
       >
-        {showGrid && (
+        {canvasBackground.type === 'grid' && showGrid && (
           <Background
             variant={backgroundVariant(gridStyle)}
             gap={gridSize}
-            size={1}
+            size={1.5}
             color="currentColor"
             style={{
-              color: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(99, 102, 241, 0.08)',
-              opacity: 1
+              color: canvasBackground.gridColor || (isDark ? 'rgb(148, 163, 184)' : 'rgb(99, 102, 241)'),
+              opacity: canvasBackground.gridOpacity ?? (isDark ? 0.25 : 0.15),
             }}
           />
         )}
