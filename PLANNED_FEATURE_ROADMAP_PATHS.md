@@ -219,7 +219,7 @@ structure immediately recognizable.
 **Full Spec Generation** ✅ PARTIALLY IMPLEMENTED
 - **Specification Components**:
     - ✅ `info` (title, version, description, contact, license, termsOfService)
-    - `servers` (multiple environments with variables)
+    - ✅ `servers` (multiple environments with variables)
     - ✅ `paths` (all operations with full configuration)
     - `components/schemas` (existing schema support)
     - `components/parameters` (reusable parameters)
@@ -229,7 +229,7 @@ structure immediately recognizable.
     - `components/securitySchemes` (auth definitions)
     - `components/links` (HATEOAS links)
     - `components/callbacks` (webhooks)
-    - `security` (global security requirements)
+    - ✅ `security` (global security requirements)
     - `tags` (tag definitions with descriptions)
     - `externalDocs` (external documentation)
 
@@ -238,26 +238,6 @@ structure immediately recognizable.
 | #424   | Update OpenAPI Generator to include missing fields |
 
 ---
-
-## Security & Authentication
-
-### 4. Security Scheme Integration 📋 PLANNED
-
-#### 4.1 Global Security Schemes
-
-Define security schemes once, apply to multiple operations:
-
-**Visual Design**:
-- ✅ Security scheme library panel
-- 📋 Drag scheme onto method node to apply
-- 📋 Visual badge showing active schemes on operations
-- 📋 Scope selector for OAuth2/OIDC
-
-| Ticket | Feature                                               |
-|--------|-------------------------------------------------------|
-| #417   | Drag scheme onto method node to apply                 |
-| #418   | Add visual badge to show active schemes on operations |
-| #419   | Scope selector for OAuth2/OIDC                        |
 
 ---
 
@@ -740,6 +720,20 @@ DROP TARGET STATE:
 - ✅ **OpenID Connect**: Discovery URL with scopes
 - ✅ **Mutual TLS**: Certificate-based authentication
 - ✅ **Custom security schemes**
+
+## Security & Authentication
+
+### 4. Security Scheme Integration 📋 PLANNED
+
+#### 4.1 Global Security Schemes
+
+Define security schemes once, apply to multiple operations:
+
+**Visual Design**:
+- ✅ Security scheme library panel
+- ✅ Drag scheme onto method node to apply
+- ✅ Visual badge showing active schemes on operations
+- ✅ Scope selector for OAuth2/OIDC
 
 #### 4.2 Operation-Level Security ✅ IMPLEMENTED
 

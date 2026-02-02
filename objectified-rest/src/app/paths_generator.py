@@ -87,6 +87,9 @@ def build_parameter_for_openapi(param: Dict[str, Any]) -> Dict[str, Any]:
         'in': param['in_location'],
     }
 
+    # Add summary if present (OpenAPI 3.x parameter field)
+    if param.get('summary'):
+        result['summary'] = param['summary']
     # Add description if present
     if param.get('description'):
         result['description'] = param['description']
@@ -327,6 +330,11 @@ def build_operation_for_openapi(operation: Dict[str, Any], options: Optional[Dic
                 security_desc = metadata.get('security_description') or metadata.get('securityDescription') or metadata.get('x-security-description')
         if security_desc and isinstance(security_desc, str) and security_desc.strip():
             result['x-security-description'] = security_desc.strip()
+
+        # x-private: hide from public docs (Swagger/OpenAPI doc generators may omit)
+        x_private = description.get('x_private') or description.get('x-private')
+        if x_private and (x_private is True or str(x_private).lower() == 'true'):
+            result['x-private'] = True
 
         # Custom x-* extensions: copy any x-* keys from metadata to the operation
         metadata = description.get('metadata')
