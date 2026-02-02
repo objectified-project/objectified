@@ -82,8 +82,10 @@ export default function OperationPropertiesPanel({
   // Responses list state
   const [responses, setResponses] = useState<any[]>([]);
 
-  // Security schemes (API Key) for dropdown
-  const [securitySchemes, setSecuritySchemes] = useState<{ scheme_name: string; in_location: string | null; param_name: string | null }[]>([]);
+  // Security schemes (API Key + HTTP) for dropdown
+  const [securitySchemes, setSecuritySchemes] = useState<
+    { scheme_name: string; scheme_type: string; in_location: string | null; param_name: string | null; http_scheme: string | null }[]
+  >([]);
   const [responsesLoading, setResponsesLoading] = useState(false);
 
   // New parameter form state
@@ -205,11 +207,15 @@ export default function OperationPropertiesPanel({
       return;
     }
     getSecuritySchemesForVersion(selectedVersionId).then((schemes) => {
-      setSecuritySchemes(schemes.map((s) => ({
-        scheme_name: s.scheme_name,
-        in_location: s.in_location,
-        param_name: s.param_name,
-      })));
+      setSecuritySchemes(
+        schemes.map((s) => ({
+          scheme_name: s.scheme_name,
+          scheme_type: s.scheme_type,
+          in_location: s.in_location,
+          param_name: s.param_name,
+          http_scheme: s.http_scheme,
+        }))
+      );
     }).catch(() => setSecuritySchemes([]));
   }, [selectedVersionId]);
 
@@ -1612,7 +1618,9 @@ export default function OperationPropertiesPanel({
                                   >
                                     {securitySchemes.map((s) => (
                                       <MenuItem key={s.scheme_name} value={s.scheme_name}>
-                                        {s.scheme_name} ({s.in_location || 'header'}: {s.param_name || s.scheme_name})
+                                        {s.scheme_type === 'http'
+                                          ? `${s.scheme_name} (HTTP: ${s.http_scheme || 'basic'})`
+                                          : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
                                       </MenuItem>
                                     ))}
                                     <MenuItem value="__custom__">Other (bearerAuth, oauth2...)</MenuItem>

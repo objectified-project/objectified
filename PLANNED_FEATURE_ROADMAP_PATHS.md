@@ -249,7 +249,7 @@ Define security schemes once, apply to multiple operations:
 
 **Supported Schemes**:
 - ✅ **API Key**: Header, query, or cookie-based keys (#410)
-- 📋 **HTTP**: Basic, Bearer, or custom HTTP auth
+- ✅ **HTTP**: Basic, Bearer, or custom HTTP auth
 - 📋 **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
 - 📋 **OpenID Connect**: Discovery URL with scopes
 - 📋 **Mutual TLS**: Certificate-based authentication
@@ -257,8 +257,6 @@ Define security schemes once, apply to multiple operations:
 
 | Ticket | Feature Description                 |
 |--------|-------------------------------------|
-| #410   | Add API Keys                        |
-| #411   | Add HTTP Authentication Schemes     |
 | #412   | OAuth2 Security Schemes             |
 | #413   | Add OpenID Connect Security Schemes |
 | #414   | Add Mutual TLS Security Schemes     |

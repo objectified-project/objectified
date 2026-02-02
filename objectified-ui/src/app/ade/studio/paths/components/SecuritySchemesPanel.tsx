@@ -13,9 +13,12 @@ import {
   getSecuritySchemesForVersion,
   createApiKeySecurityScheme,
   updateApiKeySecurityScheme,
+  createHttpSecurityScheme,
+  updateHttpSecurityScheme,
   deleteSecurityScheme,
   type SecuritySchemeRecord,
   type ApiKeySchemeInput,
+  type HttpSchemeInput,
 } from '../../../../../../lib/db/helper-security-schemes';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 
@@ -25,6 +28,21 @@ const API_KEY_IN_OPTIONS: { value: 'header' | 'query' | 'cookie'; label: string 
   { value: 'cookie', label: 'Cookie' },
 ];
 
+const HTTP_SCHEME_OPTIONS: { value: 'basic' | 'bearer' | 'custom'; label: string }[] = [
+  { value: 'basic', label: 'Basic' },
+  { value: 'bearer', label: 'Bearer' },
+  { value: 'custom', label: 'Custom (e.g. Digest)' },
+];
+
+/** Scheme types: supported now vs coming soon. Used in Add dialog type selector. */
+const SCHEME_TYPE_OPTIONS: { value: string; label: string; supported: boolean }[] = [
+  { value: 'apiKey', label: 'API Key (header, query, cookie)', supported: true },
+  { value: 'http', label: 'HTTP (Basic, Bearer, custom)', supported: true },
+  { value: 'oauth2', label: 'OAuth 2.0', supported: false },
+  { value: 'openIdConnect', label: 'OpenID Connect', supported: false },
+  { value: 'mutualTLS', label: 'Mutual TLS', supported: false },
+];
+
 export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => void }) {
   const { selectedVersionId } = useStudio();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
@@ -32,11 +50,27 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
   const [schemes, setSchemes] = useState<SecuritySchemeRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogSchemeType, setDialogSchemeType] = useState<string>('apiKey');
   const [editingScheme, setEditingScheme] = useState<SecuritySchemeRecord | null>(null);
   const [formData, setFormData] = useState<ApiKeySchemeInput>({
     scheme_name: '',
     in_location: 'header',
     param_name: 'X-API-Key',
+    description: '',
+  });
+  const [httpFormData, setHttpFormData] = useState<{
+    scheme_name: string;
+    http_scheme: 'basic' | 'bearer' | string;
+    http_scheme_kind: 'basic' | 'bearer' | 'custom';
+    custom_http_scheme: string;
+    bearer_format: string;
+    description: string;
+  }>({
+    scheme_name: '',
+    http_scheme: 'basic',
+    http_scheme_kind: 'basic',
+    custom_http_scheme: 'Digest',
+    bearer_format: '',
     description: '',
   });
 
@@ -68,42 +102,133 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       param_name: 'X-API-Key',
       description: '',
     });
+    setHttpFormData({
+      scheme_name: '',
+      http_scheme: 'basic',
+      http_scheme_kind: 'basic',
+      custom_http_scheme: 'Digest',
+      bearer_format: '',
+      description: '',
+    });
     setEditingScheme(null);
   };
 
   const handleAdd = () => {
     resetForm();
+    setDialogSchemeType('apiKey');
     setDialogOpen(true);
   };
 
   const handleEdit = (scheme: SecuritySchemeRecord) => {
-    if (scheme.scheme_type !== 'apiKey') return;
-    setFormData({
-      scheme_name: scheme.scheme_name,
-      in_location: (scheme.in_location as 'header' | 'query' | 'cookie') || 'header',
-      param_name: scheme.param_name || 'X-API-Key',
-      description: scheme.description || '',
-    });
+    if (scheme.scheme_type === 'apiKey') {
+      setFormData({
+        scheme_name: scheme.scheme_name,
+        in_location: (scheme.in_location as 'header' | 'query' | 'cookie') || 'header',
+        param_name: scheme.param_name || 'X-API-Key',
+        description: scheme.description || '',
+      });
+      setDialogSchemeType('apiKey');
+    } else if (scheme.scheme_type === 'http') {
+      const httpScheme = scheme.http_scheme || 'basic';
+      const kind: 'basic' | 'bearer' | 'custom' =
+        httpScheme === 'basic' ? 'basic' : httpScheme === 'bearer' ? 'bearer' : 'custom';
+      const bearerFormat = (scheme.data as { bearerFormat?: string })?.bearerFormat || '';
+      setHttpFormData({
+        scheme_name: scheme.scheme_name,
+        http_scheme: kind === 'custom' ? httpScheme : kind,
+        http_scheme_kind: kind,
+        custom_http_scheme: kind === 'custom' ? httpScheme : 'Digest',
+        bearer_format: bearerFormat,
+        description: scheme.description || '',
+      });
+      setDialogSchemeType('http');
+    } else return;
     setEditingScheme(scheme);
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!selectedVersionId) return;
-    const name = formData.scheme_name.trim();
-    const paramName = formData.param_name.trim();
-    if (!name || !paramName) {
+
+    if (dialogSchemeType === 'apiKey') {
+      const name = formData.scheme_name.trim();
+      const paramName = formData.param_name.trim();
+      if (!name || !paramName) {
+        await alertDialog({
+          title: 'Validation Error',
+          message: 'Scheme name and parameter name are required.',
+          variant: 'error',
+        });
+        return;
+      }
+      try {
+        if (editingScheme) {
+          const result = await updateApiKeySecurityScheme(editingScheme.id, formData);
+          if (result.success && result.scheme) {
+            setSchemes(prev =>
+              prev.map(s => (s.id === editingScheme.id ? result.scheme! : s))
+            );
+            setDialogOpen(false);
+            resetForm();
+            onRefresh?.();
+          } else {
+            await alertDialog({
+              title: 'Error',
+              message: result.error || 'Failed to update scheme',
+              variant: 'error',
+            });
+          }
+        } else {
+          const result = await createApiKeySecurityScheme(selectedVersionId, formData);
+          if (result.success && result.scheme) {
+            setSchemes(prev => [...prev, result.scheme!].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name)));
+            setDialogOpen(false);
+            resetForm();
+            onRefresh?.();
+          } else {
+            await alertDialog({
+              title: 'Error',
+              message: result.error || 'Failed to create scheme',
+              variant: 'error',
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error saving security scheme:', err);
+        await alertDialog({
+          title: 'Error',
+          message: err instanceof Error ? err.message : 'Failed to save',
+          variant: 'error',
+        });
+      }
+      return;
+    }
+
+    // HTTP scheme
+    const name = httpFormData.scheme_name.trim();
+    const httpSchemeValue =
+      httpFormData.http_scheme_kind === 'custom'
+        ? httpFormData.custom_http_scheme.trim()
+        : httpFormData.http_scheme_kind;
+    if (!name || !httpSchemeValue) {
       await alertDialog({
         title: 'Validation Error',
-        message: 'Scheme name and parameter name are required.',
+        message: 'Scheme name and HTTP scheme are required.',
         variant: 'error',
       });
       return;
     }
-
+    const httpInput: HttpSchemeInput = {
+      scheme_name: name,
+      http_scheme: httpSchemeValue,
+      description: httpFormData.description || undefined,
+    };
+    if (httpFormData.http_scheme_kind === 'bearer' && httpFormData.bearer_format.trim()) {
+      httpInput.bearer_format = httpFormData.bearer_format.trim();
+    }
     try {
       if (editingScheme) {
-        const result = await updateApiKeySecurityScheme(editingScheme.id, formData);
+        const result = await updateHttpSecurityScheme(editingScheme.id, httpInput);
         if (result.success && result.scheme) {
           setSchemes(prev =>
             prev.map(s => (s.id === editingScheme.id ? result.scheme! : s))
@@ -119,7 +244,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           });
         }
       } else {
-        const result = await createApiKeySecurityScheme(selectedVersionId, formData);
+        const result = await createHttpSecurityScheme(selectedVersionId, httpInput);
         if (result.success && result.scheme) {
           setSchemes(prev => [...prev, result.scheme!].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name)));
           setDialogOpen(false);
@@ -188,7 +313,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide flex items-center gap-1.5">
           <Lock sx={{ fontSize: 14, color: '#f59e0b' }} />
-          API Key Schemes
+          Security Schemes
         </span>
         <Button
           size="small"
@@ -207,7 +332,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
         </Button>
       </Box>
       <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">
-        Define API Key auth for header, query, or cookie. Use these scheme names when adding security to operations.
+        Add API Key, HTTP (Basic/Bearer), or other scheme types. Use scheme names when adding security to operations.
       </p>
 
       {isLoading ? (
@@ -224,7 +349,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
         >
           <VpnKey sx={{ fontSize: 32, color: isDark ? '#475569' : '#94a3b8', mb: 1 }} />
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-            No API Key schemes defined
+            No security schemes defined
           </p>
           <Button
             size="small"
@@ -242,7 +367,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
               },
             }}
           >
-            Add API Key Scheme
+            Add scheme
           </Button>
         </Box>
       ) : (
@@ -265,7 +390,9 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                   {scheme.scheme_name}
                 </span>
                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                  {getInLabel(scheme.in_location)}: {scheme.param_name || '—'}
+                  {scheme.scheme_type === 'http'
+                    ? `HTTP: ${scheme.http_scheme || 'basic'}${(scheme.data as { bearerFormat?: string })?.bearerFormat ? ` (${(scheme.data as { bearerFormat?: string }).bearerFormat})` : ''}`
+                    : `${getInLabel(scheme.in_location)}: ${scheme.param_name || '—'}`}
                 </span>
               </Box>
               <Box sx={{ display: 'flex', gap: 0.25 }}>
@@ -298,100 +425,250 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
             onPointerDownOutside={(e) => e.preventDefault()}
           >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {editingScheme ? 'Edit API Key Scheme' : 'Add API Key Scheme'}
+              {editingScheme ? `Edit ${editingScheme.scheme_type === 'http' ? 'HTTP' : 'API Key'} Scheme` : 'Add Security Scheme'}
             </Dialog.Title>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Scheme Name
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="apiKey"
-                  value={formData.scheme_name}
-                  onChange={(e) => setFormData(d => ({ ...d, scheme_name: e.target.value }))}
-                  disabled={!!editingScheme}
-                  helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., apiKey)'}
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    },
-                  }}
-                />
-              </Box>
-              <Box>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Location
-                </label>
+            {/* Scheme type: dropdown when adding, read-only when editing */}
+            <Box sx={{ mb: 2 }}>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                Scheme type
+              </label>
+              {editingScheme ? (
+                <div
+                  className={`w-full px-3 py-2 text-sm rounded-md border ${
+                    isDark ? 'bg-slate-800/50 border-slate-600 text-slate-300' : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}
+                >
+                  {SCHEME_TYPE_OPTIONS.find(o => o.value === editingScheme.scheme_type)?.label ?? editingScheme.scheme_type}
+                </div>
+              ) : (
                 <select
-                  value={formData.in_location}
-                  onChange={(e) =>
-                    setFormData(d => ({
-                      ...d,
-                      in_location: e.target.value as 'header' | 'query' | 'cookie',
-                      param_name:
-                        e.target.value === 'header'
-                          ? 'X-API-Key'
-                          : e.target.value === 'query'
-                          ? 'api_key'
-                          : 'api_key',
-                    }))
-                  }
+                  value={dialogSchemeType}
+                  onChange={(e) => setDialogSchemeType(e.target.value)}
                   className={`w-full px-3 py-2 text-sm rounded-md border ${
                     isDark
                       ? 'bg-slate-800 border-slate-600 text-slate-200'
                       : 'bg-white border-gray-300 text-gray-700'
                   }`}
                 >
-                  {API_KEY_IN_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {SCHEME_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} disabled={!opt.supported}>
+                      {opt.label}{opt.supported ? '' : ' (Coming soon)'}
                     </option>
                   ))}
                 </select>
-              </Box>
-              <Box>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Parameter / Header Name
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder={formData.in_location === 'header' ? 'X-API-Key' : 'api_key'}
-                  value={formData.param_name}
-                  onChange={(e) => setFormData(d => ({ ...d, param_name: e.target.value }))}
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    },
-                  }}
-                />
-              </Box>
-              <Box>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Description (optional)
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
-                  multiline
-                  rows={2}
-                  placeholder="API key for authentication"
-                  value={formData.description}
-                  onChange={(e) => setFormData(d => ({ ...d, description: e.target.value }))}
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    },
-                  }}
-                />
-              </Box>
+              )}
             </Box>
+
+            {!editingScheme && !SCHEME_TYPE_OPTIONS.find(o => o.value === dialogSchemeType)?.supported ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                This scheme type is not yet supported. Use API Key or HTTP for now.
+              </p>
+            ) : dialogSchemeType === 'apiKey' ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Scheme Name
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="apiKey"
+                    value={formData.scheme_name}
+                    onChange={(e) => setFormData(d => ({ ...d, scheme_name: e.target.value }))}
+                    disabled={!!editingScheme}
+                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., apiKey)'}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: '0.875rem',
+                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      },
+                    }}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Location
+                  </label>
+                  <select
+                    value={formData.in_location}
+                    onChange={(e) =>
+                      setFormData(d => ({
+                        ...d,
+                        in_location: e.target.value as 'header' | 'query' | 'cookie',
+                        param_name:
+                          e.target.value === 'header'
+                            ? 'X-API-Key'
+                            : e.target.value === 'query'
+                            ? 'api_key'
+                            : 'api_key',
+                      }))
+                    }
+                    className={`w-full px-3 py-2 text-sm rounded-md border ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-600 text-slate-200'
+                        : 'bg-white border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    {API_KEY_IN_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Parameter / Header Name
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder={formData.in_location === 'header' ? 'X-API-Key' : 'api_key'}
+                    value={formData.param_name}
+                    onChange={(e) => setFormData(d => ({ ...d, param_name: e.target.value }))}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: '0.875rem',
+                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      },
+                    }}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Description (optional)
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={2}
+                    placeholder="API key for authentication"
+                    value={formData.description}
+                    onChange={(e) => setFormData(d => ({ ...d, description: e.target.value }))}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: '0.875rem',
+                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Scheme Name
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="bearerAuth"
+                    value={httpFormData.scheme_name}
+                    onChange={(e) => setHttpFormData(d => ({ ...d, scheme_name: e.target.value }))}
+                    disabled={!!editingScheme}
+                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., bearerAuth)'}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: '0.875rem',
+                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      },
+                    }}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    HTTP Auth Type
+                  </label>
+                  <select
+                    value={httpFormData.http_scheme_kind}
+                    onChange={(e) => {
+                      const v = e.target.value as 'basic' | 'bearer' | 'custom';
+                      setHttpFormData(d => ({
+                        ...d,
+                        http_scheme_kind: v,
+                        http_scheme: v === 'custom' ? d.custom_http_scheme : v,
+                      }));
+                    }}
+                    className={`w-full px-3 py-2 text-sm rounded-md border ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-600 text-slate-200'
+                        : 'bg-white border-gray-300 text-gray-700'
+                    }`}
+                  >
+                    {HTTP_SCHEME_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </Box>
+                {httpFormData.http_scheme_kind === 'custom' && (
+                  <Box>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Custom Scheme Name
+                    </label>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Digest"
+                      value={httpFormData.custom_http_scheme}
+                      onChange={(e) =>
+                        setHttpFormData(d => ({ ...d, custom_http_scheme: e.target.value, http_scheme: e.target.value }))
+                      }
+                      sx={{
+                        '& .MuiInputBase-root': {
+                          fontSize: '0.875rem',
+                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+                {httpFormData.http_scheme_kind === 'bearer' && (
+                  <Box>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Bearer Format (optional)
+                    </label>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="JWT"
+                      value={httpFormData.bearer_format}
+                      onChange={(e) => setHttpFormData(d => ({ ...d, bearer_format: e.target.value }))}
+                      sx={{
+                        '& .MuiInputBase-root': {
+                          fontSize: '0.875rem',
+                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Description (optional)
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={2}
+                    placeholder="HTTP authentication"
+                    value={httpFormData.description}
+                    onChange={(e) => setHttpFormData(d => ({ ...d, description: e.target.value }))}
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: '0.875rem',
+                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+            )}
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
               <Dialog.Close asChild>
@@ -403,8 +680,9 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                 </button>
               </Dialog.Close>
               <button
-                className="px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg"
+                className="px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleSave}
+                disabled={!editingScheme && !SCHEME_TYPE_OPTIONS.find(o => o.value === dialogSchemeType)?.supported}
               >
                 {editingScheme ? 'Save' : 'Add'}
               </button>

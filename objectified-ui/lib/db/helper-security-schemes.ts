@@ -30,12 +30,21 @@ export interface ApiKeySchemeInput {
   description?: string;
 }
 
+/** OpenAPI HTTP scheme: basic, bearer, or custom (e.g. Digest) */
+export interface HttpSchemeInput {
+  scheme_name: string;
+  http_scheme: 'basic' | 'bearer' | string; // 'basic' | 'bearer' | custom (e.g. 'Digest', 'HOBA')
+  bearer_format?: string; // e.g. 'JWT' for bearer
+  description?: string;
+}
+
 /** OpenAPI security scheme definition for export */
 export interface OpenAPISecurityScheme {
   type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
   name?: string;
   in?: 'header' | 'query' | 'cookie';
   scheme?: string;
+  bearerFormat?: string;
   description?: string;
   [key: string]: unknown;
 }
@@ -180,6 +189,129 @@ export async function updateApiKeySecurityScheme(
 }
 
 /**
+ * Create an HTTP security scheme (basic, bearer, or custom)
+ */
+export async function createHttpSecurityScheme(
+  versionId: string,
+  input: HttpSchemeInput
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const raw = input.http_scheme.trim();
+    const schemeValue = raw.toLowerCase() === 'basic' || raw.toLowerCase() === 'bearer' ? raw.toLowerCase() : raw;
+    const data =
+      schemeValue === 'bearer' && input.bearer_format
+        ? JSON.stringify({ bearerFormat: input.bearer_format.trim() })
+        : '{}';
+    const result = await connectionPool.query(
+      `INSERT INTO odb.version_security_scheme (version_id, scheme_name, scheme_type, http_scheme, description, data)
+       VALUES ($1, $2, 'http', $3, $4, $5::jsonb)
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      [
+        versionId,
+        input.scheme_name.trim(),
+        schemeValue,
+        input.description?.trim() || null,
+        data,
+      ]
+    );
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Update an HTTP security scheme
+ */
+export async function updateHttpSecurityScheme(
+  schemeId: string,
+  input: Partial<HttpSchemeInput>
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (input.scheme_name !== undefined) {
+      updates.push(`scheme_name = $${idx++}`);
+      values.push(input.scheme_name.trim());
+    }
+    if (input.http_scheme !== undefined) {
+      const raw = input.http_scheme.trim();
+      const schemeValue = raw.toLowerCase() === 'basic' || raw.toLowerCase() === 'bearer' ? raw.toLowerCase() : raw;
+      updates.push(`http_scheme = $${idx++}`);
+      values.push(schemeValue);
+    }
+    if (input.description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(input.description.trim() || null);
+    }
+    if (input.bearer_format !== undefined) {
+      const schemeVal = (input.http_scheme ?? '').toString().trim().toLowerCase();
+      const data = schemeVal === 'bearer' ? JSON.stringify({ bearerFormat: input.bearer_format.trim() }) : '{}';
+      updates.push(`data = $${idx++}::jsonb`);
+      values.push(data);
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'No updates provided' };
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(schemeId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.version_security_scheme SET ${updates.join(', ')}
+       WHERE id = $${idx} AND scheme_type = 'http'
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Scheme not found or not an HTTP scheme' };
+    }
+
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Delete a security scheme
  */
 export async function deleteSecurityScheme(schemeId: string): Promise<{ success: boolean; error?: string }> {
@@ -208,8 +340,17 @@ export async function securitySchemesToOpenAPI(schemes: SecuritySchemeRecord[]):
         in: (s.in_location as 'header' | 'query' | 'cookie') || 'header',
         description: s.description || undefined,
       };
+    } else if (s.scheme_type === 'http' && s.http_scheme) {
+      const httpScheme: OpenAPISecurityScheme = {
+        type: 'http',
+        scheme: s.http_scheme,
+        description: s.description || undefined,
+      };
+      const bearerFormat = (s.data as { bearerFormat?: string })?.bearerFormat;
+      if (bearerFormat) httpScheme.bearerFormat = bearerFormat;
+      result[s.scheme_name] = httpScheme;
     }
-    // Future: http, oauth2, openIdConnect, mutualTLS
+    // Future: oauth2, openIdConnect, mutualTLS
   }
   return result;
 }
