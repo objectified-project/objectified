@@ -319,6 +319,15 @@ def build_operation_for_openapi(operation: Dict[str, Any], options: Optional[Dic
         if security is not None and isinstance(security, list):
             result['security'] = security  # [] = unsecured (public), non-empty = requirements
 
+        # Security description for documentation (emitted as x-security-description)
+        security_desc = description.get('security_description') or description.get('securityDescription')
+        if not security_desc and description.get('metadata'):
+            metadata = parse_json_field(description['metadata']) if isinstance(description['metadata'], str) else description['metadata']
+            if isinstance(metadata, dict):
+                security_desc = metadata.get('security_description') or metadata.get('securityDescription') or metadata.get('x-security-description')
+        if security_desc and isinstance(security_desc, str) and security_desc.strip():
+            result['x-security-description'] = security_desc.strip()
+
         # Custom x-* extensions: copy any x-* keys from metadata to the operation
         metadata = description.get('metadata')
         if metadata:

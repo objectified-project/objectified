@@ -110,6 +110,8 @@ export default function OperationPropertiesPanel({
   const [security, setSecurity] = useState<SecurityRequirement[]>([]);
   /** When true, operation is explicitly public (OpenAPI security: []) */
   const [unsecured, setUnsecured] = useState(false);
+  /** Optional documentation describing how security applies to this operation (emitted as x-security-description). */
+  const [securityDescription, setSecurityDescription] = useState('');
   const [loadedMetadata, setLoadedMetadata] = useState<Record<string, unknown>>({});
 
   // Deprecated flag state
@@ -133,6 +135,7 @@ export default function OperationPropertiesPanel({
       setOperationIdName('');
       setSecurity([]);
       setUnsecured(false);
+      setSecurityDescription('');
       setLoadedMetadata({});
       setDeprecated(false);
       setXPrivate(false);
@@ -150,6 +153,7 @@ export default function OperationPropertiesPanel({
       setOperationIdName('');
       setSecurity([]);
       setUnsecured(false);
+      setSecurityDescription('');
       setLoadedMetadata({});
       setDeprecated(false);
       setXPrivate(false);
@@ -182,6 +186,9 @@ export default function OperationPropertiesPanel({
           }
           setDeprecated(meta.deprecated === true);
           setXPrivate(meta['x-private'] === true || meta.x_private === true);
+          setSecurityDescription(
+            (meta.security_description ?? meta.securityDescription ?? meta['x-security-description'] ?? '') as string
+          );
           const extDocs = meta.external_docs ?? meta.externalDocs;
           if (extDocs && typeof extDocs === 'object') {
             setExternalDocsUrl(extDocs.url ?? '');
@@ -363,6 +370,7 @@ export default function OperationPropertiesPanel({
       const securityValue = unsecured ? [] : (sanitizedSecurity?.length ? sanitizedSecurity : undefined);
       const metadata: Record<string, unknown> = {
         security: securityValue,
+        security_description: securityDescription.trim() || undefined,
         deprecated: deprecated ? true : false,
         'x-private': xPrivate ? true : false,
         external_docs:
@@ -377,6 +385,9 @@ export default function OperationPropertiesPanel({
       // Keep security when explicitly [] (unsecured) or when we have requirements
       if (metadata.security === undefined) {
         delete metadata.security;
+      }
+      if (metadata.security_description === undefined) {
+        delete metadata.security_description;
       }
       if (metadata.external_docs === undefined) {
         delete metadata.external_docs;
@@ -1658,6 +1669,32 @@ export default function OperationPropertiesPanel({
                     </span>
                   }
                   sx={{ mb: 1.5 }}
+                />
+                <TextField
+                  size="small"
+                  multiline
+                  minRows={2}
+                  maxRows={6}
+                  placeholder="Describe how security applies to this operation (e.g. “Requires a valid API key. Unauthenticated requests return 401.”)"
+                  label="Security description (documentation)"
+                  value={securityDescription}
+                  onChange={(e) => setSecurityDescription(e.target.value)}
+                  helperText="Exported as x-security-description in OpenAPI for documentation and doc generators."
+                  sx={{
+                    width: '100%',
+                    mb: 1.5,
+                    '& .MuiInputBase-root': {
+                      fontSize: '0.875rem',
+                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                      color: isDark ? '#f1f5f9' : '#0f172a',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? '#334155' : '#e2e8f0',
+                    },
+                    '& .MuiFormHelperText-root': {
+                      fontSize: '0.7rem',
+                    },
+                  }}
                 />
                 {!unsecured && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
