@@ -5,7 +5,8 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
-import { Add, Delete, Edit, Lock, VpnKey } from '@mui/icons-material';
+import { Add, Close, Delete, Edit, Lock, VpnKey } from '@mui/icons-material';
+import { XCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
@@ -189,6 +190,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     description: '',
     additional_properties: [],
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const loadSchemes = async () => {
     if (!selectedVersionId) {
@@ -248,6 +250,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       additional_properties: [],
     });
     setEditingScheme(null);
+    setFormError(null);
   };
 
   const handleAdd = () => {
@@ -327,6 +330,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       setDialogSchemeType('custom');
     } else return;
     setEditingScheme(scheme);
+    setFormError(null);
     setDialogOpen(true);
   };
 
@@ -337,13 +341,10 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       const name = formData.scheme_name.trim();
       const paramName = formData.param_name.trim();
       if (!name || !paramName) {
-        await alertDialog({
-          title: 'Validation Error',
-          message: 'Scheme name and parameter name are required.',
-          variant: 'error',
-        });
+        setFormError('Scheme name and parameter name are required.');
         return;
       }
+      setFormError(null);
       try {
         if (editingScheme) {
           const result = await updateApiKeySecurityScheme(editingScheme.id, formData);
@@ -355,11 +356,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
             resetForm();
             onRefresh?.();
           } else {
-            await alertDialog({
-              title: 'Error',
-              message: result.error || 'Failed to update scheme',
-              variant: 'error',
-            });
+            setFormError(result.error || 'Failed to update scheme');
           }
         } else {
           const result = await createApiKeySecurityScheme(selectedVersionId, formData);
@@ -369,97 +366,73 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
             resetForm();
             onRefresh?.();
           } else {
-            await alertDialog({
-              title: 'Error',
-              message: result.error || 'Failed to create scheme',
-              variant: 'error',
-            });
+            setFormError(result.error || 'Failed to create scheme');
           }
         }
       } catch (err) {
         console.error('Error saving security scheme:', err);
-        await alertDialog({
-          title: 'Error',
-          message: err instanceof Error ? err.message : 'Failed to save',
-          variant: 'error',
-        });
+        setFormError(err instanceof Error ? err.message : 'Failed to save');
       }
       return;
     }
 
-    // HTTP scheme
-    const name = httpFormData.scheme_name.trim();
-    const httpSchemeValue =
-      httpFormData.http_scheme_kind === 'custom'
-        ? httpFormData.custom_http_scheme.trim()
-        : httpFormData.http_scheme_kind;
-    if (!name || !httpSchemeValue) {
-      await alertDialog({
-        title: 'Validation Error',
-        message: 'Scheme name and HTTP scheme are required.',
-        variant: 'error',
-      });
+    if (dialogSchemeType === 'http') {
+      const name = httpFormData.scheme_name.trim();
+      const httpSchemeValue =
+        httpFormData.http_scheme_kind === 'custom'
+          ? httpFormData.custom_http_scheme.trim()
+          : httpFormData.http_scheme_kind;
+      if (!name || !httpSchemeValue) {
+        setFormError('Scheme name and HTTP scheme are required.');
+        return;
+      }
+      setFormError(null);
+      const httpInput: HttpSchemeInput = {
+        scheme_name: name,
+        http_scheme: httpSchemeValue,
+        description: httpFormData.description || undefined,
+      };
+      if (httpFormData.http_scheme_kind === 'bearer' && httpFormData.bearer_format.trim()) {
+        httpInput.bearer_format = httpFormData.bearer_format.trim();
+      }
+      try {
+        if (editingScheme) {
+          const result = await updateHttpSecurityScheme(editingScheme.id, httpInput);
+          if (result.success && result.scheme) {
+            setSchemes(prev =>
+              prev.map(s => (s.id === editingScheme.id ? result.scheme! : s))
+            );
+            setDialogOpen(false);
+            resetForm();
+            onRefresh?.();
+          } else {
+            setFormError(result.error || 'Failed to update scheme');
+          }
+        } else {
+          const result = await createHttpSecurityScheme(selectedVersionId, httpInput);
+          if (result.success && result.scheme) {
+            setSchemes(prev => [...prev, result.scheme!].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name)));
+            setDialogOpen(false);
+            resetForm();
+            onRefresh?.();
+          } else {
+            setFormError(result.error || 'Failed to create scheme');
+          }
+        }
+      } catch (err) {
+        console.error('Error saving security scheme:', err);
+        setFormError(err instanceof Error ? err.message : 'Failed to save');
+      }
       return;
     }
-    const httpInput: HttpSchemeInput = {
-      scheme_name: name,
-      http_scheme: httpSchemeValue,
-      description: httpFormData.description || undefined,
-    };
-    if (httpFormData.http_scheme_kind === 'bearer' && httpFormData.bearer_format.trim()) {
-      httpInput.bearer_format = httpFormData.bearer_format.trim();
-    }
-    try {
-      if (editingScheme) {
-        const result = await updateHttpSecurityScheme(editingScheme.id, httpInput);
-        if (result.success && result.scheme) {
-          setSchemes(prev =>
-            prev.map(s => (s.id === editingScheme.id ? result.scheme! : s))
-          );
-          setDialogOpen(false);
-          resetForm();
-          onRefresh?.();
-        } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to update scheme',
-            variant: 'error',
-          });
-        }
-      } else {
-        const result = await createHttpSecurityScheme(selectedVersionId, httpInput);
-        if (result.success && result.scheme) {
-          setSchemes(prev => [...prev, result.scheme!].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name)));
-          setDialogOpen(false);
-          resetForm();
-          onRefresh?.();
-        } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to create scheme',
-            variant: 'error',
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error saving security scheme:', err);
-      await alertDialog({
-        title: 'Error',
-        message: err instanceof Error ? err.message : 'Failed to save',
-        variant: 'error',
-      });
-    }
-    return;
-  if (dialogSchemeType === 'oauth2') {
+
+    if (dialogSchemeType === 'oauth2') {
     const name = oauth2FormData.scheme_name.trim();
     if (!name) {
-      await alertDialog({
-        title: 'Validation Error',
-        message: 'Scheme name is required.',
-        variant: 'error',
-      });
+      setFormError('Scheme name is required.');
       return;
     }
+    setFormError(null);
     const flows: OAuth2SchemeInput['flows'] = {};
     const ac = oauth2FlowToConfig(oauth2FormData.flows.authorizationCode, 'authorizationCode');
     if (ac) flows.authorizationCode = ac;
@@ -470,13 +443,10 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     const pw = oauth2FlowToConfig(oauth2FormData.flows.password, 'password');
     if (pw) flows.password = pw;
     if (Object.keys(flows).length === 0) {
-      await alertDialog({
-        title: 'Validation Error',
-        message: 'Enable at least one OAuth2 flow and fill required URLs (Authorization Code: authorization + token; Implicit: authorization; Client Credentials / Password: token).',
-        variant: 'error',
-      });
+      setFormError('Enable at least one OAuth2 flow and fill required URLs (Authorization Code: authorization + token; Implicit: authorization; Client Credentials / Password: token).');
       return;
     }
+    setFormError(null);
     const oauth2Input: OAuth2SchemeInput = {
       scheme_name: name,
       description: oauth2FormData.description || undefined,
@@ -494,11 +464,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to update scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to update scheme');
         }
       } else {
         if (!selectedVersionId) return;
@@ -509,21 +475,13 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to create scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to create scheme');
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : String(err);
       console.error('Error saving security scheme:', msg);
-      await alertDialog({
-        title: 'Error',
-        message: msg || 'Failed to save',
-        variant: 'error',
-      });
+      setFormError(msg || 'Failed to save');
     }
   }
 
@@ -531,13 +489,10 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     const name = openIdConnectFormData.scheme_name.trim();
     const url = openIdConnectFormData.open_id_connect_url.trim();
     if (!name || !url) {
-      await alertDialog({
-        title: 'Validation Error',
-        message: 'Scheme name and OpenID Connect discovery URL are required.',
-        variant: 'error',
-      });
+      setFormError('Scheme name and OpenID Connect discovery URL are required.');
       return;
     }
+    setFormError(null);
     const openIdInput: OpenIdConnectSchemeInput = {
       scheme_name: name,
       open_id_connect_url: url,
@@ -556,11 +511,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to update scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to update scheme');
         }
       } else {
         if (!selectedVersionId) return;
@@ -571,6 +522,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
+          setDialogOpen(false);
           await alertDialog({
             title: 'Error',
             message: result.error || 'Failed to create scheme',
@@ -581,6 +533,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : String(err);
       console.error('Error saving security scheme:', msg);
+      setDialogOpen(false);
       await alertDialog({
         title: 'Error',
         message: msg || 'Failed to save',
@@ -592,13 +545,10 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
   if (dialogSchemeType === 'mutualTLS') {
     const name = mutualTlsFormData.scheme_name.trim();
     if (!name) {
-      await alertDialog({
-        title: 'Validation Error',
-        message: 'Scheme name is required.',
-        variant: 'error',
-      });
+      setFormError('Scheme name is required.');
       return;
     }
+    setFormError(null);
     const mutualTlsInput: MutualTlsSchemeInput = {
       scheme_name: name,
       description: mutualTlsFormData.description?.trim() || undefined,
@@ -615,11 +565,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to update scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to update scheme');
         }
       } else {
         if (!selectedVersionId) return;
@@ -630,34 +576,23 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to create scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to create scheme');
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : String(err);
       console.error('Error saving security scheme:', msg);
-      await alertDialog({
-        title: 'Error',
-        message: msg || 'Failed to save',
-        variant: 'error',
-      });
+      setFormError(msg || 'Failed to save');
     }
   }
 
   if (dialogSchemeType === 'custom') {
     const name = customFormData.scheme_name.trim();
     if (!name) {
-      await alertDialog({
-        title: 'Validation Error',
-        message: 'Scheme name is required.',
-        variant: 'error',
-      });
+      setFormError('Scheme name is required.');
       return;
     }
+    setFormError(null);
     const additional_properties: Record<string, string> = {};
     customFormData.additional_properties.forEach(({ name: k, value: v }) => {
       const key = k.trim();
@@ -681,11 +616,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to update scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to update scheme');
         }
       } else {
         if (!selectedVersionId) return;
@@ -696,21 +627,13 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           resetForm();
           onRefresh?.();
         } else {
-          await alertDialog({
-            title: 'Error',
-            message: result.error || 'Failed to create scheme',
-            variant: 'error',
-          });
+          setFormError(result.error || 'Failed to create scheme');
         }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : String(err);
       console.error('Error saving security scheme:', msg);
-      await alertDialog({
-        title: 'Error',
-        message: msg || 'Failed to save',
-        variant: 'error',
-      });
+      setFormError(msg || 'Failed to save');
     }
   }
   };
@@ -874,9 +797,9 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       {/* Add/Edit Dialog */}
       <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
           <Dialog.Content
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm max-h-[90vh] flex flex-col rounded-xl shadow-xl p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 overflow-y-auto"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] w-full max-w-sm max-h-[90vh] flex flex-col rounded-xl shadow-xl p-6 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}
           >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -884,6 +807,27 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                 ? `Edit ${editingScheme.scheme_type === 'oauth2' ? 'OAuth2' : editingScheme.scheme_type === 'openIdConnect' ? 'OpenID Connect' : editingScheme.scheme_type === 'mutualTLS' ? 'Mutual TLS' : editingScheme.scheme_type === 'custom' ? 'Custom' : editingScheme.scheme_type === 'http' ? 'HTTP' : 'API Key'} Scheme`
                 : 'Add Security Scheme'}
             </Dialog.Title>
+
+            {formError && (
+              <div
+                className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-start gap-2"
+                role="alert"
+              >
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-red-800 dark:text-red-200">Validation Error</p>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">{formError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormError(null)}
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 p-1 -m-1"
+                  aria-label="Dismiss"
+                >
+                  <Close sx={{ fontSize: 18 }} />
+                </button>
+              </div>
+            )}
 
             {/* Scheme type: dropdown when adding, read-only when editing */}
             <Box sx={{ mb: 2 }}>

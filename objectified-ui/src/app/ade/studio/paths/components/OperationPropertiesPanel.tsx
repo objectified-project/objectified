@@ -1768,30 +1768,38 @@ export default function OperationPropertiesPanel({
                                     }}
                                   />
                                 )}
-                                {(schemeName === 'oauth2' || schemeName === 'openIdConnect') && (
-                                  <TextField
-                                    size="small"
-                                    placeholder="Scopes (comma-separated)"
-                                    value={(scopes || []).join(', ')}
-                                    onChange={(e) => {
-                                      const scopeList = e.target.value
-                                        .split(',')
-                                        .map((s) => s.trim())
-                                        .filter(Boolean);
-                                      handleUpdateSecurity(reqIndex, schemeName, scopeList);
-                                    }}
-                                    sx={{
-                                      '& .MuiInputBase-root': {
-                                        fontSize: '0.75rem',
-                                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                        color: isDark ? '#f1f5f9' : '#0f172a',
-                                      },
-                                      '& .MuiOutlinedInput-notchedOutline': {
-                                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                                      },
-                                    }}
-                                  />
-                                )}
+                                {(() => {
+                                  const scheme = securitySchemes.find((s) => s.scheme_name === schemeName);
+                                  const supportsScopes =
+                                    scheme
+                                      ? scheme.scheme_type === 'oauth2' || scheme.scheme_type === 'openIdConnect'
+                                      : schemeName === 'oauth2' || schemeName === 'openIdConnect';
+                                  return supportsScopes ? (
+                                    <TextField
+                                      size="small"
+                                      placeholder="Required scopes (comma-separated)"
+                                      helperText="OAuth2/OpenID Connect: scopes required for this operation"
+                                      value={(scopes || []).join(', ')}
+                                      onChange={(e) => {
+                                        const scopeList = e.target.value
+                                          .split(',')
+                                          .map((s) => s.trim())
+                                          .filter(Boolean);
+                                        handleUpdateSecurity(reqIndex, schemeName, scopeList);
+                                      }}
+                                      sx={{
+                                        '& .MuiInputBase-root': {
+                                          fontSize: '0.75rem',
+                                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                          color: isDark ? '#f1f5f9' : '#0f172a',
+                                        },
+                                        '& .MuiOutlinedInput-notchedOutline': {
+                                          borderColor: isDark ? '#334155' : '#e2e8f0',
+                                        },
+                                      }}
+                                    />
+                                  ) : null;
+                                })()}
                               </Box>
                               <IconButton
                                 size="small"

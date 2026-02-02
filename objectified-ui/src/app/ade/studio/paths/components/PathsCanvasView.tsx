@@ -271,16 +271,22 @@ function OperationNode({ data }: {
             </div>
           </div>
 
-          {/* Security badges: OR = separate badges; within each, schemes are AND */}
+          {/* Security badges: OR = separate badges; within each, schemes are AND. Show scopes for OAuth2/OpenID. */}
           {data.security && data.security.length > 0 && (
             <div className="flex flex-wrap gap-1 items-center">
               {data.security.map((req, i) => {
-                const schemes = Object.keys(req).filter(Boolean);
-                if (schemes.length === 0) return null;
-                const label = schemes.join(' + ');
-                const title = schemes.length > 1
-                  ? `Security (AND): ${schemes.join(', ')}`
-                  : `Security: ${schemes[0]}`;
+                const entries = Object.entries(req).filter(([k]) => Boolean(k)) as [string, string[]][];
+                if (entries.length === 0) return null;
+                const labelParts = entries.map(([name, scopes]) =>
+                  Array.isArray(scopes) && scopes.length > 0 ? `${name} (${scopes.join(', ')})` : name
+                );
+                const label = labelParts.join(' + ');
+                const titleParts = entries.map(([name, scopes]) =>
+                  Array.isArray(scopes) && scopes.length > 0 ? `${name}: [${scopes.join(', ')}]` : name
+                );
+                const title = entries.length > 1
+                  ? `Security (AND): ${titleParts.join('; ')}`
+                  : `Security: ${titleParts[0]}`;
                 return (
                   <span
                     key={i}

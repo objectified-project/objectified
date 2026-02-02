@@ -63,6 +63,11 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       onClose={onCancel}
       maxWidth="sm"
       fullWidth
+      slotProps={{
+        root: {
+          sx: { zIndex: 10002 },
+        },
+      }}
       PaperProps={{
         sx: {
           borderRadius: 2,

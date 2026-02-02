@@ -264,15 +264,13 @@ Define security schemes once, apply to multiple operations:
 
 Each operation can override global defaults:
 
-- 📋 Apply multiple security schemes (AND/OR logic)
-- 📋 Configure required scopes per operation
+- ✅ Apply multiple security schemes (AND/OR logic)
+- ✅ Configure required scopes per operation
 - 📋 Mark operation as unsecured (public endpoint)
 - 📋 Add security descriptions for documentation
 
 | Ticket | Feature                                         |
 |--------|-------------------------------------------------|
-| #420   | Apply multiple security schemes to an operation |
-| #421   | Configure required scopes per operation         |
 | #422   | Mark operation as unsafe/public                 |
 | #423   | Add security descriptions for documentation     |
 
