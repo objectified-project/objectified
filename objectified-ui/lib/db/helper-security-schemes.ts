@@ -75,6 +75,14 @@ export interface MutualTlsSchemeInput {
   description?: string;
 }
 
+/** Custom security scheme: type string (e.g. apiKey or x-custom-auth) + description + additional properties for export */
+export interface CustomSchemeInput {
+  scheme_name: string;
+  type: string;
+  description?: string;
+  additional_properties?: Record<string, string>;
+}
+
 /** OpenAPI security scheme definition for export */
 export interface OpenAPISecurityScheme {
   type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
@@ -729,6 +737,136 @@ export async function updateMutualTlsSecurityScheme(
 }
 
 /**
+ * Create a custom security scheme (type + description + additional properties for export)
+ */
+export async function createCustomSecurityScheme(
+  versionId: string,
+  input: CustomSchemeInput
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const name = input.scheme_name.trim();
+    if (!name) {
+      return { success: false, error: 'Scheme name is required.' };
+    }
+    const typeVal = input.type?.trim() || 'apiKey';
+    const data: Record<string, unknown> = { type: typeVal };
+    if (input.description?.trim()) data.description = input.description.trim();
+    if (input.additional_properties && typeof input.additional_properties === 'object') {
+      for (const [k, v] of Object.entries(input.additional_properties)) {
+        const key = k.trim();
+        if (key && v !== undefined && v !== null) data[key] = String(v).trim();
+      }
+    }
+    const dataJson = JSON.stringify(data);
+    const result = await connectionPool.query(
+      `INSERT INTO odb.version_security_scheme (version_id, scheme_name, scheme_type, description, data)
+       VALUES ($1, $2, 'custom', $3, $4::jsonb)
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      [versionId, name, input.description?.trim() || null, dataJson]
+    );
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Update a custom security scheme
+ */
+export async function updateCustomSecurityScheme(
+  schemeId: string,
+  input: Partial<CustomSchemeInput>
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (input.scheme_name !== undefined) {
+      const name = input.scheme_name.trim();
+      if (!name) {
+        return { success: false, error: 'Scheme name is required.' };
+      }
+      updates.push(`scheme_name = $${idx++}`);
+      values.push(name);
+    }
+    if (input.description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(input.description.trim() || null);
+    }
+    if (input.type !== undefined || input.additional_properties !== undefined) {
+      const data: Record<string, unknown> = {};
+      if (input.type !== undefined) data.type = input.type.trim() || 'apiKey';
+      if (input.description !== undefined) data.description = input.description.trim();
+      if (input.additional_properties && typeof input.additional_properties === 'object') {
+        for (const [k, v] of Object.entries(input.additional_properties)) {
+          const key = k.trim();
+          if (key && v !== undefined && v !== null) data[key] = String(v).trim();
+        }
+      }
+      updates.push(`data = $${idx++}::jsonb`);
+      values.push(JSON.stringify(data));
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'No updates provided' };
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(schemeId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.version_security_scheme SET ${updates.join(', ')}
+       WHERE id = $${idx} AND scheme_type = 'custom'
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Scheme not found or not a custom scheme' };
+    }
+
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Delete a security scheme
  */
 export async function deleteSecurityScheme(schemeId: string): Promise<{ success: boolean; error?: string }> {
@@ -789,6 +927,20 @@ export async function securitySchemesToOpenAPI(schemes: SecuritySchemeRecord[]):
         type: 'mutualTLS',
         description: s.description || undefined,
       };
+    } else if (s.scheme_type === 'custom') {
+      const data = s.data as Record<string, unknown>;
+      const typeVal = (data?.type as string)?.trim() || 'apiKey';
+      const out: Record<string, unknown> = {
+        type: typeVal,
+        description: s.description || (data?.description as string) || undefined,
+      };
+      if (data && typeof data === 'object') {
+        for (const [k, v] of Object.entries(data)) {
+          if (k === 'type' || k === 'description') continue;
+          if (v !== undefined && v !== null) out[k] = typeof v === 'string' ? v : v;
+        }
+      }
+      result[s.scheme_name] = out as OpenAPISecurityScheme;
     }
   }
   return result;

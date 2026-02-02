@@ -21,6 +21,8 @@ import {
   updateOpenIdConnectSecurityScheme,
   createMutualTlsSecurityScheme,
   updateMutualTlsSecurityScheme,
+  createCustomSecurityScheme,
+  updateCustomSecurityScheme,
   deleteSecurityScheme,
   type SecuritySchemeRecord,
   type ApiKeySchemeInput,
@@ -29,6 +31,7 @@ import {
   type OAuth2FlowConfig,
   type OpenIdConnectSchemeInput,
   type MutualTlsSchemeInput,
+  type CustomSchemeInput,
 } from '../../../../../../lib/db/helper-security-schemes';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 
@@ -115,6 +118,7 @@ const SCHEME_TYPE_OPTIONS: { value: string; label: string; supported: boolean }[
   { value: 'oauth2', label: 'OAuth 2.0', supported: true },
   { value: 'openIdConnect', label: 'OpenID Connect', supported: true },
   { value: 'mutualTLS', label: 'Mutual TLS', supported: true },
+  { value: 'custom', label: 'Custom', supported: true },
 ];
 
 export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => void }) {
@@ -174,6 +178,17 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     scheme_name: '',
     description: '',
   });
+  const [customFormData, setCustomFormData] = useState<{
+    scheme_name: string;
+    type: string;
+    description: string;
+    additional_properties: { name: string; value: string }[];
+  }>({
+    scheme_name: '',
+    type: 'apiKey',
+    description: '',
+    additional_properties: [],
+  });
 
   const loadSchemes = async () => {
     if (!selectedVersionId) {
@@ -225,6 +240,12 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     setMutualTlsFormData({
       scheme_name: '',
       description: '',
+    });
+    setCustomFormData({
+      scheme_name: '',
+      type: 'apiKey',
+      description: '',
+      additional_properties: [],
     });
     setEditingScheme(null);
   };
@@ -287,6 +308,23 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
         description: scheme.description || '',
       });
       setDialogSchemeType('mutualTLS');
+    } else if (scheme.scheme_type === 'custom') {
+      const data = scheme.data as Record<string, unknown>;
+      const typeVal = (data?.type as string) || 'apiKey';
+      const additional_properties: { name: string; value: string }[] = [];
+      if (data && typeof data === 'object') {
+        for (const [k, v] of Object.entries(data)) {
+          if (k === 'type' || k === 'description') continue;
+          if (v !== undefined && v !== null) additional_properties.push({ name: k, value: String(v) });
+        }
+      }
+      setCustomFormData({
+        scheme_name: scheme.scheme_name,
+        type: typeVal,
+        description: scheme.description || '',
+        additional_properties,
+      });
+      setDialogSchemeType('custom');
     } else return;
     setEditingScheme(scheme);
     setDialogOpen(true);
@@ -609,6 +647,72 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       });
     }
   }
+
+  if (dialogSchemeType === 'custom') {
+    const name = customFormData.scheme_name.trim();
+    if (!name) {
+      await alertDialog({
+        title: 'Validation Error',
+        message: 'Scheme name is required.',
+        variant: 'error',
+      });
+      return;
+    }
+    const additional_properties: Record<string, string> = {};
+    customFormData.additional_properties.forEach(({ name: k, value: v }) => {
+      const key = k.trim();
+      if (key && v.trim()) additional_properties[key] = v.trim();
+    });
+    const customInput: CustomSchemeInput = {
+      scheme_name: name,
+      type: customFormData.type.trim() || 'apiKey',
+      description: customFormData.description?.trim() || undefined,
+      additional_properties: Object.keys(additional_properties).length > 0 ? additional_properties : undefined,
+    };
+    try {
+      if (editingScheme) {
+        const schemeId = editingScheme!.id;
+        const result = await updateCustomSecurityScheme(schemeId, customInput);
+        if (result.success && result.scheme) {
+          setSchemes(prev =>
+            prev.map(s => (s.id === schemeId ? result.scheme! : s))
+          );
+          setDialogOpen(false);
+          resetForm();
+          onRefresh?.();
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: result.error || 'Failed to update scheme',
+            variant: 'error',
+          });
+        }
+      } else {
+        if (!selectedVersionId) return;
+        const result = await createCustomSecurityScheme(selectedVersionId as string, customInput);
+        if (result.success && result.scheme) {
+          setSchemes(prev => [...prev, result.scheme!].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name)));
+          setDialogOpen(false);
+          resetForm();
+          onRefresh?.();
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: result.error || 'Failed to create scheme',
+            variant: 'error',
+          });
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? (err as Error).message : String(err);
+      console.error('Error saving security scheme:', msg);
+      await alertDialog({
+        title: 'Error',
+        message: msg || 'Failed to save',
+        variant: 'error',
+      });
+    }
+  }
   };
 
   const handleDelete = async (scheme: SecuritySchemeRecord) => {
@@ -741,6 +845,8 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                     ? `OpenID Connect: ${(scheme.data as { openIdConnectUrl?: string })?.openIdConnectUrl || '—'}`
                     : scheme.scheme_type === 'mutualTLS'
                     ? 'Mutual TLS (certificate-based)'
+                    : scheme.scheme_type === 'custom'
+                    ? `Custom: ${(scheme.data as Record<string, unknown>)?.type ?? '—'}`
                     : `${getInLabel(scheme.in_location)}: ${scheme.param_name || '—'}`}
                 </span>
               </Box>
@@ -775,7 +881,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               {editingScheme
-                ? `Edit ${editingScheme.scheme_type === 'oauth2' ? 'OAuth2' : editingScheme.scheme_type === 'openIdConnect' ? 'OpenID Connect' : editingScheme.scheme_type === 'mutualTLS' ? 'Mutual TLS' : editingScheme.scheme_type === 'http' ? 'HTTP' : 'API Key'} Scheme`
+                ? `Edit ${editingScheme.scheme_type === 'oauth2' ? 'OAuth2' : editingScheme.scheme_type === 'openIdConnect' ? 'OpenID Connect' : editingScheme.scheme_type === 'mutualTLS' ? 'Mutual TLS' : editingScheme.scheme_type === 'custom' ? 'Custom' : editingScheme.scheme_type === 'http' ? 'HTTP' : 'API Key'} Scheme`
                 : 'Add Security Scheme'}
             </Dialog.Title>
 
@@ -1223,6 +1329,106 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                     onChange={(e) => setMutualTlsFormData(d => ({ ...d, description: e.target.value }))}
                     sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
+                </Box>
+              </Box>
+            ) : dialogSchemeType === 'custom' ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Scheme Name
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="myCustomAuth"
+                    value={customFormData.scheme_name}
+                    onChange={(e) => setCustomFormData(d => ({ ...d, scheme_name: e.target.value }))}
+                    disabled={!!editingScheme}
+                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security'}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Type (OpenAPI type or x- extension)
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="apiKey, http, oauth2, openIdConnect, mutualTLS, or x-custom-auth"
+                    value={customFormData.type}
+                    onChange={(e) => setCustomFormData(d => ({ ...d, type: e.target.value }))}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Description (optional)
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={2}
+                    placeholder="Custom authentication"
+                    value={customFormData.description}
+                    onChange={(e) => setCustomFormData(d => ({ ...d, description: e.target.value }))}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Additional properties (key-value, exported as-is)
+                  </label>
+                  {customFormData.additional_properties.map((prop, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', gap: 0.5, mb: 0.5 }}>
+                      <TextField
+                        size="small"
+                        placeholder="name or x-extension"
+                        value={prop.name}
+                        onChange={(e) => {
+                          const next = [...customFormData.additional_properties];
+                          next[idx] = { ...next[idx], name: e.target.value };
+                          setCustomFormData(d => ({ ...d, additional_properties: next }));
+                        }}
+                        sx={{ flex: 1, '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                      />
+                      <TextField
+                        size="small"
+                        placeholder="value"
+                        value={prop.value}
+                        onChange={(e) => {
+                          const next = [...customFormData.additional_properties];
+                          next[idx] = { ...next[idx], value: e.target.value };
+                          setCustomFormData(d => ({ ...d, additional_properties: next }));
+                        }}
+                        sx={{ flex: 1, '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          const next = customFormData.additional_properties.filter((_, i) => i !== idx);
+                          setCustomFormData(d => ({ ...d, additional_properties: next }));
+                        }}
+                        sx={{ p: 0.5, color: '#ef4444' }}
+                      >
+                        <Delete sx={{ fontSize: 14 }} />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  <Button
+                    size="small"
+                    startIcon={<Add sx={{ fontSize: 12 }} />}
+                    onClick={() =>
+                      setCustomFormData(d => ({
+                        ...d,
+                        additional_properties: [...d.additional_properties, { name: '', value: '' }],
+                      }))
+                    }
+                    sx={{ fontSize: '0.7rem', textTransform: 'none', color: '#6366f1', mt: 0.5 }}
+                  >
+                    Add property
+                  </Button>
                 </Box>
               </Box>
             ) : (

@@ -247,18 +247,6 @@ structure immediately recognizable.
 
 Define security schemes once, apply to multiple operations:
 
-**Supported Schemes**:
-- ✅ **API Key**: Header, query, or cookie-based keys (#410)
-- ✅ **HTTP**: Basic, Bearer, or custom HTTP auth
-- ✅ **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
-- ✅ **OpenID Connect**: Discovery URL with scopes
-- ✅ **Mutual TLS**: Certificate-based authentication
-- 📋 **Custom security schemes**
-
-| Ticket | Feature Description                 |
-|--------|-------------------------------------|
-| #415   | Add Custom Security Schemes         |
-
 **Visual Design**:
 - 📋 Security scheme library panel
 - 📋 Drag scheme onto method node to apply
@@ -774,6 +762,14 @@ DROP TARGET STATE:
 - ✅ Private flag (unexposed endpoints)
 - ✅ External docs
 - ✅ Custom `x-*` extensions
+
+**Supported Security Schemes**:
+- ✅ **API Key**: Header, query, or cookie-based keys (#410)
+- ✅ **HTTP**: Basic, Bearer, or custom HTTP auth
+- ✅ **OAuth 2.0**: Authorization Code, Implicit, Client Credentials, Password flows
+- ✅ **OpenID Connect**: Discovery URL with scopes
+- ✅ **Mutual TLS**: Certificate-based authentication
+- ✅ **Custom security schemes**
 
 *This roadmap positions Objectified UI as a comprehensive visual API design platform,
 bridging the gap between schema definition and full OpenAPI specification authoring while
