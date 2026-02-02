@@ -17,12 +17,15 @@ import {
   updateHttpSecurityScheme,
   createOAuth2SecurityScheme,
   updateOAuth2SecurityScheme,
+  createOpenIdConnectSecurityScheme,
+  updateOpenIdConnectSecurityScheme,
   deleteSecurityScheme,
   type SecuritySchemeRecord,
   type ApiKeySchemeInput,
   type HttpSchemeInput,
   type OAuth2SchemeInput,
   type OAuth2FlowConfig,
+  type OpenIdConnectSchemeInput,
 } from '../../../../../../lib/db/helper-security-schemes';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 
@@ -107,7 +110,7 @@ const SCHEME_TYPE_OPTIONS: { value: string; label: string; supported: boolean }[
   { value: 'apiKey', label: 'API Key (header, query, cookie)', supported: true },
   { value: 'http', label: 'HTTP (Basic, Bearer, custom)', supported: true },
   { value: 'oauth2', label: 'OAuth 2.0', supported: true },
-  { value: 'openIdConnect', label: 'OpenID Connect', supported: false },
+  { value: 'openIdConnect', label: 'OpenID Connect', supported: true },
   { value: 'mutualTLS', label: 'Mutual TLS', supported: false },
 ];
 
@@ -150,6 +153,17 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
     description: '',
     flows: getDefaultOAuth2Flows(),
   });
+  const [openIdConnectFormData, setOpenIdConnectFormData] = useState<{
+    scheme_name: string;
+    open_id_connect_url: string;
+    description: string;
+    scopes: string[];
+  }>({
+    scheme_name: '',
+    open_id_connect_url: 'https://example.com/.well-known/openid-configuration',
+    description: '',
+    scopes: [],
+  });
 
   const loadSchemes = async () => {
     if (!selectedVersionId) {
@@ -191,6 +205,12 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       scheme_name: '',
       description: '',
       flows: getDefaultOAuth2Flows(),
+    });
+    setOpenIdConnectFormData({
+      scheme_name: '',
+      open_id_connect_url: 'https://example.com/.well-known/openid-configuration',
+      description: '',
+      scopes: [],
     });
     setEditingScheme(null);
   };
@@ -238,6 +258,15 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
         },
       });
       setDialogSchemeType('oauth2');
+    } else if (scheme.scheme_type === 'openIdConnect') {
+      const data = scheme.data as { openIdConnectUrl?: string; scopes?: string[] };
+      setOpenIdConnectFormData({
+        scheme_name: scheme.scheme_name,
+        open_id_connect_url: data?.openIdConnectUrl || 'https://example.com/.well-known/openid-configuration',
+        description: scheme.description || '',
+        scopes: Array.isArray(data?.scopes) ? data.scopes : [],
+      });
+      setDialogSchemeType('openIdConnect');
     } else return;
     setEditingScheme(scheme);
     setDialogOpen(true);
@@ -439,6 +468,68 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       });
     }
   }
+
+  if (dialogSchemeType === 'openIdConnect') {
+    const name = openIdConnectFormData.scheme_name.trim();
+    const url = openIdConnectFormData.open_id_connect_url.trim();
+    if (!name || !url) {
+      await alertDialog({
+        title: 'Validation Error',
+        message: 'Scheme name and OpenID Connect discovery URL are required.',
+        variant: 'error',
+      });
+      return;
+    }
+    const openIdInput: OpenIdConnectSchemeInput = {
+      scheme_name: name,
+      open_id_connect_url: url,
+      description: openIdConnectFormData.description || undefined,
+      scopes: openIdConnectFormData.scopes.filter((s) => s.trim()).length > 0 ? openIdConnectFormData.scopes.filter((s) => s.trim()) : undefined,
+    };
+    try {
+      if (editingScheme) {
+        const schemeId = editingScheme!.id;
+        const result = await updateOpenIdConnectSecurityScheme(schemeId, openIdInput);
+        if (result.success && result.scheme) {
+          setSchemes(prev =>
+            prev.map(s => (s.id === schemeId ? result.scheme! : s))
+          );
+          setDialogOpen(false);
+          resetForm();
+          onRefresh?.();
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: result.error || 'Failed to update scheme',
+            variant: 'error',
+          });
+        }
+      } else {
+        if (!selectedVersionId) return;
+        const result = await createOpenIdConnectSecurityScheme(selectedVersionId as string, openIdInput);
+        if (result.success && result.scheme) {
+          setSchemes(prev => [...prev, result.scheme!].sort((a, b) => a.scheme_name.localeCompare(b.scheme_name)));
+          setDialogOpen(false);
+          resetForm();
+          onRefresh?.();
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: result.error || 'Failed to create scheme',
+            variant: 'error',
+          });
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? (err as Error).message : String(err);
+      console.error('Error saving security scheme:', msg);
+      await alertDialog({
+        title: 'Error',
+        message: msg || 'Failed to save',
+        variant: 'error',
+      });
+    }
+  }
   };
 
   const handleDelete = async (scheme: SecuritySchemeRecord) => {
@@ -567,6 +658,8 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                     ? `HTTP: ${scheme.http_scheme || 'basic'}${(scheme.data as { bearerFormat?: string })?.bearerFormat ? ` (${(scheme.data as { bearerFormat?: string }).bearerFormat})` : ''}`
                     : scheme.scheme_type === 'oauth2'
                     ? `OAuth2: ${Object.keys((scheme.data as { flows?: Record<string, unknown> })?.flows || {}).join(', ') || '—'}`
+                    : scheme.scheme_type === 'openIdConnect'
+                    ? `OpenID Connect: ${(scheme.data as { openIdConnectUrl?: string })?.openIdConnectUrl || '—'}`
                     : `${getInLabel(scheme.in_location)}: ${scheme.param_name || '—'}`}
                 </span>
               </Box>
@@ -601,7 +694,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
           >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               {editingScheme
-                ? `Edit ${editingScheme.scheme_type === 'oauth2' ? 'OAuth2' : editingScheme.scheme_type === 'http' ? 'HTTP' : 'API Key'} Scheme`
+                ? `Edit ${editingScheme.scheme_type === 'oauth2' ? 'OAuth2' : editingScheme.scheme_type === 'openIdConnect' ? 'OpenID Connect' : editingScheme.scheme_type === 'http' ? 'HTTP' : 'API Key'} Scheme`
                 : 'Add Security Scheme'}
             </Dialog.Title>
 
@@ -639,7 +732,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
 
             {!editingScheme && !SCHEME_TYPE_OPTIONS.find(o => o.value === dialogSchemeType)?.supported ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
-                This scheme type is not yet supported. Use API Key, HTTP, or OAuth2 for now.
+                This scheme type is not yet supported. Use API Key, HTTP, OAuth2, or OpenID Connect for now.
               </p>
             ) : dialogSchemeType === 'apiKey' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -949,6 +1042,74 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                     </Box>
                   );
                 })}
+              </Box>
+            ) : dialogSchemeType === 'openIdConnect' ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Scheme Name
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="openId"
+                    value={openIdConnectFormData.scheme_name}
+                    onChange={(e) => setOpenIdConnectFormData(d => ({ ...d, scheme_name: e.target.value }))}
+                    disabled={!!editingScheme}
+                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., openId)'}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    OpenID Connect Discovery URL
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="https://example.com/.well-known/openid-configuration"
+                    value={openIdConnectFormData.open_id_connect_url}
+                    onChange={(e) => setOpenIdConnectFormData(d => ({ ...d, open_id_connect_url: e.target.value }))}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Scopes (optional, one per line or comma-separated)
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={3}
+                    placeholder="openid, profile, email"
+                    value={openIdConnectFormData.scopes.join(', ')}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const scopes = raw
+                        .split(/[\n,]+/)
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      setOpenIdConnectFormData(d => ({ ...d, scopes }));
+                    }}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
+                <Box>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Description (optional)
+                  </label>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={2}
+                    placeholder="OpenID Connect authentication"
+                    value={openIdConnectFormData.description}
+                    onChange={(e) => setOpenIdConnectFormData(d => ({ ...d, description: e.target.value }))}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                  />
+                </Box>
               </Box>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

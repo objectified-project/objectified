@@ -1622,6 +1622,8 @@ export default function OperationPropertiesPanel({
                                           ? `${s.scheme_name} (HTTP: ${s.http_scheme || 'basic'})`
                                           : s.scheme_type === 'oauth2'
                                           ? `${s.scheme_name} (OAuth2)`
+                                          : s.scheme_type === 'openIdConnect'
+                                          ? `${s.scheme_name} (OpenID Connect)`
                                           : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
                                       </MenuItem>
                                     ))}

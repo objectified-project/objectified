@@ -61,6 +61,14 @@ export interface OAuth2SchemeInput {
   };
 }
 
+/** OpenAPI OpenID Connect scheme: discovery URL and optional scopes (scopes used in security requirements) */
+export interface OpenIdConnectSchemeInput {
+  scheme_name: string;
+  open_id_connect_url: string;
+  description?: string;
+  scopes?: string[];
+}
+
 /** OpenAPI security scheme definition for export */
 export interface OpenAPISecurityScheme {
   type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
@@ -68,6 +76,7 @@ export interface OpenAPISecurityScheme {
   in?: 'header' | 'query' | 'cookie';
   scheme?: string;
   bearerFormat?: string;
+  openIdConnectUrl?: string;
   description?: string;
   [key: string]: unknown;
 }
@@ -484,6 +493,129 @@ export async function updateOAuth2SecurityScheme(
 }
 
 /**
+ * Create an OpenID Connect security scheme (discovery URL with optional scopes)
+ */
+export async function createOpenIdConnectSecurityScheme(
+  versionId: string,
+  input: OpenIdConnectSchemeInput
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const url = input.open_id_connect_url.trim();
+    if (!url) {
+      return { success: false, error: 'OpenID Connect discovery URL is required.' };
+    }
+    const data: Record<string, unknown> = { openIdConnectUrl: url };
+    if (input.scopes && Array.isArray(input.scopes) && input.scopes.length > 0) {
+      data.scopes = input.scopes.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim());
+    }
+    const dataJson = JSON.stringify(data);
+    const result = await connectionPool.query(
+      `INSERT INTO odb.version_security_scheme (version_id, scheme_name, scheme_type, description, data)
+       VALUES ($1, $2, 'openIdConnect', $3, $4::jsonb)
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      [versionId, input.scheme_name.trim(), input.description?.trim() || null, dataJson]
+    );
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Update an OpenID Connect security scheme
+ */
+export async function updateOpenIdConnectSecurityScheme(
+  schemeId: string,
+  input: Partial<OpenIdConnectSchemeInput>
+): Promise<{ success: boolean; scheme?: SecuritySchemeRecord; error?: string }> {
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (input.scheme_name !== undefined) {
+      updates.push(`scheme_name = $${idx++}`);
+      values.push(input.scheme_name.trim());
+    }
+    if (input.description !== undefined) {
+      updates.push(`description = $${idx++}`);
+      values.push(input.description.trim() || null);
+    }
+    if (input.open_id_connect_url !== undefined) {
+      const url = input.open_id_connect_url.trim();
+      if (!url) {
+        return { success: false, error: 'OpenID Connect discovery URL is required.' };
+      }
+      updates.push(`data = COALESCE(data, '{}'::jsonb) || jsonb_build_object('openIdConnectUrl', $${idx++}::text)`);
+      values.push(url);
+    }
+    if (input.scopes !== undefined) {
+      const scopes = Array.isArray(input.scopes)
+        ? input.scopes.filter((s) => typeof s === 'string' && s.trim()).map((s) => (s as string).trim())
+        : [];
+      updates.push(`data = COALESCE(data, '{}'::jsonb) || jsonb_build_object('scopes', $${idx++}::jsonb)`);
+      values.push(JSON.stringify(scopes));
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'No updates provided' };
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+    values.push(schemeId);
+
+    const result = await connectionPool.query(
+      `UPDATE odb.version_security_scheme SET ${updates.join(', ')}
+       WHERE id = $${idx} AND scheme_type = 'openIdConnect'
+       RETURNING id, version_id, scheme_name, scheme_type, in_location, param_name, http_scheme, description, data, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Scheme not found or not an OpenID Connect scheme' };
+    }
+
+    const row = result.rows[0];
+    return {
+      success: true,
+      scheme: {
+        id: row.id,
+        version_id: row.version_id,
+        scheme_name: row.scheme_name,
+        scheme_type: row.scheme_type,
+        in_location: row.in_location,
+        param_name: row.param_name,
+        http_scheme: row.http_scheme,
+        description: row.description,
+        data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {},
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Delete a security scheme
  */
 export async function deleteSecurityScheme(schemeId: string): Promise<{ success: boolean; error?: string }> {
@@ -530,8 +662,17 @@ export async function securitySchemesToOpenAPI(schemes: SecuritySchemeRecord[]):
           description: s.description || undefined,
         };
       }
+    } else if (s.scheme_type === 'openIdConnect') {
+      const url = (s.data as { openIdConnectUrl?: string })?.openIdConnectUrl;
+      if (url && typeof url === 'string' && url.trim()) {
+        result[s.scheme_name] = {
+          type: 'openIdConnect',
+          openIdConnectUrl: url.trim(),
+          description: s.description || undefined,
+        };
+      }
     }
-    // Future: openIdConnect, mutualTLS
+    // Future: mutualTLS
   }
   return result;
 }

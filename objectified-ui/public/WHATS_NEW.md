@@ -26,6 +26,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds API Keys for Security options
     - Adds HTTP Authentication options (Basic, Bearer, Custom)
     - Adds OAuth2 security options
+    - Adds OpenID security options
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
