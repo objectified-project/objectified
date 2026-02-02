@@ -29,6 +29,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds OpenID security options
     - Adds TLS security options
     - Adds custom security schema options
+    - Security options can be dragged and dropped to operations to set them from the catalog
   - Added ability to apply multiple security schemes to HTTP Operations (and/or)
   - Added ability to specify different security scopes on a per-operation basis
   - Added ability to mark an endpoint as public (i.e. requires no security)

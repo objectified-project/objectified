@@ -31,6 +31,7 @@ import {
 } from '../../../../../../lib/db/helper-paths';
 import {
   getOperationDescription,
+  upsertOperationDescription,
 } from '../../../../../../lib/db/helper-path-operation-descriptions';
 import {
   getLinkedParametersForOperation,
@@ -3013,6 +3014,61 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           message: 'To add a parameter, click on an operation node and use the "Add Parameter" button in the Operation Details panel on the right.',
           variant: 'info',
         });
+      } else if (dropData.type === 'security-scheme') {
+        const schemeName = dropData.schemeName;
+        if (!schemeName) return;
+        const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
+        const nodeWrapper = elementAtPoint?.closest('[data-id]');
+        const nodeId = nodeWrapper?.getAttribute('data-id');
+        if (!nodeId) {
+          await alertDialog({
+            title: 'Drop on Operation',
+            message: 'Drag the security scheme onto an operation node to apply it.',
+            variant: 'info',
+          });
+          return;
+        }
+        const opNode = nodes.find((n) => n.id === nodeId && n.type === 'operation');
+        if (!opNode) {
+          await alertDialog({
+            title: 'Drop on Operation',
+            message: 'Drag the security scheme onto an operation node to apply it.',
+            variant: 'info',
+          });
+          return;
+        }
+        const dbOperationId = opNode.id;
+        try {
+          const descResponse = await getOperationDescription(dbOperationId);
+          const desc = JSON.parse(descResponse);
+          const meta = desc?.metadata
+            ? typeof desc.metadata === 'string'
+              ? JSON.parse(desc.metadata)
+              : desc.metadata
+            : {};
+          const existingSec = Array.isArray(meta.security)
+            ? meta.security
+            : meta.security
+              ? [meta.security]
+              : [];
+          const newReq: Record<string, string[]> = { [schemeName]: [] };
+          const newSec = [...existingSec, newReq];
+          await upsertOperationDescription(
+            dbOperationId,
+            desc?.summary,
+            desc?.description,
+            desc?.operation_id,
+            { ...meta, security: newSec }
+          );
+          if (onRefresh) onRefresh();
+        } catch (err) {
+          console.error('Error applying security scheme to operation:', err);
+          await alertDialog({
+            title: 'Error',
+            message: 'Failed to apply security scheme to the operation. Please try again.',
+            variant: 'error',
+          });
+        }
       } else if (dropData.type === 'class') {
         console.log('PathsCanvasView: Class dropped on canvas', {
           dropData,
@@ -3168,7 +3224,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         setNodes((nds) => [...nds, newNode]);
       }
     },
-    [screenToFlowPosition, setNodes, selectedPathId, alertDialog, nodes, handleClassDropOnResponse]
+    [screenToFlowPosition, setNodes, selectedPathId, alertDialog, nodes, handleClassDropOnResponse, onRefresh]
   );
 
   return (

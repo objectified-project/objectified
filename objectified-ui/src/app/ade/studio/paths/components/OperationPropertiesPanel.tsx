@@ -46,6 +46,8 @@ interface OperationPropertiesPanelProps {
   versionPathId: string | null;
   onClose: () => void;
   onRefresh?: () => void;
+  /** Increment to force refetch of operation description (e.g. after security scheme drag-drop). */
+  refreshKey?: number;
 }
 
 // View modes for the panel
@@ -58,6 +60,7 @@ export default function OperationPropertiesPanel({
   versionPathId,
   onClose,
   onRefresh,
+  refreshKey,
 }: OperationPropertiesPanelProps) {
   const { selectedVersionId } = useStudio();
   const isDark = useDarkMode();
@@ -214,7 +217,7 @@ export default function OperationPropertiesPanel({
     };
 
     loadDescription();
-  }, [operationId, pathname, operation]);
+  }, [operationId, pathname, operation, refreshKey]);
 
   // Load security schemes (API Key) for dropdown
   useEffect(() => {

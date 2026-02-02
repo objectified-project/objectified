@@ -163,6 +163,7 @@ export default function PathsPage() {
               versionPathId={selectedPathId}
               onClose={() => setSelectedOperation(null)}
               onRefresh={handleCanvasRefresh}
+              refreshKey={canvasRefreshKey}
             />
           )}
 

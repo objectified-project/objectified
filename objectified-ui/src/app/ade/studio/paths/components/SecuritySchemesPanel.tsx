@@ -702,7 +702,7 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
         </Button>
       </Box>
       <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">
-        Add API Key, HTTP (Basic/Bearer), or other scheme types. Use scheme names when adding security to operations.
+        Add API Key, HTTP (Basic/Bearer), or other scheme types. Drag a scheme onto a method node to apply it, or use Edit/Delete below.
       </p>
 
       {isLoading ? (
@@ -742,55 +742,83 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {schemes.map((scheme) => (
-            <Box
-              key={scheme.id}
-              sx={{
-                p: 1.5,
-                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                borderRadius: 1,
-                backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <span className="text-sm font-medium text-gray-900 dark:text-white block truncate">
-                  {scheme.scheme_name}
-                </span>
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                  {scheme.scheme_type === 'http'
-                    ? `HTTP: ${scheme.http_scheme || 'basic'}${(scheme.data as { bearerFormat?: string })?.bearerFormat ? ` (${(scheme.data as { bearerFormat?: string }).bearerFormat})` : ''}`
-                    : scheme.scheme_type === 'oauth2'
-                    ? `OAuth2: ${Object.keys((scheme.data as { flows?: Record<string, unknown> })?.flows || {}).join(', ') || '—'}`
-                    : scheme.scheme_type === 'openIdConnect'
-                    ? `OpenID Connect: ${(scheme.data as { openIdConnectUrl?: string })?.openIdConnectUrl || '—'}`
-                    : scheme.scheme_type === 'mutualTLS'
-                    ? 'Mutual TLS (certificate-based)'
-                    : scheme.scheme_type === 'custom'
-                    ? `Custom: ${(scheme.data as Record<string, unknown>)?.type ?? '—'}`
-                    : `${getInLabel(scheme.in_location)}: ${scheme.param_name || '—'}`}
-                </span>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 0.25 }}>
-                <IconButton
-                  size="small"
-                  onClick={() => handleEdit(scheme)}
-                  sx={{ p: 0.5, color: isDark ? '#94a3b8' : '#64748b' }}
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-0.5">
+            Drag to canvas · Edit / Delete
+          </span>
+          {schemes.map((scheme) => {
+            const handleDragStart = (e: React.DragEvent) => {
+              e.dataTransfer.effectAllowed = 'copy';
+              e.dataTransfer.setData(
+                'application/json',
+                JSON.stringify({
+                  type: 'security-scheme',
+                  schemeId: scheme.id,
+                  schemeName: scheme.scheme_name,
+                  schemeType: scheme.scheme_type,
+                })
+              );
+            };
+            return (
+              <Box
+                key={scheme.id}
+                sx={{
+                  p: 1.5,
+                  border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                  borderRadius: 1,
+                  backgroundColor: isDark ? '#0f172a' : '#f9fafb',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Box
+                  component="div"
+                  draggable
+                  onDragStart={handleDragStart}
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    cursor: 'grab',
+                    transition: 'opacity 0.15s ease',
+                    '&:active': { cursor: 'grabbing' },
+                  }}
                 >
-                  <Edit sx={{ fontSize: 14 }} />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  onClick={() => handleDelete(scheme)}
-                  sx={{ p: 0.5, color: '#ef4444' }}
-                >
-                  <Delete sx={{ fontSize: 14 }} />
-                </IconButton>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white block truncate">
+                    {scheme.scheme_name}
+                  </span>
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {scheme.scheme_type === 'http'
+                      ? `HTTP: ${scheme.http_scheme || 'basic'}${(scheme.data as { bearerFormat?: string })?.bearerFormat ? ` (${(scheme.data as { bearerFormat?: string }).bearerFormat})` : ''}`
+                      : scheme.scheme_type === 'oauth2'
+                      ? `OAuth2: ${Object.keys((scheme.data as { flows?: Record<string, unknown> })?.flows || {}).join(', ') || '—'}`
+                      : scheme.scheme_type === 'openIdConnect'
+                      ? `OpenID Connect: ${(scheme.data as { openIdConnectUrl?: string })?.openIdConnectUrl || '—'}`
+                      : scheme.scheme_type === 'mutualTLS'
+                      ? 'Mutual TLS (certificate-based)'
+                      : scheme.scheme_type === 'custom'
+                      ? `Custom: ${(scheme.data as Record<string, unknown>)?.type ?? '—'}`
+                      : `${getInLabel(scheme.in_location)}: ${scheme.param_name || '—'}`}
+                  </span>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.25 }} onClick={(e) => e.stopPropagation()}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleEdit(scheme)}
+                    sx={{ p: 0.5, color: isDark ? '#94a3b8' : '#64748b' }}
+                  >
+                    <Edit sx={{ fontSize: 14 }} />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleDelete(scheme)}
+                    sx={{ p: 0.5, color: '#ef4444' }}
+                  >
+                    <Delete sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Box>
               </Box>
-            </Box>
-          ))}
+            );
+          })}
         </Box>
       )}
 

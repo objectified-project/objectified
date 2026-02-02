@@ -248,14 +248,13 @@ structure immediately recognizable.
 Define security schemes once, apply to multiple operations:
 
 **Visual Design**:
-- 📋 Security scheme library panel
+- ✅ Security scheme library panel
 - 📋 Drag scheme onto method node to apply
 - 📋 Visual badge showing active schemes on operations
 - 📋 Scope selector for OAuth2/OIDC
 
 | Ticket | Feature                                               |
 |--------|-------------------------------------------------------|
-| #416   | Security scheme library panel                         |
 | #417   | Drag scheme onto method node to apply                 |
 | #418   | Add visual badge to show active schemes on operations |
 | #419   | Scope selector for OAuth2/OIDC                        |
