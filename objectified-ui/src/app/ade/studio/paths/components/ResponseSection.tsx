@@ -1,22 +1,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import IconButton from '@mui/material/IconButton';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import { Add, Refresh } from '@mui/icons-material';
-import { FileJson, Plus, ChevronDown, ChevronRight, Trash2, Wand2 } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { FileJson, Plus, ChevronDown, ChevronRight, Trash2, Wand2, RefreshCw } from 'lucide-react';
+import { Button } from '../../../../components/ui/Button';
+import { Input } from '../../../../components/ui/Input';
+import { Label } from '../../../../components/ui/Label';
+import { Checkbox } from '../../../../components/ui/Checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../components/ui/Tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '../../../../components/ui/Tooltip';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useStudio } from '../../StudioContext';
 import { getHttpStatusDescription } from '../../../../../../lib/utils/http-status-codes';
@@ -90,50 +94,40 @@ function PropertyTreeNodeComponent({
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <Box key={node.id} sx={{ ml: depth * 3 }}>
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          py: 0.5,
-          px: 1,
-          borderRadius: 1,
-          '&:hover': {
-            bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-          },
-        }}
+    <div key={node.id} style={{ marginLeft: depth * 12 }}>
+      <div
+        className={`flex items-center gap-2 py-1 px-2 rounded hover:bg-black/5 dark:hover:bg-white/5`}
       >
         {node.children.length > 0 && (
-          <IconButton
-            size="small"
+          <button
+            type="button"
             onClick={() => setExpanded(!expanded)}
-            sx={{ p: 0.5 }}
+            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
           >
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </IconButton>
+          </button>
         )}
 
         <FileJson size={14} />
 
-        <Box sx={{ flex: 1, fontSize: '0.875rem' }}>
+        <div className="flex-1 text-sm">
           <strong>{node.name}</strong>
           {node.data?.type && (
-            <span style={{ marginLeft: 8, opacity: 0.7 }}>
+            <span className="ml-2 opacity-70">
               {node.data.type}
               {node.data.format && ` (${node.data.format})`}
             </span>
           )}
-        </Box>
+        </div>
 
-        <IconButton
-          size="small"
+        <button
+          type="button"
           onClick={() => onDeleteProperty(node.id)}
-          sx={{ p: 0.5 }}
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
         >
           <Trash2 size={14} />
-        </IconButton>
-      </Box>
+        </button>
+      </div>
 
       {expanded && node.children.map((child) => (
         <PropertyTreeNodeComponent
@@ -144,7 +138,7 @@ function PropertyTreeNodeComponent({
           onDeleteProperty={onDeleteProperty}
         />
       ))}
-    </Box>
+    </div>
   );
 }
 
@@ -533,264 +527,245 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
     : [];
 
   return (
-    <Box>
+    <TooltipProvider>
+    <div>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
           <FileJson size={20} />
-          <Box sx={{ fontWeight: 600 }}>Response {response.status_code}</Box>
-        </Box>
+          <span className="font-semibold">Response {response.status_code}</span>
+        </div>
 
         <Button
-          size="small"
-          startIcon={<Add />}
+          type="button"
+          size="sm"
+          variant="outline"
           onClick={() => setShowAddContentTypeDialog(true)}
         >
+          <Plus className="w-4 h-4 mr-1.5" />
           Add Content Type
         </Button>
-      </Box>
+      </div>
 
       {/* Description Section */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Box sx={{ fontSize: '0.875rem', fontWeight: 600 }}>Description</Box>
-          <Tooltip title="Auto-populate description from HTTP status code">
-            <FormControlLabel
-              control={
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-semibold">Description</span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs">
                 <Checkbox
-                  size="small"
                   checked={autoPopulateDescription}
-                  onChange={(e) => handleAutoPopulateToggle(e.target.checked)}
+                  onCheckedChange={(c) => handleAutoPopulateToggle(c === true)}
                   disabled={isSavingDescription}
                 />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.75rem' }}>
-                  <Wand2 size={14} />
-                  Auto
-                </Box>
-              }
-              sx={{ mr: 0 }}
-            />
+                <Wand2 size={14} />
+                Auto
+              </label>
+            </TooltipTrigger>
+            <TooltipContent>Auto-populate description from HTTP status code</TooltipContent>
           </Tooltip>
-        </Box>
-        <TextField
-          fullWidth
-          size="small"
+        </div>
+        <Input
           placeholder={autoPopulateDescription ? 'Auto-populated from status code' : 'Enter response description...'}
           value={description}
           onChange={(e) => handleDescriptionChange(e.target.value)}
           onBlur={handleDescriptionBlur}
           disabled={isSavingDescription}
-          InputProps={{
-            sx: {
-              backgroundColor: autoPopulateDescription
-                ? (isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)')
-                : undefined,
-            },
-          }}
-          helperText={
-            autoPopulateDescription
-              ? 'Description is auto-populated from status code. Uncheck "Auto" to customize.'
-              : undefined
-          }
+          className={`text-sm h-9 ${autoPopulateDescription ? 'bg-blue-500/10 dark:bg-blue-500/10' : ''}`}
         />
-      </Box>
+        {autoPopulateDescription && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Description is auto-populated from status code. Uncheck &quot;Auto&quot; to customize.
+          </p>
+        )}
+      </div>
 
       {/* Content Type Tabs */}
       {contentTypes.length > 0 && (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-          <Tabs
-            value={selectedContentTypeIndex}
-            onChange={(_, newValue) => setSelectedContentTypeIndex(newValue)}
-            variant="scrollable"
-            scrollButtons="auto"
-          >
-            {contentTypes.map((ct, index) => (
-              <Tab
-                key={ct.id}
-                label={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {ct.media_type}
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteContentType(ct.id);
-                      }}
-                      sx={{ p: 0.25 }}
-                    >
-                      <Trash2 size={12} />
-                    </IconButton>
-                  </Box>
-                }
-              />
-            ))}
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
+          <Tabs value={String(selectedContentTypeIndex)} onValueChange={(v) => setSelectedContentTypeIndex(Number(v))}>
+            <TabsList className="h-8 w-full justify-start overflow-x-auto">
+              {contentTypes.map((ct, index) => (
+                <TabsTrigger key={ct.id} value={String(index)} className="flex items-center gap-1.5 text-xs">
+                  {ct.media_type}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteContentType(ct.id);
+                    }}
+                    className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </TabsTrigger>
+              ))}
+            </TabsList>
           </Tabs>
-        </Box>
+        </div>
       )}
 
       {/* Response Schema Mode - This affects the response directly, not content types */}
-      <Box sx={{ mb: 3, p: 2, backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderRadius: 1 }}>
-        <Box sx={{ fontSize: '0.875rem', fontWeight: 600, mb: 1.5 }}>Response Schema</Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+      <div className={`mb-6 p-4 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
+        <span className="text-sm font-semibold block mb-3">Response Schema</span>
+        <div className="flex flex-wrap gap-2 mb-4">
           <Button
-            size="small"
-            variant={schemaMode === 'class' ? 'contained' : 'outlined'}
+            type="button"
+            size="sm"
+            variant={schemaMode === 'class' ? 'default' : 'outline'}
             onClick={() => handleSchemaModeChange('class')}
             disabled={isSavingSchemaMode}
           >
             Class
           </Button>
           <Button
-            size="small"
-            variant={schemaMode === 'object' ? 'contained' : 'outlined'}
+            type="button"
+            size="sm"
+            variant={schemaMode === 'object' ? 'default' : 'outline'}
             onClick={() => handleSchemaModeChange('object')}
             disabled={isSavingSchemaMode}
           >
             Object
           </Button>
           <Button
-            size="small"
-            variant={schemaMode === 'primitive' ? 'contained' : 'outlined'}
+            type="button"
+            size="sm"
+            variant={schemaMode === 'primitive' ? 'default' : 'outline'}
             onClick={() => handleSchemaModeChange('primitive')}
             disabled={isSavingSchemaMode}
           >
             Primitive
           </Button>
           <Button
-            size="small"
-            variant={schemaMode === 'array' ? 'contained' : 'outlined'}
+            type="button"
+            size="sm"
+            variant={schemaMode === 'array' ? 'default' : 'outline'}
             onClick={() => handleSchemaModeChange('array')}
             disabled={isSavingSchemaMode}
           >
             Array
           </Button>
-        </Box>
+        </div>
 
         {/* Primitive Type Selector */}
         {schemaMode === 'primitive' && (
-          <Box sx={{ mt: 2 }}>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              label="Primitive Type"
-              value={primitiveType}
-              onChange={(e) => handlePrimitiveTypeChange(e.target.value as any)}
-            >
-              <MenuItem value="string">String</MenuItem>
-              <MenuItem value="number">Number</MenuItem>
-              <MenuItem value="integer">Integer</MenuItem>
-              <MenuItem value="boolean">Boolean</MenuItem>
-            </TextField>
-          </Box>
+          <div className="mt-4">
+            <Label className="text-xs font-medium mb-1 block">Primitive Type</Label>
+            <Select value={primitiveType} onValueChange={(v) => handlePrimitiveTypeChange(v as typeof primitiveType)}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="string">String</SelectItem>
+                <SelectItem value="number">Number</SelectItem>
+                <SelectItem value="integer">Integer</SelectItem>
+                <SelectItem value="boolean">Boolean</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
 
         {/* Array Item Type Selector */}
         {schemaMode === 'array' && (
-          <Box sx={{ mt: 2 }}>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              label="Array Item Type"
-              value={arrayItemType}
-              onChange={(e) => handleArrayItemTypeChange(e.target.value as any)}
-            >
-              <MenuItem value="string">String</MenuItem>
-              <MenuItem value="number">Number</MenuItem>
-              <MenuItem value="integer">Integer</MenuItem>
-              <MenuItem value="boolean">Boolean</MenuItem>
-            </TextField>
-          </Box>
+          <div className="mt-4">
+            <Label className="text-xs font-medium mb-1 block">Array Item Type</Label>
+            <Select value={arrayItemType} onValueChange={(v) => handleArrayItemTypeChange(v as typeof arrayItemType)}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="string">String</SelectItem>
+                <SelectItem value="number">Number</SelectItem>
+                <SelectItem value="integer">Integer</SelectItem>
+                <SelectItem value="boolean">Boolean</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         )}
-      </Box>
+      </div>
 
       {/* Content Type Details - Only show for class and object modes */}
       {(schemaMode === 'class' || schemaMode === 'object') && currentContentType && (
-        <Box>
+        <div>
           {/* Legacy Schema Mode Toggle for content types */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ fontSize: '0.875rem', fontWeight: 600, mb: 1 }}>Content Type Schema</Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+          <div className="mb-4">
+            <span className="text-sm font-semibold block mb-2">Content Type Schema</span>
+            <div className="flex gap-2">
               <Button
-                size="small"
-                variant={schemaMode === 'class' ? 'contained' : 'outlined'}
+                type="button"
+                size="sm"
+                variant={schemaMode === 'class' ? 'default' : 'outline'}
                 onClick={() => handleSchemaMode('class')}
               >
                 Class Reference
               </Button>
               <Button
-                size="small"
-                variant={schemaMode === 'object' ? 'contained' : 'outlined'}
+                type="button"
+                size="sm"
+                variant={schemaMode === 'object' ? 'default' : 'outline'}
                 onClick={() => handleSchemaMode('inline')}
               >
                 Inline Schema
               </Button>
-            </Box>
-          </Box>
+            </div>
+          </div>
 
           {/* Class Reference Mode */}
           {schemaMode === 'class' && (
-            <Box>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="Response Class"
-                value={currentContentType.class_id || ''}
-                onChange={(e) => handleSetClassReference(e.target.value)}
+            <div>
+              <Label className="text-xs font-medium mb-1 block">Response Class</Label>
+              <Select
+                value={currentContentType.class_id || '__none__'}
+                onValueChange={(v) => handleSetClassReference(v === '__none__' ? '' : v)}
               >
-                <MenuItem value="">
-                  <em>Select a class</em>
-                </MenuItem>
-                {classes.map((cls) => (
-                  <MenuItem key={cls.id} value={cls.id}>
-                    {cls.name}
-                  </MenuItem>
-                ))}
-              </TextField>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select a class" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select a class</SelectItem>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {currentContentType.class_id && (
-                <Box sx={{ mt: 2 }}>
+                <div className="mt-4">
                   <Button
-                    size="small"
-                    startIcon={<Refresh />}
+                    type="button"
+                    size="sm"
+                    variant="outline"
                     onClick={() => handleSchemaModeChange('object')}
                   >
+                    <RefreshCw className="w-4 h-4 mr-1.5" />
                     Convert to Inline Schema
                   </Button>
-                </Box>
+                </div>
               )}
-            </Box>
+            </div>
           )}
 
           {/* Inline Schema Mode */}
           {schemaMode === 'object' && (
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                <Box sx={{ fontSize: '0.875rem', fontWeight: 600 }}>Properties</Box>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold">Properties</span>
                 <Button
-                  size="small"
-                  startIcon={<Plus size={16} />}
+                  type="button"
+                  size="sm"
+                  variant="outline"
                   onClick={() => setShowAddPropertyDialog(true)}
                 >
+                  <Plus size={16} className="mr-1.5" />
                   Add Property
                 </Button>
-              </Box>
+              </div>
 
               {propertyTree.length > 0 ? (
-                <Box
-                  sx={{
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    p: 1,
-                    maxHeight: 400,
-                    overflow: 'auto',
-                  }}
-                >
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 max-h-[400px] overflow-auto">
                   {propertyTree.map((node) => (
                     <PropertyTreeNodeComponent
                       key={node.id}
@@ -800,130 +775,99 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
                       onDeleteProperty={handleDeleteProperty}
                     />
                   ))}
-                </Box>
+                </div>
               ) : (
-                <Box
-                  sx={{
-                    p: 3,
-                    textAlign: 'center',
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    borderStyle: 'dashed',
-                  }}
-                >
-                  <Box sx={{ opacity: 0.6, fontSize: '0.875rem' }}>
-                    No properties defined. Click "Add Property" to get started.
-                  </Box>
-                </Box>
+                <div className="p-6 text-center border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                  <span className="text-sm opacity-60">
+                    No properties defined. Click &quot;Add Property&quot; to get started.
+                  </span>
+                </div>
               )}
-            </Box>
+            </div>
           )}
-        </Box>
+        </div>
       )}
 
       {/* No Content Types */}
       {contentTypes.length === 0 && (
-        <Box
-          sx={{
-            p: 3,
-            textAlign: 'center',
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 1,
-            borderStyle: 'dashed',
-          }}
-        >
-          <FileJson size={48} style={{ opacity: 0.3, marginBottom: 8 }} />
-          <Box sx={{ opacity: 0.6, fontSize: '0.875rem' }}>
+        <div className="p-6 text-center border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+          <FileJson size={48} className="opacity-30 mb-2 mx-auto block" />
+          <span className="text-sm opacity-60 block mb-4">
             No content types defined for this response.
-          </Box>
+          </span>
           <Button
-            size="small"
-            startIcon={<Add />}
+            type="button"
+            size="sm"
+            variant="outline"
             onClick={() => setShowAddContentTypeDialog(true)}
-            sx={{ mt: 2 }}
           >
+            <Plus className="w-4 h-4 mr-1.5" />
             Add Content Type
           </Button>
-        </Box>
+        </div>
       )}
 
       {/* Add Content Type Dialog */}
-      <Dialog
-        open={showAddContentTypeDialog}
-        onClose={() => setShowAddContentTypeDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Add Content Type</DialogTitle>
-        <DialogContent>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Media Type"
-            value={newMediaType}
-            onChange={(e) => setNewMediaType(e.target.value)}
-            sx={{ mt: 2 }}
-          >
-            <MenuItem value="application/json">application/json</MenuItem>
-            <MenuItem value="application/xml">application/xml</MenuItem>
-            <MenuItem value="text/plain">text/plain</MenuItem>
-            <MenuItem value="text/html">text/html</MenuItem>
-            <MenuItem value="application/pdf">application/pdf</MenuItem>
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowAddContentTypeDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddContentType} variant="contained">
-            Add
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <Dialog.Root open={showAddContentTypeDialog} onOpenChange={setShowAddContentTypeDialog}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+            <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Content Type</Dialog.Title>
+            <Label className="text-xs font-medium mb-1 block">Media Type</Label>
+            <Select value={newMediaType} onValueChange={setNewMediaType}>
+              <SelectTrigger className="h-9 text-sm mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="application/json">application/json</SelectItem>
+                <SelectItem value="application/xml">application/xml</SelectItem>
+                <SelectItem value="text/plain">text/plain</SelectItem>
+                <SelectItem value="text/html">text/html</SelectItem>
+                <SelectItem value="application/pdf">application/pdf</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddContentTypeDialog(false)}>Cancel</Button>
+              <Button type="button" variant="default" size="sm" onClick={handleAddContentType}>Add</Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* Add Property Dialog */}
-      <Dialog
-        open={showAddPropertyDialog}
-        onClose={() => setShowAddPropertyDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Add Property</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            size="small"
-            label="Property Name"
-            value={newPropertyName}
-            onChange={(e) => setNewPropertyName(e.target.value)}
-            sx={{ mt: 2 }}
-          />
-
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Type"
-            value={newPropertyType}
-            onChange={(e) => setNewPropertyType(e.target.value)}
-            sx={{ mt: 2 }}
-          >
-            <MenuItem value="string">string</MenuItem>
-            <MenuItem value="number">number</MenuItem>
-            <MenuItem value="integer">integer</MenuItem>
-            <MenuItem value="boolean">boolean</MenuItem>
-            <MenuItem value="array">array</MenuItem>
-            <MenuItem value="object">object</MenuItem>
-          </TextField>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowAddPropertyDialog(false)}>Cancel</Button>
-          <Button onClick={handleAddProperty} variant="contained" disabled={!newPropertyName}>
-            Add
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+      <Dialog.Root open={showAddPropertyDialog} onOpenChange={setShowAddPropertyDialog}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+            <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Property</Dialog.Title>
+            <Label className="text-xs font-medium mb-1 block">Property Name</Label>
+            <Input
+              value={newPropertyName}
+              onChange={(e) => setNewPropertyName(e.target.value)}
+              className="h-9 text-sm mt-1 mb-4"
+            />
+            <Label className="text-xs font-medium mb-1 block">Type</Label>
+            <Select value={newPropertyType} onValueChange={setNewPropertyType}>
+              <SelectTrigger className="h-9 text-sm mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="string">string</SelectItem>
+                <SelectItem value="number">number</SelectItem>
+                <SelectItem value="integer">integer</SelectItem>
+                <SelectItem value="boolean">boolean</SelectItem>
+                <SelectItem value="array">array</SelectItem>
+                <SelectItem value="object">object</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowAddPropertyDialog(false)}>Cancel</Button>
+              <Button type="button" variant="default" size="sm" onClick={handleAddProperty} disabled={!newPropertyName}>Add</Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+    </TooltipProvider>
   );
 }

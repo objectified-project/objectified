@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import { Close, Save } from '@mui/icons-material';
+import { X, Save } from 'lucide-react';
+import { Button } from '../../../../components/ui/Button';
+import { Textarea } from '../../../../components/ui/Textarea';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -590,98 +588,56 @@ export default function ResponsePropertiesPanel({
   };
 
   return (
-    <Box
-      sx={{
-        width: 360,
-        height: '100%',
-        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-        borderLeft: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
+    <div
+      className={`w-[360px] h-full flex flex-col overflow-hidden border-l ${
+        isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+      }`}
     >
       {/* Header */}
-      <Box
-        sx={{
-          p: 2,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-        }}
+      <div
+        className={`p-4 border-b flex justify-between items-center ${
+          isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-50'
+        }`}
       >
-        <Box>
+        <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Response Properties</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             Status Code: {statusCode}
           </p>
-        </Box>
-        <IconButton
-          size="small"
+        </div>
+        <button
+          type="button"
           onClick={onClose}
-          sx={{
-            color: isDark ? '#9ca3af' : '#6b7280',
-            '&:hover': {
-              backgroundColor: isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-            },
-          }}
+          className="p-1.5 rounded text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+          aria-label="Close"
         >
-          <Close fontSize="small" />
-        </IconButton>
-      </Box>
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Content */}
-      <Box
-        sx={{
-          flex: 1,
-          overflowY: 'auto',
-          p: 2,
-        }}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex flex-col gap-4">
           {/* Description */}
-          <Box>
+          <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Description
             </label>
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
+            <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe this response..."
-              variant="outlined"
-              size="small"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                  fontSize: '0.875rem',
-                  '& fieldset': {
-                    borderColor: isDark ? '#334155' : '#e2e8f0',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: isDark ? '#475569' : '#cbd5e1',
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#6366f1',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: isDark ? '#f1f5f9' : '#1e293b',
-                },
-              }}
+              rows={4}
+              className="text-sm resize-none"
             />
-          </Box>
+          </div>
 
           {/* Response Schema Builder */}
-          <Box sx={{ mt: 3, pt: 3, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
+          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
             {isLoading ? (
-              <Box sx={{ py: 2, textAlign: 'center' }}>
+              <div className="py-4 text-center">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Loading schema...</span>
-              </Box>
+              </div>
             ) : (
               <SchemaBuilder
                 value={responseSchema}
@@ -691,34 +647,24 @@ export default function ResponsePropertiesPanel({
                 allowInline={true}
               />
             )}
-          </Box>
+          </div>
 
           {/* Save Button */}
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <div className="flex gap-2">
             <Button
-              fullWidth
-              variant="contained"
-              startIcon={<Save />}
+              type="button"
+              variant="default"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-600 dark:disabled:bg-slate-700"
               onClick={handleSave}
               disabled={isSaving || !responseId}
-              sx={{
-                textTransform: 'none',
-                backgroundColor: '#6366f1',
-                '&:hover': {
-                  backgroundColor: '#4f46e5',
-                },
-                '&:disabled': {
-                  backgroundColor: isDark ? '#334155' : '#e2e8f0',
-                  color: isDark ? '#64748b' : '#94a3b8',
-                },
-              }}
             >
+              <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Changes'}
             </Button>
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

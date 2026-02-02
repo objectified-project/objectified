@@ -1,15 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import MenuItem from '@mui/material/MenuItem';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import { Close, Save, Add, Delete, ArrowBack } from '@mui/icons-material';
-import { Lock, Unlock, ExternalLink } from 'lucide-react';
+import { X, Save, Plus, Trash2, ArrowLeft, Lock, Unlock, ExternalLink } from 'lucide-react';
+import { Button } from '../../../../components/ui/Button';
+import { Input } from '../../../../components/ui/Input';
+import { Label } from '../../../../components/ui/Label';
+import { Checkbox } from '../../../../components/ui/Checkbox';
+import { Textarea } from '../../../../components/ui/Textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -728,286 +732,205 @@ export default function OperationPropertiesPanel({
   if (!operationId) return null;
 
   return (
-    <Box
-      sx={{
-        width: 320,
-        height: '100%',
-        borderLeft: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+    <div
+      className="w-80 h-full flex flex-col border-l"
+      style={{
+        borderColor: isDark ? '#334155' : '#e2e8f0',
         background: isDark
           ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
           : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-        display: 'flex',
-        flexDirection: 'column',
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          p: 2,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
+      <div
+        className={`p-4 border-b flex justify-between items-center ${
+          isDark ? 'border-slate-700' : 'border-slate-200'
+        }`}
       >
         {viewMode === 'add-parameter' ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <IconButton size="small" onClick={handleBackToOperation} sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-              <ArrowBack sx={{ fontSize: 18 }} />
-            </IconButton>
-            <Box>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBackToOperation}
+              className={`p-1 rounded transition-colors ${
+                isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              aria-label="Back to operation"
+            >
+              <ArrowLeft className="w-[18px] h-[18px]" />
+            </button>
+            <div>
               <span className="text-sm font-semibold text-gray-900 dark:text-white">
                 Add Parameter
               </span>
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 {operation} {pathname}
               </div>
-            </Box>
-          </Box>
+            </div>
+          </div>
         ) : (
-          <Box>
+          <div>
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
               Operation Details
             </span>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               {operation} {pathname}
             </div>
-          </Box>
+          </div>
         )}
-        <IconButton size="small" onClick={onClose} sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-          <Close sx={{ fontSize: 18 }} />
-        </IconButton>
-      </Box>
+        <button
+          type="button"
+          onClick={onClose}
+          className={`p-1 rounded transition-colors ${
+            isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+          aria-label="Close panel"
+        >
+          <X className="w-[18px] h-[18px]" />
+        </button>
+      </div>
 
       {/* Content */}
       {isLoading ? (
-        <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+        <div className="p-6 flex justify-center">
           <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
-        </Box>
+        </div>
       ) : viewMode === 'add-response' ? (
         /* Add Response Form */
         <>
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div className="flex-1 overflow-auto p-4">
+            <div className="flex flex-col gap-4">
               {/* Status Code */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Status Code <span className="text-red-500">*</span>
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
+                </Label>
+                <Input
+                  className="w-full text-sm"
                   value={newResponseStatusCode}
                   onChange={(e) => handleStatusCodeChange(e.target.value)}
                   placeholder="200, 2XX, 404, etc."
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   HTTP status code or pattern (e.g., 200, 2XX for all 2xx responses)
                 </p>
-              </Box>
+              </div>
 
               {/* Description */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description
-                </label>
-                <TextField
-                  fullWidth
-                  multiline
+                </Label>
+                <Textarea
                   rows={4}
-                  size="small"
+                  className="w-full text-sm"
                   value={newResponseDescription}
                   onChange={(e) => {
                     setNewResponseDescription(e.target.value);
-                    // If user manually edits, turn off auto-fill
                     if (newResponseAutoFillDescription) {
                       setNewResponseAutoFillDescription(false);
                     }
                   }}
                   placeholder="Describe when this response is returned..."
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: newResponseAutoFillDescription
-                        ? (isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)')
-                        : (isDark ? '#0f172a' : '#ffffff'),
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={newResponseAutoFillDescription}
-                      onChange={(e) => handleAutoFillToggle(e.target.checked)}
-                      sx={{
-                        color: isDark ? '#64748b' : '#94a3b8',
-                        '&.Mui-checked': {
-                          color: '#6366f1',
-                        },
-                      }}
-                    />
-                  }
-                  label={
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Auto-fill description from status code
-                    </span>
-                  }
-                  sx={{ mt: 0.5 }}
-                />
-              </Box>
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <Checkbox
+                    checked={newResponseAutoFillDescription}
+                    onCheckedChange={(checked) => handleAutoFillToggle(checked === true)}
+                  />
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Auto-fill description from status code
+                  </span>
+                </label>
+              </div>
 
               {/* Schema Type */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Response Schema Type
-                </label>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  value={newResponseSchemaType}
-                  onChange={(e) => setNewResponseSchemaType(e.target.value as any)}
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
-                >
-                  <MenuItem value="object">Object (default)</MenuItem>
-                  <MenuItem value="string">String</MenuItem>
-                  <MenuItem value="number">Number</MenuItem>
-                  <MenuItem value="integer">Integer</MenuItem>
-                  <MenuItem value="boolean">Boolean</MenuItem>
-                  <MenuItem value="array">Array</MenuItem>
-                </TextField>
+                </Label>
+                <Select value={newResponseSchemaType} onValueChange={(v) => setNewResponseSchemaType(v as typeof newResponseSchemaType)}>
+                  <SelectTrigger className="w-full h-9 text-sm">
+                    <SelectValue placeholder="Schema type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="object">Object (default)</SelectItem>
+                    <SelectItem value="string">String</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="integer">Integer</SelectItem>
+                    <SelectItem value="boolean">Boolean</SelectItem>
+                    <SelectItem value="array">Array</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   The type of data returned in the response body
                 </p>
-              </Box>
+              </div>
 
-              {/* Array Item Type (only shown when array is selected) */}
               {newResponseSchemaType === 'array' && (
-                <Box>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <div>
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Array Item Type
-                  </label>
-                  <TextField
-                    fullWidth
-                    select
-                    size="small"
-                    value={newResponseArrayItemType}
-                    onChange={(e) => setNewResponseArrayItemType(e.target.value as any)}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
-                  >
-                    <MenuItem value="string">String</MenuItem>
-                    <MenuItem value="number">Number</MenuItem>
-                    <MenuItem value="integer">Integer</MenuItem>
-                    <MenuItem value="boolean">Boolean</MenuItem>
-                  </TextField>
+                  </Label>
+                  <Select value={newResponseArrayItemType} onValueChange={(v) => setNewResponseArrayItemType(v as typeof newResponseArrayItemType)}>
+                    <SelectTrigger className="w-full h-9 text-sm">
+                      <SelectValue placeholder="Item type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="string">String</SelectItem>
+                      <SelectItem value="number">Number</SelectItem>
+                      <SelectItem value="integer">Integer</SelectItem>
+                      <SelectItem value="boolean">Boolean</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     The type of items in the array
                   </p>
-                </Box>
+                </div>
               )}
-            </Box>
-          </Box>
+            </div>
+          </div>
 
           {/* Footer with Save button */}
-          <Box
-            sx={{
-              p: 2,
-              borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            }}
+          <div
+            className={`p-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
           >
             <Button
-              fullWidth
-              variant="contained"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSaveResponse}
               disabled={isSaving || !newResponseStatusCode.trim()}
-              startIcon={<Save />}
-              sx={{
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                },
-                '&:disabled': {
-                  background: isDark ? '#334155' : '#e2e8f0',
-                  color: isDark ? '#64748b' : '#94a3b8',
-                },
-              }}
             >
+              <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
-          </Box>
+          </div>
         </>
       ) : viewMode === 'add-parameter' ? (
         /* Add Parameter Form */
         <>
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div className="flex-1 overflow-auto p-4">
+            <div className="flex flex-col gap-4">
               {/* Parameter Name */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Parameter Name <span className="text-red-500">*</span>
-                </label>
+                </Label>
                 {newParamLocation === 'path' && unlinkedPathParams.length > 0 ? (
-                  <TextField
-                    fullWidth
-                    select
-                    size="small"
-                    value={newParamName}
-                    onChange={(e) => setNewParamName(e.target.value)}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
-                  >
-                    <MenuItem value="">Select a path parameter</MenuItem>
-                    {unlinkedPathParams.map((param) => (
-                      <MenuItem key={param} value={param}>
-                        {param}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  <Select value={newParamName || undefined} onValueChange={setNewParamName}>
+                    <SelectTrigger className="w-full h-9 text-sm">
+                      <SelectValue placeholder="Select a path parameter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unlinkedPathParams.map((param) => (
+                        <SelectItem key={param} value={param}>
+                          {param}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     value={newParamName}
                     onChange={(e) => setNewParamName(e.target.value)}
                     placeholder={
@@ -1016,16 +939,6 @@ export default function OperationPropertiesPanel({
                       newParamLocation === 'cookie' ? 'e.g., session, token' :
                       'e.g., userId, groupId'
                     }
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
                   />
                 )}
                 {newParamLocation === 'path' && unlinkedPathParams.length > 0 && (
@@ -1033,10 +946,10 @@ export default function OperationPropertiesPanel({
                     Select from path parameters in: {pathname}
                   </p>
                 )}
-              </Box>
+              </div>
 
               {/* Location */}
-              <Box>
+              <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Location <span className="text-red-500">*</span>
                 </label>
@@ -1082,356 +995,216 @@ export default function OperationPropertiesPanel({
                     </p>
                   </div>
                 )}
-              </Box>
+              </div>
 
               {/* Required */}
-              <Box>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newParamRequired}
-                    onChange={(e) => setNewParamRequired(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-xs text-gray-700 dark:text-gray-300">
-                    Required parameter
-                  </span>
-                </label>
-              </Box>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={newParamRequired}
+                  onCheckedChange={(checked) => setNewParamRequired(checked === true)}
+                />
+                <span className="text-xs text-gray-700 dark:text-gray-300">
+                  Required parameter
+                </span>
+              </label>
 
               {/* Summary */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Summary
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
+                </Label>
+                <Input
+                  className="w-full text-sm"
                   value={newParamSummary}
                   onChange={(e) => setNewParamSummary(e.target.value)}
                   placeholder="Brief description"
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-              </Box>
+              </div>
 
               {/* Description */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description
-                </label>
-                <TextField
-                  fullWidth
-                  multiline
+                </Label>
+                <Textarea
                   rows={4}
-                  size="small"
+                  className="w-full text-sm"
                   value={newParamDescription}
                   onChange={(e) => setNewParamDescription(e.target.value)}
                   placeholder="Detailed description..."
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-              </Box>
-            </Box>
-          </Box>
+              </div>
+            </div>
+          </div>
 
           {/* Footer with Save button */}
-          <Box
-            sx={{
-              p: 2,
-              borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            }}
+          <div
+            className={`p-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
           >
             <Button
-              fullWidth
-              variant="contained"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSaveParameter}
               disabled={isSaving || !newParamName.trim()}
-              startIcon={<Save />}
-              sx={{
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                },
-                '&:disabled': {
-                  background: isDark ? '#334155' : '#e2e8f0',
-                  color: isDark ? '#64748b' : '#94a3b8',
-                },
-              }}
             >
+              <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
-          </Box>
+          </div>
         </>
       ) : (
         /* Operation Details Form */
         <>
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div className="flex-1 overflow-auto p-4">
+            <div className="flex flex-col gap-4">
               {/* Operation ID */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Operation ID
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
+                </Label>
+                <Input
+                  className="w-full text-sm"
                   value={operationIdName}
                   onChange={(e) => setOperationIdName(e.target.value)}
                   placeholder="Auto-generated from path and verb"
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   Used for code generation and API client SDKs
                 </p>
-              </Box>
+              </div>
 
               {/* Summary */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Summary
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
+                </Label>
+                <Input
+                  className="w-full text-sm"
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Brief summary of the operation"
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-              </Box>
+              </div>
 
               {/* Description */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description
-                </label>
-                <TextField
-                  fullWidth
-                  multiline
+                </Label>
+                <Textarea
                   rows={4}
-                  size="small"
+                  className="w-full text-sm"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Detailed description of what this operation does..."
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-              </Box>
+              </div>
 
               {/* Deprecated and Hidden: side-by-side */}
-              <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={deprecated}
-                      onChange={(e) => setDeprecated(e.target.checked)}
-                      size="small"
-                      sx={{
-                        color: isDark ? '#64748b' : '#94a3b8',
-                        '&.Mui-checked': {
-                          color: '#f59e0b',
-                        },
-                      }}
-                    />
-                  }
-                  label={
-                    <span className={`text-xs ${deprecated ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Deprecated
-                    </span>
-                  }
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={xPrivate}
-                      onChange={(e) => setXPrivate(e.target.checked)}
-                      size="small"
-                      sx={{
-                        color: isDark ? '#64748b' : '#94a3b8',
-                        '&.Mui-checked': {
-                          color: '#6366f1',
-                        },
-                      }}
-                    />
-                  }
-                  label={
-                    <span className={`text-xs flex items-center gap-1 ${xPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      <Lock className="w-3.5 h-3.5" />
-                      Hidden
-                    </span>
-                  }
-                />
-              </Box>
+              <div className="mt-2 flex flex-wrap gap-4 items-center">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={deprecated}
+                    onCheckedChange={(checked) => setDeprecated(checked === true)}
+                  />
+                  <span className={`text-xs ${deprecated ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    Deprecated
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={xPrivate}
+                    onCheckedChange={(checked) => setXPrivate(checked === true)}
+                  />
+                  <span className={`text-xs flex items-center gap-1 ${xPrivate ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <Lock className="w-3.5 h-3.5" />
+                    Hidden
+                  </span>
+                </label>
+              </div>
 
               {/* Custom x-* extensions */}
-              <Box sx={{ mt: 2 }}>
+              <div className="mt-4">
                 <ExtensionsEditor
                   value={extensions as Record<string, any>}
                   onChange={setExtensions as (v: Record<string, any>) => void}
                   size="small"
                 />
-              </Box>
+              </div>
 
               {/* External documentation (OpenAPI externalDocs) */}
-              <Box sx={{ mt: 2 }}>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+              <div className="mt-4">
+                <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
                   <ExternalLink className="w-3.5 h-3.5" />
                   External documentation
-                </label>
-                <TextField
-                  size="small"
-                  fullWidth
+                </Label>
+                <Input
                   type="url"
+                  className="w-full text-sm mb-2"
                   placeholder="https://docs.example.com/..."
                   value={externalDocsUrl}
                   onChange={(e) => setExternalDocsUrl(e.target.value)}
-                  sx={{
-                    mb: 1,
-                    '& .MuiOutlinedInput-root': {
-                      fontSize: '0.8125rem',
-                      backgroundColor: isDark ? '#1e293b' : '#fff',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-                <TextField
-                  size="small"
-                  fullWidth
-                  multiline
-                  minRows={2}
+                <Textarea
+                  rows={2}
+                  className="w-full text-sm"
                   placeholder="Brief description of external docs (optional)"
                   value={externalDocsDescription}
                   onChange={(e) => setExternalDocsDescription(e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      fontSize: '0.8125rem',
-                      backgroundColor: isDark ? '#1e293b' : '#fff',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
                 />
-              </Box>
+              </div>
 
               {/* Parameters Section */}
-              <Box sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                     Parameters
-                  </label>
+                  </Label>
                   <Button
-                    size="small"
-                    startIcon={<Add />}
+                    size="sm"
+                    variant="ghost"
                     onClick={handleAddParameterClick}
-                    sx={{
-                      fontSize: '0.75rem',
-                      textTransform: 'none',
-                      color: '#6366f1',
-                      '&:hover': {
-                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)',
-                      },
-                    }}
+                    className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
                   >
+                    <Plus className="w-4 h-4" />
                     Add Parameter
                   </Button>
-                </Box>
+                </div>
 
                 {parametersLoading ? (
-                  <Box sx={{ py: 2, textAlign: 'center' }}>
+                  <div className="py-4 text-center">
                     <span className="text-xs text-gray-500 dark:text-gray-400">Loading parameters...</span>
-                  </Box>
+                  </div>
                 ) : parameters.length === 0 ? (
-                  <Box
-                    sx={{
-                      py: 3,
-                      px: 2,
-                      textAlign: 'center',
-                      border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                      borderRadius: 1,
-                    }}
+                  <div
+                    className={`py-6 px-4 text-center rounded border border-dashed ${
+                      isDark ? 'border-slate-700' : 'border-slate-200'
+                    }`}
                   >
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       No parameters defined yet
                     </span>
-                  </Box>
+                  </div>
                 ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <div className="flex flex-col gap-1">
                     {parameters.map((param) => (
-                      <Box
+                      <div
                         key={param.id}
-                        sx={{
-                          p: 1.5,
-                          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                          borderRadius: 1,
-                          backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'start',
-                        }}
+                        className={`p-3 rounded border flex justify-between items-start ${
+                          isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-gray-50'
+                        }`}
                       >
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
                             {param.name}
                           </div>
                           <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
                             {param.in_location} • {param.data?.required ? 'required' : 'optional'}
                           </div>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box
-                            sx={{
-                              px: 1,
-                              py: 0.5,
-                              borderRadius: 0.5,
-                              fontSize: '0.625rem',
-                              fontWeight: 600,
-                              color: '#fff',
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold text-white"
+                            style={{
                               backgroundColor:
                                 param.in_location === 'path' ? '#8b5cf6' :
                                 param.in_location === 'query' ? '#3b82f6' :
@@ -1442,53 +1215,39 @@ export default function OperationPropertiesPanel({
                             {param.in_location === 'path' ? '/' :
                              param.in_location === 'query' ? '?' :
                              param.in_location === 'header' ? 'H' : 'C'}
-                          </Box>
-                          <IconButton
-                            size="small"
+                          </span>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteParameter(param.id, param.name)}
-                            sx={{
-                              color: '#ef4444',
-                              p: 0.5,
-                              '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                            }}
+                            className="p-1 rounded text-red-500 hover:bg-red-500/10 transition-colors"
+                            aria-label={`Delete ${param.name}`}
                           >
-                            <Delete sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Box>
-                      </Box>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     ))}
-                  </Box>
+                  </div>
                 )}
-              </Box>
+              </div>
 
               {/* Request Body Section (for POST/PUT/PATCH) */}
               {['POST', 'PUT', 'PATCH'].includes(operation) && (
-                <Box sx={{ mt: 2, pt: 2, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <div className="flex justify-between items-center mb-3">
+                    <Label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
                       Request Body
+                    </Label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={requestBodyRequired}
+                        onCheckedChange={(checked) => setRequestBodyRequired(checked === true)}
+                      />
+                      <span className="text-[10px] text-gray-600 dark:text-gray-400">
+                        Required
+                      </span>
                     </label>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={requestBodyRequired}
-                          onChange={(e) => setRequestBodyRequired(e.target.checked)}
-                          size="small"
-                          sx={{
-                            color: isDark ? '#64748b' : '#94a3b8',
-                            '&.Mui-checked': {
-                              color: '#8b5cf6',
-                            },
-                          }}
-                        />
-                      }
-                      label={
-                        <span className="text-[10px] text-gray-600 dark:text-gray-400">
-                          Required
-                        </span>
-                      }
-                    />
-                  </Box>
+                  </div>
                   <SchemaBuilder
                     value={requestBodySchema}
                     onChange={setRequestBodySchema}
@@ -1496,81 +1255,59 @@ export default function OperationPropertiesPanel({
                     description="Define the request body schema using existing classes or create inline schemas"
                     allowInline={true}
                   />
-                </Box>
+                </div>
               )}
 
               {/* Responses Section */}
-              <Box sx={{ mt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                     Responses
-                  </label>
+                  </Label>
                   <Button
-                    size="small"
-                    startIcon={<Add />}
+                    size="sm"
+                    variant="ghost"
                     onClick={() => setViewMode('add-response')}
-                    sx={{
-                      fontSize: '0.75rem',
-                      textTransform: 'none',
-                      color: '#6366f1',
-                      '&:hover': {
-                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)',
-                      },
-                    }}
+                    className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
                   >
+                    <Plus className="w-4 h-4" />
                     Add Response
                   </Button>
-                </Box>
+                </div>
 
                 {responsesLoading ? (
-                  <Box sx={{ py: 2, textAlign: 'center' }}>
+                  <div className="py-4 text-center">
                     <span className="text-xs text-gray-500 dark:text-gray-400">Loading responses...</span>
-                  </Box>
+                  </div>
                 ) : responses.length === 0 ? (
-                  <Box
-                    sx={{
-                      py: 3,
-                      px: 2,
-                      textAlign: 'center',
-                      border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                      borderRadius: 1,
-                    }}
+                  <div
+                    className={`py-6 px-4 text-center rounded border border-dashed ${
+                      isDark ? 'border-slate-700' : 'border-slate-200'
+                    }`}
                   >
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       No responses defined yet
                     </span>
-                  </Box>
+                  </div>
                 ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div className="flex flex-col gap-4">
                     {responses.map((response) => (
-                      <Box
+                      <div
                         key={response.id}
-                        sx={{
-                          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                          borderRadius: 1,
-                          overflow: 'hidden',
-                        }}
+                        className={`rounded border overflow-hidden ${
+                          isDark ? 'border-slate-700' : 'border-slate-200'
+                        }`}
                       >
                         {/* Response Header */}
-                        <Box
-                          sx={{
-                            p: 1.5,
-                            backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                          }}
+                        <div
+                          className={`p-3 flex justify-between items-center border-b ${
+                            isDark ? 'bg-slate-900 border-slate-700' : 'bg-gray-50 border-slate-200'
+                          }`}
                         >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box
-                              sx={{
-                                px: 1.5,
-                                py: 0.5,
-                                borderRadius: 1,
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                color: '#fff',
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="px-3 py-1 rounded text-xs font-bold text-white"
+                              style={{
                                 backgroundColor:
                                   response.status_code.startsWith('2') ? '#10b981' :
                                   response.status_code.startsWith('3') ? '#3b82f6' :
@@ -1579,28 +1316,25 @@ export default function OperationPropertiesPanel({
                               }}
                             >
                               {response.status_code}
-                            </Box>
+                            </div>
                             {response.description && (
-                              <Box sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {response.description}
-                              </Box>
+                              </div>
                             )}
-                          </Box>
-                          <IconButton
-                            size="small"
+                          </div>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteResponse(response.id, response.status_code)}
-                            sx={{
-                              color: '#ef4444',
-                              p: 0.5,
-                              '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                            }}
+                            className="p-1 rounded text-red-500 hover:bg-red-500/10 transition-colors"
+                            aria-label={`Delete response ${response.status_code}`}
                           >
-                            <Delete sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Box>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
 
                         {/* Response Schema Section */}
-                        <Box sx={{ p: 2, backgroundColor: isDark ? '#1e293b' : '#ffffff' }}>
+                        <div className={`p-4 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
                           <ResponseSection
                             response={response}
                             onUpdate={async () => {
@@ -1618,175 +1352,122 @@ export default function OperationPropertiesPanel({
                             }}
                             onRefresh={onRefresh}
                           />
-                        </Box>
-                      </Box>
+                        </div>
+                      </div>
                     ))}
-                  </Box>
+                  </div>
                 )}
-              </Box>
+              </div>
 
               {/* Security Section: OR = alternative requirements, AND = schemes within a requirement */}
-              <Box sx={{ mt: 2, pt: 2, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+              <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                     <Lock size={14} className="text-amber-500" />
                     Security
-                  </label>
+                  </Label>
                   {!unsecured && (
                     <Button
-                      size="small"
-                      startIcon={<Add />}
+                      size="sm"
+                      variant="ghost"
                       onClick={handleAddSecurity}
-                      sx={{
-                        fontSize: '0.75rem',
-                        textTransform: 'none',
-                        color: '#6366f1',
-                        '&:hover': {
-                          backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)',
-                        },
-                      }}
+                      className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
                     >
                       Add requirement (OR)
                     </Button>
                   )}
-                </Box>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={unsecured}
-                      onChange={(_, checked) => {
-                        setUnsecured(checked);
-                        if (checked) setSecurity([]);
-                      }}
-                      size="small"
-                      sx={{
-                        color: isDark ? '#94a3b8' : '#64748b',
-                        '&.Mui-checked': { color: '#22c55e' },
-                      }}
-                    />
-                  }
-                  label={
-                    <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                      <Unlock size={12} />
-                      Unsecured (public endpoint — no authentication)
-                    </span>
-                  }
-                  sx={{ mb: 1.5 }}
-                />
-                <TextField
-                  size="small"
-                  multiline
-                  minRows={2}
-                  maxRows={6}
-                  placeholder="Describe how security applies to this operation (e.g. “Requires a valid API key. Unauthenticated requests return 401.”)"
-                  label="Security description (documentation)"
-                  value={securityDescription}
-                  onChange={(e) => setSecurityDescription(e.target.value)}
-                  helperText="Exported as x-security-description in OpenAPI for documentation and doc generators."
-                  sx={{
-                    width: '100%',
-                    mb: 1.5,
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                    '& .MuiFormHelperText-root': {
-                      fontSize: '0.7rem',
-                    },
-                  }}
-                />
+                </div>
+                <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                  <Checkbox
+                    checked={unsecured}
+                    onCheckedChange={(checked) => {
+                      setUnsecured(checked === true);
+                      if (checked) setSecurity([]);
+                    }}
+                  />
+                  <span className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                    <Unlock size={12} />
+                    Unsecured (public endpoint — no authentication)
+                  </span>
+                </label>
+                <div className="mb-3">
+                  <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Security description (documentation)
+                  </Label>
+                  <Textarea
+                    rows={2}
+                    className="w-full text-sm"
+                    placeholder="Describe how security applies to this operation"
+                    value={securityDescription}
+                    onChange={(e) => setSecurityDescription(e.target.value)}
+                  />
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                    Exported as x-security-description in OpenAPI for documentation and doc generators.
+                  </p>
+                </div>
                 {!unsecured && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     OR = alternative options; within an option, schemes are AND (all required).
                   </p>
                 )}
                 {unsecured ? (
-                  <Box
-                    sx={{
-                      py: 2,
-                      px: 2,
-                      textAlign: 'center',
-                      border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                      borderRadius: 1,
-                      backgroundColor: isDark ? 'rgba(34, 197, 94, 0.08)' : 'rgba(34, 197, 94, 0.06)',
-                    }}
+                  <div
+                    className={`py-4 px-4 text-center rounded border ${
+                      isDark ? 'border-slate-700 bg-green-500/10' : 'border-slate-200 bg-green-500/10'
+                    }`}
                   >
                     <span className="text-xs text-green-700 dark:text-green-400 flex items-center justify-center gap-1.5">
                       <Unlock size={14} />
                       Public endpoint — no authentication required
                     </span>
-                  </Box>
+                  </div>
                 ) : security.length === 0 ? (
-                  <Box
-                    sx={{
-                      py: 2,
-                      px: 2,
-                      textAlign: 'center',
-                      border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                      borderRadius: 1,
-                    }}
+                  <div
+                    className={`py-4 px-4 text-center rounded border border-dashed ${
+                      isDark ? 'border-slate-700' : 'border-slate-200'
+                    }`}
                   >
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       No security requirements
                     </span>
-                  </Box>
+                  </div>
                 ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <div className="flex flex-col gap-2">
                     {security.map((req, reqIndex) => (
-                      <Box
+                      <div
                         key={reqIndex}
-                        sx={{
-                          p: 1.5,
-                          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                          borderRadius: 1,
-                          backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 1,
-                        }}
+                        className={`p-3 rounded border flex flex-col gap-2 ${
+                          isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-gray-50'
+                        }`}
                       >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                        <div className="flex justify-between items-center flex-wrap gap-1">
                           <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
                             Option {reqIndex + 1} (OR)
                           </span>
-                          <IconButton
-                            size="small"
+                          <button
+                            type="button"
                             onClick={() => handleRemoveSecurity(reqIndex)}
-                            sx={{
-                              color: '#ef4444',
-                              p: 0.25,
-                              '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                            }}
+                            className="p-1 rounded text-red-500 hover:bg-red-500/10 transition-colors"
                             title="Remove this requirement (OR)"
+                            aria-label="Remove requirement"
                           >
-                            <Delete sx={{ fontSize: 14 }} />
-                          </IconButton>
-                        </Box>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                         {Object.entries(req).map(([schemeName, scopes]) => (
-                          <Box
+                          <div
                             key={schemeName}
-                            sx={{
-                              pl: 1,
-                              borderLeft: isDark ? '2px solid #334155' : '2px solid #e2e8f0',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 1,
-                            }}
+                            className={`pl-2 border-l-2 flex flex-col gap-2 ${
+                              isDark ? 'border-slate-700' : 'border-slate-200'
+                            }`}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
-                              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <div className="flex items-start gap-1">
+                              <div className="flex-1 flex flex-col gap-1">
                                 {securitySchemes.length > 0 ? (
                                   <>
-                                    <TextField
-                                      select
-                                      size="small"
+                                    <Select
                                       value={schemeName.startsWith('__new__') || !securitySchemes.some((s) => s.scheme_name === schemeName) ? '__custom__' : schemeName}
-                                      onChange={(e) => {
-                                        const v = e.target.value;
+                                      onValueChange={(v) => {
                                         handleRenameSecurityScheme(
                                           reqIndex,
                                           schemeName,
@@ -1794,73 +1475,48 @@ export default function OperationPropertiesPanel({
                                           scopes || []
                                         );
                                       }}
-                                      sx={{
-                                        '& .MuiInputBase-root': {
-                                          fontSize: '0.875rem',
-                                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                          color: isDark ? '#f1f5f9' : '#0f172a',
-                                        },
-                                        '& .MuiOutlinedInput-notchedOutline': {
-                                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                                        },
-                                      }}
                                     >
-                                      {securitySchemes.map((s) => (
-                                        <MenuItem key={s.scheme_name} value={s.scheme_name}>
-                                          {s.scheme_type === 'http'
-                                            ? `${s.scheme_name} (HTTP: ${s.http_scheme || 'basic'})`
-                                            : s.scheme_type === 'oauth2'
-                                            ? `${s.scheme_name} (OAuth2)`
-                                            : s.scheme_type === 'openIdConnect'
-                                            ? `${s.scheme_name} (OpenID Connect)`
-                                            : s.scheme_type === 'mutualTLS'
-                                            ? `${s.scheme_name} (Mutual TLS)`
-                                            : s.scheme_type === 'custom'
-                                            ? `${s.scheme_name} (Custom)`
-                                            : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
-                                        </MenuItem>
-                                      ))}
-                                      <MenuItem value="__custom__">Other (bearerAuth, oauth2...)</MenuItem>
-                                    </TextField>
+                                      <SelectTrigger className="h-9 text-sm w-full">
+                                        <SelectValue placeholder="Scheme" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {securitySchemes.map((s) => (
+                                          <SelectItem key={s.scheme_name} value={s.scheme_name}>
+                                            {s.scheme_type === 'http'
+                                              ? `${s.scheme_name} (HTTP: ${s.http_scheme || 'basic'})`
+                                              : s.scheme_type === 'oauth2'
+                                              ? `${s.scheme_name} (OAuth2)`
+                                              : s.scheme_type === 'openIdConnect'
+                                              ? `${s.scheme_name} (OpenID Connect)`
+                                              : s.scheme_type === 'mutualTLS'
+                                              ? `${s.scheme_name} (Mutual TLS)`
+                                              : s.scheme_type === 'custom'
+                                              ? `${s.scheme_name} (Custom)`
+                                              : `${s.scheme_name} (${s.in_location || 'header'}: ${s.param_name || s.scheme_name})`}
+                                          </SelectItem>
+                                        ))}
+                                        <SelectItem value="__custom__">Other (bearerAuth, oauth2...)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                     {(schemeName.startsWith('__new__') || !schemeName || !securitySchemes.some((s) => s.scheme_name === schemeName)) && (
-                                      <TextField
-                                        size="small"
+                                      <Input
+                                        className="w-full text-sm mt-1"
                                         placeholder="Custom scheme name"
                                         value={schemeName.startsWith('__new__') ? '' : schemeName}
                                         onChange={(e) =>
                                           handleRenameSecurityScheme(reqIndex, schemeName, e.target.value, scopes || [])
                                         }
-                                        sx={{
-                                          '& .MuiInputBase-root': {
-                                            fontSize: '0.75rem',
-                                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                            color: isDark ? '#f1f5f9' : '#0f172a',
-                                          },
-                                          '& .MuiOutlinedInput-notchedOutline': {
-                                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                                          },
-                                        }}
                                       />
                                     )}
                                   </>
                                 ) : (
-                                  <TextField
-                                    size="small"
+                                  <Input
+                                    className="w-full text-sm"
                                     placeholder="Scheme name (e.g., apiKey, bearerAuth)"
                                     value={schemeName.startsWith('__new__') ? '' : schemeName}
                                     onChange={(e) =>
                                       handleRenameSecurityScheme(reqIndex, schemeName, e.target.value, scopes || [])
                                     }
-                                    sx={{
-                                      '& .MuiInputBase-root': {
-                                        fontSize: '0.875rem',
-                                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                        color: isDark ? '#f1f5f9' : '#0f172a',
-                                      },
-                                      '& .MuiOutlinedInput-notchedOutline': {
-                                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                                      },
-                                    }}
                                   />
                                 )}
                                 {(() => {
@@ -1870,106 +1526,75 @@ export default function OperationPropertiesPanel({
                                       ? scheme.scheme_type === 'oauth2' || scheme.scheme_type === 'openIdConnect'
                                       : schemeName === 'oauth2' || schemeName === 'openIdConnect';
                                   return supportsScopes ? (
-                                    <TextField
-                                      size="small"
-                                      placeholder="Required scopes (comma-separated)"
-                                      helperText="OAuth2/OpenID Connect: scopes required for this operation"
-                                      value={(scopes || []).join(', ')}
-                                      onChange={(e) => {
-                                        const scopeList = e.target.value
-                                          .split(',')
-                                          .map((s) => s.trim())
-                                          .filter(Boolean);
-                                        handleUpdateSecurity(reqIndex, schemeName, scopeList);
-                                      }}
-                                      sx={{
-                                        '& .MuiInputBase-root': {
-                                          fontSize: '0.75rem',
-                                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                                          color: isDark ? '#f1f5f9' : '#0f172a',
-                                        },
-                                        '& .MuiOutlinedInput-notchedOutline': {
-                                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                                        },
-                                      }}
-                                    />
+                                    <div className="mt-1">
+                                      <Input
+                                        className="w-full text-sm"
+                                        placeholder="Required scopes (comma-separated)"
+                                        value={(scopes || []).join(', ')}
+                                        onChange={(e) => {
+                                          const scopeList = e.target.value
+                                            .split(',')
+                                            .map((s) => s.trim())
+                                            .filter(Boolean);
+                                          handleUpdateSecurity(reqIndex, schemeName, scopeList);
+                                        }}
+                                      />
+                                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                        OAuth2/OpenID Connect: scopes required for this operation
+                                      </p>
+                                    </div>
                                   ) : null;
                                 })()}
-                              </Box>
-                              <IconButton
-                                size="small"
+                              </div>
+                              <button
+                                type="button"
                                 onClick={() => handleRemoveSchemeFromRequirement(reqIndex, schemeName)}
-                                sx={{
-                                  color: '#ef4444',
-                                  p: 0.5,
-                                  flexShrink: 0,
-                                  '&:hover': { backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                                }}
+                                className="p-1.5 rounded text-red-500 hover:bg-red-500/10 transition-colors shrink-0"
                                 title="Remove this scheme (AND)"
+                                aria-label="Remove scheme"
                               >
-                                <Delete sx={{ fontSize: 14 }} />
-                              </IconButton>
-                            </Box>
-                          </Box>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                         <Button
-                          size="small"
-                          startIcon={<Add />}
+                          size="sm"
+                          variant="ghost"
                           onClick={() => handleAddSchemeToRequirement(reqIndex)}
-                          sx={{
-                            fontSize: '0.7rem',
-                            textTransform: 'none',
-                            color: '#10b981',
-                            alignSelf: 'flex-start',
-                            '&:hover': {
-                              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)',
-                            },
-                          }}
+                          className="text-emerald-600 dark:text-emerald-400 text-xs self-start hover:bg-emerald-500/10"
                         >
+                          <Plus className="w-4 h-4" />
                           Add scheme (AND)
                         </Button>
-                      </Box>
+                      </div>
                     ))}
-                  </Box>
+                  </div>
                 )}
-              </Box>
-            </Box>
-          </Box>
+              </div>
+            </div>
+          </div>
 
           {/* Footer with Save button */}
-          <Box
-            sx={{
-              p: 2,
-              borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            }}
+          <div
+            className={`p-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
           >
             <Button
-              fullWidth
-              variant="contained"
+              className={`w-full text-white ${
+                saveStatus === 'saved'
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
+              } disabled:opacity-60 disabled:cursor-not-allowed`}
               onClick={handleSaveOperation}
               disabled={isSaving}
-              startIcon={<Save />}
-              sx={{
-                background: saveStatus === 'saved'
-                  ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)'
-                  : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                '&:hover': {
-                  background: saveStatus === 'saved'
-                    ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-                    : 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                },
-                '&:disabled': {
-                  background: isDark ? '#334155' : '#e2e8f0',
-                  color: isDark ? '#64748b' : '#94a3b8',
-                },
-              }}
             >
+              <Save className="w-4 h-4" />
               {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved ✓' : 'Save'}
             </Button>
-          </Box>
+          </div>
         </>
       )}
-    </Box>
+    </div>
   );
 }
 

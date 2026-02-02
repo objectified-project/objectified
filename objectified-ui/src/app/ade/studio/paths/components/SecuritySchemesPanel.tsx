@@ -1,13 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import TextField from '@mui/material/TextField';
-import IconButton from '@mui/material/IconButton';
-import { Add, Close, Delete, Edit, Lock, VpnKey } from '@mui/icons-material';
-import { XCircle } from 'lucide-react';
+import { Plus, X, Trash2, Pencil, Lock, Key, XCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { Button } from '../../../../components/ui/Button';
+import { Input } from '../../../../components/ui/Input';
+import { Label } from '../../../../components/ui/Label';
+import { Textarea } from '../../../../components/ui/Textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -679,28 +685,22 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
   if (!selectedVersionId) return null;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-between items-center">
         <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide flex items-center gap-1.5">
-          <Lock sx={{ fontSize: 14, color: '#f59e0b' }} />
+          <Lock className="w-3.5 h-3.5 text-amber-500" />
           Security Schemes
         </span>
         <Button
-          size="small"
-          startIcon={<Add sx={{ fontSize: 14 }} />}
+          size="sm"
+          variant="ghost"
           onClick={handleAdd}
-          sx={{
-            fontSize: '0.7rem',
-            textTransform: 'none',
-            color: '#6366f1',
-            '&:hover': {
-              backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)',
-            },
-          }}
+          className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
         >
+          <Plus className="w-3.5 h-3.5" />
           Add
         </Button>
-      </Box>
+      </div>
       <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1">
         Add API Key, HTTP (Basic/Bearer), or other scheme types. Drag a scheme onto a method node to apply it, or use Edit/Delete below.
       </p>
@@ -708,40 +708,27 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
       {isLoading ? (
         <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
       ) : schemes.length === 0 ? (
-        <Box
-          sx={{
-            py: 3,
-            px: 2,
-            textAlign: 'center',
-            border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-            borderRadius: 1,
-          }}
+        <div
+          className={`py-6 px-4 text-center rounded border border-dashed ${
+            isDark ? 'border-slate-700' : 'border-slate-200'
+          }`}
         >
-          <VpnKey sx={{ fontSize: 32, color: isDark ? '#475569' : '#94a3b8', mb: 1 }} />
+          <Key className={`w-8 h-8 mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
             No security schemes defined
           </p>
           <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Add />}
+            size="sm"
+            variant="outline"
             onClick={handleAdd}
-            sx={{
-              fontSize: '0.7rem',
-              textTransform: 'none',
-              borderColor: '#6366f1',
-              color: '#6366f1',
-              '&:hover': {
-                borderColor: '#4f46e5',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-              },
-            }}
+            className="text-indigo-600 dark:text-indigo-400 border-indigo-500 hover:bg-indigo-500/10 text-xs"
           >
+            <Plus className="w-4 h-4" />
             Add scheme
           </Button>
-        </Box>
+        </div>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="flex flex-col gap-2">
           <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-0.5">
             Drag to canvas · Edit / Delete
           </span>
@@ -759,29 +746,16 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
               );
             };
             return (
-              <Box
+              <div
                 key={scheme.id}
-                sx={{
-                  p: 1.5,
-                  border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                  borderRadius: 1,
-                  backgroundColor: isDark ? '#0f172a' : '#f9fafb',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
+                className={`p-3 rounded border flex justify-between items-center ${
+                  isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-gray-50'
+                }`}
               >
-                <Box
-                  component="div"
+                <div
                   draggable
                   onDragStart={handleDragStart}
-                  sx={{
-                    flex: 1,
-                    minWidth: 0,
-                    cursor: 'grab',
-                    transition: 'opacity 0.15s ease',
-                    '&:active': { cursor: 'grabbing' },
-                  }}
+                  className="flex-1 min-w-0 cursor-grab active:cursor-grabbing transition-opacity"
                 >
                   <span className="text-sm font-medium text-gray-900 dark:text-white block truncate">
                     {scheme.scheme_name}
@@ -799,27 +773,31 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                       ? `Custom: ${(scheme.data as Record<string, unknown>)?.type ?? '—'}`
                       : `${getInLabel(scheme.in_location)}: ${scheme.param_name || '—'}`}
                   </span>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 0.25 }} onClick={(e) => e.stopPropagation()}>
-                  <IconButton
-                    size="small"
+                </div>
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
                     onClick={() => handleEdit(scheme)}
-                    sx={{ p: 0.5, color: isDark ? '#94a3b8' : '#64748b' }}
+                    className={`p-1.5 rounded transition-colors ${
+                      isDark ? 'text-slate-400 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-200'
+                    }`}
+                    aria-label="Edit scheme"
                   >
-                    <Edit sx={{ fontSize: 14 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleDelete(scheme)}
-                    sx={{ p: 0.5, color: '#ef4444' }}
+                    className="p-1.5 rounded text-red-500 hover:bg-red-500/10 transition-colors"
+                    aria-label="Delete scheme"
                   >
-                    <Delete sx={{ fontSize: 14 }} />
-                  </IconButton>
-                </Box>
-              </Box>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             );
           })}
-        </Box>
+        </div>
       )}
 
       {/* Add/Edit Dialog */}
@@ -852,13 +830,13 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                   className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 p-1 -m-1"
                   aria-label="Dismiss"
                 >
-                  <Close sx={{ fontSize: 18 }} />
+                  <X className="w-[18px] h-[18px]" />
                 </button>
               </div>
             )}
 
             {/* Scheme type: dropdown when adding, read-only when editing */}
-            <Box sx={{ mb: 2 }}>
+            <div className="mb-4">
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                 Scheme type
               </label>
@@ -887,35 +865,30 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                   ))}
                 </select>
               )}
-            </Box>
+            </div>
 
             {!editingScheme && !SCHEME_TYPE_OPTIONS.find(o => o.value === dialogSchemeType)?.supported ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
                 This scheme type is not yet supported.
               </p>
             ) : dialogSchemeType === 'apiKey' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <Label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scheme Name
-                  </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  </Label>
+                  <Input
+                    className="w-full text-sm"
                     placeholder="apiKey"
                     value={formData.scheme_name}
                     onChange={(e) => setFormData(d => ({ ...d, scheme_name: e.target.value }))}
                     disabled={!!editingScheme}
-                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., apiKey)'}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      },
-                    }}
                   />
-                </Box>
-                <Box>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                    {editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., apiKey)'}
+                  </p>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Location
                   </label>
@@ -945,78 +918,60 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                       </option>
                     ))}
                   </select>
-                </Box>
-                <Box>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                </div>
+                <div>
+                  <Label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Parameter / Header Name
-                  </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  </Label>
+                  <Input
+                    className="w-full text-sm"
                     placeholder={formData.in_location === 'header' ? 'X-API-Key' : 'api_key'}
                     value={formData.param_name}
                     onChange={(e) => setFormData(d => ({ ...d, param_name: e.target.value }))}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      },
-                    }}
                   />
-                </Box>
-                <Box>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                </div>
+                <div>
+                  <Label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Description (optional)
-                  </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  </Label>
+                  <Textarea
                     rows={2}
+                    className="w-full text-sm"
                     placeholder="API key for authentication"
                     value={formData.description}
                     onChange={(e) => setFormData(d => ({ ...d, description: e.target.value }))}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      },
-                    }}
                   />
-                </Box>
-              </Box>
+                </div>
+              </div>
             ) : dialogSchemeType === 'oauth2' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: '60vh', overflowY: 'auto' }}>
-                <Box>
+              <div className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scheme Name
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="oauth2"
                     value={oauth2FormData.scheme_name}
                     onChange={(e) => setOAuth2FormData(d => ({ ...d, scheme_name: e.target.value }))}
                     disabled={!!editingScheme}
-                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., oauth2)'}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                  {editingScheme && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Name cannot be changed</p>
+                  )}
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Description (optional)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  <Textarea
                     rows={2}
+                    className="w-full text-sm"
                     placeholder="OAuth2 authentication"
                     value={oauth2FormData.description}
                     onChange={(e) => setOAuth2FormData(d => ({ ...d, description: e.target.value }))}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
+                </div>
                 {(['authorizationCode', 'implicit', 'clientCredentials', 'password'] as const).map((flowKey) => {
                   const flowLabels: Record<OAuth2FlowType, string> = {
                     authorizationCode: 'Authorization Code',
@@ -1028,16 +983,13 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                   const needsAuthUrl = flowKey === 'authorizationCode' || flowKey === 'implicit';
                   const needsTokenUrl = flowKey === 'authorizationCode' || flowKey === 'clientCredentials' || flowKey === 'password';
                   return (
-                    <Box
+                    <div
                       key={flowKey}
-                      sx={{
-                        p: 1.5,
-                        border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                        borderRadius: 1,
-                        backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-                      }}
+                      className={`p-3 rounded border ${
+                        isDark ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-slate-50'
+                      }`}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: entry.enabled ? 1.5 : 0 }}>
+                      <div className={`flex items-center gap-2 ${entry.enabled ? 'mb-3' : ''}`}>
                         <label
                           htmlFor={`oauth2-flow-${flowKey}`}
                           className="flex items-center gap-2 cursor-pointer select-none"
@@ -1060,17 +1012,16 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                           />
                           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{flowLabels[flowKey]}</span>
                         </label>
-                      </Box>
+                      </div>
                       {entry.enabled && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pl: 2.5 }}>
+                        <div className="flex flex-col gap-3 pl-5">
                           {needsAuthUrl && (
-                            <Box>
+                            <div>
                               <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">
                                 Authorization URL
                               </label>
-                              <TextField
-                                fullWidth
-                                size="small"
+                              <Input
+                                className="w-full text-sm"
                                 placeholder="https://example.com/oauth/authorize"
                                 value={entry.authorizationUrl}
                                 onChange={(e) =>
@@ -1082,18 +1033,16 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                     },
                                   }))
                                 }
-                                sx={{ '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                               />
-                            </Box>
+                            </div>
                           )}
                           {needsTokenUrl && (
-                            <Box>
+                            <div>
                               <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">
                                 Token URL
                               </label>
-                              <TextField
-                                fullWidth
-                                size="small"
+                              <Input
+                                className="w-full text-sm"
                                 placeholder="https://example.com/oauth/token"
                                 value={entry.tokenUrl}
                                 onChange={(e) =>
@@ -1105,17 +1054,15 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                     },
                                   }))
                                 }
-                                sx={{ '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                               />
-                            </Box>
+                            </div>
                           )}
-                          <Box>
+                          <div>
                             <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">
                               Refresh URL (optional)
                             </label>
-                            <TextField
-                              fullWidth
-                              size="small"
+                            <Input
+                              className="w-full text-sm"
                               placeholder="https://example.com/oauth/refresh"
                               value={entry.refreshUrl}
                               onChange={(e) =>
@@ -1127,17 +1074,15 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                   },
                                 }))
                               }
-                              sx={{ '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                             />
-                          </Box>
-                          <Box>
+                          </div>
+                          <div>
                             <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-0.5">
                               Scopes (name : description)
                             </label>
                             {entry.scopes.map((scope, idx) => (
-                              <Box key={idx} sx={{ display: 'flex', gap: 0.5, mb: 0.5 }}>
-                                <TextField
-                                  size="small"
+                              <div key={idx} className="flex gap-1 mb-1">
+                                <Input
                                   placeholder="read"
                                   value={scope.name}
                                   onChange={(e) => {
@@ -1148,10 +1093,9 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                       flows: { ...d.flows, [flowKey]: { ...d.flows[flowKey], scopes: next } },
                                     }));
                                   }}
-                                  sx={{ flex: 1, '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                                  className="flex-1 w-full text-sm"
                                 />
-                                <TextField
-                                  size="small"
+                                <Input
                                   placeholder="Read access"
                                   value={scope.description}
                                   onChange={(e) => {
@@ -1162,10 +1106,10 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                       flows: { ...d.flows, [flowKey]: { ...d.flows[flowKey], scopes: next } },
                                     }));
                                   }}
-                                  sx={{ flex: 1.5, '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                                  className="flex-1 w-full text-sm"
                                 />
-                                <IconButton
-                                  size="small"
+                                <button
+                                  type="button"
                                   onClick={() => {
                                     const next = entry.scopes.filter((_, i) => i !== idx);
                                     setOAuth2FormData(d => ({
@@ -1173,15 +1117,15 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                       flows: { ...d.flows, [flowKey]: { ...d.flows[flowKey], scopes: next } },
                                     }));
                                   }}
-                                  sx={{ p: 0.5, color: '#ef4444' }}
+                                  className="p-1.5 rounded text-red-500 hover:bg-red-500/10"
                                 >
-                                  <Delete sx={{ fontSize: 14 }} />
-                                </IconButton>
-                              </Box>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             ))}
                             <Button
-                              size="small"
-                              startIcon={<Add sx={{ fontSize: 12 }} />}
+                              size="sm"
+                              variant="ghost"
                               onClick={() =>
                                 setOAuth2FormData(d => ({
                                   ...d,
@@ -1191,56 +1135,50 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                                   },
                                 }))
                               }
-                              sx={{ fontSize: '0.7rem', textTransform: 'none', color: '#6366f1', mt: 0.5 }}
+                              className="text-indigo-600 dark:text-indigo-400 text-xs mt-1 hover:bg-indigo-500/10"
                             >
+                              <Plus className="w-3 h-3" />
                               Add scope
                             </Button>
-                          </Box>
-                        </Box>
+                          </div>
+                        </div>
                       )}
-                    </Box>
+                    </div>
                   );
                 })}
-              </Box>
+              </div>
             ) : dialogSchemeType === 'openIdConnect' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
+              <div className="flex flex-col gap-4">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scheme Name
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="openId"
                     value={openIdConnectFormData.scheme_name}
                     onChange={(e) => setOpenIdConnectFormData(d => ({ ...d, scheme_name: e.target.value }))}
                     disabled={!!editingScheme}
-                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., openId)'}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     OpenID Connect Discovery URL
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="https://example.com/.well-known/openid-configuration"
                     value={openIdConnectFormData.open_id_connect_url}
                     onChange={(e) => setOpenIdConnectFormData(d => ({ ...d, open_id_connect_url: e.target.value }))}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scopes (optional, one per line or comma-separated)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  <Textarea
                     rows={3}
+                    className="w-full text-sm"
                     placeholder="openid, profile, email"
                     value={openIdConnectFormData.scopes.join(', ')}
                     onChange={(e) => {
@@ -1251,111 +1189,92 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                         .filter(Boolean);
                       setOpenIdConnectFormData(d => ({ ...d, scopes }));
                     }}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Description (optional)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  <Textarea
                     rows={2}
+                    className="w-full text-sm"
                     placeholder="OpenID Connect authentication"
                     value={openIdConnectFormData.description}
                     onChange={(e) => setOpenIdConnectFormData(d => ({ ...d, description: e.target.value }))}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-              </Box>
+                </div>
+              </div>
             ) : dialogSchemeType === 'mutualTLS' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
+              <div className="flex flex-col gap-4">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scheme Name
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="mutualTLS"
                     value={mutualTlsFormData.scheme_name}
                     onChange={(e) => setMutualTlsFormData(d => ({ ...d, scheme_name: e.target.value }))}
                     disabled={!!editingScheme}
-                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., mutualTLS)'}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Description (optional)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  <Textarea
                     rows={2}
+                    className="w-full text-sm"
                     placeholder="Certificate-based (mutual TLS) authentication"
                     value={mutualTlsFormData.description}
                     onChange={(e) => setMutualTlsFormData(d => ({ ...d, description: e.target.value }))}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-              </Box>
+                </div>
+              </div>
             ) : dialogSchemeType === 'custom' ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
+              <div className="flex flex-col gap-4">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scheme Name
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="myCustomAuth"
                     value={customFormData.scheme_name}
                     onChange={(e) => setCustomFormData(d => ({ ...d, scheme_name: e.target.value }))}
                     disabled={!!editingScheme}
-                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security'}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Type (OpenAPI type or x- extension)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="apiKey, http, oauth2, openIdConnect, mutualTLS, or x-custom-auth"
                     value={customFormData.type}
                     onChange={(e) => setCustomFormData(d => ({ ...d, type: e.target.value }))}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Description (optional)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  <Textarea
                     rows={2}
+                    className="w-full text-sm"
                     placeholder="Custom authentication"
                     value={customFormData.description}
                     onChange={(e) => setCustomFormData(d => ({ ...d, description: e.target.value }))}
-                    sx={{ '& .MuiInputBase-root': { fontSize: '0.875rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Additional properties (key-value, exported as-is)
                   </label>
                   {customFormData.additional_properties.map((prop, idx) => (
-                    <Box key={idx} sx={{ display: 'flex', gap: 0.5, mb: 0.5 }}>
-                      <TextField
-                        size="small"
+                    <div key={idx} className="flex gap-1 mb-1">
+                      <Input
                         placeholder="name or x-extension"
                         value={prop.name}
                         onChange={(e) => {
@@ -1363,10 +1282,9 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                           next[idx] = { ...next[idx], name: e.target.value };
                           setCustomFormData(d => ({ ...d, additional_properties: next }));
                         }}
-                        sx={{ flex: 1, '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                        className="flex-1 w-full text-sm"
                       />
-                      <TextField
-                        size="small"
+                      <Input
                         placeholder="value"
                         value={prop.value}
                         onChange={(e) => {
@@ -1374,58 +1292,49 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                           next[idx] = { ...next[idx], value: e.target.value };
                           setCustomFormData(d => ({ ...d, additional_properties: next }));
                         }}
-                        sx={{ flex: 1, '& .MuiInputBase-root': { fontSize: '0.8rem', backgroundColor: isDark ? '#0f172a' : '#ffffff' }}}
+                        className="flex-1 w-full text-sm"
                       />
-                      <IconButton
-                        size="small"
+                      <button
+                        type="button"
                         onClick={() => {
                           const next = customFormData.additional_properties.filter((_, i) => i !== idx);
                           setCustomFormData(d => ({ ...d, additional_properties: next }));
                         }}
-                        sx={{ p: 0.5, color: '#ef4444' }}
+                        className="p-1.5 rounded text-red-500 hover:bg-red-500/10"
+                        aria-label="Remove property"
                       >
-                        <Delete sx={{ fontSize: 14 }} />
-                      </IconButton>
-                    </Box>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))}
                   <Button
-                    size="small"
-                    startIcon={<Add sx={{ fontSize: 12 }} />}
                     onClick={() =>
                       setCustomFormData(d => ({
                         ...d,
                         additional_properties: [...d.additional_properties, { name: '', value: '' }],
                       }))
                     }
-                    sx={{ fontSize: '0.7rem', textTransform: 'none', color: '#6366f1', mt: 0.5 }}
+                    className="text-indigo-600 dark:text-indigo-400 text-xs mt-1 hover:bg-indigo-500/10"
                   >
                     Add property
                   </Button>
-                </Box>
-              </Box>
+                </div>
+              </div>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
+              <div className="flex flex-col gap-4">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Scheme Name
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
+                    className="w-full text-sm"
                     placeholder="bearerAuth"
                     value={httpFormData.scheme_name}
                     onChange={(e) => setHttpFormData(d => ({ ...d, scheme_name: e.target.value }))}
                     disabled={!!editingScheme}
-                    helperText={editingScheme ? 'Name cannot be changed' : 'Used in operation security (e.g., bearerAuth)'}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      },
-                    }}
                   />
-                </Box>
-                <Box>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     HTTP Auth Type
                   </label>
@@ -1451,73 +1360,51 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
                       </option>
                     ))}
                   </select>
-                </Box>
+                </div>
                 {httpFormData.http_scheme_kind === 'custom' && (
-                  <Box>
+                  <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                       Custom Scheme Name
                     </label>
-                    <TextField
-                      fullWidth
-                      size="small"
+                    <Input
+                      className="w-full text-sm"
                       placeholder="Digest"
                       value={httpFormData.custom_http_scheme}
                       onChange={(e) =>
                         setHttpFormData(d => ({ ...d, custom_http_scheme: e.target.value, http_scheme: e.target.value }))
                       }
-                      sx={{
-                        '& .MuiInputBase-root': {
-                          fontSize: '0.875rem',
-                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        },
-                      }}
                     />
-                  </Box>
+                  </div>
                 )}
                 {httpFormData.http_scheme_kind === 'bearer' && (
-                  <Box>
+                  <div>
                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                       Bearer Format (optional)
                     </label>
-                    <TextField
-                      fullWidth
-                      size="small"
+                    <Input
+                      className="w-full text-sm"
                       placeholder="JWT"
                       value={httpFormData.bearer_format}
                       onChange={(e) => setHttpFormData(d => ({ ...d, bearer_format: e.target.value }))}
-                      sx={{
-                        '& .MuiInputBase-root': {
-                          fontSize: '0.875rem',
-                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        },
-                      }}
                     />
-                  </Box>
+                  </div>
                 )}
-                <Box>
+                <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Description (optional)
                   </label>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    multiline
+                  <Textarea
                     rows={2}
+                    className="w-full text-sm"
                     placeholder="HTTP authentication"
                     value={httpFormData.description}
                     onChange={(e) => setHttpFormData(d => ({ ...d, description: e.target.value }))}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      },
-                    }}
                   />
-                </Box>
-              </Box>
+                </div>
+              </div>
             )}
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+            <div className="flex justify-end gap-2 mt-6">
               <Dialog.Close asChild>
                 <button
                   className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
@@ -1533,10 +1420,10 @@ export default function SecuritySchemesPanel({ onRefresh }: { onRefresh?: () => 
               >
                 {editingScheme ? 'Save' : 'Add'}
               </button>
-            </Box>
+            </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </Box>
+    </div>
   );
 }

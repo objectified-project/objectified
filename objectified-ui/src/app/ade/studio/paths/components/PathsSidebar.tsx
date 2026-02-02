@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import Fab from '@mui/material/Fab';
-import Drawer from '@mui/material/Drawer';
-import IconButton from '@mui/material/IconButton';
-import { Add, Edit, Delete } from '@mui/icons-material';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
 import { useStudio } from '../../StudioContext';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -300,8 +301,8 @@ export default function PathsSidebar({
     }));
   };
 
-  const handleTabChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onTabChange(event.target.value as 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers');
+  const handleTabChange = (value: string) => {
+    onTabChange(value as 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers');
   };
 
   const TAB_OPTIONS = [
@@ -314,162 +315,101 @@ export default function PathsSidebar({
   ];
 
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: 280,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: 280,
-          boxSizing: 'border-box',
-          top: 102, // TopHeader (48px) + Studio Header (~48px with py-2)
-          height: 'calc(100vh - 102px)',
-          borderRight: 'none',
-          background: isDark
-            ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          boxShadow: isDark
-            ? '4px 0 24px rgba(0, 0, 0, 0.3)'
-            : '4px 0 24px rgba(0, 0, 0, 0.06)',
-        },
+    <div
+      className={`w-[280px] h-full shrink-0 flex flex-col relative border-r ${
+        isDark ? 'border-slate-700' : 'border-slate-200'
+      }`}
+      style={{
+        background: isDark
+          ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
+          : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+        boxShadow: isDark
+          ? '4px 0 24px rgba(0, 0, 0, 0.3)'
+          : '4px 0 24px rgba(0, 0, 0, 0.06)',
       }}
     >
-      <Box
-        sx={{
-          width: 280,
-          flexShrink: 0,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          background: isDark
-            ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          position: 'relative',
-        }}
-      >
-        {/* Section Dropdown */}
-        <Box
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          }}
+      {/* Section Dropdown */}
+        <div
+          className={`px-4 py-3 border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}
         >
-          <TextField
-            select
-            value={activeTab}
-            onChange={handleTabChange}
-            size="small"
-            fullWidth
-            variant="outlined"
-            sx={{
-              '& .MuiInputBase-root': {
-                fontSize: '0.8125rem',
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(249, 250, 251, 1)',
-                color: isDark ? '#e2e8f0' : '#1e293b',
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: isDark ? '#334155' : '#e2e8f0',
-              },
-              '& .MuiSelect-select': {
-                py: 1,
-              },
-            }}
-          >
-            {TAB_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger className="h-9 text-[0.8125rem] w-full">
+              <SelectValue placeholder="Section" />
+            </SelectTrigger>
+            <SelectContent>
+              {TAB_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Content Area */}
-        <Box sx={{
-          flex: 1,
-          overflow: activeTab === 'properties' ? 'hidden' : 'auto',
-          p: 2,
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
+        <div
+          className={`flex-1 p-4 flex flex-col ${activeTab === 'properties' ? 'overflow-hidden' : 'overflow-auto'}`}
+        >
           {isLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <div className="flex justify-center py-8">
               <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
-            </Box>
+            </div>
           ) : (
             <>
               {/* Operations Tab Content */}
               {activeTab === 'operations' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ mb: 1, px: 0.5 }}>
+                <div className="flex flex-col gap-4">
+                  <div className="mb-2 px-1">
                     <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                       Drag to Canvas
                     </span>
-                  </Box>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1 px-0.5">
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 -mt-1 px-1">
                     Drag an operation onto a path on the canvas to add it.
                   </p>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <div className="flex flex-col gap-1">
                     {AVAILABLE_OPERATIONS.map((operation) => (
-                      <Box
+                      <div
                         key={operation.id}
                         draggable
                         onDragStart={(e) => handleOperationDragStart(e, operation)}
-                        sx={{
-                          px: 1.5,
-                          py: 1,
-                          borderRadius: 1,
-                          border: isDark ? '1px solid #374151' : '1px solid #e5e7eb',
-                          backgroundColor: isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)',
-                          cursor: 'grab',
-                          transition: 'all 0.15s ease',
-                          '&:hover': {
-                            backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                          },
-                          '&:active': {
-                            cursor: 'grabbing',
-                          },
-                        }}
+                        className={`px-3 py-2 rounded border cursor-grab transition-all duration-150 hover:-translate-y-px hover:shadow active:cursor-grabbing ${
+                          isDark
+                            ? 'border-gray-700 bg-gray-700/30 hover:bg-gray-700/50'
+                            : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                        }`}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box
-                            sx={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: '50%',
-                              backgroundColor: operation.color,
-                              flexShrink: 0,
-                            }}
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: operation.color }}
                           />
                           <span className="text-sm font-medium" style={{ color: operation.color }}>
                             {operation.label}
                           </span>
-                        </Box>
-                      </Box>
+                        </div>
+                      </div>
                     ))}
-                  </Box>
-                </Box>
+                  </div>
+                </div>
               )}
 
               {/* Paths Tab Content */}
               {activeTab === 'paths' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div className="flex flex-col gap-4">
                   {/* Paths List Section */}
-                  <Box>
-                    <Box sx={{ mb: 1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div className="mb-2 px-1 flex justify-between items-center">
                       <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                         Paths
                       </span>
                       <span className="text-[10px] text-gray-400 dark:text-gray-500">
                         {paths.length} total
                       </span>
-                    </Box>
+                    </div>
 
                     {/* Search Input */}
-                    <Box sx={{ mb: 1.5 }}>
+                    <div className="mb-3">
                       <input
                         type="text"
                         value={pathSearch}
@@ -481,7 +421,7 @@ export default function PathsSidebar({
                             : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
                         }`}
                       />
-                    </Box>
+                    </div>
 
                     {(() => {
                       // Filter paths based on search
@@ -508,32 +448,18 @@ export default function PathsSidebar({
                       }
 
                       return filteredPaths.map((path) => (
-                      <Box
+                      <div
                         key={path.id}
                         onClick={() => onPathSelect(path.id, path.pathname)}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          px: 1.5,
-                          py: 1,
-                          borderRadius: 1,
-                          border: selectedPathId === path.id
-                            ? (isDark ? '2px solid #6366f1' : '2px solid #6366f1')
-                            : (isDark ? '1px solid #374151' : '1px solid #e5e7eb'),
-                          backgroundColor: selectedPathId === path.id
-                            ? (isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)')
-                            : (isDark ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 1)'),
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          '&:hover': {
-                            backgroundColor: selectedPathId === path.id
-                              ? (isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.15)')
-                              : (isDark ? 'rgba(55, 65, 81, 0.5)' : 'rgba(243, 244, 246, 1)'),
-                          },
-                        }}
+                        className={`flex items-center justify-between px-3 py-2 rounded border cursor-pointer transition-all duration-150 ${
+                          selectedPathId === path.id
+                            ? 'border-2 border-indigo-500 bg-indigo-500/20 hover:bg-indigo-500/30'
+                            : isDark
+                              ? 'border-gray-700 bg-gray-700/30 hover:bg-gray-700/50'
+                              : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                        }`}
                       >
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <div className="flex-1 min-w-0">
                           <span className={`text-sm truncate block ${
                             selectedPathId === path.id 
                               ? 'text-indigo-600 dark:text-indigo-400 font-semibold' 
@@ -541,56 +467,47 @@ export default function PathsSidebar({
                           }`}>
                             {path.pathname}
                           </span>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <IconButton
-                            size="small"
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditPath(path);
                             }}
-                            sx={{
-                              padding: '4px',
-                              color: isDark ? '#94a3b8' : '#64748b',
-                              '&:hover': {
-                                color: '#6366f1',
-                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                              },
-                            }}
+                            className={`p-1 rounded transition-colors ${
+                              isDark ? 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-500/10'
+                            }`}
+                            aria-label="Edit path"
                           >
-                            <Edit sx={{ fontSize: 16 }} />
-                          </IconButton>
-                          <IconButton
-                            size="small"
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeletePath(path);
                             }}
-                            sx={{
-                              padding: '4px',
-                              color: isDark ? '#94a3b8' : '#64748b',
-                              '&:hover': {
-                                color: '#ef4444',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                              },
-                            }}
+                            className={`p-1 rounded transition-colors ${
+                              isDark ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-600 hover:bg-red-500/10'
+                            }`}
+                            aria-label="Delete path"
                           >
-                            <Delete sx={{ fontSize: 16 }} />
-                          </IconButton>
-                        </Box>
-                      </Box>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     ));
                     })()}
-                  </Box>
-                </Box>
+                  </div>
+                </div>
               )}
 
               {/* Classes Tab Content */}
               {activeTab === 'classes' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 0 }}>
-                  {/* Header with count */}
+                <div className="flex flex-col h-full gap-0">
                   {/* Search Input */}
-                  <Box sx={{ flexShrink: 0, mb: 1.5 }}>
+                  <div className="shrink-0 mb-3">
                     <input
                       type="text"
                       value={classSearch}
@@ -602,12 +519,11 @@ export default function PathsSidebar({
                           : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                       }`}
                     />
-                  </Box>
+                  </div>
 
                   {/* Scrollable classes list */}
-                  <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <div className="flex-1 overflow-y-auto flex flex-col gap-3">
                     {(() => {
-                      // Filter classes based on search
                       const filteredClasses = classSearch.trim()
                         ? classes.filter(cls =>
                             cls.name.toLowerCase().includes(classSearch.toLowerCase())
@@ -616,19 +532,15 @@ export default function PathsSidebar({
 
                       if (classes.length === 0) {
                         return (
-                          <Box
-                            sx={{
-                              py: 3,
-                              px: 2,
-                              textAlign: 'center',
-                              border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                              borderRadius: 1,
-                            }}
+                          <div
+                            className={`py-6 px-4 text-center rounded border border-dashed ${
+                              isDark ? 'border-slate-700' : 'border-slate-200'
+                            }`}
                           >
                             <span className="text-xs text-gray-500 dark:text-gray-400">
                               No classes found. Create classes in the main Studio editor.
                             </span>
-                          </Box>
+                          </div>
                         );
                       }
 
@@ -642,7 +554,7 @@ export default function PathsSidebar({
 
                       return (
                         <>
-                          <Box sx={{ px: 0.5, mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                          <div className="px-1 mb-1 flex justify-between items-center shrink-0">
                             <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                               Drag to Canvas
                             </span>
@@ -651,7 +563,7 @@ export default function PathsSidebar({
                                 {filteredClasses.length} / {classes.length}
                               </span>
                             )}
-                          </Box>
+                          </div>
                           {filteredClasses.map((cls) => {
                             const handleClassDragStart = (e: React.DragEvent) => {
                               e.dataTransfer.effectAllowed = 'copy';
@@ -663,73 +575,48 @@ export default function PathsSidebar({
                             };
 
                             return (
-                              <Box
+                              <div
                                 key={cls.id}
                                 draggable
                                 onDragStart={handleClassDragStart}
-                                sx={{
-                                  px: 2,
-                                  py: 1.5,
-                                  borderRadius: 1.5,
-                                  border: isDark ? '1px solid #475569' : '1px solid #cbd5e1',
+                                className={`px-4 py-3 rounded-lg border text-sm cursor-grab transition-all duration-200 relative ${
+                                  isDark
+                                    ? 'border-slate-600 bg-slate-800/80 text-slate-200 shadow shadow-black/30 hover:bg-slate-700/60 hover:-translate-y-px hover:shadow-lg hover:border-indigo-500 active:cursor-grabbing active:translate-y-0'
+                                    : 'border-slate-300 bg-white/90 text-slate-800 shadow hover:bg-slate-50 hover:-translate-y-px hover:shadow-md hover:border-indigo-400 active:cursor-grabbing active:translate-y-0'
+                                }`}
+                                style={{
                                   background: isDark
                                     ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
                                     : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                                  fontSize: '0.875rem',
-                                  color: isDark ? '#e2e8f0' : '#1e293b',
-                                  cursor: 'grab',
-                                  transition: 'all 0.2s ease',
-                                  position: 'relative',
-                                  boxShadow: isDark
-                                    ? '0 1px 3px rgba(0, 0, 0, 0.3)'
-                                    : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                                  '&:hover': {
-                                    backgroundColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(241, 245, 249, 1)',
-                                    transform: 'translateY(-1px)',
-                                    boxShadow: isDark
-                                      ? '0 4px 12px rgba(0, 0, 0, 0.4)'
-                                      : '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                    borderColor: isDark ? '#6366f1' : '#818cf8',
-                                  },
-                                  '&:active': {
-                                    cursor: 'grabbing',
-                                    transform: 'translateY(0)',
-                                  },
                                 }}
                               >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                  <Box
-                                    sx={{
-                                      width: 8,
-                                      height: 8,
-                                      borderRadius: '50%',
-                                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                                      flexShrink: 0,
-                                      boxShadow: '0 0 8px rgba(99, 102, 241, 0.4)',
-                                    }}
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_8px_rgba(99,102,241,0.4)]"
+                                    style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
                                   />
-                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <div className="flex-1 min-w-0">
                                     <div className="font-semibold text-sm truncate">{cls.name}</div>
                                     <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
                                       Class Schema
                                     </div>
-                                  </Box>
-                                </Box>
-                              </Box>
+                                  </div>
+                                </div>
+                              </div>
                             );
                           })}
                         </>
                       );
                     })()}
-                  </Box>
-                </Box>
+                  </div>
+                </div>
               )}
 
               {/* Properties Tab Content */}
               {activeTab === 'properties' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 0 }}>
+                <div className="flex flex-col h-full gap-0">
                   {/* Search Input - Fixed at top */}
-                  <Box sx={{ flexShrink: 0, mb: 1.5 }}>
+                  <div className="shrink-0 mb-3">
                     <input
                       type="text"
                       placeholder="Search properties..."
@@ -741,27 +628,23 @@ export default function PathsSidebar({
                           : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
                       }`}
                     />
-                  </Box>
+                  </div>
 
                   {/* Scrollable properties list */}
-                  <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <div className="flex-1 overflow-y-auto flex flex-col gap-3">
                     {properties.length === 0 ? (
-                      <Box
-                        sx={{
-                          py: 3,
-                          px: 2,
-                          textAlign: 'center',
-                          border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-                          borderRadius: 1,
-                        }}
+                      <div
+                        className={`py-6 px-4 text-center rounded border border-dashed ${
+                          isDark ? 'border-slate-700' : 'border-slate-200'
+                        }`}
                       >
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           No properties found. Create properties in the main Studio editor.
                         </span>
-                      </Box>
+                      </div>
                     ) : (
                       <>
-                        <Box sx={{ px: 0.5, mb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                        <div className="px-1 mb-1 flex justify-between items-center shrink-0">
                           <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Drag to canvas or onto path variables for type binding">
                             Drag to Canvas / Path Variables
                           </span>
@@ -771,7 +654,7 @@ export default function PathsSidebar({
                               (p.data?.type && p.data.type.toLowerCase().includes(propertySearch.toLowerCase()))
                             ).length} / {properties.length}
                           </span>
-                        </Box>
+                        </div>
                         {properties
                           .filter(prop =>
                             prop.name.toLowerCase().includes(propertySearch.toLowerCase()) ||
@@ -789,7 +672,6 @@ export default function PathsSidebar({
                           }));
                         };
 
-                        // Whether the property is optional (nullable or type includes null)
                         const isOptional = (() => {
                           if (!prop.data) return false;
                           const { type, nullable } = prop.data;
@@ -798,7 +680,6 @@ export default function PathsSidebar({
                           return typeArr.some((t: unknown) => t === 'null' || t == null);
                         })();
 
-                        // Get a display-friendly type name from the property data (handles type array)
                         const getTypeDisplay = () => {
                           if (!prop.data) return 'string';
                           const { type, format, enum: enumValues, items } = prop.data;
@@ -823,84 +704,53 @@ export default function PathsSidebar({
                         const typeDisplay = getTypeDisplay();
 
                         return (
-                          <Box
+                          <div
                             key={prop.id}
                             draggable
                             onDragStart={handlePropertyDragStart}
-                            sx={{
-                              px: 2,
-                              py: 1.5,
-                              borderRadius: 1.5,
-                              border: isDark ? '1px solid #475569' : '1px solid #cbd5e1',
+                            className={`px-4 py-3 rounded-lg border text-sm cursor-grab transition-all duration-200 relative ${
+                              isDark
+                                ? 'border-slate-600 hover:border-violet-500 active:cursor-grabbing active:translate-y-0'
+                                : 'border-slate-300 hover:border-violet-400 active:cursor-grabbing active:translate-y-0'
+                            } hover:-translate-y-px hover:shadow-md`}
+                            style={{
                               background: isDark
                                 ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)'
                                 : 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%)',
-                              fontSize: '0.875rem',
                               color: isDark ? '#e2e8f0' : '#1e293b',
-                              cursor: 'grab',
-                              transition: 'all 0.2s ease',
-                              position: 'relative',
-                              boxShadow: isDark
-                                ? '0 1px 3px rgba(0, 0, 0, 0.3)'
-                                : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                              '&:hover': {
-                                backgroundColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(241, 245, 249, 1)',
-                                transform: 'translateY(-1px)',
-                                boxShadow: isDark
-                                  ? '0 4px 12px rgba(0, 0, 0, 0.4)'
-                                  : '0 4px 12px rgba(0, 0, 0, 0.15)',
-                                borderColor: isDark ? '#8b5cf6' : '#a78bfa',
-                              },
-                              '&:active': {
-                                cursor: 'grabbing',
-                                transform: 'translateY(0)',
-                              },
+                              boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
                             }}
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <Box
-                                sx={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: '2px',
-                                  background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-                                  flexShrink: 0,
-                                  boxShadow: '0 0 6px rgba(139, 92, 246, 0.4)',
-                                }}
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-1.5 h-1.5 rounded shrink-0 shadow-[0_0_6px_rgba(139,92,246,0.4)]"
+                                style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)' }}
                               />
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
                                   <span className="font-medium text-sm truncate">{prop.name}</span>
                                   {isOptional && (
-                                    <Box
-                                      component="span"
-                                      sx={{
-                                        flexShrink: 0,
-                                        fontSize: '10px',
-                                        fontWeight: 600,
-                                        px: 1,
-                                        py: 0.25,
-                                        borderRadius: 1,
-                                        backgroundColor: isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.2)',
-                                        color: isDark ? '#94a3b8' : '#64748b',
-                                      }}
+                                    <span
+                                      className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded ${
+                                        isDark ? 'bg-slate-400/25 text-slate-400' : 'bg-slate-400/20 text-slate-500'
+                                      }`}
                                     >
                                       optional
-                                    </Box>
+                                    </span>
                                   )}
-                                </Box>
+                                </div>
                                 <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 font-mono">
                                   {typeDisplay}
                                 </div>
-                              </Box>
-                            </Box>
-                          </Box>
+                              </div>
+                            </div>
+                          </div>
                         );
                       })}
                     </>
                   )}
-                </Box>
-              </Box>
+                </div>
+              </div>
             )}
 
               {/* Security Tab Content */}
@@ -914,28 +764,19 @@ export default function PathsSidebar({
               )}
             </>
           )}
-        </Box>
+        </div>
 
         {/* Add Button (Paths Tab Only) - Bottom Right */}
         {activeTab === 'paths' && (
-          <Fab
-            color="primary"
-            size="small"
+          <button
+            type="button"
             onClick={handleAddPath}
-            sx={{
-              position: 'absolute',
-              bottom: 16,
-              right: 16,
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-              },
-            }}
+            className="absolute bottom-4 right-4 flex items-center justify-center w-10 h-10 rounded-full text-white shadow-lg transition-all hover:shadow-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            aria-label="Add path"
           >
-            <Add />
-          </Fab>
+            <Plus className="w-5 h-5" />
+          </button>
         )}
-      </Box>
 
       {/* Add/Edit Path Dialog */}
       <Dialog.Root open={pathDialogOpen} onOpenChange={setPathDialogOpen}>
@@ -1044,7 +885,7 @@ export default function PathsSidebar({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </Drawer>
+    </div>
   );
 }
 

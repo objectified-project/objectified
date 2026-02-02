@@ -1,21 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import { Add, Delete, Link, LinkOff, Edit, Refresh } from '@mui/icons-material';
-import { FileJson, Link2, Pencil, Plus, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { FileJson, Link2, Pencil, Plus, ChevronDown, ChevronRight, Trash2, Link, Unlink, RefreshCw } from 'lucide-react';
+import { Button } from '../../../../components/ui/Button';
+import { Input } from '../../../../components/ui/Input';
+import { Label } from '../../../../components/ui/Label';
+import { Checkbox } from '../../../../components/ui/Checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../components/ui/Tabs';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import { useStudio } from '../../StudioContext';
@@ -310,89 +309,79 @@ function ContentTypeEditor({
   const isInline = !content.class_id && !!content.inline_schema;
 
   return (
-    <Box sx={{ p: 2, border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: 1 }}>
+    <div className={`p-4 rounded-lg border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <div className="flex justify-between items-center mb-4">
         <code className="text-xs font-mono px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
           {content.media_type}
         </code>
-        <IconButton size="small" onClick={onDelete} sx={{ color: '#ef4444' }}>
-          <Delete sx={{ fontSize: 16 }} />
-        </IconButton>
-      </Box>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="p-1.5 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+          aria-label="Delete"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Schema Type Selector */}
-      <Box sx={{ mb: 2 }}>
-        <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+      <div className="mb-4">
+        <Label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
           Schema Type
-        </label>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        </Label>
+        <div className="flex gap-2">
           <Button
-            size="small"
-            variant={isReference ? 'contained' : 'outlined'}
+            type="button"
+            size="sm"
+            variant={isReference ? 'default' : 'outline'}
             onClick={() => onSchemaTypeChange('reference')}
-            startIcon={<Link2 className="w-3 h-3" />}
-            sx={{
-              flex: 1,
-              fontSize: '0.65rem',
-              textTransform: 'none',
-              ...(isReference && {
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              }),
-            }}
+            className={`flex-1 text-xs ${isReference ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
           >
+            <Link2 className="w-3 h-3 mr-1" />
             Class Reference
           </Button>
           <Button
-            size="small"
-            variant={isInline ? 'contained' : 'outlined'}
+            type="button"
+            size="sm"
+            variant={isInline ? 'default' : 'outline'}
             onClick={() => onSchemaTypeChange('inline')}
-            startIcon={<Pencil className="w-3 h-3" />}
-            sx={{
-              flex: 1,
-              fontSize: '0.65rem',
-              textTransform: 'none',
-              ...(isInline && {
-                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-              }),
-            }}
+            className={`flex-1 text-xs ${isInline ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
           >
+            <Pencil className="w-3 h-3 mr-1" />
             Inline Schema
           </Button>
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {/* Reference Mode: Class Selector */}
       {isReference && (
-        <Box>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Select Class"
-            value={content.class_id || ''}
-            onChange={(e) => onClassChange(e.target.value)}
-            sx={{
-              '& .MuiInputBase-input': { fontSize: '0.75rem' },
-              '& .MuiInputLabel-root': { fontSize: '0.75rem' },
-            }}
-          >
-            {classes.map((cls) => (
-              <MenuItem key={cls.id} value={cls.id} sx={{ fontSize: '0.75rem' }}>
-                {cls.name}
-              </MenuItem>
-            ))}
-          </TextField>
+        <div>
+          <Label className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1 block">Select Class</Label>
+          <Select value={content.class_id || ''} onValueChange={onClassChange}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Select a class" />
+            </SelectTrigger>
+            <SelectContent>
+              {classes.map((cls) => (
+                <SelectItem key={cls.id} value={cls.id} className="text-xs">
+                  {cls.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {content.class_id && (
             <Button
-              size="small"
+              type="button"
+              size="sm"
+              variant="ghost"
               onClick={onConvertToInline}
-              sx={{ mt: 1, fontSize: '0.65rem', textTransform: 'none' }}
+              className="mt-2 text-xs"
             >
               Convert to Inline (copy properties)
             </Button>
           )}
-        </Box>
+        </div>
       )}
 
       {/* Inline Mode: Property Tree */}
@@ -412,7 +401,7 @@ function ContentTypeEditor({
           Select a schema type above
         </div>
       )}
-    </Box>
+    </div>
   );
 }
 
@@ -765,9 +754,9 @@ export default function RequestBodySection({
   // Render loading state
   if (isLoading) {
     return (
-      <Box sx={{ py: 2, textAlign: 'center' }}>
+      <div className="py-4 text-center">
         <span className="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
-      </Box>
+      </div>
     );
   }
 
@@ -776,10 +765,10 @@ export default function RequestBodySection({
     const contentTypes = linkedRequestBody.content_types || [];
 
     return (
-      <Box>
+      <div>
         {/* Header with unlink button */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
             <FileJson className="w-4 h-4 text-indigo-500" />
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
               {linkedRequestBody.name}
@@ -789,16 +778,26 @@ export default function RequestBodySection({
                 Required
               </span>
             )}
-          </Box>
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton size="small" onClick={loadData} title="Refresh">
-              <Refresh sx={{ fontSize: 16 }} />
-            </IconButton>
-            <IconButton size="small" onClick={handleUnlinkRequestBody} title="Unlink" sx={{ color: '#f59e0b' }}>
-              <LinkOff sx={{ fontSize: 16 }} />
-            </IconButton>
-          </Box>
-        </Box>
+          </div>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={loadData}
+              className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+              title="Refresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={handleUnlinkRequestBody}
+              className="p-1.5 rounded text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+              title="Unlink"
+            >
+              <Unlink className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
         {/* Description */}
         {linkedRequestBody.description && (
@@ -809,249 +808,212 @@ export default function RequestBodySection({
 
         {/* Content Types Tabs */}
         {contentTypes.length > 0 ? (
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <div>
+            <div className="flex justify-between items-center mb-2">
               <Tabs
-                value={Math.min(selectedContentTab, contentTypes.length - 1)}
-                onChange={(_, newValue) => setSelectedContentTab(newValue)}
-                sx={{
-                  minHeight: 32,
-                  '& .MuiTab-root': {
-                    minHeight: 32,
-                    fontSize: '0.65rem',
-                    textTransform: 'none',
-                    py: 0.5,
-                  },
-                }}
+                value={String(Math.min(selectedContentTab, contentTypes.length - 1))}
+                onValueChange={(v) => setSelectedContentTab(Number(v))}
               >
-                {contentTypes.map((ct, index) => (
-                  <Tab key={ct.id} label={ct.media_type.replace('application/', '')} />
-                ))}
+                <TabsList className="h-8 min-h-8 text-xs">
+                  {contentTypes.map((ct, index) => (
+                    <TabsTrigger key={ct.id} value={String(index)} className="text-xs py-1">
+                      {ct.media_type.replace('application/', '')}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
               </Tabs>
               <Button
-                size="small"
-                startIcon={<Add />}
+                type="button"
+                size="sm"
+                variant="outline"
                 onClick={() => setAddContentDialogOpen(true)}
-                sx={{ fontSize: '0.65rem', textTransform: 'none' }}
+                className="text-xs"
               >
+                <Plus className="w-3.5 h-3.5 mr-1" />
                 Add
               </Button>
-            </Box>
+            </div>
 
             {/* Selected Content Type Editor */}
-            {contentTypes[selectedContentTab] && (
-              <ContentTypeEditor
-                content={contentTypes[selectedContentTab]}
-                classes={classes}
-                onSchemaTypeChange={(type) =>
-                  handleSchemaTypeChange(contentTypes[selectedContentTab].id, type)
-                }
-                onClassChange={(classId) =>
-                  handleClassChange(contentTypes[selectedContentTab].id, classId)
-                }
-                onConvertToInline={() =>
-                  handleConvertToInline(contentTypes[selectedContentTab].id)
-                }
-                onPropertyEdit={(propId) => {
-                  // TODO: Open property edit dialog
-                  console.log('Edit property:', propId);
-                }}
-                onPropertyDelete={(propId) =>
-                  handleDeleteProperty(contentTypes[selectedContentTab].id, propId)
-                }
-                onAddProperty={() => {
-                  setCurrentContentId(contentTypes[selectedContentTab].id);
-                  setAddPropertyDialogOpen(true);
-                }}
-                onDelete={() => handleDeleteContentType(contentTypes[selectedContentTab].id)}
-              />
-            )}
-          </Box>
+            {contentTypes.map((ct, index) => (
+              <TabsContent key={ct.id} value={String(index)} className="mt-2">
+                <ContentTypeEditor
+                  content={ct}
+                  classes={classes}
+                  onSchemaTypeChange={(type) => handleSchemaTypeChange(ct.id, type)}
+                  onClassChange={(classId) => handleClassChange(ct.id, classId)}
+                  onConvertToInline={() => handleConvertToInline(ct.id)}
+                  onPropertyEdit={(propId) => {
+                    console.log('Edit property:', propId);
+                  }}
+                  onPropertyDelete={(propId) => handleDeleteProperty(ct.id, propId)}
+                  onAddProperty={() => {
+                    setCurrentContentId(ct.id);
+                    setAddPropertyDialogOpen(true);
+                  }}
+                  onDelete={() => handleDeleteContentType(ct.id)}
+                />
+              </TabsContent>
+            ))}
+          </div>
         ) : (
-          <Box
-            sx={{
-              py: 3,
-              px: 2,
-              textAlign: 'center',
-              border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-              borderRadius: 1,
-            }}
-          >
+          <div className={`py-6 px-4 text-center rounded-lg border border-dashed ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>
             <span className="text-xs text-gray-500 dark:text-gray-400">No content types defined</span>
             <Button
-              size="small"
-              startIcon={<Add />}
+              type="button"
+              size="sm"
+              variant="outline"
               onClick={() => setAddContentDialogOpen(true)}
-              sx={{ mt: 1, fontSize: '0.65rem', textTransform: 'none' }}
+              className="mt-2 text-xs"
             >
+              <Plus className="w-3.5 h-3.5 mr-1" />
               Add Content Type
             </Button>
-          </Box>
+          </div>
         )}
 
         {/* Add Content Type Dialog */}
-        <Dialog open={addContentDialogOpen} onClose={() => setAddContentDialogOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ fontSize: '0.875rem' }}>Add Content Type</DialogTitle>
-          <DialogContent>
-            <TextField
-              select
-              fullWidth
-              size="small"
-              label="Media Type"
-              value={newMediaType}
-              onChange={(e) => setNewMediaType(e.target.value)}
-              sx={{ mt: 1 }}
-            >
-              {MEDIA_TYPE_OPTIONS.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAddContentDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddContentType} variant="contained">
-              Add
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <Dialog.Root open={addContentDialogOpen} onOpenChange={setAddContentDialogOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
+            <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-xs -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+              <Dialog.Title className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add Content Type</Dialog.Title>
+              <Label className="text-xs font-medium mb-1 block">Media Type</Label>
+              <Select value={newMediaType} onValueChange={setNewMediaType}>
+                <SelectTrigger className="h-9 text-sm mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEDIA_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setAddContentDialogOpen(false)}>Cancel</Button>
+                <Button type="button" variant="default" size="sm" onClick={handleAddContentType}>Add</Button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
 
         {/* Add Property Dialog */}
-        <Dialog open={addPropertyDialogOpen} onClose={() => setAddPropertyDialogOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ fontSize: '0.875rem' }}>Add Property</DialogTitle>
-          <DialogContent>
-            <TextField
-              fullWidth
-              size="small"
-              label="Property Name"
-              value={newPropertyName}
-              onChange={(e) => setNewPropertyName(e.target.value)}
-              sx={{ mt: 1, mb: 2 }}
-            />
-            <TextField
-              select
-              fullWidth
-              size="small"
-              label="Type"
-              value={newPropertyType}
-              onChange={(e) => setNewPropertyType(e.target.value)}
-            >
-              <MenuItem value="string">string</MenuItem>
-              <MenuItem value="number">number</MenuItem>
-              <MenuItem value="integer">integer</MenuItem>
-              <MenuItem value="boolean">boolean</MenuItem>
-              <MenuItem value="object">object</MenuItem>
-              <MenuItem value="array">array</MenuItem>
-            </TextField>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAddPropertyDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddProperty} variant="contained" disabled={!newPropertyName.trim()}>
-              Add
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
+        <Dialog.Root open={addPropertyDialogOpen} onOpenChange={setAddPropertyDialogOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
+            <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-xs -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+              <Dialog.Title className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add Property</Dialog.Title>
+              <Label className="text-xs font-medium mb-1 block">Property Name</Label>
+              <Input
+                value={newPropertyName}
+                onChange={(e) => setNewPropertyName(e.target.value)}
+                className="h-9 text-sm mt-1 mb-4"
+              />
+              <Label className="text-xs font-medium mb-1 block">Type</Label>
+              <Select value={newPropertyType} onValueChange={setNewPropertyType}>
+                <SelectTrigger className="h-9 text-sm mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="string">string</SelectItem>
+                  <SelectItem value="number">number</SelectItem>
+                  <SelectItem value="integer">integer</SelectItem>
+                  <SelectItem value="boolean">boolean</SelectItem>
+                  <SelectItem value="object">object</SelectItem>
+                  <SelectItem value="array">array</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setAddPropertyDialogOpen(false)}>Cancel</Button>
+                <Button type="button" variant="default" size="sm" onClick={handleAddProperty} disabled={!newPropertyName.trim()}>Add</Button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      </div>
     );
   }
 
   // Render no linked request body - show link options
   return (
-    <Box>
-      <Box
-        sx={{
-          py: 3,
-          px: 2,
-          textAlign: 'center',
-          border: isDark ? '1px dashed #334155' : '1px dashed #e2e8f0',
-          borderRadius: 1,
-        }}
-      >
+    <div>
+      <div className={`py-6 px-4 text-center rounded-lg border border-dashed ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>
         <FileJson className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-        <span className="text-xs text-gray-500 dark:text-gray-400 block mb-3">
+        <span className="text-xs text-gray-500 dark:text-gray-400 block mb-4">
           No request body linked
         </span>
 
         {/* Available request bodies to link */}
         {availableRequestBodies.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+          <div className="mb-4">
+            <Label className="block text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-2">
               Link Existing
-            </label>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            </Label>
+            <div className="flex flex-col gap-1">
               {availableRequestBodies.map((rb) => (
                 <Button
                   key={rb.id}
-                  size="small"
-                  variant="outlined"
-                  startIcon={<Link />}
+                  type="button"
+                  size="sm"
+                  variant="outline"
                   onClick={() => handleLinkRequestBody(rb.id)}
-                  sx={{ fontSize: '0.65rem', textTransform: 'none', justifyContent: 'flex-start' }}
+                  className="text-xs justify-start"
                 >
+                  <Link className="w-3.5 h-3.5 mr-1.5" />
                   {rb.name}
                 </Button>
               ))}
-            </Box>
-          </Box>
+            </div>
+          </div>
         )}
 
         <Button
-          size="small"
-          variant="contained"
-          startIcon={<Add />}
+          type="button"
+          size="sm"
+          variant="default"
           onClick={() => setCreateDialogOpen(true)}
-          sx={{
-            fontSize: '0.7rem',
-            textTransform: 'none',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-          }}
+          className="text-sm bg-indigo-600 hover:bg-indigo-700"
         >
+          <Plus className="w-4 h-4 mr-1.5" />
           Create New Request Body
         </Button>
-      </Box>
+      </div>
 
       {/* Create Request Body Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontSize: '0.875rem' }}>Create Request Body</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            size="small"
-            label="Name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="e.g., CreateUserRequest"
-            sx={{ mt: 1, mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            size="small"
-            label="Description (optional)"
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            multiline
-            rows={2}
-            sx={{ mb: 2 }}
-          />
-          <FormControlLabel
-            control={
+      <Dialog.Root open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-xs -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+            <Dialog.Title className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Create Request Body</Dialog.Title>
+            <Label className="text-xs font-medium mb-1 block">Name</Label>
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g., CreateUserRequest"
+              className="h-9 text-sm mt-1 mb-4"
+            />
+            <Label className="text-xs font-medium mb-1 block">Description (optional)</Label>
+            <Input
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              className="h-9 text-sm mt-1 mb-4"
+            />
+            <label className="flex items-center gap-2 cursor-pointer mt-2">
               <Checkbox
                 checked={newRequired}
-                onChange={(e) => setNewRequired(e.target.checked)}
-                size="small"
+                onCheckedChange={(c) => setNewRequired(c === true)}
               />
-            }
-            label={<span className="text-xs">Required</span>}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleCreateRequestBody} variant="contained" disabled={!newName.trim()}>
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              <span className="text-xs">Required</span>
+            </label>
+            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+              <Button type="button" variant="default" size="sm" onClick={handleCreateRequestBody} disabled={!newName.trim()}>Create</Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
   );
 }

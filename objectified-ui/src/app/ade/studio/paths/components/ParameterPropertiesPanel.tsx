@@ -1,19 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import MenuItem from '@mui/material/MenuItem';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import { Close, Save } from '@mui/icons-material';
-import { Hash, Sparkles, Search, Shield, User, Loader2, Database } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Hash, Sparkles, Search, Shield, User, Loader2, Database, X, Save } from 'lucide-react';
+import { Button } from '../../../../components/ui/Button';
+import { Input } from '../../../../components/ui/Input';
+import { Label } from '../../../../components/ui/Label';
+import { Checkbox } from '../../../../components/ui/Checkbox';
+import { Textarea } from '../../../../components/ui/Textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -33,7 +34,10 @@ const SCHEMA_TYPES = [
   { value: 'array', label: 'Array' },
 ] as const;
 
-// Common string formats
+// Sentinel for "no format" in Radix Select (Select.Item cannot have value="")
+const FORMAT_NONE_VALUE = '__none__';
+
+// Common string formats (empty string = none, stored in schema; use FORMAT_NONE_VALUE for Select UI only)
 const STRING_FORMATS = [
   { value: '', label: 'None' },
   { value: 'date', label: 'Date (YYYY-MM-DD)' },
@@ -399,228 +403,144 @@ export default function ParameterPropertiesPanel({
   if (!parameterId) return null;
 
   return (
-    <Box
-      sx={{
-        width: 320,
-        height: '100%',
-        borderLeft: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        background: isDark
-          ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-          : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+    <div
+      className={`w-[320px] h-full flex flex-col border-l ${
+        isDark ? 'border-slate-700 bg-gradient-to-b from-slate-800 to-slate-900' : 'border-slate-200 bg-gradient-to-b from-white to-slate-50'
+      }`}
     >
       {/* Header */}
-      <Box
-        sx={{
-          p: 2,
-          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Hash size={20} color={isDark ? '#a78bfa' : '#8b5cf6'} />
-          <Box>
+      <div className={`p-4 border-b flex justify-between items-center ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+        <div className="flex items-center gap-2">
+          <Hash size={20} className={isDark ? 'text-violet-400' : 'text-violet-600'} />
+          <div>
             <span className="text-sm font-semibold text-gray-900 dark:text-white">
               Parameter Details
             </span>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {name}
             </div>
-          </Box>
-        </Box>
-        <IconButton size="small" onClick={onClose} sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-          <Close sx={{ fontSize: 18 }} />
-        </IconButton>
-      </Box>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-slate-500 dark:text-slate-400"
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+      </div>
 
       {/* Content */}
       {isLoading ? (
-        <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+        <div className="p-6 flex justify-center">
           <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
-        </Box>
+        </div>
       ) : (
         <>
-          <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div className="flex-1 overflow-auto p-4">
+            <div className="flex flex-col gap-4">
               {/* Parameter Name */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                   Parameter Name
-                </label>
+                </Label>
                 {inLocation === 'path' && availablePathParams.length > 0 ? (
-                  <TextField
-                    fullWidth
-                    select
-                    size="small"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
-                  >
-                    {availablePathParams.map((param) => (
-                      <MenuItem key={param} value={param}>
-                        {param}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+                  <Select value={name} onValueChange={setName}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Parameter name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePathParams.map((param) => (
+                        <SelectItem key={param} value={param}>
+                          {param}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
-                  <TextField
-                    fullWidth
-                    size="small"
+                  <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Parameter name"
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
+                    className="h-9 text-sm"
                   />
                 )}
-              </Box>
+              </div>
 
               {/* Location */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                   Location
-                </label>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  value={inLocation}
-                  onChange={(e) => setInLocation(e.target.value as any)}
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
-                >
-                  <MenuItem value="path">Path</MenuItem>
-                  <MenuItem value="query">Query</MenuItem>
-                  <MenuItem value="header">Header</MenuItem>
-                  <MenuItem value="cookie">Cookie</MenuItem>
-                </TextField>
-              </Box>
+                </Label>
+                <Select value={inLocation} onValueChange={(v) => setInLocation(v as typeof inLocation)}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="path">Path</SelectItem>
+                    <SelectItem value="query">Query</SelectItem>
+                    <SelectItem value="header">Header</SelectItem>
+                    <SelectItem value="cookie">Cookie</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Required */}
-              <Box>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={required}
-                      onChange={(e) => setRequired(e.target.checked)}
-                      sx={{
-                        color: isDark ? '#64748b' : '#94a3b8',
-                        '&.Mui-checked': {
-                          color: '#8b5cf6',
-                        },
-                      }}
-                    />
-                  }
-                  label={
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Required parameter
-                    </span>
-                  }
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="param-required"
+                  checked={required}
+                  onCheckedChange={(checked) => setRequired(checked === true)}
                 />
-              </Box>
+                <Label htmlFor="param-required" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  Required parameter
+                </Label>
+              </div>
 
               {/* Summary */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                   Summary
-                </label>
-                <TextField
-                  fullWidth
-                  size="small"
+                </Label>
+                <Input
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Brief summary"
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
+                  className="h-9 text-sm"
                 />
-              </Box>
+              </div>
 
               {/* Description */}
-              <Box>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <div>
+                <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                   Description
-                </label>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  size="small"
+                </Label>
+                <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Detailed description of the parameter..."
-                  sx={{
-                    '& .MuiInputBase-root': {
-                      fontSize: '0.875rem',
-                      backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#f1f5f9' : '#0f172a',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? '#334155' : '#e2e8f0',
-                    },
-                  }}
+                  rows={4}
+                  className="text-sm resize-none"
                 />
-              </Box>
+              </div>
 
               {/* Schema Section */}
-              <Box sx={{ mt: 2, pt: 2, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 block">
                   Schema Definition
-                </label>
+                </Label>
 
                 {/* Apply from primitive template (REST service primitives) */}
-                <Box sx={{ mb: 2 }}>
+                <div className="mb-4">
                   <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<Sparkles style={{ width: 14, height: 14 }} />}
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => setPrimitiveDialogOpen(true)}
-                    sx={{
-                      borderColor: isDark ? '#6366f1' : '#8b5cf6',
-                      color: isDark ? '#a5b4fc' : '#7c3aed',
-                      fontSize: '0.75rem',
-                      '&:hover': {
-                        borderColor: isDark ? '#818cf8' : '#7c3aed',
-                        backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(139, 92, 246, 0.08)',
-                      },
-                    }}
+                    className="text-xs border-violet-500 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                   >
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                     Apply from primitive template
                   </Button>
                   <span
@@ -629,263 +549,164 @@ export default function ParameterPropertiesPanel({
                   >
                     ⓘ
                   </span>
-                </Box>
+                </div>
 
                 {/* Schema Type */}
-                <Box sx={{ mb: 2 }}>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <div className="mb-4">
+                  <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                     Type
-                  </label>
-                  <TextField
-                    fullWidth
-                    select
-                    size="small"
-                    value={schemaType}
-                    onChange={(e) => setSchemaType(e.target.value as any)}
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
-                  >
-                    {SCHEMA_TYPES.map((t) => (
-                      <MenuItem key={t.value} value={t.value}>
-                        {t.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Box>
+                  </Label>
+                  <Select value={schemaType} onValueChange={(v) => setSchemaType(v as typeof schemaType)}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SCHEMA_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 {/* String-specific options */}
                 {schemaType === 'string' && (
                   <>
-                    <Box sx={{ mb: 2 }}>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <div className="mb-4">
+                      <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                         Format
-                      </label>
-                      <TextField
-                        fullWidth
-                        select
-                        size="small"
-                        value={schemaFormat}
-                        onChange={(e) => setSchemaFormat(e.target.value)}
-                        sx={{
-                          '& .MuiInputBase-root': {
-                            fontSize: '0.875rem',
-                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                            color: isDark ? '#f1f5f9' : '#0f172a',
-                          },
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                          },
-                        }}
+                      </Label>
+                      <Select
+                        value={schemaFormat === '' ? FORMAT_NONE_VALUE : schemaFormat}
+                        onValueChange={(v) => setSchemaFormat(v === FORMAT_NONE_VALUE ? '' : v)}
                       >
-                        {STRING_FORMATS.map((f) => (
-                          <MenuItem key={f.value} value={f.value}>
-                            {f.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Box>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STRING_FORMATS.map((f) => (
+                            <SelectItem key={f.value || FORMAT_NONE_VALUE} value={f.value === '' ? FORMAT_NONE_VALUE : f.value}>
+                              {f.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <div className="flex gap-2 mb-4">
+                      <div className="flex-1">
+                        <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                           Min Length
-                        </label>
-                        <TextField
-                          fullWidth
-                          size="small"
+                        </Label>
+                        <Input
                           type="number"
                           value={schemaMinLength}
                           onChange={(e) => setSchemaMinLength(e.target.value)}
                           placeholder="0"
-                          sx={{
-                            '& .MuiInputBase-root': {
-                              fontSize: '0.875rem',
-                              backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                              color: isDark ? '#f1f5f9' : '#0f172a',
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: isDark ? '#334155' : '#e2e8f0',
-                            },
-                          }}
+                          className="h-9 text-sm"
                         />
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                           Max Length
-                        </label>
-                        <TextField
-                          fullWidth
-                          size="small"
+                        </Label>
+                        <Input
                           type="number"
                           value={schemaMaxLength}
                           onChange={(e) => setSchemaMaxLength(e.target.value)}
                           placeholder="∞"
-                          sx={{
-                            '& .MuiInputBase-root': {
-                              fontSize: '0.875rem',
-                              backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                              color: isDark ? '#f1f5f9' : '#0f172a',
-                            },
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: isDark ? '#334155' : '#e2e8f0',
-                            },
-                          }}
+                          className="h-9 text-sm"
                         />
-                      </Box>
-                    </Box>
+                      </div>
+                    </div>
 
-                    <Box sx={{ mb: 2 }}>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <div className="mb-4">
+                      <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                         Pattern (Regex)
-                      </label>
-                      <TextField
-                        fullWidth
-                        size="small"
+                      </Label>
+                      <Input
                         value={schemaPattern}
                         onChange={(e) => setSchemaPattern(e.target.value)}
                         placeholder="e.g., ^[a-z]+$"
-                        sx={{
-                          '& .MuiInputBase-root': {
-                            fontSize: '0.875rem',
-                            fontFamily: 'monospace',
-                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                            color: isDark ? '#f1f5f9' : '#0f172a',
-                          },
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                          },
-                        }}
+                        className="h-9 text-sm font-mono"
                       />
-                    </Box>
+                    </div>
                   </>
                 )}
 
                 {/* Number/Integer-specific options */}
                 {(schemaType === 'integer' || schemaType === 'number') && (
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="flex gap-2 mb-4">
+                    <div className="flex-1">
+                      <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                         Minimum
-                      </label>
-                      <TextField
-                        fullWidth
-                        size="small"
+                      </Label>
+                      <Input
                         type="number"
                         value={schemaMinimum}
                         onChange={(e) => setSchemaMinimum(e.target.value)}
                         placeholder="-∞"
-                        sx={{
-                          '& .MuiInputBase-root': {
-                            fontSize: '0.875rem',
-                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                            color: isDark ? '#f1f5f9' : '#0f172a',
-                          },
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                          },
-                        }}
+                        className="h-9 text-sm"
                       />
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                         Maximum
-                      </label>
-                      <TextField
-                        fullWidth
-                        size="small"
+                      </Label>
+                      <Input
                         type="number"
                         value={schemaMaximum}
                         onChange={(e) => setSchemaMaximum(e.target.value)}
                         placeholder="∞"
-                        sx={{
-                          '& .MuiInputBase-root': {
-                            fontSize: '0.875rem',
-                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                            color: isDark ? '#f1f5f9' : '#0f172a',
-                          },
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                          },
-                        }}
+                        className="h-9 text-sm"
                       />
-                    </Box>
-                  </Box>
+                    </div>
+                  </div>
                 )}
 
                 {/* Array-specific options */}
                 {schemaType === 'array' && (
-                  <Box sx={{ mb: 2 }}>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="mb-4">
+                    <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                       Array Item Type
-                    </label>
-                    <TextField
-                      fullWidth
-                      select
-                      size="small"
-                      value={schemaArrayItemType}
-                      onChange={(e) => setSchemaArrayItemType(e.target.value as any)}
-                      sx={{
-                        '& .MuiInputBase-root': {
-                          fontSize: '0.875rem',
-                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                          color: isDark ? '#f1f5f9' : '#0f172a',
-                        },
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                        },
-                      }}
-                    >
-                      {ARRAY_ITEM_TYPES.map((t) => (
-                        <MenuItem key={t.value} value={t.value}>
-                          {t.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  </Box>
+                    </Label>
+                    <Select value={schemaArrayItemType} onValueChange={(v) => setSchemaArrayItemType(v as typeof schemaArrayItemType)}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ARRAY_ITEM_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
 
                 {/* Enum values (for string, integer, number) */}
                 {(schemaType === 'string' || schemaType === 'integer' || schemaType === 'number') && (
-                  <Box sx={{ mb: 2 }}>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <div className="mb-4">
+                    <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                       Allowed Values (comma-separated)
-                    </label>
-                    <TextField
-                      fullWidth
-                      size="small"
+                    </Label>
+                    <Input
                       value={schemaEnum}
                       onChange={(e) => setSchemaEnum(e.target.value)}
                       placeholder="e.g., active, pending, completed"
-                      sx={{
-                        '& .MuiInputBase-root': {
-                          fontSize: '0.875rem',
-                          backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                          color: isDark ? '#f1f5f9' : '#0f172a',
-                        },
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                        },
-                      }}
+                      className="h-9 text-sm"
                     />
-                  </Box>
+                  </div>
                 )}
 
                 {/* Default value */}
-                <Box>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <div>
+                  <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                     Default Value
-                  </label>
-                  <TextField
-                    fullWidth
-                    size="small"
+                  </Label>
+                  <Input
                     value={schemaDefault}
                     onChange={(e) => setSchemaDefault(e.target.value)}
                     placeholder={
@@ -894,235 +715,182 @@ export default function ParameterPropertiesPanel({
                       schemaType === 'number' ? 'e.g., 0.0' :
                       'e.g., default value'
                     }
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        fontSize: '0.875rem',
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#f1f5f9' : '#0f172a',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                      },
-                    }}
+                    className="h-9 text-sm"
                   />
-                </Box>
-              </Box>
-            </Box>
-          </Box>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Footer with Save and Delete buttons */}
-          <Box
-            sx={{
-              p: 2,
-              borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1,
-            }}
-          >
+          <div className={`p-4 border-t flex flex-col gap-2 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
             <Button
-              fullWidth
-              variant="contained"
+              type="button"
+              variant="default"
               onClick={handleSave}
               disabled={isSaving || !name.trim()}
-              startIcon={<Save />}
-              sx={{
-                background: saveStatus === 'saved'
-                  ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)'
-                  : 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-                '&:hover': {
-                  background: saveStatus === 'saved'
-                    ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-                    : 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
-                },
-                '&:disabled': {
-                  background: isDark ? '#334155' : '#e2e8f0',
-                  color: isDark ? '#64748b' : '#94a3b8',
-                },
-              }}
+              className={`w-full ${saveStatus === 'saved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-violet-600 hover:bg-violet-700'} disabled:opacity-50 disabled:bg-slate-600 dark:disabled:bg-slate-700`}
             >
+              <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Saving...' : saveStatus === 'saved' ? 'Saved ✓' : 'Save Changes'}
             </Button>
             {operationId && (
               <Button
-                fullWidth
-                variant="outlined"
+                type="button"
+                variant="outline"
                 onClick={handleDelete}
-                sx={{
-                  borderColor: '#ef4444',
-                  color: '#ef4444',
-                  '&:hover': {
-                    borderColor: '#dc2626',
-                    backgroundColor: 'rgba(239, 68, 68, 0.04)',
-                  },
-                }}
+                className="w-full border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
               >
                 Unlink Parameter
               </Button>
             )}
-          </Box>
+          </div>
         </>
       )}
 
       {/* Primitive template selection dialog (REST service primitives) */}
-      <Dialog
+      <Dialog.Root
         open={primitiveDialogOpen}
-        onClose={() => {
-          setPrimitiveDialogOpen(false);
-          setSelectedPrimitive(null);
-          setPrimitiveSearch('');
-        }}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 2,
-            background: isDark ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)' : undefined,
-            border: isDark ? '1px solid #334155' : undefined,
-          },
+        onOpenChange={(open) => {
+          if (!open) {
+            setPrimitiveDialogOpen(false);
+            setSelectedPrimitive(null);
+            setPrimitiveSearch('');
+          }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '1rem' }}>
-          <Sparkles size={18} style={{ color: '#8b5cf6' }} />
-          Apply from primitive template
-        </DialogTitle>
-        <DialogContent dividers>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-            Select a primitive from the REST service to apply its format, pattern, and constraints to this parameter.
-          </p>
-          <Box sx={{ mb: 2 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="Search primitives by name, description, or tags..."
-              value={primitiveSearch}
-              onChange={(e) => setPrimitiveSearch(e.target.value)}
-              InputProps={{
-                startAdornment: <Search size={14} style={{ marginRight: 8, color: isDark ? '#94a3b8' : '#64748b' }} />,
-              }}
-              sx={{
-                '& .MuiInputBase-root': {
-                  fontSize: '0.875rem',
-                  backgroundColor: isDark ? '#0f172a' : '#f8fafc',
-                  borderRadius: 1,
-                },
-              }}
-            />
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={showSystemPrimitives}
-                  onChange={(e) => setShowSystemPrimitives(e.target.checked)}
-                  sx={{ color: isDark ? '#64748b' : '#94a3b8', '&.Mui-checked': { color: '#10b981' } }}
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
+          <Dialog.Content
+            className={`fixed left-1/2 top-1/2 z-[9999] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg shadow-xl ${
+              isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'
+            }`}
+          >
+            <Dialog.Title className="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white p-4 pb-0">
+              <Sparkles size={18} className="text-violet-500" />
+              Apply from primitive template
+            </Dialog.Title>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                Select a primitive from the REST service to apply its format, pattern, and constraints to this parameter.
+              </p>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+                <Input
+                  placeholder="Search primitives by name, description, or tags..."
+                  value={primitiveSearch}
+                  onChange={(e) => setPrimitiveSearch(e.target.value)}
+                  className="pl-9 h-9 text-sm"
                 />
-              }
-              label={<span className="text-xs flex items-center gap-1"><Shield size={12} /> System</span>}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={showTenantPrimitives}
-                  onChange={(e) => setShowTenantPrimitives(e.target.checked)}
-                  sx={{ color: isDark ? '#64748b' : '#94a3b8', '&.Mui-checked': { color: '#8b5cf6' } }}
-                />
-              }
-              label={<span className="text-xs flex items-center gap-1"><User size={12} /> Tenant</span>}
-            />
-            <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-auto">
-              {filteredPrimitives.length} primitive{filteredPrimitives.length !== 1 ? 's' : ''}
-            </span>
-          </Box>
-          <Box sx={{ maxHeight: 320, overflowY: 'auto', border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', borderRadius: 1 }}>
-            {primitiveLoading ? (
-              <Box sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <Loader2 size={24} className="animate-spin text-indigo-500" />
-              </Box>
-            ) : primitiveError ? (
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <p className="text-sm text-red-500 dark:text-red-400 mb-2">{primitiveError}</p>
-                <Button size="small" variant="outlined" onClick={() => primitiveDialogOpen && setPrimitiveDialogOpen(false)}>
-                  Close
-                </Button>
-              </Box>
-            ) : filteredPrimitives.length === 0 ? (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Database size={32} style={{ color: isDark ? '#475569' : '#cbd5e1', marginBottom: 8 }} />
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {primitiveSearch ? 'No primitives match your search' : `No ${schemaType} primitives available`}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  {primitiveSearch ? 'Try a different search term' : 'Create primitives in the Primitives Management section'}
-                </p>
-              </Box>
-            ) : (
-              filteredPrimitives.map((primitive) => (
-                <button
-                  key={primitive.id}
-                  type="button"
-                  onClick={() => setSelectedPrimitive(primitive)}
-                  className={`w-full text-left px-3 py-2.5 transition-colors border-b last:border-b-0 ${
-                    selectedPrimitive?.id === primitive.id
-                      ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-gray-100 dark:border-gray-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    {primitive.is_system ? <Shield size={12} style={{ color: '#10b981' }} /> : <User size={12} style={{ color: '#8b5cf6' }} />}
-                    <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{primitive.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
-                      {primitive.category}
-                    </span>
-                    {primitive.usage_count > 0 && (
-                      <span className="text-[10px] text-gray-500 ml-auto">Used {primitive.usage_count}×</span>
-                    )}
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox
+                    checked={showSystemPrimitives}
+                    onCheckedChange={(c) => setShowSystemPrimitives(c === true)}
+                  />
+                  <span className="text-xs flex items-center gap-1"><Shield size={12} /> System</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <Checkbox
+                    checked={showTenantPrimitives}
+                    onCheckedChange={(c) => setShowTenantPrimitives(c === true)}
+                  />
+                  <span className="text-xs flex items-center gap-1"><User size={12} /> Tenant</span>
+                </label>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-auto">
+                  {filteredPrimitives.length} primitive{filteredPrimitives.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className={`max-h-80 overflow-y-auto rounded border ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                {primitiveLoading ? (
+                  <div className="py-8 flex justify-center items-center">
+                    <Loader2 size={24} className="animate-spin text-indigo-500" />
                   </div>
-                  {primitive.description && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{primitive.description}</p>
-                  )}
-                  <p className="text-[10px] text-gray-500 dark:text-gray-500 font-mono truncate mt-0.5">
-                    {[
-                      primitive.schema.format && `format: ${primitive.schema.format}`,
-                      primitive.schema.pattern && 'pattern',
-                      primitive.schema.minimum !== undefined && `min: ${primitive.schema.minimum}`,
-                      primitive.schema.maximum !== undefined && `max: ${primitive.schema.maximum}`,
-                      primitive.schema.enum && Array.isArray(primitive.schema.enum) && `enum(${primitive.schema.enum.length})`,
-                    ].filter(Boolean).join(', ') || 'No constraints'}
-                  </p>
-                </button>
-              ))
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 2, py: 1.5, borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
-          <Button
-            size="small"
-            onClick={() => {
-              setPrimitiveDialogOpen(false);
-              setSelectedPrimitive(null);
-              setPrimitiveSearch('');
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={!selectedPrimitive}
-            onClick={() => selectedPrimitive && applyPrimitiveToParameter(selectedPrimitive)}
-            sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-              '&:hover': { background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)' },
-            }}
-          >
-            Apply primitive
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+                ) : primitiveError ? (
+                  <div className="p-4 text-center">
+                    <p className="text-sm text-red-500 dark:text-red-400 mb-2">{primitiveError}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setPrimitiveDialogOpen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                ) : filteredPrimitives.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <Database size={32} className={`mx-auto mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {primitiveSearch ? 'No primitives match your search' : `No ${schemaType} primitives available`}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {primitiveSearch ? 'Try a different search term' : 'Create primitives in the Primitives Management section'}
+                    </p>
+                  </div>
+                ) : (
+                  filteredPrimitives.map((primitive) => (
+                    <button
+                      key={primitive.id}
+                      type="button"
+                      onClick={() => setSelectedPrimitive(primitive)}
+                      className={`w-full text-left px-3 py-2.5 transition-colors border-b last:border-b-0 ${
+                        selectedPrimitive?.id === primitive.id
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
+                          : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-gray-100 dark:border-gray-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        {primitive.is_system ? <Shield size={12} className="text-emerald-500" /> : <User size={12} className="text-violet-500" />}
+                        <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{primitive.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                          {primitive.category}
+                        </span>
+                        {primitive.usage_count > 0 && (
+                          <span className="text-[10px] text-gray-500 ml-auto">Used {primitive.usage_count}×</span>
+                        )}
+                      </div>
+                      {primitive.description && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{primitive.description}</p>
+                      )}
+                      <p className="text-[10px] text-gray-500 dark:text-gray-500 font-mono truncate mt-0.5">
+                        {[
+                          primitive.schema.format && `format: ${primitive.schema.format}`,
+                          primitive.schema.pattern && 'pattern',
+                          primitive.schema.minimum !== undefined && `min: ${primitive.schema.minimum}`,
+                          primitive.schema.maximum !== undefined && `max: ${primitive.schema.maximum}`,
+                          primitive.schema.enum && Array.isArray(primitive.schema.enum) && `enum(${primitive.schema.enum.length})`,
+                        ].filter(Boolean).join(', ') || 'No constraints'}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className={`flex justify-end gap-2 px-4 py-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPrimitiveDialogOpen(false);
+                  setSelectedPrimitive(null);
+                  setPrimitiveSearch('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                disabled={!selectedPrimitive}
+                onClick={() => selectedPrimitive && applyPrimitiveToParameter(selectedPrimitive)}
+                className="bg-violet-600 hover:bg-violet-700"
+              >
+                Apply primitive
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
   );
 }
 
