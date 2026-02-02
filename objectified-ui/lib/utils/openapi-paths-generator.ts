@@ -35,6 +35,8 @@ export interface PathOperationDescription {
   };
   /** Operation-level security requirements (OpenAPI security array) */
   security?: SecurityRequirement[];
+  /** Optional documentation for how security applies (emitted as x-security-description). */
+  securityDescription?: string;
 }
 
 export interface PathParameter {
@@ -113,6 +115,10 @@ export function buildParameterForOpenAPI(param: PathParameter): Record<string, u
     in: param.in_location,
   };
 
+  // Add summary if present (OpenAPI 3.x parameter field)
+  if (param.summary) {
+    result.summary = param.summary;
+  }
   // Add description if present
   if (param.description) {
     result.description = param.description;
@@ -307,6 +313,14 @@ export function buildOperationForOpenAPI(
     // Add security requirements (OpenAPI Operation.security)
     if (operation.description.security && operation.description.security.length > 0) {
       result.security = operation.description.security;
+    }
+    // x-security-description: optional documentation for how security applies to this operation
+    if (operation.description.securityDescription && operation.description.securityDescription.trim()) {
+      result['x-security-description'] = operation.description.securityDescription.trim();
+    }
+    // x-private: hide from public docs (Swagger/OpenAPI doc generators may omit)
+    if (operation.description['x-private'] === true) {
+      result['x-private'] = true;
     }
   }
 

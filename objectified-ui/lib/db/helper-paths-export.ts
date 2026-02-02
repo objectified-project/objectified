@@ -71,7 +71,11 @@ export async function loadPathsForOpenAPIExport(versionId: string): Promise<stri
             metadata->'tags' as tags,
             (metadata->>'deprecated')::boolean as deprecated,
             metadata->'external_docs' as external_docs,
-            metadata->'security' as security
+            metadata->'security' as security,
+            metadata->>'security_description' as security_description,
+            metadata->>'x-security-description' as x_security_description,
+            (metadata->>'x-private')::boolean as x_private_meta,
+            (metadata->>'x_private')::boolean as x_private_alt
           FROM odb.path_operation_description 
           WHERE path_operation_id = $1 
           LIMIT 1
@@ -88,13 +92,21 @@ export async function loadPathsForOpenAPIExport(versionId: string): Promise<stri
             const parsed = typeof securityRaw === 'string' ? JSON.parse(securityRaw) : securityRaw;
             security = Array.isArray(parsed) ? parsed : [parsed];
           }
+          const securityDescription =
+            (d.security_description as string) || (d.x_security_description as string) || undefined;
+          const xPrivate =
+            (d.x_private_meta === true || d.x_private_alt === true) ? true : undefined;
           opDescription = {
-            id: d.id, summary: d.summary, description: d.description,
+            id: d.id,
+            summary: d.summary,
+            description: d.description,
             operationId: d.operation_id,
             tags: d.tags ? (typeof d.tags === 'string' ? JSON.parse(d.tags) : d.tags) : undefined,
             deprecated: d.deprecated,
             externalDocs: d.external_docs ? (typeof d.external_docs === 'string' ? JSON.parse(d.external_docs) : d.external_docs) : undefined,
             security,
+            securityDescription,
+            'x-private': xPrivate,
           };
         }
 

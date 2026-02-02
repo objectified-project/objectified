@@ -258,6 +258,12 @@ export async function generateOpenApiSpec(
     openapiVersion?: string;
     /** OpenAPI servers array (url, description) */
     servers?: Array<{ url: string; description?: string }>;
+    /** OpenAPI top-level tags (name, description) */
+    tags?: Array<{ name: string; description?: string }>;
+    /** OpenAPI global security requirements */
+    security?: Array<Record<string, string[]>>;
+    /** OpenAPI external documentation */
+    externalDocs?: { url: string; description?: string };
     metadata?: {
       summary?: string;
       termsOfService?: string;
@@ -325,6 +331,9 @@ export async function generateOpenApiSpec(
     paths: paths || {},  // Include paths in template data, default to empty object
     ...(securitySchemes && Object.keys(securitySchemes).length > 0 ? { securitySchemes } : {}),
     ...(options?.servers && options.servers.length > 0 ? { servers: options.servers } : {}),
+    ...(options?.tags && options.tags.length > 0 ? { tags: options.tags } : {}),
+    ...(options?.security && options.security.length > 0 ? { security: options.security } : {}),
+    ...(options?.externalDocs ? { externalDocs: options.externalDocs } : {}),
   };
 
   console.log('[OpenAPI Generator] Template data paths count:', Object.keys(paths || {}).length);
