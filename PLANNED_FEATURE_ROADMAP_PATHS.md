@@ -260,15 +260,6 @@ Define security schemes once, apply to multiple operations:
 | #418   | Add visual badge to show active schemes on operations |
 | #419   | Scope selector for OAuth2/OIDC                        |
 
-#### 4.3 Server Definitions ✅ IMPLEMENTED
-
-**Server Configuration** ✅ IMPLEMENTED
-- ✅ Multiple server definitions
-- ✅ Server variables with enum values (OpenAPI Server.variables: default, enum, description)
-- ✅ Environment-specific servers (dev, staging, prod) — optional environment label per server
-- ✅ Server descriptions (per-server description in UI and OpenAPI)
-- ✅ Relative server paths (URL field accepts absolute or relative paths, e.g. /api/v1)
-
 ---
 
 ## 9. Visual Design Specification
@@ -759,6 +750,15 @@ Each operation can override global defaults:
 - ✅ Configure required scopes per operation
 - ✅ Mark operation as unsecured (public endpoint)
 - ✅ Add security descriptions for documentation
+
+#### 4.3 Server Definitions ✅ IMPLEMENTED
+
+**Server Configuration** ✅ IMPLEMENTED
+- ✅ Multiple server definitions
+- ✅ Server variables with enum values (OpenAPI Server.variables: default, enum, description)
+- ✅ Environment-specific servers (dev, staging, prod) — optional environment label per server
+- ✅ Server descriptions (per-server description in UI and OpenAPI)
+- ✅ Relative server paths (URL field accepts absolute or relative paths, e.g. /api/v1)
 
 *This roadmap positions Objectified UI as a comprehensive visual API design platform,
 bridging the gap between schema definition and full OpenAPI specification authoring while
