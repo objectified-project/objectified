@@ -38,6 +38,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds ability to create a server, name, and description
   - Parameters for headers and properties can include:
     - Required
+    - Default Value
   - Configure required OAuth2/OpenID Connect scopes per operation (#421)
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:

@@ -197,6 +197,7 @@ export default function ParameterPropertiesPanel({
             setSchemaDefault('');
             setSchemaEnum('');
             setSchemaArrayItemType('string');
+            setSchemaDefault('');
             setRequired(param.in_location === 'path');
           }
         }
@@ -720,7 +721,7 @@ export default function ParameterPropertiesPanel({
                   </div>
                 )}
 
-                {/* Default value */}
+                {/* Default value — optional; used when the client omits this parameter */}
                 <div>
                   <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                     Default Value
@@ -735,7 +736,11 @@ export default function ParameterPropertiesPanel({
                       'e.g., default value'
                     }
                     className="h-9 text-sm"
+                    title="Optional. Used when the client omits this parameter (query, header, cookie)."
                   />
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                    Optional. Used when the client omits this parameter.
+                  </p>
                 </div>
               </div>
             </div>
