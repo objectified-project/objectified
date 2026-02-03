@@ -853,7 +853,15 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   // Handle property drop on path variable: bind property type/schema to the parameter
   const handlePropertyDropOnPathVariable = useCallback(
     async (variableName: string, dropData: any) => {
-      if (!selectedPathId || dropData?.type !== 'property') return;
+      if (!selectedPathId) return;
+      if (dropData?.type !== 'property') {
+        await alertDialog({
+          title: 'Invalid drop',
+          message: 'Only properties are allowed to be bound to a path parameter.',
+          variant: 'warning',
+        });
+        return;
+      }
       const propertyData = dropData.data || { type: 'string' };
       const schema = propertyDataToParameterSchema(propertyData);
       try {
