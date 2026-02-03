@@ -125,6 +125,13 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
               <span>in: {data.inLocation}</span>
             </div>
           )}
+
+          {/* Fifth line: description (if present) */}
+          {data.description && data.description.trim() !== '' && (
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2" title={data.description}>
+              {data.description}
+            </div>
+          )}
         </div>
       </div>
 
