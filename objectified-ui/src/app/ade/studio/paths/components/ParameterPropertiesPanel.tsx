@@ -170,9 +170,9 @@ export default function ParameterPropertiesPanel({
           setSummary(param.summary || '');
           setDescription(param.description || '');
 
-          // Load schema from param.data column
-          const schema = param.data;
-          if (schema) {
+          // Load schema from param.data column (JSONB may be object or string)
+          const schema = typeof param.data === 'string' ? JSON.parse(param.data) : param.data;
+          if (schema && typeof schema === 'object') {
             setSchemaType(schema.type || 'string');
             setSchemaFormat(schema.format || '');
             setSchemaMinimum(schema.minimum !== undefined ? String(schema.minimum) : '');
@@ -197,6 +197,7 @@ export default function ParameterPropertiesPanel({
             setSchemaDefault('');
             setSchemaEnum('');
             setSchemaArrayItemType('string');
+            setRequired(param.in_location === 'path');
           }
         }
       } catch (error) {
@@ -320,8 +321,8 @@ export default function ParameterPropertiesPanel({
         }
       }
 
-      // Add required to schema data
-      schemaData.required = required;
+      // Add required to schema data (path params are always required in OpenAPI)
+      schemaData.required = inLocation === 'path' ? true : required;
 
       const result = await updateSharedPathParameter(parameterId, {
         name: name.trim(),
@@ -473,7 +474,14 @@ export default function ParameterPropertiesPanel({
                 <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
                   Location
                 </Label>
-                <Select value={inLocation} onValueChange={(v) => setInLocation(v as typeof inLocation)}>
+                <Select
+                  value={inLocation}
+                  onValueChange={(v) => {
+                    const loc = v as typeof inLocation;
+                    setInLocation(loc);
+                    if (loc === 'path') setRequired(true);
+                  }}
+                >
                   <SelectTrigger className="h-9 text-sm">
                     <SelectValue />
                   </SelectTrigger>
@@ -486,16 +494,27 @@ export default function ParameterPropertiesPanel({
                 </Select>
               </div>
 
-              {/* Required */}
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="param-required"
-                  checked={required}
-                  onCheckedChange={(checked) => setRequired(checked === true)}
-                />
-                <Label htmlFor="param-required" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                  Required parameter
-                </Label>
+              {/* Required — path params are always required in OpenAPI; query/header/cookie can be optional */}
+              <div className="flex flex-col gap-1.5">
+                {inLocation === 'path' ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Checkbox id="param-required" checked={true} disabled />
+                    <Label htmlFor="param-required" className="cursor-default">
+                      Required (path parameters are always required in OpenAPI)
+                    </Label>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="param-required"
+                      checked={required}
+                      onCheckedChange={(checked) => setRequired(checked === true)}
+                    />
+                    <Label htmlFor="param-required" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      Required parameter
+                    </Label>
+                  </div>
+                )}
               </div>
 
               {/* Summary */}

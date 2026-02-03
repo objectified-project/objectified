@@ -1933,7 +1933,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           // Create nodes for all parameters - positioned BELOW operations
           allParamsData.parameters.forEach((param: any, paramIndex: number) => {
             const paramNodeId = `param-${param.id}`;
-            const paramData = param.data || {};
+            const paramData = typeof param.data === 'string' ? (JSON.parse(param.data) || {}) : (param.data || {});
 
             allParameterNodes.push({
               id: paramNodeId,
