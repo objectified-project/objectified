@@ -137,7 +137,8 @@ export default function PathsPage() {
                     </p>
                     <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1">
                       <p>💡 <strong>Tip:</strong> Drag operations from the sidebar to the canvas</p>
-                      <p>💡 <strong>Tip:</strong> Drag classes/properties onto operations to define schemas</p>
+                      <p>💡 <strong>Tip:</strong> Drag schemas from the Classes tab onto the canvas to add schema reference nodes</p>
+                      <p>💡 <strong>Tip:</strong> Drag classes/properties onto operations to define request/response schemas</p>
                     </div>
                   </div>
                 </div>

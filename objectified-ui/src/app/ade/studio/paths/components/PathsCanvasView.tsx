@@ -3076,15 +3076,23 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             variant: 'error',
           });
         }
-      } else if (dropData.type === 'class') {
-        console.log('PathsCanvasView: Class dropped on canvas', {
-          dropData,
+      } else if (dropData.type === 'class' || dropData.type === 'schema') {
+        // Normalize schema drag to class format (classId, className) for use on canvas
+        const classDropData = {
+          type: 'class' as const,
+          classId: dropData.classId ?? dropData.schemaId,
+          className: dropData.className ?? dropData.schemaName ?? 'Schema',
+        };
+        if (!classDropData.classId) {
+          console.warn('PathsCanvasView: Class/schema drop missing classId/schemaId', dropData);
+          return;
+        }
+        console.log('PathsCanvasView: Class/schema dropped on canvas', {
+          dropData: classDropData,
           clientX: event.clientX,
           clientY: event.clientY,
-          target: event.target,
-          currentTarget: event.currentTarget,
         });
-        
+
         // Check if we're dropping on a response node
         // React Flow nodes have data-id attribute on the wrapper
         // Use elementFromPoint to find the element under the cursor
@@ -3180,7 +3188,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           const responseData = responseNode?.data as { onClassDrop?: (responseId: string, classData: unknown) => void; dbResponseId?: string } | undefined;
           if (responseNode && responseData?.onClassDrop && responseData?.dbResponseId) {
             try {
-              await responseData.onClassDrop(responseData.dbResponseId, dropData);
+              await responseData.onClassDrop(responseData.dbResponseId, classDropData);
             } catch (error) {
               console.error('Error in onClassDrop:', error);
             }
@@ -3202,29 +3210,29 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
 
         // Check if class node already exists
         const existingClassNode = nodes.find(
-          (n) => n.type === 'class' && (n.data as any).dbClassId === dropData.classId
+          (n) => n.type === 'class' && (n.data as any).dbClassId === classDropData.classId
         );
 
         if (existingClassNode) {
           await alertDialog({
-            title: 'Class Already on Canvas',
-            message: `The class "${dropData.className}" is already on the canvas. You can connect it to responses by dragging it onto them.`,
+            title: 'Schema Already on Canvas',
+            message: `"${classDropData.className}" is already on the canvas. You can connect it to responses by dragging it onto them.`,
             variant: 'info',
           });
           return;
         }
 
-        // Create new class node
-        const classNodeId = `class-${dropData.classId}`;
+        // Create new schema reference (class) node
+        const classNodeId = `class-${classDropData.classId}`;
         const newNode: Node = {
           id: classNodeId,
           type: 'class',
           position,
           data: {
-            className: dropData.className,
-            classId: dropData.classId,
-            dbClassId: dropData.classId,
-            onDelete: () => handleDeleteClassFromCanvas(dropData.classId),
+            className: classDropData.className,
+            classId: classDropData.classId,
+            dbClassId: classDropData.classId,
+            onDelete: () => handleDeleteClassFromCanvas(classDropData.classId),
           },
         };
 
