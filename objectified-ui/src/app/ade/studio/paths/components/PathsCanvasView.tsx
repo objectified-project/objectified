@@ -2877,6 +2877,20 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
       console.log('[onDrop] Parsed dropData:', dropData);
       console.log('[onDrop] dropData.type:', dropData.type);
 
+      // Dropping on a parameter node (header or canvas): only properties are allowed
+      const elementAtDrop = document.elementFromPoint(event.clientX, event.clientY);
+      const dropNodeWrapper = elementAtDrop?.closest('[data-id]');
+      const dropTargetNodeId = dropNodeWrapper?.getAttribute('data-id');
+      const dropTargetNode = dropTargetNodeId ? nodes.find((n) => n.id === dropTargetNodeId) : null;
+      if (dropTargetNode?.type === 'parameter' && dropData?.type !== 'property') {
+        await alertDialog({
+          title: 'Invalid drop',
+          message: 'Only properties are allowed to be bound to a path parameter.',
+          variant: 'warning',
+        });
+        return;
+      }
+
       // Handle property drops - check if dropping on a response body node
       if (dropData.type === 'property') {
         console.log('[onDrop] Property dropped at canvas level, checking for target node');
@@ -2951,6 +2965,44 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             // Drop was on a child element - it should have been handled by the child handler
             // If we reach here, the child handler didn't process it, so return silently
             console.log('[onDrop] Drop was on child element, should have been handled by child handler');
+            return;
+          }
+        }
+
+        // Property dropped on a parameter node on the canvas - update parameter schema
+        if (targetNodeId && targetNodeId.startsWith('param-')) {
+          const paramNode = nodes.find((n) => n.id === targetNodeId && n.type === 'parameter');
+          const paramData = paramNode?.data as { dbParameterId?: string; name?: string } | undefined;
+          if (paramNode && paramData?.dbParameterId) {
+            const propertyData = dropData.data || { type: 'string' };
+            const schema = propertyDataToParameterSchema(propertyData);
+            try {
+              const updateResult = await updateSharedPathParameter(paramData.dbParameterId, { data: schema });
+              const updateParsed = JSON.parse(updateResult);
+              if (!updateParsed.success) {
+                await alertDialog({
+                  title: 'Error',
+                  message: updateParsed.error || 'Failed to update parameter schema',
+                  variant: 'error',
+                });
+                return;
+              }
+              if (onRefresh) onRefresh();
+              if (onParameterSelect) {
+                onParameterSelect({
+                  id: paramData.dbParameterId,
+                  name: paramData.name ?? '',
+                  operationId: '',
+                });
+              }
+            } catch (error) {
+              console.error('Error updating parameter schema:', error);
+              await alertDialog({
+                title: 'Error',
+                message: 'Failed to bind property to parameter',
+                variant: 'error',
+              });
+            }
             return;
           }
         }
@@ -3152,7 +3204,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         // Class dropped on empty canvas: no longer creates a node (undo #372)
       }
     },
-    [screenToFlowPosition, getNodes, nodes]
+    [screenToFlowPosition, getNodes, nodes, alertDialog, propertyDataToParameterSchema, updateSharedPathParameter, onRefresh, onParameterSelect]
   );
 
   return (
