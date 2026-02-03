@@ -61,16 +61,15 @@ structure immediately recognizable.
 **Purpose**: Create visual connections between schema definitions (from Schema tab) and API operations
 
 **Features**:
-- 📋 Drag schema from library panel onto canvas
+- ✅ Drag schema from library panel onto canvas
 - 📋 Connect to method nodes for request/response binding
 - 📋 Hover to see schema preview (collapsed property tree)
 - 📋 Click to navigate to schema definition in Schema tab
-- Visual badge showing schema version compatibility
+- 📋 Visual badge showing schema version compatibility
 - 📋 Inline schema override for operation-specific modifications
 
 | Ticket | Feature                                                                          |
 |--------|----------------------------------------------------------------------------------|
-| #372   | Add ability to drag schema from library panel onto canvas                        |
 | #373   | Add ability to connect schema nodes to method nodes for request/response binding |
 | #374   | Hover over a schema node to see a schema preview (collapsed property tree)       |
 | #375   | Click to edit schema (change views)                                              |

@@ -555,8 +555,8 @@ export default function PathsSidebar({
                       return (
                         <>
                           <div className="px-1 mb-1 flex justify-between items-center shrink-0">
-                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Drag a schema onto the canvas to add a schema reference node">
-                              Schema library — Drag to canvas
+                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Classes
                             </span>
                             {classSearch.trim() && (
                               <span className="text-[10px] text-gray-400 dark:text-gray-500">
@@ -568,9 +568,7 @@ export default function PathsSidebar({
                             const handleClassDragStart = (e: React.DragEvent) => {
                               e.dataTransfer.effectAllowed = 'copy';
                               e.dataTransfer.setData('application/json', JSON.stringify({
-                                type: 'schema',
-                                schemaId: cls.id,
-                                schemaName: cls.name,
+                                type: 'class',
                                 classId: cls.id,
                                 className: cls.name,
                               }));

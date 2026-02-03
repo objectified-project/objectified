@@ -3076,47 +3076,24 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             variant: 'error',
           });
         }
-      } else if (dropData.type === 'class' || dropData.type === 'schema') {
-        // Normalize schema drag to class format (classId, className) for use on canvas
+      } else if (dropData.type === 'class') {
         const classDropData = {
           type: 'class' as const,
-          classId: dropData.classId ?? dropData.schemaId,
-          className: dropData.className ?? dropData.schemaName ?? 'Schema',
+          classId: dropData.classId,
+          className: dropData.className ?? 'Class',
         };
         if (!classDropData.classId) {
-          console.warn('PathsCanvasView: Class/schema drop missing classId/schemaId', dropData);
           return;
         }
-        console.log('PathsCanvasView: Class/schema dropped on canvas', {
-          dropData: classDropData,
-          clientX: event.clientX,
-          clientY: event.clientY,
-        });
 
         // Check if we're dropping on a response node
-        // React Flow nodes have data-id attribute on the wrapper
-        // Use elementFromPoint to find the element under the cursor
         const elementAtPoint = document.elementFromPoint(event.clientX, event.clientY);
-        console.log('PathsCanvasView: Element at drop point', {
-          element: elementAtPoint,
-          tagName: elementAtPoint?.tagName,
-          className: elementAtPoint?.className,
-          id: elementAtPoint?.id,
-          dataset: elementAtPoint ? Object.keys((elementAtPoint as HTMLElement).dataset || {}) : [],
-        });
-        
-        // Try multiple ways to find the response node
         let responseNodeId: string | null = null;
-        
         if (elementAtPoint) {
-          // Method 1: Check for data-id attribute (React Flow's node wrapper)
           const nodeWrapper = elementAtPoint.closest('[data-id]');
           if (nodeWrapper) {
             responseNodeId = nodeWrapper.getAttribute('data-id');
-            console.log('PathsCanvasView: Found node via data-id', responseNodeId);
           }
-          
-          // Method 2: Check parent elements for data-id
           if (!responseNodeId) {
             let parent = elementAtPoint.parentElement;
             let depth = 0;
@@ -3124,66 +3101,36 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               const nodeId = parent.getAttribute('data-id');
               if (nodeId && nodeId.startsWith('response-')) {
                 responseNodeId = nodeId;
-                console.log('PathsCanvasView: Found node via parent traversal', responseNodeId);
                 break;
               }
               parent = parent.parentElement;
               depth++;
             }
           }
-          
-          // Method 3: Use React Flow's getNodes to find node at position
           if (!responseNodeId) {
             try {
-              const position = screenToFlowPosition({
-                x: event.clientX,
-                y: event.clientY,
-              });
-              
-              // Get all nodes from React Flow
+              const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
               const allNodes = getNodes();
-              console.log('PathsCanvasView: All nodes from React Flow', allNodes.map(n => ({ id: n.id, type: n.type, position: n.position })));
-              
-              // Find response nodes and check if position is within bounds
-              // React Flow nodes are approximately 280x150
               for (const node of allNodes) {
                 if (node.type === 'response') {
                   const nodeX = node.position.x || 0;
                   const nodeY = node.position.y || 0;
-                  const nodeWidth = 280; // Approximate width
-                  const nodeHeight = 150; // Approximate height
-                  
-                  const isWithinBounds = (
-                    position.x >= nodeX - 10 && // Add some padding
-                    position.x <= nodeX + nodeWidth + 10 &&
-                    position.y >= nodeY - 10 &&
-                    position.y <= nodeY + nodeHeight + 10
-                  );
-                  
-                  console.log('PathsCanvasView: Checking node', {
-                    nodeId: node.id,
-                    nodePosition: { x: nodeX, y: nodeY },
-                    dropPosition: position,
-                    isWithinBounds,
-                  });
-                  
-                  if (isWithinBounds) {
+                  const nodeWidth = 280;
+                  const nodeHeight = 150;
+                  if (
+                    position.x >= nodeX - 10 && position.x <= nodeX + nodeWidth + 10 &&
+                    position.y >= nodeY - 10 && position.y <= nodeY + nodeHeight + 10
+                  ) {
                     responseNodeId = node.id;
-                    console.log('PathsCanvasView: Found node via position calculation', responseNodeId);
                     break;
                   }
                 }
               }
-            } catch (error) {
-              console.error('PathsCanvasView: Error in position calculation', error);
-            }
+            } catch (_) {}
           }
         }
         
         if (responseNodeId && responseNodeId.startsWith('response-')) {
-          console.log('PathsCanvasView: Dropped on response node', { responseNodeId });
-          
-          // Find the response node and call its onClassDrop handler
           const responseNode = nodes.find(n => n.id === responseNodeId && n.type === 'response');
           const responseData = responseNode?.data as { onClassDrop?: (responseId: string, classData: unknown) => void; dbResponseId?: string } | undefined;
           if (responseNode && responseData?.onClassDrop && responseData?.dbResponseId) {
@@ -3192,54 +3139,12 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             } catch (error) {
               console.error('Error in onClassDrop:', error);
             }
-            return; // Don't create a new class node
-          } else {
-            console.warn('PathsCanvasView: Response node found but missing handler or dbResponseId', {
-              responseNode: !!responseNode,
-              hasOnClassDrop: !!responseData?.onClassDrop,
-              hasDbResponseId: !!responseData?.dbResponseId,
-            });
           }
         }
-        
-        // Class dropped on empty canvas - create a class node
-        const position = screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
-        });
-
-        // Check if class node already exists
-        const existingClassNode = nodes.find(
-          (n) => n.type === 'class' && (n.data as any).dbClassId === classDropData.classId
-        );
-
-        if (existingClassNode) {
-          await alertDialog({
-            title: 'Schema Already on Canvas',
-            message: `"${classDropData.className}" is already on the canvas. You can connect it to responses by dragging it onto them.`,
-            variant: 'info',
-          });
-          return;
-        }
-
-        // Create new schema reference (class) node
-        const classNodeId = `class-${classDropData.classId}`;
-        const newNode: Node = {
-          id: classNodeId,
-          type: 'class',
-          position,
-          data: {
-            className: classDropData.className,
-            classId: classDropData.classId,
-            dbClassId: classDropData.classId,
-            onDelete: () => handleDeleteClassFromCanvas(classDropData.classId),
-          },
-        };
-
-        setNodes((nds) => [...nds, newNode]);
+        // Class dropped on empty canvas: no longer creates a node (undo #372)
       }
     },
-    [screenToFlowPosition, setNodes, selectedPathId, alertDialog, nodes, handleClassDropOnResponse, onRefresh]
+    [screenToFlowPosition, getNodes, nodes]
   );
 
   return (
