@@ -53,15 +53,15 @@ export default function ClassDropChoiceDialog({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-gray-900 dark:text-white">
-                  Copy Properties
+                  Copy properties into response schema
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  Creates an independent copy of the class properties. Changes to the original class won&apos;t affect this response.
+                  Copies the class properties into this response. The schema is static and you can edit it here at any time. Changes to the original class won&apos;t affect this response.
                 </p>
               </div>
             </button>
 
-            {/* Create Reference Option */}
+            {/* Use as $ref Option */}
             <button
               onClick={() => handleChoice('reference')}
               className="w-full flex items-start gap-4 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group"
@@ -71,10 +71,10 @@ export default function ClassDropChoiceDialog({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-gray-900 dark:text-white">
-                  Create Reference
+                  Use as $ref (reference)
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  Links to the class definition using $ref. Changes to the class will be reflected in this response.
+                  References the class with $ref. The node will show &quot;$ref&quot; and display the class properties as read-only. If the class definition changes, this response updates automatically; you cannot edit the schema here.
                 </p>
               </div>
             </button>

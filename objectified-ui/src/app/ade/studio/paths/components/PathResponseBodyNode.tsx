@@ -14,6 +14,14 @@ import {
 // TYPES
 // =============================================================================
 
+/** Single class property for read-only $ref display */
+export interface ClassPropertyDisplay {
+  id: string;
+  name: string;
+  data?: { type?: string; $ref?: string; format?: string; [key: string]: unknown };
+  description?: string | null;
+}
+
 export interface ContentTypeInfo {
   id: string;
   media_type: string;
@@ -21,6 +29,8 @@ export interface ContentTypeInfo {
   class_name?: string | null;
   inline_schema?: InlineSchema | null;
   examples?: any[] | null;
+  /** When class_id is set, properties from the class for read-only $ref display */
+  classProperties?: ClassPropertyDisplay[] | null;
 }
 
 export interface PathResponseBodyData {
@@ -61,13 +71,14 @@ function ContentTypeBadge({ content }: { content: ContentTypeInfo }) {
 
   const isReference = !!content.class_id;
   const propertyCount = content.inline_schema?.properties?.length || 0;
+  const refLabel = isReference ? `$ref: ${content.class_name || 'Unknown'}` : null;
 
   return (
     <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium ${colors.bg} ${colors.text}`}>
       {isReference ? (
         <>
           <Link2 className="w-3 h-3" />
-          <span className="truncate max-w-[100px]">{content.class_name || 'Unknown'}</span>
+          <span className="truncate max-w-[120px]" title={content.class_name || undefined}>{refLabel}</span>
         </>
       ) : (
         <>
@@ -285,7 +296,9 @@ function ContentTypePanel({
 }: ContentTypePanelProps) {
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState(false);
+  const [refDragOver, setRefDragOver] = useState(false);
   const dragCounterRef = React.useRef(0);
+  const refDragCounterRef = React.useRef(0);
 
   const propertyTree: PropertyTreeNode[] = content.inline_schema
     ? buildPropertyTreeFromInlineSchema(content.inline_schema)
@@ -339,33 +352,17 @@ function ContentTypePanel({
     dragCounterRef.current = 0;
     setIsDragOver(false);
 
-    console.log('[ContentTypePanel.handleDrop] Called');
-    console.log('[ContentTypePanel.handleDrop] content.id:', content.id);
-    console.log('[ContentTypePanel.handleDrop] content.class_id:', content.class_id);
-    console.log('[ContentTypePanel.handleDrop] onPropertyDrop defined:', !!onPropertyDrop);
-    console.log('[ContentTypePanel.handleDrop] onClassDrop defined:', !!onClassDrop);
-
-    if (content.class_id) {
-      console.log('[ContentTypePanel.handleDrop] Early return - has class reference');
-      return;
-    }
+    if (content.class_id) return;
 
     try {
       const dataStr = e.dataTransfer.getData('application/json');
-      console.log('[ContentTypePanel.handleDrop] dataStr:', dataStr);
-      if (!dataStr) {
-        console.log('[ContentTypePanel.handleDrop] No data in transfer');
-        return;
-      }
+      if (!dataStr) return;
 
       const dropData = JSON.parse(dataStr);
-      console.log('[ContentTypePanel.handleDrop] dropData:', dropData);
 
       if (dropData.type === 'property' && onPropertyDrop) {
-        console.log('[ContentTypePanel.handleDrop] Calling onPropertyDrop');
         onPropertyDrop(dropData);
       } else if (dropData.type === 'class') {
-        console.log('[ContentTypePanel.handleDrop] Class drop detected');
         if (onShowClassDropDialog) {
           // Show dialog to ask user what action to take
           onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
@@ -377,8 +374,6 @@ function ContentTypePanel({
           // Fallback: default to copy if no dialog handler
           onClassDrop(dropData, 'copy');
         }
-      } else {
-        console.log('[ContentTypePanel.handleDrop] Unhandled drop type:', dropData.type);
       }
     } catch (error) {
       console.error('Error parsing dropped data:', error);
@@ -391,17 +386,96 @@ function ContentTypePanel({
     }
   };
 
-  // If it's a class reference, show that
+  // If it's a class reference ($ref), show $ref label, read-only properties, and a drop zone to replace
   if (content.class_id) {
+    const handleRefDragEnter = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      refDragCounterRef.current++;
+      setRefDragOver(true);
+    };
+    const handleRefDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setRefDragOver(true);
+      e.dataTransfer.dropEffect = 'copy';
+    };
+    const handleRefDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      refDragCounterRef.current--;
+      if (refDragCounterRef.current === 0) setRefDragOver(false);
+    };
+    const handleRefDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      refDragCounterRef.current = 0;
+      setRefDragOver(false);
+      try {
+        const dataStr = e.dataTransfer.getData('application/json');
+        if (!dataStr) return;
+        const dropData = JSON.parse(dataStr);
+        if (dropData.type === 'property' && onPropertyDrop) {
+          onPropertyDrop(dropData);
+        } else if (dropData.type === 'class') {
+          if (onShowClassDropDialog) {
+            onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
+              if (onClassDrop) onClassDrop(dropData, action);
+            });
+          } else if (onClassDrop) {
+            onClassDrop(dropData, 'copy');
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing dropped data:', err);
+      }
+    };
+    const classProps = content.classProperties || [];
+    const getTypeLabel = (p: ClassPropertyDisplay) => {
+      const d = p.data;
+      if (!d) return 'any';
+      if (d.$ref) return d.$ref.split('/').pop() || 'ref';
+      if (d.type === 'array' && d.items?.$ref) return `${(d.items.$ref as string).split('/').pop()}[]`;
+      return d.type || 'any';
+    };
     return (
-      <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
-          <Link2 className="w-4 h-4" />
-          <span className="font-medium">References: {content.class_name}</span>
+      <div className="space-y-2" data-drop-zone="response-body-content-type">
+        <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+            <Link2 className="w-4 h-4" />
+            <span className="font-medium">$ref: {content.class_name || 'Unknown'}</span>
+          </div>
+          <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+            Read-only; changes to the class will update this response.
+          </p>
+          {classProps.length > 0 && (
+            <div className="mt-2 rounded border border-blue-200/60 dark:border-blue-700/60 bg-white/50 dark:bg-gray-800/50 p-2 max-h-[200px] overflow-y-auto">
+              <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400 mb-1.5">Properties (read-only)</div>
+              <ul className="space-y-1">
+                {classProps.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <span className="font-mono truncate">{p.name}</span>
+                    <span className="text-gray-500 dark:text-gray-400 font-mono text-[10px] shrink-0">{getTypeLabel(p)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-        <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
-          This response uses a predefined class schema
-        </p>
+        <div
+          onDragEnter={handleRefDragEnter}
+          onDragOver={handleRefDragOver}
+          onDragLeave={handleRefDragLeave}
+          onDrop={handleRefDrop}
+          className={`p-3 rounded-lg border-2 border-dashed text-center transition-colors text-xs ${
+            refDragOver
+              ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+              : 'border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          <Plus className="w-4 h-4 mx-auto mb-1 opacity-70" />
+          Drop a class or property to replace this $ref
+        </div>
       </div>
     );
   }
@@ -516,31 +590,17 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
     dragCounterRef.current = 0;
     setIsDragOverEmpty(false);
 
-    console.log('[PathResponseBodyNode] handleEmptyDrop called');
-    console.log('[PathResponseBodyNode] data.id:', data.id);
-    console.log('[PathResponseBodyNode] onCreateContentTypeWithProperty:', !!data.onCreateContentTypeWithProperty);
-    console.log('[PathResponseBodyNode] onCreateContentTypeWithClass:', !!data.onCreateContentTypeWithClass);
-
     try {
       const dataStr = e.dataTransfer.getData('application/json');
-      console.log('[PathResponseBodyNode] Drop data string:', dataStr);
-      if (!dataStr) {
-        console.error('[PathResponseBodyNode] No data in dataTransfer');
-        return;
-      }
+      if (!dataStr) return;
 
       const dropData = JSON.parse(dataStr);
-      console.log('[PathResponseBodyNode] Parsed drop data:', dropData);
 
       if (dropData.type === 'property') {
-        if (!data.onCreateContentTypeWithProperty) {
-          console.error('[PathResponseBodyNode] onCreateContentTypeWithProperty is not defined!');
-          return;
+        if (data.onCreateContentTypeWithProperty) {
+          data.onCreateContentTypeWithProperty(data.id, dropData);
         }
-        console.log('[PathResponseBodyNode] Calling onCreateContentTypeWithProperty');
-        data.onCreateContentTypeWithProperty(data.id, dropData);
       } else if (dropData.type === 'class') {
-        console.log('[PathResponseBodyNode] Class drop detected');
         if (data.onShowClassDropDialog) {
           // Show dialog to ask user what action to take
           data.onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
@@ -549,13 +609,8 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
             }
           });
         } else if (data.onCreateContentTypeWithClass) {
-          // Fallback: default to copy if no dialog handler
           data.onCreateContentTypeWithClass(data.id, dropData, 'copy');
-        } else {
-          console.error('[PathResponseBodyNode] onCreateContentTypeWithClass is not defined!');
         }
-      } else {
-        console.log('[PathResponseBodyNode] Unhandled drop data type:', dropData.type);
       }
     } catch (error) {
       console.error('Error parsing dropped data:', error);
@@ -574,14 +629,29 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
       />
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-emerald-500 dark:border-emerald-600 min-w-[320px] max-w-[400px]">
-        {/* Header */}
+        {/* Header: status + schema summary so the attached schema is visible at a glance */}
+        {(() => {
+          const ct = data.contentTypes[selectedContentTypeIndex];
+          const schemaLabel = ct
+            ? (ct.class_id
+                ? `$ref: ${ct.class_name || 'Unknown'}`
+                : (ct.inline_schema?.properties?.length ?? 0) > 0
+                  ? `${ct.inline_schema!.properties!.length} props`
+                  : 'Object')
+            : null;
+          return (
         <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-t-xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className={`px-2 py-0.5 rounded text-white text-xs font-bold ${getStatusCodeColor()}`}>
                 {data.status_code}
               </div>
               <span className="text-white font-semibold text-sm">Response</span>
+              {schemaLabel && (
+                <span className="text-emerald-100 text-xs font-medium truncate max-w-[140px]" title={`Schema: ${schemaLabel}`}>
+                  → {schemaLabel}
+                </span>
+              )}
             </div>
             {data.onDelete && (
               <button
@@ -597,6 +667,8 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
             <p className="text-xs text-emerald-50 mt-1 truncate">{data.description}</p>
           )}
         </div>
+          );
+        })()}
 
         {/* Content Type Tabs */}
         {data.contentTypes.length > 1 && (
@@ -652,36 +724,13 @@ export default function PathResponseBodyNode({ data }: { data: PathResponseBodyD
               <ContentTypePanel
                 content={currentContent}
                 onPropertyDrop={
-                  data.onPropertyDrop
-                    ? (propertyData, parentId) => {
-                        console.log('[PathResponseBodyNode] onPropertyDrop wrapper called');
-                        console.log('[PathResponseBodyNode] data.id:', data.id);
-                        console.log('[PathResponseBodyNode] currentContent:', currentContent);
-                        console.log('[PathResponseBodyNode] currentContent.id:', currentContent?.id);
-                        console.log('[PathResponseBodyNode] data.contentTypes:', data.contentTypes);
-                        console.log('[PathResponseBodyNode] propertyData:', propertyData);
-                        if (currentContent?.id) {
-                          data.onPropertyDrop!(currentContent.id, propertyData, parentId);
-                        } else {
-                          console.error('[PathResponseBodyNode] currentContent.id is undefined!');
-                        }
-                      }
+                  data.onPropertyDrop && currentContent?.id
+                    ? (propertyData, parentId) => data.onPropertyDrop!(currentContent.id, propertyData, parentId)
                     : undefined
                 }
                 onClassDrop={
-                  data.onClassDrop
-                    ? (classData, action) => {
-                        console.log('[PathResponseBodyNode] onClassDrop wrapper called');
-                        console.log('[PathResponseBodyNode] data.id:', data.id);
-                        console.log('[PathResponseBodyNode] currentContent.id:', currentContent?.id);
-                        console.log('[PathResponseBodyNode] classData:', classData);
-                        console.log('[PathResponseBodyNode] action:', action);
-                        if (currentContent?.id) {
-                          data.onClassDrop!(currentContent.id, classData, action);
-                        } else {
-                          console.error('[PathResponseBodyNode] currentContent.id is undefined!');
-                        }
-                      }
+                  data.onClassDrop && currentContent?.id
+                    ? (classData, action) => data.onClassDrop!(currentContent.id, classData, action)
                     : undefined
                 }
                 onShowClassDropDialog={data.onShowClassDropDialog}

@@ -455,39 +455,66 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     }
   }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
 
-  // Handle class drop on response - copies class properties to inline schema
-  const handleClassDropOnResponse = useCallback(async (responseId: string, classData: any) => {
+  // Handle class drop on response - now accepts an action for copy vs reference
+  const handleClassDropOnResponse = useCallback(async (
+    responseId: string,
+    classData: any,
+    action: 'copy' | 'reference'
+  ) => {
     if (!selectedPathId || !classData.classId) return;
 
     try {
-      // Copy class properties to the response's inline schema
-      const result = await copyClassPropertiesToResponseInlineSchema(responseId, classData.classId);
-      const parsed = JSON.parse(result);
-      
-      if (parsed.success) {
-        // Show success message with info about copied properties
-        await alertDialog({
-          title: 'Properties Copied',
-          message: `Copied ${parsed.copiedProperties} properties from class "${parsed.fromClass}" to the response schema.`,
-          variant: 'success',
-        });
+      if (action === 'copy') {
+        // Copy class properties to the response's inline schema
+        const result = await copyClassPropertiesToResponseInlineSchema(responseId, classData.classId);
+        const parsed = JSON.parse(result);
 
-        // Refresh canvas to show updated schema
-        if (onRefresh) {
-          onRefresh();
+        if (parsed.success) {
+          await alertDialog({
+            title: 'Properties Copied',
+            message: `Copied ${parsed.copiedProperties} properties from class "${parsed.fromClass}" to the response schema.`,
+            variant: 'success',
+          });
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: parsed.error || 'Failed to copy class properties to response',
+            variant: 'error',
+          });
         }
-      } else {
-        await alertDialog({
-          title: 'Error',
-          message: parsed.error || 'Failed to copy class properties to response',
-          variant: 'error',
+      } else if (action === 'reference') {
+        // Create class reference by updating response
+        const result = await updateSharedPathResponse(responseId, {
+          classId: classData.classId, // Set class reference
+          schemaMode: 'class', // Set schema mode to class
+          inlineSchema: null, // Clear any inline schema
+          data: null, // Clear any legacy data
         });
+        const parsed = JSON.parse(result);
+
+        if (parsed.success) {
+          await alertDialog({
+            title: 'Class Referenced',
+            message: `Response now references class "${classData.className}" ($ref).`,
+            variant: 'success',
+          });
+        } else {
+          await alertDialog({
+            title: 'Error',
+            message: parsed.error || 'Failed to reference class for response',
+            variant: 'error',
+          });
+        }
+      }
+      // Refresh canvas to show updated schema
+      if (onRefresh) {
+        onRefresh();
       }
     } catch (error) {
-      console.error('Error copying class to response:', error);
+      console.error('Error handling class drop on response:', error);
       await alertDialog({
         title: 'Error',
-        message: 'Failed to copy class properties to response',
+        message: 'Failed to handle class drop on response. Please try again.',
         variant: 'error',
       });
     }
@@ -1249,24 +1276,38 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     }
   }, [confirmDialog, alertDialog, onRefresh]);
 
+  // Detect synthetic content type IDs (e.g. response-<responseId>-application/json) and resolve to a real DB content id
+  const resolveContentId = useCallback(async (contentId: string): Promise<string> => {
+    const uuidOnly = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidOnly.test(contentId)) return contentId;
+    const match = contentId.match(/^response-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-/i);
+    if (!match) return contentId;
+    const responseId = match[1];
+    const createResult = await addResponseContentType(
+      responseId,
+      'application/json',
+      undefined,
+      { type: 'object', properties: [] },
+      undefined
+    );
+    const parsed = JSON.parse(createResult);
+    if (!parsed.success || !parsed.content?.id) throw new Error(parsed.error || 'Failed to create content type');
+    return parsed.content.id;
+  }, []);
+
   // Handle class drop on response body content type - supports copy or reference
   const handleResponseBodyClassDrop = useCallback(async (
     contentId: string,
     classData: any,
     action: 'copy' | 'reference'
   ) => {
-    console.log('[handleResponseBodyClassDrop] Called with:', { contentId, classData, action });
-
-    if (!classData.classId) {
-      console.error('[handleResponseBodyClassDrop] No classId in drop data');
-      return;
-    }
+    if (!classData.classId) return;
 
     try {
+      const resolvedContentId = await resolveContentId(contentId);
+
       if (action === 'copy') {
-        // Copy class properties to inline schema
-        const result = await copyClassPropertiesToContentType(contentId, classData.classId);
-        console.log('[handleResponseBodyClassDrop] Copy result:', result);
+        const result = await copyClassPropertiesToContentType(resolvedContentId, classData.classId);
         const parsed = JSON.parse(result);
 
         if (parsed.success) {
@@ -1275,10 +1316,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             message: `Copied ${parsed.copiedProperties} properties from class "${parsed.fromClass}" to the response schema.`,
             variant: 'success',
           });
-
-          if (onRefresh) {
-            onRefresh();
-          }
+          if (onRefresh) onRefresh();
         } else {
           await alertDialog({
             title: 'Error',
@@ -1287,9 +1325,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           });
         }
       } else if (action === 'reference') {
-        // Create a reference to the class
-        const result = await setResponseContentTypeClassReference(contentId, classData.classId);
-        console.log('[handleResponseBodyClassDrop] Reference result:', result);
+        const result = await setResponseContentTypeClassReference(resolvedContentId, classData.classId);
         const parsed = JSON.parse(result);
 
         if (parsed.success) {
@@ -1298,10 +1334,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
             message: `Response now references class "${classData.className || 'class'}".`,
             variant: 'success',
           });
-
-          if (onRefresh) {
-            onRefresh();
-          }
+          if (onRefresh) onRefresh();
         } else {
           await alertDialog({
             title: 'Error',
@@ -1314,11 +1347,11 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
       console.error('Error handling class drop on response content type:', error);
       await alertDialog({
         title: 'Error',
-        message: 'Failed to process class drop',
+        message: error instanceof Error ? error.message : 'Failed to process class drop',
         variant: 'error',
       });
     }
-  }, [alertDialog, onRefresh]);
+  }, [alertDialog, onRefresh, resolveContentId]);
 
   // Handle creating content type and adding first property in one operation
   const handleCreateContentTypeWithProperty = useCallback(async (
@@ -1997,8 +2030,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           }
         }
 
-        // Load classes for this version to map class IDs to names
+        // Load classes for this version (names for nodes + properties for $ref read-only display)
         let classesMap = new Map<string, { id: string; name: string; description?: string }>();
+        const classesWithPropertiesMap = new Map<string, { name: string; properties: any[] }>();
         if (selectedVersionId) {
           try {
             const classesResponse = await getClassesWithPropertiesAndTags(selectedVersionId);
@@ -2011,6 +2045,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                   description: cls.description,
                 });
               }
+              const rootProps = (cls.properties || []).filter((p: any) => !p.parent_id);
+              classesWithPropertiesMap.set(cls.id, { name: cls.name, properties: rootProps });
             });
           } catch (error) {
             console.error('Error loading classes:', error);
@@ -2137,7 +2173,11 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                   const linkedOp = responseLinkedOpsMap.get(response.id)?.find(op => op.id === operationId);
                   handleUnlinkResponse(response.id, operationId, linkedOp?.operation);
                 },
-                onClassDrop: handleClassDropOnResponse,
+                onClassDrop: (responseId: string, classData: any) => {
+                  handleShowClassDropDialog(classData, (action) => {
+                    handleClassDropOnResponse(responseId, classData, action);
+                  });
+                },
                 onPropertyDrop: handlePropertyDropOnResponse, // NEW: Add property drop handler
                 onSchemaTypeChange: handleSchemaTypeChange,
                 onClassUnlink: handleClassUnlinkFromResponse,
@@ -2175,21 +2215,26 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         const allResponseBodyNodes: Node[] = [];
         if (allResponsesData.success && allResponsesData.responses) {
           allResponsesData.responses.forEach((response: any, responseIndex: number) => {
-            // Get content types for this response
-            const contentTypes = (response.content_types || []).map((ct: any) => ({
-              id: ct.id,
-              media_type: ct.media_type,
-              class_id: ct.class_id,
-              class_name: ct.class_name,
-              inline_schema: typeof ct.inline_schema === 'string'
-                ? JSON.parse(ct.inline_schema)
-                : ct.inline_schema,
-              examples: typeof ct.examples === 'string'
-                ? JSON.parse(ct.examples)
-                : ct.examples,
-            }));
+            // Get content types for this response (include class properties for $ref read-only display)
+            const contentTypes = (response.content_types || []).map((ct: any) => {
+              const classInfo = ct.class_id ? classesWithPropertiesMap.get(ct.class_id) : undefined;
+              return {
+                id: ct.id,
+                media_type: ct.media_type,
+                class_id: ct.class_id,
+                class_name: ct.class_name,
+                inline_schema: typeof ct.inline_schema === 'string'
+                  ? JSON.parse(ct.inline_schema)
+                  : ct.inline_schema,
+                examples: typeof ct.examples === 'string'
+                  ? JSON.parse(ct.examples)
+                  : ct.examples,
+                classProperties: classInfo?.properties,
+              };
+            });
 
             // Check if response itself has an object schema (from inline_schema column)
+            // Response Properties panel saves object schema to response.inline_schema; ensure the node shows it
             let responseInlineSchema = null;
             if (response.inline_schema) {
               try {
@@ -2201,15 +2246,56 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               }
             }
 
+            const hasResponseLevelObjectSchema =
+              responseInlineSchema?.type === 'object' &&
+              Array.isArray(responseInlineSchema?.properties) &&
+              responseInlineSchema.properties.length > 0;
+
+            // Use response-level inline_schema so the node shows the same schema as Response Properties panel
+            let contentTypesForNode = contentTypes;
+            if (hasResponseLevelObjectSchema) {
+              if (contentTypesForNode.length === 0) {
+                contentTypesForNode = [{
+                  id: `response-${response.id}-application/json`,
+                  media_type: 'application/json',
+                  class_id: null,
+                  class_name: null,
+                  inline_schema: responseInlineSchema,
+                  examples: null,
+                }];
+              } else {
+                const firstHasProps = Array.isArray(contentTypesForNode[0].inline_schema?.properties) &&
+                  contentTypesForNode[0].inline_schema.properties.length > 0;
+                if (!firstHasProps) {
+                  contentTypesForNode = contentTypesForNode.map((ct: any, i: number) =>
+                    i === 0 ? { ...ct, inline_schema: responseInlineSchema } : ct
+                  );
+                }
+              }
+            }
+            // When response is $ref (schema_mode class) but has no content types, show one synthetic content type so the body node displays $ref + read-only properties
+            if (contentTypesForNode.length === 0 && response.schema_mode === 'class' && response.class_id) {
+              const classInfo = classesWithPropertiesMap.get(response.class_id);
+              contentTypesForNode = [{
+                id: `response-${response.id}-application/json-ref`,
+                media_type: 'application/json',
+                class_id: response.class_id,
+                class_name: response.class_name,
+                inline_schema: null,
+                examples: null,
+                classProperties: classInfo?.properties,
+              }];
+            }
+
             // Create response body node if:
             // 1. There are content types with object schemas or class references
             // 2. OR the response itself has an object type schema
-            const hasContentTypeWithObjectSchema = contentTypes.some((ct: any) =>
+            const hasContentTypeWithObjectSchema = contentTypesForNode.some((ct: any) =>
               ct.inline_schema?.type === 'object' || ct.class_id
             );
             const hasResponseObjectSchema = responseInlineSchema?.type === 'object';
 
-            if (contentTypes.length > 0 || hasContentTypeWithObjectSchema || hasResponseObjectSchema) {
+            if (contentTypesForNode.length > 0 || hasContentTypeWithObjectSchema || hasResponseObjectSchema) {
               const responseBodyNodeId = `response-body-${response.id}`;
               allResponseBodyNodes.push({
                 id: responseBodyNodeId,
@@ -2222,7 +2308,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                   id: response.id,
                   status_code: response.status_code,
                   description: response.description,
-                  contentTypes,
+                  contentTypes: contentTypesForNode,
                   onDelete: () => handleDeleteSharedResponse(response.id, response.status_code),
                   onPropertyDrop: stableHandleResponseBodyPropertyDrop,
                   onClassDrop: stableHandleResponseBodyClassDrop,
@@ -2576,6 +2662,25 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           });
           return;
         }
+
+        // Class <-> Response: show copy vs $ref dialog only; do not add an edge (schema is bound to response)
+        if (
+          (sourceNode?.type === 'class' && targetNode?.type === 'response') ||
+          (sourceNode?.type === 'response' && targetNode?.type === 'class')
+        ) {
+          const responseNode = sourceNode?.type === 'response' ? sourceNode : targetNode;
+          const classNode = sourceNode?.type === 'class' ? sourceNode : targetNode;
+          const respId = (responseNode?.data as any)?.dbResponseId;
+          const classId = (classNode?.data as any)?.dbClassId;
+          const className = (classNode?.data as any)?.className;
+          if (respId && classId) {
+            const classData = { classId, className: className || 'Unknown', type: 'class' };
+            handleShowClassDropDialog(classData, (action) => {
+              handleClassDropOnResponse(respId, classData, action);
+            });
+          }
+          return;
+        }
       }
 
       // Get edge type based on settings
@@ -2627,43 +2732,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           responseId = (sourceNode.data as any)?.dbResponseId;
         }
 
-        // Handle response to class connection (both directions) - check this FIRST before other handlers
-        if (
-          (sourceNode?.type === 'response' && targetNode?.type === 'class') ||
-          (sourceNode?.type === 'class' && targetNode?.type === 'response')
-        ) {
-          // Determine which is the response and which is the class
-          const responseNode = sourceNode?.type === 'response' ? sourceNode : targetNode;
-          const classNode = sourceNode?.type === 'class' ? sourceNode : targetNode;
-          
-          const responseId = (responseNode.data as any)?.dbResponseId;
-          const classId = (classNode.data as any)?.dbClassId;
-          const className = (classNode.data as any)?.className;
-          
-          if (responseId && classId) {
-            try {
-              // handleClassDropOnResponse expects { classId, className }
-              await handleClassDropOnResponse(responseId, { 
-                classId,
-                className: className || 'Unknown',
-                type: 'class'
-              });
-            } catch (error) {
-              console.error('Error connecting response to class:', error);
-              await alertDialog({
-                title: 'Error',
-                message: 'Failed to attach class to response. Please try again.',
-                variant: 'error',
-              });
-              // Remove the edge from UI since DB save failed
-              setEdges((eds) => eds.filter(e =>
-                !(e.source === connection.source && e.target === connection.target)
-              ));
-            }
-          }
-        }
         // Handle parameter linking
-        else if (operationId && parameterId) {
+        if (operationId && parameterId) {
           try {
             const result = await linkParameterToOperation(operationId, parameterId, undefined);
             const parsed = JSON.parse(result);
@@ -2759,7 +2829,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         }
       }
     },
-    [setEdges, setNodes, nodes, alertDialog, edgeRouting, edgeAnimation, handleClassDropOnResponse, selectedPathId, selectedVersionId]
+    [setEdges, setNodes, nodes, alertDialog, edgeRouting, edgeAnimation, handleShowClassDropDialog, handleClassDropOnResponse, selectedPathId, selectedVersionId]
   );
 
   // Handle deleting edges (unlinking parameters and responses from operations)

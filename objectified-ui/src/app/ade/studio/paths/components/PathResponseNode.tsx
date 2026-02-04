@@ -223,17 +223,6 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
     data.inlineSchema?.type &&
     ['string', 'number', 'integer', 'boolean', 'null', 'array'].includes(data.inlineSchema.type);
 
-  // Debug logging
-  console.log('[PathResponseNode]', data.statusCode, {
-    hasContentTypes,
-    hasContentTypesWithSchema,
-    hasInlineSchema,
-    hasAttachedClass,
-    showInlineSchemaFirst,
-    inlineSchema: data.inlineSchema,
-    schemaMode: data.schemaMode,
-  });
-
   return (
     <>
       {/* Connection handle at TOP */}
@@ -396,8 +385,8 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
               </div>
             </div>
           ) : (
-            <div className={`text-[10px] ${dragOver ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 italic'}`}>
-              {dragOver ? 'Drop class or property here' : '(none)'}
+            <div className={`text-[10px] ${dragOver ? 'text-indigo-600 dark:text-indigo-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+              {dragOver ? 'Drop to set schema' : 'Drop class or property to set schema'}
             </div>
           )}
 

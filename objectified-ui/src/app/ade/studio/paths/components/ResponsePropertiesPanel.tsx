@@ -100,20 +100,20 @@ export default function ResponsePropertiesPanel({
                 }
               }
             } else if (schemaMode === 'object') {
-              // Object mode - use inline_schema
+              // Object mode - use full inline_schema (type + properties) so SchemaBuilder shows them
               if (response.inline_schema) {
                 try {
                   const inlineSchema = typeof response.inline_schema === 'string'
                     ? JSON.parse(response.inline_schema)
                     : response.inline_schema;
-                  // For object mode, just indicate it's an object type
-                  schema = { type: 'object' };
-                  console.log('[ResponsePropertiesPanel] Loaded object schema');
+                  schema = inlineSchema && typeof inlineSchema === 'object'
+                    ? { type: 'object', ...inlineSchema }
+                    : { type: 'object' };
                 } catch (error) {
                   console.error('Error parsing inline_schema:', error);
+                  schema = { type: 'object' };
                 }
               } else {
-                // Default to object type
                 schema = { type: 'object' };
               }
             } else {

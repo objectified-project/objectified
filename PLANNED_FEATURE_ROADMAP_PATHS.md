@@ -65,22 +65,6 @@ structure immediately recognizable.
 | Header   | Purple | H icon     |
 | Cookie   | Orange | 🍪 icon    |
 
-**Configurable Properties**:
-- ✅ Parameter name (with auto-suggest from common patterns)
-- ✅ Location: query, path, header, cookie (fixed from dragged node)
-- ✅ Schema type (string, number, boolean, array, object)
-- ✅ Required flag
-- ✅ Default value
-- ✅ Description
-- ✅ Validation rules (min/max, pattern, enum)
-- ✅ Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
-- ✅ Explode flag for arrays/objects
-- ✅ Deprecated flag
-
-| Ticket | Feature                                                |
-|--------|--------------------------------------------------------|
-| #377   | Parameter name with auto-suggest from common patterns  |
-
 #### 2.5 Request Body Nodes 📋 PLANNED
 
 **Visual Design**: Input port icon with blue accent, shows content types
@@ -669,6 +653,18 @@ DROP TARGET STATE:
 - ✅ **OpenID Connect**: Discovery URL with scopes
 - ✅ **Mutual TLS**: Certificate-based authentication
 - ✅ **Custom security schemes**
+
+**Configurable Properties**:
+- ✅ Parameter name (with auto-suggest from common patterns)
+- ✅ Location: query, path, header, cookie (fixed from dragged node)
+- ✅ Schema type (string, number, boolean, array, object)
+- ✅ Required flag
+- ✅ Default value
+- ✅ Description
+- ✅ Validation rules (min/max, pattern, enum)
+- ✅ Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
+- ✅ Explode flag for arrays/objects
+- ✅ Deprecated flag
 
 ## Security & Authentication
 
