@@ -74,13 +74,12 @@ structure immediately recognizable.
 - ✅ Description
 - ✅ Validation rules (min/max, pattern, enum)
 - ✅ Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
-- 📋 Explode flag for arrays/objects
+- ✅ Explode flag for arrays/objects
 - ✅ Deprecated flag
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
 | #377   | Parameter name with auto-suggest from common patterns  |
-| #384   | Add explode flag to parameters                         |
 
 #### 2.5 Request Body Nodes 📋 PLANNED
 

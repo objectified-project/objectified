@@ -20,6 +20,8 @@ export interface PathParameterData {
   defaultValue?: string | number | boolean;
   /** Serialization style (default form) */
   style?: ParamSerializationStyle;
+  /** Explode arrays/objects (OpenAPI 3.0) */
+  explode?: boolean;
   dbParameterId?: string;
   operationId?: string;
   onDelete?: () => void;
@@ -134,6 +136,7 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
           {/* Style line: serialization style (show when set; default is form) */}
           <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">
             <span>style: {data.style ?? 'form'}</span>
+            {data.explode && <span className="ml-1.5">· explode</span>}
           </div>
 
           {/* Description (if present) */}

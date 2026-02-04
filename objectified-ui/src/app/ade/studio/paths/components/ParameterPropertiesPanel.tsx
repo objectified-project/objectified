@@ -123,6 +123,7 @@ export default function ParameterPropertiesPanel({
   const [schemaEnum, setSchemaEnum] = useState('');
   const [schemaArrayItemType, setSchemaArrayItemType] = useState<'string' | 'integer' | 'number' | 'boolean'>('string');
   const [paramStyle, setParamStyle] = useState<ParamStyle>(PARAM_STYLE_DEFAULT);
+  const [paramExplode, setParamExplode] = useState(false);
 
   // Primitive template dialog state (Apply from REST primitives)
   const [primitiveDialogOpen, setPrimitiveDialogOpen] = useState(false);
@@ -154,6 +155,7 @@ export default function ParameterPropertiesPanel({
       setSchemaEnum('');
       setSchemaArrayItemType('string');
       setParamStyle(PARAM_STYLE_DEFAULT);
+      setParamExplode(false);
       return;
     }
 
@@ -199,6 +201,8 @@ export default function ParameterPropertiesPanel({
             setRequired(schema.required ?? (param.in_location === 'path'));
             // Serialization style (default form)
             setParamStyle(PARAM_STYLES.some((s) => s.value === schema.style) ? (schema.style as ParamStyle) : PARAM_STYLE_DEFAULT);
+            // Explode (arrays/objects)
+            setParamExplode(schema.explode === true);
           } else {
             // Reset to defaults if no schema
             setSchemaType('string');
@@ -213,6 +217,7 @@ export default function ParameterPropertiesPanel({
             setSchemaArrayItemType('string');
             setSchemaDefault('');
             setParamStyle(PARAM_STYLE_DEFAULT);
+            setParamExplode(false);
             setRequired(param.in_location === 'path');
           }
         }
@@ -342,6 +347,8 @@ export default function ParameterPropertiesPanel({
 
       // Serialization style (OpenAPI 3.0 parameter style; default form)
       schemaData.style = paramStyle;
+      // Explode (arrays/objects)
+      schemaData.explode = paramExplode;
 
       const result = await updateSharedPathParameter(parameterId, {
         name: name.trim(),
@@ -555,6 +562,23 @@ export default function ParameterPropertiesPanel({
                 </Select>
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                   How arrays/objects are serialized (query, header, etc.). Default: form.
+                </p>
+              </div>
+
+              {/* Explode — for arrays/objects (OpenAPI 3.0) */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="param-explode"
+                    checked={paramExplode}
+                    onCheckedChange={(checked) => setParamExplode(checked === true)}
+                  />
+                  <Label htmlFor="param-explode" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    Explode (arrays/objects)
+                  </Label>
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  When true, array/object values are expanded (e.g. id=1&amp;id=2 for form style).
                 </p>
               </div>
 
