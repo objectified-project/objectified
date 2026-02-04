@@ -66,7 +66,7 @@ structure immediately recognizable.
 | Cookie   | Orange | 🍪 icon    |
 
 **Configurable Properties**:
-- 📋 Parameter name (with auto-suggest from common patterns)
+- ✅ Parameter name (with auto-suggest from common patterns)
 - ✅ Location: query, path, header, cookie (fixed from dragged node)
 - ✅ Schema type (string, number, boolean, array, object)
 - ✅ Required flag

@@ -69,6 +69,27 @@ export const PARAM_STYLES = [
 ] as const;
 export type ParamStyle = (typeof PARAM_STYLES)[number]['value'];
 
+// Common parameter name patterns for suggestion (query, header, cookie, and path)
+const COMMON_PARAM_NAMES = [
+  // Path / resource
+  'id', 'ids', 'slug', 'version', 'type', 'name', 'key',
+  // Pagination
+  'limit', 'offset', 'page', 'pageSize', 'per_page', 'size',
+  // Sort / order
+  'sort', 'order', 'orderBy', 'order_by', 'direction', 'asc', 'desc',
+  // Filter / search
+  'filter', 'q', 'query', 'search', 'keywords',
+  // Field selection / expand
+  'fields', 'expand', 'select', 'include', 'embed', 'with',
+  // Cursor / time range
+  'cursor', 'next', 'since', 'until', 'before', 'after',
+  // Response format
+  'format', 'callback', 'pretty',
+  // Headers / common
+  'Authorization', 'X-Request-ID', 'X-Correlation-ID', 'Accept', 'Content-Type',
+  'include_deleted',
+];
+
 // Primitive from REST API (for Apply from primitive template)
 interface PrimitiveTemplate {
   id: string;
@@ -486,12 +507,21 @@ export default function ParameterPropertiesPanel({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Parameter name"
-                    className="h-9 text-sm"
-                  />
+                  <>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Parameter name"
+                      className="h-9 text-sm"
+                      list="param-name-suggestions"
+                      autoComplete="off"
+                    />
+                    <datalist id="param-name-suggestions">
+                      {COMMON_PARAM_NAMES.map((p) => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
+                  </>
                 )}
               </div>
 

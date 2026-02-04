@@ -43,6 +43,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Configure required OAuth2/OpenID Connect scopes per operation
   - Configure serialization style for parameterized variables: form, spaceDelimited, pipeDelimited, deepObject
   - Added flag to explode variable arrays and objects in the parameterized variables section
+  - Added autocomplete on variable name suggestions for common parameter names in the parameters panel
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
