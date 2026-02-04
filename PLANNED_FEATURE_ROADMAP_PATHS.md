@@ -54,27 +54,6 @@ structure immediately recognizable.
 | HEAD     | Gray   | Metadata retrieval            |
 | OPTIONS  | Gray   | CORS preflight                |
 
-#### 2.3 Schema Reference Nodes 📋 PLANNED
-
-**Visual Design**: Compact card showing schema name, type, and property count
-
-**Purpose**: Create visual connections between schema definitions (from Schema tab) and API operations
-
-**Features**:
-- ✅ Drag schema from library panel onto canvas
-- 📋 Connect to method nodes for request/response binding
-- 📋 Hover to see schema preview (collapsed property tree)
-- 📋 Click to navigate to schema definition in Schema tab
-- 📋 Visual badge showing schema version compatibility
-- 📋 Inline schema override for operation-specific modifications
-
-| Ticket | Feature                                                                          |
-|--------|----------------------------------------------------------------------------------|
-| #373   | Add ability to connect schema nodes to method nodes for request/response binding |
-| #374   | Hover over a schema node to see a schema preview (collapsed property tree)       |
-| #375   | Click to edit schema (change views)                                              |
-| #376   | Inline schema override for operation-specific modifications                      |
-
 #### 2.4 Parameter Nodes 📋 PLANNED
 
 **Visual Design**: Small chips/tags color-coded by parameter location
@@ -90,24 +69,18 @@ structure immediately recognizable.
 - 📋 Parameter name (with auto-suggest from common patterns)
 - ✅ Location: query, path, header, cookie (fixed from dragged node)
 - ✅ Schema type (string, number, boolean, array, object)
-- 📋 Required flag
-- 📋 Default value
-- 📋 Description
-- 📋 Validation rules (min/max, pattern, enum)
-- 📋 Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
+- ✅ Required flag
+- ✅ Default value
+- ✅ Description
+- ✅ Validation rules (min/max, pattern, enum)
+- ✅ Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
 - 📋 Explode flag for arrays/objects
-- 📋 Deprecated flag
+- ✅ Deprecated flag
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
 | #377   | Parameter name with auto-suggest from common patterns  |
-| #379   | Add required flag to parameters                        |
-| #380   | Add default value to parameters                        |
-| #381   | Add description to parameters                          |
-| #382   | Add validation rules to parameters                     |
-| #383   | Add serialization style to parameters (default "form") |
 | #384   | Add explode flag to parameters                         |
-| #385   | Add deprecated flag to parameters                      |
 
 #### 2.5 Request Body Nodes 📋 PLANNED
 

@@ -6,6 +6,9 @@ import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 
+/** Serialization style for the parameter (OpenAPI 3.0; default "form") */
+export type ParamSerializationStyle = 'form' | 'spaceDelimited' | 'pipeDelimited' | 'deepObject';
+
 export interface PathParameterData {
   name: string;
   inLocation: 'path' | 'query' | 'header' | 'cookie';
@@ -15,6 +18,8 @@ export interface PathParameterData {
   type?: string;
   format?: string;
   defaultValue?: string | number | boolean;
+  /** Serialization style (default form) */
+  style?: ParamSerializationStyle;
   dbParameterId?: string;
   operationId?: string;
   onDelete?: () => void;
@@ -126,7 +131,12 @@ export default function PathParameterNode({ data }: { data: PathParameterData })
             </div>
           )}
 
-          {/* Fifth line: description (if present) */}
+          {/* Style line: serialization style (show when set; default is form) */}
+          <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+            <span>style: {data.style ?? 'form'}</span>
+          </div>
+
+          {/* Description (if present) */}
           {data.description && data.description.trim() !== '' && (
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2" title={data.description}>
               {data.description}

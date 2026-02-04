@@ -1951,6 +1951,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 type: paramData.type || 'string',
                 format: paramData.format,
                 defaultValue: paramData.default,
+                style: ['form', 'spaceDelimited', 'pipeDelimited', 'deepObject'].includes(paramData.style) ? paramData.style : 'form',
                 dbParameterId: param.id,
                 onDelete: () => handleDeleteParameter(param.id, param.name),
               },

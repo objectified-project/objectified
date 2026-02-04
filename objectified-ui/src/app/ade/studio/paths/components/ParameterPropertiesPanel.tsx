@@ -59,6 +59,16 @@ const ARRAY_ITEM_TYPES = [
   { value: 'boolean', label: 'Boolean' },
 ];
 
+// Serialization style for parameters (OpenAPI 3.0; default "form")
+export const PARAM_STYLE_DEFAULT = 'form' as const;
+export const PARAM_STYLES = [
+  { value: 'form', label: 'form' },
+  { value: 'spaceDelimited', label: 'spaceDelimited' },
+  { value: 'pipeDelimited', label: 'pipeDelimited' },
+  { value: 'deepObject', label: 'deepObject' },
+] as const;
+export type ParamStyle = (typeof PARAM_STYLES)[number]['value'];
+
 // Primitive from REST API (for Apply from primitive template)
 interface PrimitiveTemplate {
   id: string;
@@ -112,6 +122,7 @@ export default function ParameterPropertiesPanel({
   const [schemaDefault, setSchemaDefault] = useState('');
   const [schemaEnum, setSchemaEnum] = useState('');
   const [schemaArrayItemType, setSchemaArrayItemType] = useState<'string' | 'integer' | 'number' | 'boolean'>('string');
+  const [paramStyle, setParamStyle] = useState<ParamStyle>(PARAM_STYLE_DEFAULT);
 
   // Primitive template dialog state (Apply from REST primitives)
   const [primitiveDialogOpen, setPrimitiveDialogOpen] = useState(false);
@@ -142,6 +153,7 @@ export default function ParameterPropertiesPanel({
       setSchemaDefault('');
       setSchemaEnum('');
       setSchemaArrayItemType('string');
+      setParamStyle(PARAM_STYLE_DEFAULT);
       return;
     }
 
@@ -185,6 +197,8 @@ export default function ParameterPropertiesPanel({
             setSchemaArrayItemType(schema.items?.type || 'string');
             // Read required from data field
             setRequired(schema.required ?? (param.in_location === 'path'));
+            // Serialization style (default form)
+            setParamStyle(PARAM_STYLES.some((s) => s.value === schema.style) ? (schema.style as ParamStyle) : PARAM_STYLE_DEFAULT);
           } else {
             // Reset to defaults if no schema
             setSchemaType('string');
@@ -198,6 +212,7 @@ export default function ParameterPropertiesPanel({
             setSchemaEnum('');
             setSchemaArrayItemType('string');
             setSchemaDefault('');
+            setParamStyle(PARAM_STYLE_DEFAULT);
             setRequired(param.in_location === 'path');
           }
         }
@@ -324,6 +339,9 @@ export default function ParameterPropertiesPanel({
 
       // Add required to schema data (path params are always required in OpenAPI)
       schemaData.required = inLocation === 'path' ? true : required;
+
+      // Serialization style (OpenAPI 3.0 parameter style; default form)
+      schemaData.style = paramStyle;
 
       const result = await updateSharedPathParameter(parameterId, {
         name: name.trim(),
@@ -516,6 +534,28 @@ export default function ParameterPropertiesPanel({
                     </Label>
                   </div>
                 )}
+              </div>
+
+              {/* Serialization style — default "form" (OpenAPI 3.0) */}
+              <div>
+                <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                  Serialization style
+                </Label>
+                <Select value={paramStyle} onValueChange={(v) => setParamStyle(v as ParamStyle)}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PARAM_STYLES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  How arrays/objects are serialized (query, header, etc.). Default: form.
+                </p>
               </div>
 
               {/* Summary */}
