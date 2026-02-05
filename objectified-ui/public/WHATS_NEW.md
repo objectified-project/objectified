@@ -46,6 +46,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added autocomplete on variable name suggestions for common parameter names in the parameters panel
   - Added custom response headers to response codes
   - Added custom response content types for the response codes, each response code can be its own response
+  - Added HATEOS links support for response mapping
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
   - Dragging a class to a response schema allows the class to be copied or referenced
 - OpenAPI Support:

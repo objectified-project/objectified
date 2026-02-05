@@ -109,12 +109,11 @@ structure immediately recognizable.
 - ✅ Description (auto-populated from status code, configurable)
 - ✅ Response headers (name, schema, description)
 - ✅ Content type map with schema bindings
-- 📋 Links (HATEOAS navigation)
+- ✅ Links (HATEOAS navigation)
 - 📋 Examples per content type
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
-| #396   | Add links (HATEOAS navigation)                         |
 | #397   | Add content-type examples to response node             |
 
 **Advanced Features**:

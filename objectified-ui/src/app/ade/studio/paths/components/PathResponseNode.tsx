@@ -51,6 +51,8 @@ export interface PathResponseData {
   } | null;
   /** Response headers (OpenAPI: name, description, schema) */
   headers?: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }>;
+  /** Response links (OpenAPI 3.1 Link Object - HATEOAS navigation) */
+  links?: Array<{ name: string; operationId?: string; operationRef?: string; description?: string }>;
 }
 
 // Helper to get schema display text for primitives and arrays
@@ -218,6 +220,7 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
   );
   const hasAttachedClass = !!data.attachedClassName;
   const hasHeaders = data.headers && data.headers.length > 0;
+  const hasLinks = data.links && data.links.length > 0;
 
   // For primitive/array types, prioritize inlineSchema display
   const showInlineSchemaFirst = hasInlineSchema && !hasAttachedClass &&
@@ -434,6 +437,32 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
           {!hasHeaders && (
             <>
               <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Headers:</div>
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(none)</div>
+            </>
+          )}
+
+          {/* Links (HATEOAS) Section */}
+          {hasLinks && (
+            <>
+              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Links:</div>
+              <div className="space-y-0.5">
+                {data.links!.map((link, idx) => (
+                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                    <span className="font-mono">{link.name}</span>
+                    {(link.operationId || link.operationRef) && (
+                      <span className="text-gray-500 dark:text-gray-500 font-mono truncate">
+                        → {link.operationId || link.operationRef}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {!hasLinks && (
+            <>
+              <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Links:</div>
               <div className="text-[10px] text-gray-400 dark:text-gray-500 italic">(none)</div>
             </>
           )}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Save, Plus, Trash2, FileJson } from 'lucide-react';
+import { X, Save, Plus, Trash2, FileJson, Link2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { Textarea } from '../../../../components/ui/Textarea';
 import { Input } from '../../../../components/ui/Input';
@@ -48,6 +48,15 @@ export interface ResponseHeaderItem {
   schema?: { type?: string; format?: string };
 }
 
+/** Single response link (OpenAPI 3.1 Link Object - HATEOAS) */
+export interface ResponseLinkItem {
+  name: string;
+  operationId?: string;
+  operationRef?: string;
+  description?: string;
+  parameters?: Record<string, string>;
+}
+
 interface ResponsePropertiesPanelProps {
   responseId: string | null;
   statusCode: string;
@@ -79,6 +88,31 @@ function headersArrayToDataMap(headers: ResponseHeaderItem[]): Record<string, { 
   return map;
 }
 
+function dataLinksToArray(data: any): ResponseLinkItem[] {
+  if (!data?.links || typeof data.links !== 'object' || Array.isArray(data.links)) return [];
+  return Object.entries(data.links).map(([name, link]: [string, any]) => ({
+    name,
+    operationId: link?.operationId,
+    operationRef: link?.operationRef,
+    description: link?.description,
+    parameters: link?.parameters && typeof link.parameters === 'object' ? link.parameters : undefined,
+  }));
+}
+
+function linksArrayToDataMap(links: ResponseLinkItem[]): Record<string, { operationId?: string; operationRef?: string; description?: string; parameters?: Record<string, string> }> {
+  const map: Record<string, { operationId?: string; operationRef?: string; description?: string; parameters?: Record<string, string> }> = {};
+  for (const link of links) {
+    if (!link.name.trim()) continue;
+    const key = link.name.trim();
+    map[key] = {};
+    if (link.operationId?.trim()) map[key].operationId = link.operationId.trim();
+    if (link.operationRef?.trim()) map[key].operationRef = link.operationRef.trim();
+    if (link.description?.trim()) map[key].description = link.description.trim();
+    if (link.parameters && Object.keys(link.parameters).length > 0) map[key].parameters = link.parameters;
+  }
+  return map;
+}
+
 export default function ResponsePropertiesPanel({
   responseId,
   statusCode,
@@ -96,6 +130,7 @@ export default function ResponsePropertiesPanel({
   const [responseSchema, setResponseSchema] = useState<any>(null);
   const [currentResponse, setCurrentResponse] = useState<any>(null); // Store full response data
   const [headers, setHeaders] = useState<ResponseHeaderItem[]>([]);
+  const [links, setLinks] = useState<ResponseLinkItem[]>([]);
   const [contentTypes, setContentTypes] = useState<ContentTypeMapItem[]>([]);
   const [selectedContentTypeIndex, setSelectedContentTypeIndex] = useState(0);
   const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
@@ -114,6 +149,7 @@ export default function ResponsePropertiesPanel({
       setDescription('');
       setResponseSchema(null);
       setHeaders([]);
+      setLinks([]);
       setContentTypes([]);
       setCurrentResponse(null);
       return;
@@ -139,6 +175,7 @@ export default function ResponsePropertiesPanel({
             // Load response headers from data.headers (OpenAPI format: map of name -> { description?, schema? })
             const rawData = response.data ? (typeof response.data === 'string' ? JSON.parse(response.data) : response.data) : null;
             setHeaders(dataHeadersToArray(rawData));
+            setLinks(dataLinksToArray(rawData));
 
             // Content type map: each content type has its own schema binding (class_id or inline_schema)
             const cts = (response.content_types || []).map((ct: any) => ({
@@ -303,6 +340,7 @@ export default function ResponsePropertiesPanel({
 
                 const rawData = response.data ? (typeof response.data === 'string' ? JSON.parse(response.data) : response.data) : null;
                 setHeaders(dataHeadersToArray(rawData));
+                setLinks(dataLinksToArray(rawData));
 
                 const cts = (response.content_types || []).map((ct: any) => ({
                   id: ct.id,
@@ -750,7 +788,8 @@ export default function ResponsePropertiesPanel({
           : currentResponse?.data && typeof currentResponse.data === 'object'
             ? (typeof currentResponse.data === 'string' ? JSON.parse(currentResponse.data) : currentResponse.data)
             : {};
-      updateData.data = { ...baseData, headers: headersMap };
+      const linksMap = linksArrayToDataMap(links);
+      updateData.data = { ...baseData, headers: headersMap, links: linksMap };
 
       console.log('[ResponsePropertiesPanel] Updating response with data:', updateData);
       
@@ -1043,6 +1082,91 @@ export default function ResponsePropertiesPanel({
               ))}
               {headers.length === 0 && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 italic">No headers defined.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Response links (HATEOAS navigation) */}
+          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300">
+                <Link2 className="w-3.5 h-3.5" />
+                Links (HATEOAS)
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setLinks([...links, { name: '' }])}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add link
+              </Button>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+              Link relations to other operations (operationId or operationRef).
+            </p>
+            <div className="space-y-3">
+              {links.map((link, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2 rounded border ${isDark ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}
+                >
+                  <div className="flex gap-2 mb-1.5">
+                    <Input
+                      placeholder="Link name (e.g. user, order)"
+                      value={link.name}
+                      onChange={(e) => {
+                        const next = [...links];
+                        next[idx] = { ...next[idx], name: e.target.value };
+                        setLinks(next);
+                      }}
+                      className="flex-1 text-xs h-8 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLinks(links.filter((_, i) => i !== idx))}
+                      className="p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      aria-label="Remove link"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <Input
+                    placeholder="operationId (e.g. getUserById)"
+                    value={link.operationId ?? ''}
+                    onChange={(e) => {
+                      const next = [...links];
+                      next[idx] = { ...next[idx], operationId: e.target.value || undefined };
+                      setLinks(next);
+                    }}
+                    className="mb-1.5 text-xs h-7 font-mono"
+                  />
+                  <Input
+                    placeholder="operationRef (URI) — optional if operationId set"
+                    value={link.operationRef ?? ''}
+                    onChange={(e) => {
+                      const next = [...links];
+                      next[idx] = { ...next[idx], operationRef: e.target.value || undefined };
+                      setLinks(next);
+                    }}
+                    className="mb-1.5 text-xs h-7 font-mono"
+                  />
+                  <Input
+                    placeholder="Description (optional)"
+                    value={link.description ?? ''}
+                    onChange={(e) => {
+                      const next = [...links];
+                      next[idx] = { ...next[idx], description: e.target.value || undefined };
+                      setLinks(next);
+                    }}
+                    className="text-xs h-7"
+                  />
+                </div>
+              ))}
+              {links.length === 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 italic">No links defined.</p>
               )}
             </div>
           </div>

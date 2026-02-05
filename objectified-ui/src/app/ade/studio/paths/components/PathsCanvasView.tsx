@@ -2151,8 +2151,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               console.log('[PathsCanvasView] Response', response.status_code, 'has', contentTypes.length, 'content types');
             }
 
-            // Parse response headers from data (OpenAPI: headers is map of name -> { description?, schema? })
+            // Parse response headers and links from data (OpenAPI: headers/links are maps)
             let headers: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }> | undefined;
+            let links: Array<{ name: string; operationId?: string; operationRef?: string; description?: string }> | undefined;
             if (response.data) {
               try {
                 const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
@@ -2161,6 +2162,14 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                     name,
                     description: def?.description,
                     schema: def?.schema && typeof def.schema === 'object' ? { type: def.schema.type, format: def.schema.format } : undefined,
+                  }));
+                }
+                if (data.links && typeof data.links === 'object' && !Array.isArray(data.links)) {
+                  links = Object.entries(data.links).map(([name, link]: [string, any]) => ({
+                    name,
+                    operationId: link?.operationId,
+                    operationRef: link?.operationRef,
+                    description: link?.description,
                   }));
                 }
               } catch (_) {
@@ -2185,6 +2194,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 contentTypes,
                 inlineSchema,
                 headers,
+                links,
                 linkedOperations: responseLinkedOpsMap.get(response.id) || [],
                 onDelete: () => handleDeleteSharedResponse(response.id, response.status_code),
                 onUnlink: (operationId: string) => {
