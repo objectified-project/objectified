@@ -49,7 +49,8 @@ export interface PathResponseData {
     enum?: (string | number | boolean | null)[];
     default?: unknown;
   } | null;
-  headers?: Array<{ name: string; description?: string }>;
+  /** Response headers (OpenAPI: name, description, schema) */
+  headers?: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }>;
 }
 
 // Helper to get schema display text for primitives and arrays
@@ -419,8 +420,11 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
               <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Headers:</div>
               <div className="space-y-0.5">
                 {data.headers!.map((header, idx) => (
-                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400 font-mono">
-                    {header.name}
+                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                    <span className="font-mono">{header.name}</span>
+                    {header.schema?.type && (
+                      <span className="text-gray-500 dark:text-gray-500 font-mono">({header.schema.type}{header.schema.format ? `, ${header.schema.format}` : ''})</span>
+                    )}
                   </div>
                 ))}
               </div>

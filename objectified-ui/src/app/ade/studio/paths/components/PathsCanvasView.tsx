@@ -2151,6 +2151,23 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               console.log('[PathsCanvasView] Response', response.status_code, 'has', contentTypes.length, 'content types');
             }
 
+            // Parse response headers from data (OpenAPI: headers is map of name -> { description?, schema? })
+            let headers: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }> | undefined;
+            if (response.data) {
+              try {
+                const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+                if (data.headers && typeof data.headers === 'object' && !Array.isArray(data.headers)) {
+                  headers = Object.entries(data.headers).map(([name, def]: [string, any]) => ({
+                    name,
+                    description: def?.description,
+                    schema: def?.schema && typeof def.schema === 'object' ? { type: def.schema.type, format: def.schema.format } : undefined,
+                  }));
+                }
+              } catch (_) {
+                // ignore
+              }
+            }
+
             allResponseNodes.push({
               id: responseNodeId,
               type: 'response',
@@ -2167,6 +2184,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 attachedClassName,
                 contentTypes,
                 inlineSchema,
+                headers,
                 linkedOperations: responseLinkedOpsMap.get(response.id) || [],
                 onDelete: () => handleDeleteSharedResponse(response.id, response.status_code),
                 onUnlink: (operationId: string) => {

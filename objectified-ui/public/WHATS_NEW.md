@@ -44,6 +44,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Configure serialization style for parameterized variables: form, spaceDelimited, pipeDelimited, deepObject
   - Added flag to explode variable arrays and objects in the parameterized variables section
   - Added autocomplete on variable name suggestions for common parameter names in the parameters panel
+  - Added custom response headers to response codes
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
   - Dragging a class to a response schema allows the class to be copied or referenced
 - OpenAPI Support:

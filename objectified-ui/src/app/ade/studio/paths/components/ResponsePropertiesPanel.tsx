@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { Textarea } from '../../../../components/ui/Textarea';
+import { Input } from '../../../../components/ui/Input';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { useDialog } from '../../../../components/providers/DialogProvider';
 import {
@@ -19,6 +20,13 @@ import {
 import SchemaBuilder from './SchemaBuilder';
 import { useStudio } from '../../StudioContext';
 
+/** Single response header (OpenAPI: name, description, schema) */
+export interface ResponseHeaderItem {
+  name: string;
+  description?: string;
+  schema?: { type?: string; format?: string };
+}
+
 interface ResponsePropertiesPanelProps {
   responseId: string | null;
   statusCode: string;
@@ -27,6 +35,27 @@ interface ResponsePropertiesPanelProps {
   refreshKey?: number; // Key from parent to force reload
   onClose: () => void;
   onRefresh?: () => void;
+}
+
+function dataHeadersToArray(data: any): ResponseHeaderItem[] {
+  if (!data?.headers || typeof data.headers !== 'object' || Array.isArray(data.headers)) return [];
+  return Object.entries(data.headers).map(([name, def]: [string, any]) => ({
+    name,
+    description: def?.description,
+    schema: def?.schema && typeof def.schema === 'object' ? { type: def.schema.type, format: def.schema.format } : undefined,
+  }));
+}
+
+function headersArrayToDataMap(headers: ResponseHeaderItem[]): Record<string, { description?: string; schema?: { type?: string; format?: string } }> {
+  const map: Record<string, { description?: string; schema?: { type?: string; format?: string } }> = {};
+  for (const h of headers) {
+    if (!h.name.trim()) continue;
+    const key = h.name.trim();
+    map[key] = {};
+    if (h.description?.trim()) map[key].description = h.description.trim();
+    if (h.schema?.type) map[key].schema = { type: h.schema.type, format: h.schema.format };
+  }
+  return map;
 }
 
 export default function ResponsePropertiesPanel({
@@ -45,6 +74,7 @@ export default function ResponsePropertiesPanel({
   const [description, setDescription] = useState(initialDescription);
   const [responseSchema, setResponseSchema] = useState<any>(null);
   const [currentResponse, setCurrentResponse] = useState<any>(null); // Store full response data
+  const [headers, setHeaders] = useState<ResponseHeaderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
@@ -56,6 +86,8 @@ export default function ResponsePropertiesPanel({
     if (!responseId || !versionPathId) {
       setDescription('');
       setResponseSchema(null);
+      setHeaders([]);
+      setCurrentResponse(null);
       return;
     }
 
@@ -75,6 +107,10 @@ export default function ResponsePropertiesPanel({
             
             // Update description
             setDescription(response.description || initialDescription);
+
+            // Load response headers from data.headers (OpenAPI format: map of name -> { description?, schema? })
+            const rawData = response.data ? (typeof response.data === 'string' ? JSON.parse(response.data) : response.data) : null;
+            setHeaders(dataHeadersToArray(rawData));
 
             // Load schema based on schema_mode
             let schema: any = null;
@@ -179,6 +215,9 @@ export default function ResponsePropertiesPanel({
                 setCurrentResponse(response);
                 
                 setDescription(response.description || initialDescription);
+
+                const rawData = response.data ? (typeof response.data === 'string' ? JSON.parse(response.data) : response.data) : null;
+                setHeaders(dataHeadersToArray(rawData));
 
                 // Load schema based on schema_mode (same logic as main useEffect)
                 let schema: any = null;
@@ -553,6 +592,16 @@ export default function ResponsePropertiesPanel({
 
       updateData.schemaMode = schemaMode;
 
+      // Merge response headers into data (OpenAPI: data.headers = map of name -> { description?, schema? })
+      const headersMap = headersArrayToDataMap(headers);
+      const baseData =
+        updateData.data !== undefined && updateData.data !== null && typeof updateData.data === 'object'
+          ? updateData.data
+          : currentResponse?.data && typeof currentResponse.data === 'object'
+            ? (typeof currentResponse.data === 'string' ? JSON.parse(currentResponse.data) : currentResponse.data)
+            : {};
+      updateData.data = { ...baseData, headers: headersMap };
+
       console.log('[ResponsePropertiesPanel] Updating response with data:', updateData);
       
       const result = await updateSharedPathResponse(responseId, updateData);
@@ -647,6 +696,107 @@ export default function ResponsePropertiesPanel({
                 allowInline={true}
               />
             )}
+          </div>
+
+          {/* Response Headers (name, description, schema) */}
+          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Response headers
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setHeaders([...headers, { name: '' }])}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add header
+              </Button>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+              Headers returned with this response (name, description, schema).
+            </p>
+            <div className="space-y-3">
+              {headers.map((header, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2 rounded border ${isDark ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}
+                >
+                  <div className="flex gap-2 mb-1.5">
+                    <Input
+                      placeholder="Header name (e.g. X-Rate-Limit)"
+                      value={header.name}
+                      onChange={(e) => {
+                        const next = [...headers];
+                        next[idx] = { ...next[idx], name: e.target.value };
+                        setHeaders(next);
+                      }}
+                      className="flex-1 text-xs h-8 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setHeaders(headers.filter((_, i) => i !== idx))}
+                      className="p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      aria-label="Remove header"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <Input
+                    placeholder="Description (optional)"
+                    value={header.description ?? ''}
+                    onChange={(e) => {
+                      const next = [...headers];
+                      next[idx] = { ...next[idx], description: e.target.value };
+                      setHeaders(next);
+                    }}
+                    className="mb-1.5 text-xs h-7"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={header.schema?.type ?? ''}
+                      onChange={(e) => {
+                        const next = [...headers];
+                        const type = e.target.value || undefined;
+                        next[idx] = {
+                          ...next[idx],
+                          schema: type ? { ...next[idx].schema, type } : undefined,
+                        };
+                        setHeaders(next);
+                      }}
+                      className={`text-xs h-7 rounded border flex-1 ${isDark ? 'border-slate-600 bg-slate-800 text-slate-200' : 'border-slate-300 bg-white'}`}
+                    >
+                      <option value="">No schema type</option>
+                      <option value="string">string</option>
+                      <option value="integer">integer</option>
+                      <option value="number">number</option>
+                      <option value="boolean">boolean</option>
+                      <option value="array">array</option>
+                      <option value="object">object</option>
+                    </select>
+                    <Input
+                      placeholder="Format (e.g. int32)"
+                      value={header.schema?.format ?? ''}
+                      onChange={(e) => {
+                        const next = [...headers];
+                        const format = e.target.value || undefined;
+                        next[idx] = {
+                          ...next[idx],
+                          schema: next[idx].schema ? { ...next[idx].schema!, format } : format ? { type: 'string', format } : undefined,
+                        };
+                        setHeaders(next);
+                      }}
+                      className="text-xs h-7 w-24 font-mono"
+                    />
+                  </div>
+                </div>
+              ))}
+              {headers.length === 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 italic">No headers defined.</p>
+              )}
+            </div>
           </div>
 
           {/* Save Button */}
