@@ -38,7 +38,14 @@ export interface ContentTypeMapItem {
   class_id?: string | null;
   class_name?: string | null;
   inline_schema?: { type?: string; properties?: any[]; items?: any; $ref?: string } | null;
-  examples?: unknown[] | null;
+  examples?: ResponseExampleItem[] | null;
+}
+
+/** Single example per content type (OpenAPI: name/summary/value) */
+export interface ResponseExampleItem {
+  name?: string;
+  summary?: string;
+  value?: unknown;
 }
 
 /** Single response header (OpenAPI: name, description, schema) */
@@ -692,6 +699,17 @@ export default function ResponsePropertiesPanel({
     }
   };
 
+  const handleContentTypeExamplesChange = async (contentId: string, examples: ResponseExampleItem[]) => {
+    try {
+      const result = await updateResponseContentType(contentId, { examples: examples.length ? examples : null });
+      const parsed = JSON.parse(result);
+      if (!parsed.success) await alertDialog({ message: parsed.error || 'Failed to update examples', variant: 'error' });
+      else await reloadContentTypes();
+    } catch (e) {
+      await alertDialog({ message: 'Failed to update examples', variant: 'error' });
+    }
+  };
+
   const handleSave = async () => {
     if (!responseId) return;
 
@@ -938,6 +956,94 @@ export default function ResponsePropertiesPanel({
                             Inline schema ({Array.isArray(ct.inline_schema?.properties) ? ct.inline_schema.properties.length : 0} properties). Use Operation panel → Responses to edit inline schema.
                           </p>
                         )}
+                      </div>
+
+                      {/* Examples per content type */}
+                      <div className={`pt-3 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Examples</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px]"
+                            onClick={() => {
+                              const prev = (ct.examples || []) as ResponseExampleItem[];
+                              const next = [...prev, { name: `Example ${prev.length + 1}`, summary: '', value: {} }];
+                              handleContentTypeExamplesChange(ct.id, next);
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Add example
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-2">
+                          Example responses for this content type (name, summary, value).
+                        </p>
+                        <div className="space-y-2">
+                          {((ct.examples || []) as ResponseExampleItem[]).map((ex, exIdx) => (
+                            <div
+                              key={exIdx}
+                              className={`p-2 rounded border ${isDark ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50/50'}`}
+                            >
+                              <div className="flex gap-2 mb-1.5">
+                                <Input
+                                  placeholder="Name (optional)"
+                                  value={ex.name ?? ''}
+                                  onChange={(e) => {
+                                    const prev = (ct.examples || []) as ResponseExampleItem[];
+                                    const next = prev.map((x, i) => i === exIdx ? { ...x, name: e.target.value || undefined } : x);
+                                    handleContentTypeExamplesChange(ct.id, next);
+                                  }}
+                                  className="text-xs h-7 flex-1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const prev = (ct.examples || []) as ResponseExampleItem[];
+                                    handleContentTypeExamplesChange(ct.id, prev.filter((_, i) => i !== exIdx));
+                                  }}
+                                  className="p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  aria-label="Remove example"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <Input
+                                placeholder="Summary (optional)"
+                                value={ex.summary ?? ''}
+                                onChange={(e) => {
+                                  const prev = (ct.examples || []) as ResponseExampleItem[];
+                                  const next = prev.map((x, i) => i === exIdx ? { ...x, summary: e.target.value || undefined } : x);
+                                  handleContentTypeExamplesChange(ct.id, next);
+                                }}
+                                className="mb-1.5 text-xs h-7"
+                              />
+                              <Textarea
+                                key={`${ct.id}-${exIdx}-${JSON.stringify((ex as ResponseExampleItem).value ?? {})}`}
+                                placeholder='Value (JSON, e.g. {"id": 1, "name": "..."})'
+                                defaultValue={typeof (ex as ResponseExampleItem).value === 'object' && (ex as ResponseExampleItem).value !== null
+                                  ? JSON.stringify((ex as ResponseExampleItem).value, null, 2)
+                                  : (ex as ResponseExampleItem).value !== undefined && (ex as ResponseExampleItem).value !== null
+                                    ? String((ex as ResponseExampleItem).value)
+                                    : '{}'}
+                                onBlur={(e) => {
+                                  const raw = e.target.value.trim();
+                                  let value: unknown = raw ? (() => { try { return JSON.parse(raw); } catch { return undefined; } })() : {};
+                                  if (value === undefined) return;
+                                  const prev = (ct.examples || []) as ResponseExampleItem[];
+                                  const next = prev.map((x, i) => i === exIdx ? { ...x, value } : x);
+                                  handleContentTypeExamplesChange(ct.id, next);
+                                }}
+                                rows={3}
+                                className="text-[11px] font-mono resize-none"
+                              />
+                            </div>
+                          ))}
+                          {(ct.examples?.length ?? 0) === 0 && (
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 italic">No examples. Add one to document sample responses.</p>
+                          )}
+                        </div>
                       </div>
                     </TabsContent>
                   ))}

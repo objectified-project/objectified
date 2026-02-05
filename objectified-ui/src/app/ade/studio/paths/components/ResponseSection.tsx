@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { FileJson, Plus, ChevronDown, ChevronRight, Trash2, Wand2, RefreshCw } from 'lucide-react';
+import { FileJson, Plus, ChevronDown, ChevronRight, Trash2, Wand2, RefreshCw, ListChecks } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { Label } from '../../../../components/ui/Label';
+import { Textarea } from '../../../../components/ui/Textarea';
 import { Checkbox } from '../../../../components/ui/Checkbox';
 import {
   Select,
@@ -28,6 +29,7 @@ import {
   getResponseContentTypes,
   addResponseContentType,
   deleteResponseContentType,
+  updateResponseContentType,
   convertResponseClassToInlineSchema,
   setResponseContentTypeClassReference,
   addPropertyToResponseInlineSchema,
@@ -47,13 +49,19 @@ import {
 // TYPES
 // =============================================================================
 
+interface ResponseExampleItem {
+  name?: string;
+  summary?: string;
+  value?: unknown;
+}
+
 interface ContentTypeInfo {
   id: string;
   media_type: string;
   class_id?: string | null;
   class_name?: string | null;
   inline_schema?: InlineSchema | null;
-  examples?: unknown[] | null;
+  examples?: ResponseExampleItem[] | null;
 }
 
 interface ResponseInfo {
@@ -526,6 +534,19 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
     ? buildPropertyTreeFromInlineSchema(currentContentType.inline_schema)
     : [];
 
+  const handleContentTypeExamplesChange = async (contentId: string, examples: ResponseExampleItem[]) => {
+    try {
+      const result = await updateResponseContentType(contentId, { examples: examples.length ? examples : null });
+      const data = JSON.parse(result);
+      if (data.success) {
+        await loadContentTypes();
+        onUpdate();
+      }
+    } catch (e) {
+      console.error('Error updating examples:', e);
+    }
+  };
+
   return (
     <TooltipProvider>
     <div>
@@ -604,6 +625,99 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
               ))}
             </TabsList>
           </Tabs>
+        </div>
+      )}
+
+      {/* Examples for selected content type */}
+      {contentTypes.length > 0 && currentContentType && (
+        <div className={`mb-6 p-4 rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold flex items-center gap-1.5">
+              <ListChecks size={16} />
+              Examples for {currentContentType.media_type}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const prev = (currentContentType.examples || []) as ResponseExampleItem[];
+                const next = [...prev, { name: `Example ${prev.length + 1}`, summary: '', value: {} }];
+                handleContentTypeExamplesChange(currentContentType.id, next);
+              }}
+            >
+              <Plus size={14} className="mr-1" />
+              Add example
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Sample response values for this content type (name, summary, value).
+          </p>
+          <div className="space-y-3">
+            {((currentContentType.examples || []) as ResponseExampleItem[]).map((ex, exIdx) => (
+              <div
+                key={exIdx}
+                className={`p-3 rounded border ${isDark ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-white'}`}
+              >
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="Name (optional)"
+                    value={ex.name ?? ''}
+                    onChange={(e) => {
+                      const prev = (currentContentType!.examples || []) as ResponseExampleItem[];
+                      const next = prev.map((x, i) => i === exIdx ? { ...x, name: e.target.value || undefined } : x);
+                      handleContentTypeExamplesChange(currentContentType!.id, next);
+                    }}
+                    className="text-xs h-8 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-red-600 hover:text-red-700"
+                    onClick={() => {
+                      const prev = (currentContentType!.examples || []) as ResponseExampleItem[];
+                      handleContentTypeExamplesChange(currentContentType!.id, prev.filter((_, i) => i !== exIdx));
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+                <Input
+                  placeholder="Summary (optional)"
+                  value={ex.summary ?? ''}
+                  onChange={(e) => {
+                    const prev = (currentContentType!.examples || []) as ResponseExampleItem[];
+                    const next = prev.map((x, i) => i === exIdx ? { ...x, summary: e.target.value || undefined } : x);
+                    handleContentTypeExamplesChange(currentContentType!.id, next);
+                  }}
+                  className="mb-2 text-xs h-8"
+                />
+                <Textarea
+                  key={`${currentContentType.id}-${exIdx}-${JSON.stringify((ex as ResponseExampleItem).value ?? {})}`}
+                  placeholder='Value (JSON, e.g. {"id": 1, "name": "..."})'
+                  defaultValue={typeof (ex as ResponseExampleItem).value === 'object' && (ex as ResponseExampleItem).value !== null
+                    ? JSON.stringify((ex as ResponseExampleItem).value, null, 2)
+                    : (ex as ResponseExampleItem).value !== undefined && (ex as ResponseExampleItem).value !== null
+                      ? String((ex as ResponseExampleItem).value)
+                      : '{}'}
+                  onBlur={(e) => {
+                    const raw = e.target.value.trim();
+                    const value: unknown = raw ? (() => { try { return JSON.parse(raw); } catch { return undefined; } })() : {};
+                    if (value === undefined) return;
+                    const prev = (currentContentType!.examples || []) as ResponseExampleItem[];
+                    const next = prev.map((x, i) => i === exIdx ? { ...x, value } : x);
+                    handleContentTypeExamplesChange(currentContentType!.id, next);
+                  }}
+                  rows={3}
+                  className="text-xs font-mono resize-none"
+                />
+              </div>
+            ))}
+            {((currentContentType.examples || []).length) === 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">No examples. Add one to document sample responses.</p>
+            )}
+          </div>
         </div>
       )}
 

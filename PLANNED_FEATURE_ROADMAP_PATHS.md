@@ -110,11 +110,7 @@ structure immediately recognizable.
 - ✅ Response headers (name, schema, description)
 - ✅ Content type map with schema bindings
 - ✅ Links (HATEOAS navigation)
-- 📋 Examples per content type
-
-| Ticket | Feature                                                |
-|--------|--------------------------------------------------------|
-| #397   | Add content-type examples to response node             |
+- ✅ Examples per content type
 
 **Advanced Features**:
 - 📋 Response range patterns: 2XX, 4XX, 5XX wildcards
