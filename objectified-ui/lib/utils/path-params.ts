@@ -36,3 +36,26 @@ export function replacePathParameters(
   });
 }
 
+/**
+ * Check if a path template is valid (OpenAPI-style).
+ * Invalid: empty/whitespace, does not start with /, unclosed or empty braces.
+ */
+export function isValidPath(pathname: string): boolean {
+  const s = pathname.trim();
+  if (s.length === 0) return false;
+  if (s[0] !== '/') return false;
+  // Reject empty parameter {}
+  if (/\{\s*\}/.test(s)) return false;
+  // Unclosed brace: count { and }
+  const open = (s.match(/\{/g) || []).length;
+  const close = (s.match(/\}/g) || []).length;
+  if (open !== close) return false;
+  // No } before a matching {
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}') depth--;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}

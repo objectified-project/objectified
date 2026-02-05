@@ -43,7 +43,7 @@ import {
   updateSharedPathParameter,
   deleteSharedPathParameter,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
-import { extractPathParameters } from '../../../../../../lib/utils/path-params';
+import { extractPathParameters, isValidPath } from '../../../../../../lib/utils/path-params';
 import {
   getLinkedResponsesForOperation,
   getSharedPathResponses,
@@ -3327,11 +3327,24 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   return (
     <div ref={reactFlowWrapper} className="flex-1 flex flex-col h-full">
       {/* Path header with clickable variables - click to edit schema, or drag a property here for type binding */}
-      {selectedPathId && pathname && extractPathParameters(pathname).length > 0 && (
+      {selectedPathId && pathname && (
         <div
-          className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 flex items-center gap-1 flex-wrap font-mono text-sm"
-          title="Click a variable to edit its schema, or drag a property from the sidebar for type binding"
+          className={`relative flex-shrink-0 px-4 py-2 border-b bg-white/95 dark:bg-gray-800/95 flex items-center gap-1 flex-wrap font-mono text-sm ${
+            !isValidPath(pathname)
+              ? 'border-2 border-red-600 ring-2 ring-red-500/50 dark:border-red-500 dark:ring-red-400/50'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={
+            !isValidPath(pathname)
+              ? 'Invalid path: must start with / and use valid {param} placeholders'
+              : 'Click a variable to edit its schema, or drag a property from the sidebar for type binding'
+          }
         >
+          {!isValidPath(pathname) && (
+            <div className="absolute top-1.5 right-2 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
+              <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
+            </div>
+          )}
           <span className="text-gray-500 dark:text-gray-400 mr-1">Path:</span>
           {parsePathSegments(pathname).map((seg, i) =>
             seg.type === 'literal' ? (

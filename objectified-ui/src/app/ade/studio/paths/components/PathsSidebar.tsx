@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Select,
@@ -24,6 +24,7 @@ import {
   deletePath as deletePathRest,
   createOperation as createOperationRest,
 } from '../../../../../../lib/api/paths-client';
+import { isValidPath } from '../../../../../../lib/utils/path-params';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS } from './paths-operation-colors';
 
@@ -437,18 +438,28 @@ export default function PathsSidebar({
                         );
                       }
 
-                      return filteredPaths.map((path) => (
+                      return filteredPaths.map((path) => {
+                        const invalid = !isValidPath(path.pathname);
+                        return (
                       <div
                         key={path.id}
                         onClick={() => onPathSelect(path.id, path.pathname)}
-                        className={`flex items-center justify-between px-3 py-2 rounded border cursor-pointer transition-all duration-150 ${
-                          selectedPathId === path.id
-                            ? 'border-2 border-indigo-500 bg-indigo-500/20 hover:bg-indigo-500/30'
-                            : isDark
-                              ? 'border-gray-700 bg-gray-700/30 hover:bg-gray-700/50'
-                              : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                        className={`relative flex items-center justify-between px-3 py-2 rounded border cursor-pointer transition-all duration-150 ${
+                          invalid
+                            ? 'border-2 border-red-600 ring-2 ring-red-500/60 bg-red-500/15 dark:bg-red-500/20 dark:ring-red-400/50'
+                            : selectedPathId === path.id
+                              ? 'border-2 border-indigo-500 bg-indigo-500/20 hover:bg-indigo-500/30'
+                              : isDark
+                                ? 'border-gray-700 bg-gray-700/30 hover:bg-gray-700/50'
+                                : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                         }`}
+                        title={invalid ? 'Invalid path: must start with / and use valid {param} placeholders' : undefined}
                       >
+                        {invalid && (
+                          <div className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
+                            <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <span className={`text-sm truncate block ${
                             selectedPathId === path.id 
@@ -458,7 +469,7 @@ export default function PathsSidebar({
                             {path.pathname}
                           </span>
                         </div>
-                        <div className="flex gap-1">
+                        <div className={`flex gap-1 shrink-0 ${invalid ? 'pl-6' : ''}`}>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -487,7 +498,7 @@ export default function PathsSidebar({
                           </button>
                         </div>
                       </div>
-                    ));
+                    ); });
                     })()}
                   </div>
                 </div>

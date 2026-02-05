@@ -32,12 +32,11 @@ structure immediately recognizable.
 **Features**: 📋 PLANNED
 - ✅ Click on `{variable}` to open inline schema editor
 - ✅ Drag schema property onto variable for type binding
-- 📋 Visual validation: invalid paths show red border
+- ✅ Visual validation: invalid paths show red border
 - 📋 Path template preview with sample values
 
 | Ticket | Feature                                                                  |
 |--------|--------------------------------------------------------------------------|
-| #359   | Add invalid paths with a red border                                      |
 | #360   | Add path template preview with sample values                             |
 
 #### 2.2 Method Nodes (HTTP Operations) 📋 PLANNED
