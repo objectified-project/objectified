@@ -432,10 +432,10 @@ function ContentTypePanel({
     };
     const classProps = content.classProperties || [];
     const getTypeLabel = (p: ClassPropertyDisplay) => {
-      const d = p.data;
+      const d = p.data as { type?: string; $ref?: string; items?: { $ref?: string } } | undefined;
       if (!d) return 'any';
       if (d.$ref) return d.$ref.split('/').pop() || 'ref';
-      if (d.type === 'array' && d.items?.$ref) return `${(d.items.$ref as string).split('/').pop()}[]`;
+      if (d.type === 'array' && d.items?.$ref) return `${d.items.$ref.split('/').pop()}[]`;
       return d.type || 'any';
     };
     return (

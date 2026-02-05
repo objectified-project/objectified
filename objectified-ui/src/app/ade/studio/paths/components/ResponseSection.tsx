@@ -581,9 +581,10 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
         )}
       </div>
 
-      {/* Content Type Tabs */}
+      {/* Content type map with schema bindings */}
       {contentTypes.length > 0 && (
         <div className="border-b border-gray-200 dark:border-gray-700 mb-4">
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">Content type map (schema bindings)</span>
           <Tabs value={String(selectedContentTypeIndex)} onValueChange={(v) => setSelectedContentTypeIndex(Number(v))}>
             <TabsList className="h-8 w-full justify-start overflow-x-auto">
               {contentTypes.map((ct, index) => (

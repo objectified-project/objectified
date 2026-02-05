@@ -151,23 +151,32 @@ const SmartEdge: React.FC<EdgeProps> = ({
       />
       {label && (
         <g transform={`translate(${labelX}, ${labelY})`}>
-          <rect
-            x={-40}
-            y={-10}
-            width={80}
-            height={20}
-            rx={4}
-            style={labelBgStyle}
-          />
-          <text
-            x={0}
-            y={4}
-            textAnchor="middle"
-            style={labelStyle}
-            className="react-flow__edge-text"
-          >
-            {label as string}
-          </text>
+          {(() => {
+            const text = label as string;
+            const w = Math.max(80, Math.min(200, text.length * 6.5));
+            const h = 20;
+            return (
+              <>
+                <rect
+                  x={-w / 2}
+                  y={-h / 2}
+                  width={w}
+                  height={h}
+                  rx={4}
+                  style={labelBgStyle}
+                />
+                <text
+                  x={0}
+                  y={4}
+                  textAnchor="middle"
+                  style={labelStyle}
+                  className="react-flow__edge-text"
+                >
+                  {text}
+                </text>
+              </>
+            );
+          })()}
         </g>
       )}
     </>

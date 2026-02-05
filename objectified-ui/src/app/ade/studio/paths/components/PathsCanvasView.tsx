@@ -2340,6 +2340,20 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
           });
         }
 
+        // Helper: content types with schema binding -> short label for edge (e.g. "application/json" or "application/json, application/xml")
+        const getContentTypeEdgeLabel = (contentTypes: Array<{ media_type?: string; class_id?: string | null; inline_schema?: any }> | undefined): string | undefined => {
+          if (!contentTypes?.length) return undefined;
+          const withSchema = contentTypes.filter((ct: any) =>
+            ct.class_id || (ct.inline_schema && (ct.inline_schema.type || ct.inline_schema.$ref || (Array.isArray(ct.inline_schema?.properties) && ct.inline_schema.properties.length > 0)))
+          );
+          if (withSchema.length === 0) return undefined;
+          const mediaTypes = withSchema.map((ct: any) => ct.media_type).filter(Boolean);
+          if (mediaTypes.length === 0) return undefined;
+          if (mediaTypes.length === 1) return mediaTypes[0];
+          if (mediaTypes.length === 2) return `${mediaTypes[0]}, ${mediaTypes[1]}`;
+          return `${mediaTypes[0]}, +${mediaTypes.length - 1}`;
+        };
+
         // Create edges from response nodes to response body nodes
         allResponseBodyNodes.forEach((responseBodyNode) => {
           const responseId = (responseBodyNode.data as any).id;
@@ -2352,6 +2366,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               : edgeRouting === 'smart' ? 'smart'
               : 'smoothstep';
 
+            const bodyContentTypes = (responseBodyNode.data as any).contentTypes;
+            const contentTypeLabel = getContentTypeEdgeLabel(bodyContentTypes);
+
             allEdges.push({
               id: `edge-resp-body-${responseId}`,
               source: responseNodeId,
@@ -2360,6 +2377,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               targetHandle: 'response-input', // PathResponseBodyNode uses this
               type: edgeType,
               animated: edgeAnimation !== 'none',
+              label: contentTypeLabel,
+              labelStyle: { fontSize: 10, fill: '#1e40af' },
+              labelBgStyle: { fill: '#dbeafe', stroke: '#60a5fa' },
               style: {
                 stroke: '#60a5fa', // Blue for response-to-body edges
                 strokeWidth: 2,
@@ -2372,10 +2392,14 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
         // Create edges from operations to responses using the already-collected linked operations
         responseLinkedOpsMap.forEach((linkedOps, responseId) => {
           const responseNodeId = `response-${responseId}`;
+          const responseNode = allResponseNodes.find((n) => n.id === responseNodeId);
+          const responseContentTypes = (responseNode?.data as any)?.contentTypes;
+          const contentTypeLabel = getContentTypeEdgeLabel(responseContentTypes);
+
           linkedOps.forEach((op) => {
             console.log('[PathsCanvasView] Creating edge from', op.id, 'to', responseNodeId);
 
-            // Create edge from operation to response
+            // Create edge from operation to response (label = content types with schema bindings)
             const edgeType = edgeRouting === 'straight' ? 'straight'
               : edgeRouting === 'bezier' ? 'default'
               : edgeRouting === 'smart' ? 'smart'
@@ -2389,6 +2413,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               targetHandle: 'response-input',
               type: edgeType,
               animated: edgeAnimation !== 'none',
+              label: contentTypeLabel,
+              labelStyle: { fontSize: 10, fill: '#5b21b6' },
+              labelBgStyle: { fill: '#ede9fe', stroke: '#a78bfa' },
               style: {
                 stroke: '#a78bfa',
                 strokeWidth: 2,

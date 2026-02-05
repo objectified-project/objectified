@@ -108,13 +108,12 @@ structure immediately recognizable.
 - ✅ Status code (100-599)
 - ✅ Description (auto-populated from status code, configurable)
 - ✅ Response headers (name, schema, description)
-- 📋 Content type map with schema bindings
+- ✅ Content type map with schema bindings
 - 📋 Links (HATEOAS navigation)
 - 📋 Examples per content type
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
-| #395   | Add content type map with schema bindings              |
 | #396   | Add links (HATEOAS navigation)                         |
 | #397   | Add content-type examples to response node             |
 

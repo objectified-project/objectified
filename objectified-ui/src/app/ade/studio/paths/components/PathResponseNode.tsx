@@ -263,9 +263,9 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
           <span className="text-lg">{config.icon}</span>
         </div>
 
-        {/* Content Section */}
+        {/* Content type map with schema bindings */}
         <div className="p-3">
-          <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">Content:</div>
+          <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mb-1.5">Content type map:</div>
 
           {/* Priority 1: Primitive/Array types from inlineSchema */}
           {showInlineSchemaFirst ? (

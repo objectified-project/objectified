@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Save, Plus, Trash2, FileJson } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { Textarea } from '../../../../components/ui/Textarea';
 import { Input } from '../../../../components/ui/Input';
@@ -15,10 +15,31 @@ import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
 import {
+  addResponseContentType,
   deleteResponseContentType,
+  setResponseContentTypeClassReference,
+  updateResponseContentType,
 } from '../../../../../../lib/db/helper-shared-path-responses-content';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../../components/ui/Select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../components/ui/Tabs';
 import SchemaBuilder from './SchemaBuilder';
 import { useStudio } from '../../StudioContext';
+
+/** Content type with schema binding (class or inline) - matches API shape */
+export interface ContentTypeMapItem {
+  id: string;
+  media_type: string;
+  class_id?: string | null;
+  class_name?: string | null;
+  inline_schema?: { type?: string; properties?: any[]; items?: any; $ref?: string } | null;
+  examples?: unknown[] | null;
+}
 
 /** Single response header (OpenAPI: name, description, schema) */
 export interface ResponseHeaderItem {
@@ -75,6 +96,12 @@ export default function ResponsePropertiesPanel({
   const [responseSchema, setResponseSchema] = useState<any>(null);
   const [currentResponse, setCurrentResponse] = useState<any>(null); // Store full response data
   const [headers, setHeaders] = useState<ResponseHeaderItem[]>([]);
+  const [contentTypes, setContentTypes] = useState<ContentTypeMapItem[]>([]);
+  const [selectedContentTypeIndex, setSelectedContentTypeIndex] = useState(0);
+  const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const [newMediaType, setNewMediaType] = useState('application/json');
+  const [showAddContentType, setShowAddContentType] = useState(false);
+  const [isSavingContentType, setIsSavingContentType] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
@@ -87,6 +114,7 @@ export default function ResponsePropertiesPanel({
       setDescription('');
       setResponseSchema(null);
       setHeaders([]);
+      setContentTypes([]);
       setCurrentResponse(null);
       return;
     }
@@ -111,6 +139,18 @@ export default function ResponsePropertiesPanel({
             // Load response headers from data.headers (OpenAPI format: map of name -> { description?, schema? })
             const rawData = response.data ? (typeof response.data === 'string' ? JSON.parse(response.data) : response.data) : null;
             setHeaders(dataHeadersToArray(rawData));
+
+            // Content type map: each content type has its own schema binding (class_id or inline_schema)
+            const cts = (response.content_types || []).map((ct: any) => ({
+              id: ct.id,
+              media_type: ct.media_type,
+              class_id: ct.class_id,
+              class_name: ct.class_name,
+              inline_schema: typeof ct.inline_schema === 'string' ? (ct.inline_schema ? JSON.parse(ct.inline_schema) : null) : ct.inline_schema,
+              examples: typeof ct.examples === 'string' ? (ct.examples ? JSON.parse(ct.examples) : null) : ct.examples,
+            }));
+            setContentTypes(cts);
+            setSelectedContentTypeIndex(0);
 
             // Load schema based on schema_mode
             let schema: any = null;
@@ -184,6 +224,51 @@ export default function ResponsePropertiesPanel({
     loadResponse();
   }, [responseId, versionPathId, initialDescription, refreshKey]); // Include refreshKey to reload when canvas refreshes
 
+  // Load classes for content type schema binding (class reference dropdown)
+  useEffect(() => {
+    if (!selectedVersionId) {
+      setClasses([]);
+      return;
+    }
+    const loadClasses = async () => {
+      try {
+        const res = await getClassesWithPropertiesAndTags(selectedVersionId);
+        const data: any[] = JSON.parse(res as string);
+        setClasses((data || []).map((c: any) => ({ id: c.id, name: c.name })));
+      } catch {
+        setClasses([]);
+      }
+    };
+    loadClasses();
+  }, [selectedVersionId]);
+
+  // Reload content types from server (after add/delete/class change)
+  const reloadContentTypes = useCallback(async () => {
+    if (!responseId || !versionPathId) return;
+    try {
+      const responsesResponse = await getSharedPathResponses(versionPathId);
+      const parsed = JSON.parse(responsesResponse);
+      if (parsed.success && parsed.responses) {
+        const response = parsed.responses.find((r: any) => r.id === responseId);
+        if (response?.content_types) {
+          const cts = response.content_types.map((ct: any) => ({
+            id: ct.id,
+            media_type: ct.media_type,
+            class_id: ct.class_id,
+            class_name: ct.class_name,
+            inline_schema: typeof ct.inline_schema === 'string' ? (ct.inline_schema ? JSON.parse(ct.inline_schema) : null) : ct.inline_schema,
+            examples: typeof ct.examples === 'string' ? (ct.examples ? JSON.parse(ct.examples) : null) : ct.examples,
+          }));
+          setContentTypes(cts);
+          setCurrentResponse((prev: any) => (prev ? { ...prev, content_types: response.content_types } : null));
+        }
+      }
+      if (onRefresh) onRefresh();
+    } catch (e) {
+      console.error('Error reloading content types:', e);
+    }
+  }, [responseId, versionPathId, onRefresh]);
+
   // Listen for onRefresh callback and reload when it's called
   // This happens when a class is dropped on a response
   const prevOnRefreshRef = useRef(onRefresh);
@@ -218,6 +303,16 @@ export default function ResponsePropertiesPanel({
 
                 const rawData = response.data ? (typeof response.data === 'string' ? JSON.parse(response.data) : response.data) : null;
                 setHeaders(dataHeadersToArray(rawData));
+
+                const cts = (response.content_types || []).map((ct: any) => ({
+                  id: ct.id,
+                  media_type: ct.media_type,
+                  class_id: ct.class_id,
+                  class_name: ct.class_name,
+                  inline_schema: typeof ct.inline_schema === 'string' ? (ct.inline_schema ? JSON.parse(ct.inline_schema) : null) : ct.inline_schema,
+                  examples: typeof ct.examples === 'string' ? (ct.examples ? JSON.parse(ct.examples) : null) : ct.examples,
+                }));
+                setContentTypes(cts);
 
                 // Load schema based on schema_mode (same logic as main useEffect)
                 let schema: any = null;
@@ -504,6 +599,61 @@ export default function ResponsePropertiesPanel({
     previousSchemaRef.current = newSchema;
   };
 
+  const handleAddContentType = async () => {
+    if (!responseId || !newMediaType.trim()) return;
+    setIsSavingContentType(true);
+    try {
+      const result = await addResponseContentType(
+        responseId,
+        newMediaType.trim(),
+        undefined,
+        { type: 'object', properties: [] },
+        undefined
+      );
+      const parsed = JSON.parse(result);
+      if (parsed.success) {
+        setNewMediaType('application/json');
+        setShowAddContentType(false);
+        await reloadContentTypes();
+      } else {
+        await alertDialog({ message: parsed.error || 'Failed to add content type', variant: 'error' });
+      }
+    } catch (e) {
+      await alertDialog({ message: 'Failed to add content type', variant: 'error' });
+    } finally {
+      setIsSavingContentType(false);
+    }
+  };
+
+  const handleDeleteContentType = async (contentTypeId: string) => {
+    if (!confirm('Remove this content type and its schema binding?')) return;
+    try {
+      await deleteResponseContentType(contentTypeId);
+      await reloadContentTypes();
+      setSelectedContentTypeIndex((i) => Math.max(0, i - 1));
+    } catch (e) {
+      await alertDialog({ message: 'Failed to delete content type', variant: 'error' });
+    }
+  };
+
+  const handleContentTypeClassChange = async (contentId: string, classId: string) => {
+    try {
+      if (!classId || classId === '__none__') {
+        const result = await updateResponseContentType(contentId, { classId: null });
+        const parsed = JSON.parse(result);
+        if (!parsed.success) await alertDialog({ message: parsed.error || 'Failed to clear class', variant: 'error' });
+        else await reloadContentTypes();
+        return;
+      }
+      const result = await setResponseContentTypeClassReference(contentId, classId);
+      const parsed = JSON.parse(result);
+      if (!parsed.success) await alertDialog({ message: parsed.error || 'Failed to set class', variant: 'error' });
+      else await reloadContentTypes();
+    } catch (e) {
+      await alertDialog({ message: 'Failed to update schema binding', variant: 'error' });
+    }
+  };
+
   const handleSave = async () => {
     if (!responseId) return;
 
@@ -679,6 +829,104 @@ export default function ResponsePropertiesPanel({
               rows={4}
               className="text-sm resize-none"
             />
+          </div>
+
+          {/* Content type map: schema binding per content type */}
+          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Content type map (schema bindings)
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setShowAddContentType(true)}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add type
+              </Button>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+              Map each media type to a schema (class reference or inline).
+            </p>
+
+            {contentTypes.length > 0 ? (
+              <>
+                <Tabs
+                  value={String(selectedContentTypeIndex)}
+                  onValueChange={(v) => setSelectedContentTypeIndex(Number(v))}
+                  className="w-full"
+                >
+                  <TabsList className={`h-8 w-full justify-start overflow-x-auto ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                    {contentTypes.map((ct, idx) => (
+                      <TabsTrigger key={ct.id} value={String(idx)} className="flex items-center gap-1.5 text-xs">
+                        <FileJson className="w-3 h-3" />
+                        {ct.media_type}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteContentType(ct.id); }}
+                          className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 hover:text-red-600"
+                          aria-label="Remove content type"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {contentTypes.map((ct, idx) => (
+                    <TabsContent key={ct.id} value={String(idx)} className="mt-3 space-y-3">
+                      <div>
+                        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 block mb-1">Schema binding</span>
+                        <Select
+                          value={ct.class_id ? ct.class_id : (ct.inline_schema ? '__inline__' : '__none__')}
+                          onValueChange={(v) => handleContentTypeClassChange(ct.id, v)}
+                        >
+                          <SelectTrigger className={`h-9 text-xs ${isDark ? 'bg-slate-800 border-slate-600' : ''}`}>
+                            <SelectValue placeholder="Select class or use inline" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— None —</SelectItem>
+                            <SelectItem value="__inline__" disabled>— Inline schema (edit in Operation → Responses) —</SelectItem>
+                            {classes.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {ct.inline_schema && !ct.class_id && (
+                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                            Inline schema ({Array.isArray(ct.inline_schema?.properties) ? ct.inline_schema.properties.length : 0} properties). Use Operation panel → Responses to edit inline schema.
+                          </p>
+                        )}
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">No content types. Add one to map a media type to a schema.</p>
+            )}
+
+            {showAddContentType && (
+              <div className={`mt-3 p-3 rounded border ${isDark ? 'border-slate-600 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">New media type</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newMediaType}
+                    onChange={(e) => setNewMediaType(e.target.value)}
+                    placeholder="e.g. application/json"
+                    className="text-xs h-8 font-mono flex-1"
+                  />
+                  <Button type="button" size="sm" className="h-8" onClick={handleAddContentType} disabled={isSavingContentType}>
+                    {isSavingContentType ? 'Adding…' : 'Add'}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => { setShowAddContentType(false); setNewMediaType('application/json'); }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Response Schema Builder */}
