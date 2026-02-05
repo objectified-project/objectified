@@ -44,16 +44,6 @@ structure immediately recognizable.
 
 **Visual Design**: Color-coded badges attached to path nodes
 
-| Method   | Color  | Common Use Cases              |
-|----------|--------|-------------------------------|
-| GET      | Green  | Read, list, search operations |
-| POST     | Blue   | Create, submit, trigger       |
-| PUT      | Orange | Full resource replacement     |
-| PATCH    | Purple | Partial updates               |
-| DELETE   | Red    | Resource deletion             |
-| HEAD     | Gray   | Metadata retrieval            |
-| OPTIONS  | Gray   | CORS preflight                |
-
 #### 2.4 Parameter Nodes 📋 PLANNED
 
 **Visual Design**: Small chips/tags color-coded by parameter location
@@ -96,21 +86,6 @@ structure immediately recognizable.
 #### 2.6 Response Nodes 📋 PLANNED
 
 **Visual Design**: Output port icon, color-coded by status code family
-
-| Status Range | Color  | Common Codes                        |
-|--------------|--------|-------------------------------------|
-| 2XX Success  | Green  | 200 OK, 201 Created, 204 No Content |
-| 3XX Redirect | Blue   | 301, 302, 304 Not Modified          |
-| 4XX Client   | Yellow | 400, 401, 403, 404, 422             |
-| 5XX Server   | Red    | 500, 502, 503, 504                  |
-
-**Configurable Properties**:
-- ✅ Status code (100-599)
-- ✅ Description (auto-populated from status code, configurable)
-- ✅ Response headers (name, schema, description)
-- ✅ Content type map with schema bindings
-- ✅ Links (HATEOAS navigation)
-- ✅ Examples per content type
 
 **Advanced Features**:
 - 📋 Response range patterns: 2XX, 4XX, 5XX wildcards
@@ -658,6 +633,39 @@ DROP TARGET STATE:
 - ✅ Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
 - ✅ Explode flag for arrays/objects
 - ✅ Deprecated flag
+
+#### 2.2.1 Color Representations
+
+| Method   | Color  | Common Use Cases              |
+|----------|--------|-------------------------------|
+| GET      | Green  | Read, list, search operations |
+| POST     | Blue   | Create, submit, trigger       |
+| PUT      | Orange | Full resource replacement     |
+| PATCH    | Purple | Partial updates               |
+| DELETE   | Red    | Resource deletion             |
+| HEAD     | Gray   | Metadata retrieval            |
+| OPTIONS  | Gray   | CORS preflight                |
+
+#### 2.6 Response Nodes 📋 PLANNED
+
+**Visual Design**: Output port icon, color-coded by status code family
+
+**Configurable Properties**:
+- ✅ Status code (100-599)
+- ✅ Description (auto-populated from status code, configurable)
+- ✅ Response headers (name, schema, description)
+- ✅ Content type map with schema bindings
+- ✅ Links (HATEOAS navigation)
+- ✅ Examples per content type
+
+#### 2.6.1 Color designations
+
+| Status Range | Color  | Common Codes                        |
+|--------------|--------|-------------------------------------|
+| 2XX Success  | Green  | 200 OK, 201 Created, 204 No Content |
+| 3XX Redirect | Blue   | 301, 302, 304 Not Modified          |
+| 4XX Client   | Yellow | 400, 401, 403, 404, 422             |
+| 5XX Server   | Red    | 500, 502, 503, 504                  |
 
 ## Security & Authentication
 

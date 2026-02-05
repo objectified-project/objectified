@@ -100,62 +100,25 @@ const getSchemaDisplayText = (schema: ContentTypeInfo['inline_schema'] | PathRes
   return { text: '', isObject: false };
 };
 
-// Get color scheme and icon based on status code (per 9.3.4 spec)
+// Section 2.6.1 Color designations: response nodes are color-coded by status code family
+const STATUS_COLOR_2XX = { headerBg: 'bg-green-500', borderColor: 'border-green-500', color: '#22c55e', icon: '✓', iconComponent: Check };
+const STATUS_COLOR_3XX = { headerBg: 'bg-blue-500', borderColor: 'border-blue-500', color: '#3b82f6', icon: '→', iconComponent: Activity };
+const STATUS_COLOR_4XX = { headerBg: 'bg-yellow-500', borderColor: 'border-yellow-500', color: '#eab308', icon: '⚠', iconComponent: AlertTriangle };
+const STATUS_COLOR_5XX = { headerBg: 'bg-red-500', borderColor: 'border-red-500', color: '#ef4444', icon: '✕', iconComponent: X };
+const STATUS_COLOR_DEFAULT = { headerBg: 'bg-gray-500', borderColor: 'border-gray-500', color: '#6b7280', icon: '∿', iconComponent: Activity };
+
 const getStatusConfig = (statusCode: string) => {
   const code = statusCode.toLowerCase();
   const firstChar = code.charAt(0);
 
-  if (code === 'default') {
-    return {
-      headerBg: 'bg-gray-500',
-      borderColor: 'border-gray-500',
-      color: '#6b7280',
-      icon: '∿',
-      iconComponent: Activity,
-    };
-  }
+  if (code === 'default') return STATUS_COLOR_DEFAULT;
 
   switch (firstChar) {
-    case '2':
-      return {
-        headerBg: 'bg-emerald-500',
-        borderColor: 'border-emerald-500',
-        color: '#10b981',
-        icon: '✓',
-        iconComponent: Check,
-      };
-    case '3':
-      return {
-        headerBg: 'bg-blue-500',
-        borderColor: 'border-blue-500',
-        color: '#3b82f6',
-        icon: '→',
-        iconComponent: Activity,
-      };
-    case '4':
-      return {
-        headerBg: 'bg-amber-500',
-        borderColor: 'border-amber-500',
-        color: '#f59e0b',
-        icon: '⚠️',
-        iconComponent: AlertTriangle,
-      };
-    case '5':
-      return {
-        headerBg: 'bg-red-500',
-        borderColor: 'border-red-500',
-        color: '#ef4444',
-        icon: '✕',
-        iconComponent: X,
-      };
-    default:
-      return {
-        headerBg: 'bg-gray-500',
-        borderColor: 'border-gray-500',
-        color: '#6b7280',
-        icon: '○',
-        iconComponent: Activity,
-      };
+    case '2': return STATUS_COLOR_2XX;  // 2XX Success – Green (200 OK, 201 Created, 204 No Content)
+    case '3': return STATUS_COLOR_3XX;  // 3XX Redirect – Blue (301, 302, 304 Not Modified)
+    case '4': return STATUS_COLOR_4XX;  // 4XX Client – Yellow (400, 401, 403, 404, 422)
+    case '5': return STATUS_COLOR_5XX;  // 5XX Server – Red (500, 502, 503, 504)
+    default:  return STATUS_COLOR_DEFAULT;
   }
 };
 

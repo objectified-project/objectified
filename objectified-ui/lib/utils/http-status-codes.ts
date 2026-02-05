@@ -130,6 +130,12 @@ export function getStatusCodesByCategory(category: HttpStatusInfo['category']): 
 }
 
 /**
+ * Range and default catch-all values for response node capture (OpenAPI-style).
+ * Use "default" for catch-all; use 1XX–5XX for range matching.
+ */
+export const STATUS_RANGE_AND_DEFAULT = ['default', '1XX', '2XX', '3XX', '4XX', '5XX'] as const;
+
+/**
  * Get commonly used status codes grouped by category
  * Useful for quick selection UIs
  */

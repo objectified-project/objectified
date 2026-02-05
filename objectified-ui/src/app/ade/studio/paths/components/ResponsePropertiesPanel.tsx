@@ -15,6 +15,12 @@ import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
 import {
+  getHttpStatusDescription,
+  isValidStatusCode,
+  COMMON_STATUS_CODES,
+  STATUS_RANGE_AND_DEFAULT,
+} from '../../../../../../lib/utils/http-status-codes';
+import {
   addResponseContentType,
   deleteResponseContentType,
   setResponseContentTypeClassReference,
@@ -134,6 +140,7 @@ export default function ResponsePropertiesPanel({
   const { selectedVersionId } = useStudio();
 
   const [description, setDescription] = useState(initialDescription);
+  const [statusCodeEdit, setStatusCodeEdit] = useState(statusCode);
   const [responseSchema, setResponseSchema] = useState<any>(null);
   const [currentResponse, setCurrentResponse] = useState<any>(null); // Store full response data
   const [headers, setHeaders] = useState<ResponseHeaderItem[]>([]);
@@ -175,6 +182,8 @@ export default function ResponsePropertiesPanel({
           if (response) {
             // Store full response data for validation
             setCurrentResponse(response);
+            // Sync status code (capture value) from DB for editing / catch-all (default, 2XX, etc.)
+            setStatusCodeEdit(response.status_code ?? statusCode);
             
             // Update description
             setDescription(response.description || initialDescription);
@@ -713,11 +722,25 @@ export default function ResponsePropertiesPanel({
   const handleSave = async () => {
     if (!responseId) return;
 
+    const codeToSave = statusCodeEdit.trim();
+    if (!codeToSave) {
+      await alertDialog({ message: 'Status code (capture value) is required.', variant: 'error' });
+      return;
+    }
+    if (!isValidStatusCode(codeToSave)) {
+      await alertDialog({
+        message: 'Enter a valid HTTP status code (e.g. 200, 404), a range (2XX, 4XX), or "default" for catch-all.',
+        variant: 'error',
+      });
+      return;
+    }
+
     setIsSaving(true);
     setSaveStatus('idle');
     try {
       const updateData: any = {
         description: description.trim() || undefined,
+        statusCode: codeToSave,
       };
 
       // Determine schema mode based on the schema type
@@ -824,10 +847,12 @@ export default function ResponsePropertiesPanel({
 
       console.log('[ResponsePropertiesPanel] Response updated successfully');
 
+      setCurrentResponse((prev: any) => (prev ? { ...prev, status_code: codeToSave } : null));
+      setStatusCodeEdit(codeToSave);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
       
-      // Force canvas refresh to update node connections and remove class nodes
+      // Force canvas refresh to update node label and connections
       if (onRefresh) {
         console.log('[ResponsePropertiesPanel] Triggering canvas refresh');
         onRefresh();
@@ -858,7 +883,7 @@ export default function ResponsePropertiesPanel({
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Response Properties</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Status Code: {statusCode}
+            {getHttpStatusDescription(statusCodeEdit) ? `${statusCodeEdit} – ${getHttpStatusDescription(statusCodeEdit)}` : `Status: ${statusCodeEdit}`}
           </p>
         </div>
         <button
@@ -874,6 +899,40 @@ export default function ResponsePropertiesPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4">
+          {/* Response status (capture value): specific code, range (2XX, 4XX), or default catch-all */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Response status (capture value)
+            </label>
+            <Input
+              list="response-status-codes"
+              value={statusCodeEdit}
+              onChange={(e) => setStatusCodeEdit(e.target.value)}
+              placeholder="e.g. 200, 2XX, default"
+              className="text-sm font-mono"
+            />
+            <datalist id="response-status-codes">
+              {STATUS_RANGE_AND_DEFAULT.map((c) => (
+                <option key={c} value={c} />
+              ))}
+              {COMMON_STATUS_CODES.success.map((c) => (
+                <option key={c} value={c} />
+              ))}
+              {COMMON_STATUS_CODES.client_error.map((c) => (
+                <option key={c} value={c} />
+              ))}
+              {COMMON_STATUS_CODES.server_error.map((c) => (
+                <option key={c} value={c} />
+              ))}
+              {COMMON_STATUS_CODES.redirection.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+              Use a specific code (e.g. 200), a range (2XX, 4XX), or <strong>default</strong> for catch-all.
+            </p>
+          </div>
+
           {/* Description */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

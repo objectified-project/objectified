@@ -59,6 +59,7 @@ import PathClassNode, { PathClassNodeData } from './PathClassNode';
 import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode';
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
+import { OPERATION_COLORS } from './paths-operation-colors';
 import { Trash2, Lock, Unlock, AlertTriangle } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
@@ -338,17 +339,6 @@ const nodeTypes = {
 // Define custom edge types
 const edgeTypes = {
   smart: SmartEdge,
-};
-
-// Operation color mapping - Updated to match section 9.3.1 specification
-const OPERATION_COLORS: Record<string, string> = {
-  'GET': '#48BB78',
-  'POST': '#4299E1',
-  'PUT': '#ED8936',
-  'PATCH': '#9F7AEA',
-  'DELETE': '#F56565',
-  'HEAD': '#718096',
-  'OPTIONS': '#718096',
 };
 
 /** Split pathname into segments: literal strings and variable names for clickable variables */

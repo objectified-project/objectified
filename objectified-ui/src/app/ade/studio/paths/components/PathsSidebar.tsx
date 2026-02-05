@@ -25,6 +25,7 @@ import {
   createOperation as createOperationRest,
 } from '../../../../../../lib/api/paths-client';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
+import { AVAILABLE_OPERATIONS } from './paths-operation-colors';
 
 interface ClassItem {
   id: string;
@@ -46,17 +47,6 @@ interface PathItem {
   created_at: string;
   updated_at: string;
 }
-
-// Available HTTP operations for OpenAPI - Updated to match section 9.3.1 specification
-const AVAILABLE_OPERATIONS = [
-  { id: 'GET', label: 'GET', color: '#48BB78' },      // green
-  { id: 'POST', label: 'POST', color: '#4299E1' },    // blue
-  { id: 'PUT', label: 'PUT', color: '#ED8936' },      // orange
-  { id: 'PATCH', label: 'PATCH', color: '#9F7AEA' },  // purple
-  { id: 'DELETE', label: 'DELETE', color: '#F56565' }, // red
-  { id: 'HEAD', label: 'HEAD', color: '#718096' },    // gray
-  { id: 'OPTIONS', label: 'OPTIONS', color: '#718096' }, // gray
-];
 
 export default function PathsSidebar({
   activeTab,
