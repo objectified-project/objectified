@@ -49,6 +49,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added HATEOS links support for response mapping
   - Added Examples creation for each response type along with each operation verb details
   - Added the ability to use a catch-all for response values with a range: 2XX, 3XX, and so on
+  - Added the ability to define a catch-all response for error responses in HTTP Operations
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
   - Dragging a class to a response schema allows the class to be copied or referenced
 - OpenAPI Support:

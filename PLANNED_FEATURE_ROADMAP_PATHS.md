@@ -88,15 +88,13 @@ structure immediately recognizable.
 **Visual Design**: Output port icon, color-coded by status code family
 
 **Advanced Features**:
-- 📋 Response range patterns: 2XX, 4XX, 5XX wildcards
-- 📋 Default response for catch-all error handling
+- ✅ Response range patterns: 2XX, 4XX, 5XX wildcards
+- ✅ Default response for catch-all error handling
 - 📋 Link objects for response-driven navigation
 - 📋 Header templates (pagination, rate limiting, CORS)
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
-| #398   | Add response range patterns to response nodes          |
-| #399   | Add default response to HTTP Operation                 |
 | #400   | Add link objects for response-driven navigation        |
 | #401   | Add header templates (pagination, rate limiting, CORS) |
 

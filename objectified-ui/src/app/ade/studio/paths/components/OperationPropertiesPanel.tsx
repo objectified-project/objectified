@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, Plus, Trash2, ArrowLeft, Lock, Unlock, ExternalLink } from 'lucide-react';
+import { X, Save, Plus, Trash2, ArrowLeft, Lock, Unlock, ExternalLink, ListChecks } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { Label } from '../../../../components/ui/Label';
@@ -607,6 +607,73 @@ export default function OperationPropertiesPanel({
       await alertDialog({
         title: 'Error',
         message: 'Failed to add response. Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /** Add default response (catch-all for error handling) to this operation in one click. */
+  const handleAddDefaultResponse = async () => {
+    if (!operationId || !versionPathId) return;
+    const hasDefault = responses.some((r) => r.status_code === 'default');
+    if (hasDefault) {
+      await alertDialog({
+        title: 'Already added',
+        message: 'This operation already has a default (catch-all) response.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const defaultDescription = 'Default error response (catch-all for unhandled statuses).';
+      const schemaData = { type: 'object', properties: [] };
+      const sharedResponseResult = await createSharedPathResponse(
+        versionPathId,
+        'default',
+        defaultDescription,
+        schemaData
+      );
+      const sharedResponseParsed = JSON.parse(sharedResponseResult);
+
+      if (!sharedResponseParsed.success) {
+        await alertDialog({
+          title: 'Error',
+          message: sharedResponseParsed.error || 'Failed to create default response',
+          variant: 'error',
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      const linkResult = await linkResponseToOperation(
+        operationId,
+        sharedResponseParsed.response.id
+      );
+      const linkParsed = JSON.parse(linkResult);
+
+      if (linkParsed.success) {
+        const responsesResult = await getLinkedResponsesForOperation(operationId);
+        const responsesData = JSON.parse(responsesResult);
+        if (responsesData.success) {
+          setResponses(responsesData.responses || []);
+        }
+        if (onRefresh) onRefresh();
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: linkParsed.error || 'Failed to link default response',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error adding default response:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to add default response. Please try again.',
         variant: 'error',
       });
     } finally {
@@ -1264,15 +1331,32 @@ export default function OperationPropertiesPanel({
                   <Label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                     Responses
                   </Label>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setViewMode('add-response')}
-                    className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Response
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleAddDefaultResponse}
+                      disabled={isSaving || responses.some((r) => r.status_code === 'default')}
+                      className="text-slate-600 dark:text-slate-400 text-xs hover:bg-slate-500/10 disabled:opacity-50"
+                      title={
+                        responses.some((r) => r.status_code === 'default')
+                          ? 'Default (catch-all) response already added'
+                          : 'Add default response for catch-all error handling'
+                      }
+                    >
+                      <ListChecks className="w-4 h-4" />
+                      Add default
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setViewMode('add-response')}
+                      className="text-indigo-600 dark:text-indigo-400 text-xs hover:bg-indigo-500/10"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Response
+                    </Button>
+                  </div>
                 </div>
 
                 {responsesLoading ? (
@@ -1309,10 +1393,12 @@ export default function OperationPropertiesPanel({
                               className="px-3 py-1 rounded text-xs font-bold text-white"
                               style={{
                                 backgroundColor:
+                                  response.status_code === 'default' ? '#64748b' :
                                   response.status_code.startsWith('2') ? '#10b981' :
                                   response.status_code.startsWith('3') ? '#3b82f6' :
                                   response.status_code.startsWith('4') ? '#f59e0b' :
-                                  '#ef4444',
+                                  response.status_code.startsWith('5') ? '#ef4444' :
+                                  '#64748b',
                               }}
                             >
                               {response.status_code}
