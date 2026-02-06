@@ -304,6 +304,7 @@ const StudioContent = () => {
   // Canvas search state
   const [canvasSearchQuery, setCanvasSearchQuery] = useState('');
   const [canvasSearchOpen, setCanvasSearchOpen] = useState(false);
+  const [canvasSearchUseRegex, setCanvasSearchUseRegex] = useState(false);
   const canvasSearchInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -440,22 +441,53 @@ const StudioContent = () => {
     setNodes((prev) => prev.map((n) => ({ ...n, data: { ...(n.data as any), expandedProperties: empty } })));
   }, []);
 
-  // Canvas search - compute matching node IDs
+  // Canvas search - validate regex when in regex mode (for error message)
+  const canvasSearchRegexError = useMemo(() => {
+    if (!canvasSearchUseRegex || !canvasSearchQuery.trim()) return null;
+    try {
+      new RegExp(canvasSearchQuery.trim(), 'i');
+      return null;
+    } catch {
+      return 'Invalid regex';
+    }
+  }, [canvasSearchUseRegex, canvasSearchQuery]);
+
+  // Canvas search - compute matching node IDs (basic substring or regex)
   const matchingNodeIds = useMemo(() => {
-    if (!canvasSearchQuery.trim()) return new Set<string>();
-    const query = canvasSearchQuery.toLowerCase().trim();
+    const raw = canvasSearchQuery.trim();
+    if (!raw) return new Set<string>();
     const matching = new Set<string>();
-    nodes.forEach(node => {
-      if (node.type === 'groupNode') return; // Skip group nodes
-      const nodeData = node.data as any;
-      const name = nodeData?.name?.toLowerCase() || '';
-      const description = nodeData?.description?.toLowerCase() || '';
-      if (name.includes(query) || description.includes(query)) {
-        matching.add(node.id);
+
+    if (canvasSearchUseRegex) {
+      let re: RegExp;
+      try {
+        re = new RegExp(raw, 'i');
+      } catch {
+        return matching; // Invalid regex: no matches
       }
-    });
+      nodes.forEach(node => {
+        if (node.type === 'groupNode') return;
+        const nodeData = node.data as any;
+        const name = nodeData?.name ?? '';
+        const description = nodeData?.description ?? '';
+        if (re.test(name) || re.test(description)) {
+          matching.add(node.id);
+        }
+      });
+    } else {
+      const query = raw.toLowerCase();
+      nodes.forEach(node => {
+        if (node.type === 'groupNode') return;
+        const nodeData = node.data as any;
+        const name = (nodeData?.name?.toLowerCase() ?? '');
+        const description = (nodeData?.description?.toLowerCase() ?? '');
+        if (name.includes(query) || description.includes(query)) {
+          matching.add(node.id);
+        }
+      });
+    }
     return matching;
-  }, [canvasSearchQuery, nodes]);
+  }, [canvasSearchQuery, canvasSearchUseRegex, nodes]);
 
   // Handle opening canvas search
   const openCanvasSearch = useCallback(() => {
@@ -4605,24 +4637,52 @@ const StudioContent = () => {
                 className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
               >
                 <div className="flex items-center gap-2 p-2">
-                  <Search className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                  <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
                   <input
                     ref={canvasSearchInputRef}
                     type="text"
                     value={canvasSearchQuery}
                     onChange={(e) => setCanvasSearchQuery(e.target.value)}
-                    placeholder="Search classes..."
+                    placeholder={canvasSearchUseRegex ? 'Regex pattern...' : 'Search classes...'}
                     className="w-64 px-2 py-1 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     autoFocus
                   />
+                  <ToggleGroup.Root
+                    type="single"
+                    value={canvasSearchUseRegex ? 'regex' : 'basic'}
+                    onValueChange={(v) => v && setCanvasSearchUseRegex(v === 'regex')}
+                    className="inline-flex rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-0.5"
+                    aria-label="Search mode"
+                  >
+                    <ToggleGroup.Item
+                      value="basic"
+                      className="px-2 py-0.5 text-xs rounded data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:shadow data-[state=on]:text-gray-900 dark:data-[state=on]:text-gray-100 text-gray-500 dark:text-gray-400"
+                    >
+                      Basic
+                    </ToggleGroup.Item>
+                    <ToggleGroup.Item
+                      value="regex"
+                      className="px-2 py-0.5 text-xs rounded data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:shadow data-[state=on]:text-gray-900 dark:data-[state=on]:text-gray-100 text-gray-500 dark:text-gray-400"
+                    >
+                      Regex
+                    </ToggleGroup.Item>
+                  </ToggleGroup.Root>
                   {canvasSearchQuery && (
-                    <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
-                      {matchingNodeIds.size} found
-                    </span>
+                    <>
+                      {canvasSearchRegexError ? (
+                        <span className="text-xs text-red-600 dark:text-red-400 px-2 py-0.5 shrink-0" title="Pattern is not a valid regular expression">
+                          {canvasSearchRegexError}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded shrink-0">
+                          {matchingNodeIds.size} found
+                        </span>
+                      )}
+                    </>
                   )}
                   <button
                     onClick={closeCanvasSearch}
-                    className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
                     title="Close search (Esc)"
                   >
                     <X className="h-4 w-4" />

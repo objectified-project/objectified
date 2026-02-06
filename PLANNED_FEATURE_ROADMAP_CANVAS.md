@@ -93,13 +93,11 @@
   - Exit focus mode (Esc key)
 - 📋 Search history (recent searches)
 - 📋 Search filters: by type, group, properties
-- 📋 Regex search support
+- ✅ Regex search support
 - 📋 Search within property names/descriptions
 
 | Ticket | Feature                                              |
 |--------|------------------------------------------------------|
-| #186   | Clicking a class in the sidebar focuses it on canvas |
-| #187   | Regex search support                                 |
 | #188   | Search within property names/descriptions            |
 | #194   | Search highlighting on canvas                        |
 | #195   | Focus mode - dim non-matching results                |
