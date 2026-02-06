@@ -717,6 +717,69 @@ function ClassNode({ id, data, selected }: NodeProps) {
         </div>
       )}
 
+      {/* Collapsed view: show references only so edges and ref info are preserved */}
+      {!showProperties && (() => {
+        const allProps = typedData.properties || [];
+        const refProps = allProps.filter((p: ClassProperty) => hasRef(p));
+        if (refProps.length === 0) return null;
+        return (
+          <div
+            style={{
+              padding: '6px 0 4px 0',
+              borderTop: '1px solid #f1f5f9',
+              background: 'rgba(248, 250, 252, 0.6)',
+            }}
+          >
+            <div style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', padding: '0 10px 4px 10px', letterSpacing: '0.02em' }}>
+              References
+            </div>
+            {refProps.map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 36px',
+                  alignItems: 'center',
+                  padding: '3px 10px',
+                  minHeight: '24px',
+                  position: 'relative',
+                  gap: '4px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '11px',
+                    color: '#475569',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={`${p.name} → ${getPropertyType(p)}`}
+                >
+                  {p.name}
+                  <span style={{ color: '#94a3b8', marginLeft: '4px' }}>{'\u2192'}</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: '10px', color: '#6366f1' }}>{getPropertyType(p)}</span>
+                </span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={`prop-${p.id}`}
+                  style={{
+                    background: '#6366f1',
+                    width: '8px',
+                    height: '8px',
+                    border: '2px solid white',
+                    borderRadius: '50%',
+                    boxShadow: '0 1px 3px rgba(99, 102, 241, 0.25)',
+                  }}
+                  isConnectable={!typedData.isReadOnly}
+                />
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Properties */}
       {showProperties && (
         <div style={{
