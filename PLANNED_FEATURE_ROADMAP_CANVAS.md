@@ -94,11 +94,10 @@
 - 📋 Search history (recent searches)
 - 📋 Search filters: by type, group, properties
 - ✅ Regex search support
-- 📋 Search within property names/descriptions
+- ✅ Search within property names/descriptions
 
 | Ticket | Feature                                              |
 |--------|------------------------------------------------------|
-| #188   | Search within property names/descriptions            |
 | #194   | Search highlighting on canvas                        |
 | #195   | Focus mode - dim non-matching results                |
 | #196   | Search history with clear option                     |

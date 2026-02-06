@@ -14,6 +14,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added background configurations to the canvas
   - Added ability to enable/disable grid
   - Added ability to search using regular expressions in the canvas
+  - Improved search to include properties and descriptions in the results
   - Canvas changes also apply to the Paths canvas
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)

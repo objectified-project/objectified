@@ -452,11 +452,20 @@ const StudioContent = () => {
     }
   }, [canvasSearchUseRegex, canvasSearchQuery]);
 
-  // Canvas search - compute matching node IDs (basic substring or regex)
+  // Canvas search - compute matching node IDs (class + property names and descriptions, basic or regex)
   const matchingNodeIds = useMemo(() => {
     const raw = canvasSearchQuery.trim();
     if (!raw) return new Set<string>();
     const matching = new Set<string>();
+
+    const propsMatch = (props: Array<{ name?: string; description?: string }> | undefined, test: (s: string) => boolean): boolean => {
+      if (!props || !Array.isArray(props)) return false;
+      return props.some(p => {
+        const n = (p.name ?? '').trim();
+        const d = (p.description ?? '').trim();
+        return (n && test(n)) || (d && test(d));
+      });
+    };
 
     if (canvasSearchUseRegex) {
       let re: RegExp;
@@ -465,23 +474,25 @@ const StudioContent = () => {
       } catch {
         return matching; // Invalid regex: no matches
       }
+      const test = (s: string) => re.test(s);
       nodes.forEach(node => {
         if (node.type === 'groupNode') return;
         const nodeData = node.data as any;
         const name = nodeData?.name ?? '';
         const description = nodeData?.description ?? '';
-        if (re.test(name) || re.test(description)) {
+        if (re.test(name) || re.test(description) || propsMatch(nodeData?.properties, test)) {
           matching.add(node.id);
         }
       });
     } else {
       const query = raw.toLowerCase();
+      const test = (s: string) => s.toLowerCase().includes(query);
       nodes.forEach(node => {
         if (node.type === 'groupNode') return;
         const nodeData = node.data as any;
-        const name = (nodeData?.name?.toLowerCase() ?? '');
-        const description = (nodeData?.description?.toLowerCase() ?? '');
-        if (name.includes(query) || description.includes(query)) {
+        const name = (nodeData?.name ?? '').toLowerCase();
+        const description = (nodeData?.description ?? '').toLowerCase();
+        if (name.includes(query) || description.includes(query) || propsMatch(nodeData?.properties, (s) => s.toLowerCase().includes(query))) {
           matching.add(node.id);
         }
       });
