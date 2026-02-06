@@ -588,6 +588,87 @@ export async function convertClassToInlineSchema(contentId: string): Promise<str
   }
 }
 
+/**
+ * Copy class properties into a request body content type's inline schema (replace $ref or add to schema).
+ * Sets class_id = NULL and populates inline_schema with copied properties.
+ */
+export async function copyClassPropertiesToRequestBodyContentType(
+  contentId: string,
+  classId: string
+): Promise<string> {
+  const getContentQuery = `
+    SELECT id FROM odb.shared_path_request_body_content WHERE id = $1
+  `;
+  const contentResult = await connectionPool.query(getContentQuery, [contentId]);
+  if (contentResult.rows.length === 0) {
+    return JSON.stringify({ success: false, error: 'Content type not found' });
+  }
+
+  const getClassQuery = `
+    SELECT id, name, description FROM odb.classes WHERE id = $1
+  `;
+  const classResult = await connectionPool.query(getClassQuery, [classId]);
+  if (classResult.rows.length === 0) {
+    return JSON.stringify({ success: false, error: 'Class not found' });
+  }
+  const classInfo = classResult.rows[0];
+
+  const propsQuery = `
+    SELECT id, name, description, data, parent_id
+    FROM odb.class_properties WHERE class_id = $1
+    ORDER BY parent_id NULLS FIRST, name
+  `;
+  const propsResult = await connectionPool.query(propsQuery, [classId]);
+  const idMap = new Map<string, string>();
+  propsResult.rows.forEach((prop: any) => {
+    idMap.set(prop.id, crypto.randomUUID());
+  });
+
+  const properties = propsResult.rows.map((prop: any) => {
+    const newId = idMap.get(prop.id);
+    const oldParentId = prop.parent_id;
+    const newParentId = oldParentId && idMap.has(oldParentId) ? idMap.get(oldParentId) : null;
+    return {
+      id: newId,
+      name: prop.name,
+      description: prop.description || null,
+      data: typeof prop.data === 'string' ? JSON.parse(prop.data) : prop.data,
+      parent_id: newParentId || null,
+    };
+  });
+
+  const inlineSchema = {
+    type: 'object',
+    description: classInfo.description || `Copied from class: ${classInfo.name}`,
+    properties,
+  };
+
+  const updateQuery = `
+    UPDATE odb.shared_path_request_body_content
+    SET class_id = NULL, inline_schema = $2, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+    RETURNING id, class_id, inline_schema
+  `;
+  try {
+    const updateResult = await connectionPool.query(updateQuery, [
+      contentId,
+      JSON.stringify(inlineSchema),
+    ]);
+    if (updateResult.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Content type not found' });
+    }
+    return JSON.stringify({
+      success: true,
+      content: updateResult.rows[0],
+      copiedProperties: properties.length,
+      fromClass: classInfo.name,
+    });
+  } catch (error: any) {
+    console.error('Error copying class properties to request body content:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 // =============================================================================
 // INLINE SCHEMA PROPERTY MANAGEMENT
 // =============================================================================
@@ -604,9 +685,9 @@ export async function addPropertyToInlineSchema(
   },
   parentId?: string
 ): Promise<string> {
-  // Get current inline_schema
+  // Get current inline_schema and class_id (must be null to add properties – i.e. "copy" not "reference")
   const getQuery = `
-    SELECT id, inline_schema
+    SELECT id, class_id, inline_schema
     FROM odb.shared_path_request_body_content
     WHERE id = $1
   `;

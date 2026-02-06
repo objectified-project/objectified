@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { FileJson, Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle } from 'lucide-react';
+import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 import {
   buildPropertyTreeFromInlineSchema,
@@ -14,6 +14,14 @@ import {
 // TYPES
 // =============================================================================
 
+/** Single class property for read-only $ref display */
+export interface ClassPropertyDisplay {
+  id: string;
+  name: string;
+  data?: { type?: string; $ref?: string; format?: string; [key: string]: unknown };
+  description?: string | null;
+}
+
 export interface ContentTypeInfo {
   id: string;
   media_type: string;
@@ -22,6 +30,8 @@ export interface ContentTypeInfo {
   inline_schema?: InlineSchema | null;
   encoding?: Record<string, any> | null;
   examples?: any[] | null;
+  /** When class_id is set, properties from the class for read-only $ref display */
+  classProperties?: ClassPropertyDisplay[] | null;
 }
 
 export interface PathRequestBodyData {
@@ -33,9 +43,11 @@ export interface PathRequestBodyData {
   onDelete?: () => void;
   onEdit?: () => void;
   onPropertyDrop?: (contentId: string, propertyData: any, parentId?: string) => void;
+  onClassDrop?: (contentId: string, classData: any, action: 'copy' | 'reference') => void;
   onPropertyEdit?: (contentId: string, propertyId: string) => void;
   onPropertyDelete?: (contentId: string, propertyId: string) => void;
   onAddContentType?: () => void;
+  onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   [key: string]: unknown; // Index signature for React Flow compatibility
 }
 
@@ -267,60 +279,63 @@ function PropertyTreeItem({
 }
 
 // =============================================================================
-// INLINE SCHEMA VIEWER
+// REQUEST BODY CONTENT TYPE PANEL (matches response body: $ref vs inline drop zones)
 // =============================================================================
 
-interface InlineSchemaViewerProps {
+interface RequestBodyContentTypePanelProps {
   content: ContentTypeInfo;
   onPropertyDrop?: (propertyData: any, parentId?: string) => void;
+  onClassDrop?: (classData: any, action: 'copy' | 'reference') => void;
+  onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   onPropertyEdit?: (propertyId: string) => void;
   onPropertyDelete?: (propertyId: string) => void;
 }
 
-function InlineSchemaViewer({
+function RequestBodyContentTypePanel({
   content,
   onPropertyDrop,
+  onClassDrop,
+  onShowClassDropDialog,
   onPropertyEdit,
   onPropertyDelete,
-}: InlineSchemaViewerProps) {
+}: RequestBodyContentTypePanelProps) {
   const [expandedProps, setExpandedProps] = useState<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState(false);
+  const [refDragOver, setRefDragOver] = useState(false);
   const dragCounterRef = React.useRef(0);
+  const refDragCounterRef = React.useRef(0);
 
   const propertyTree = buildPropertyTreeFromInlineSchema(content.inline_schema || null);
 
   const toggleExpanded = (propId: string) => {
     setExpandedProps((prev) => {
       const next = new Set(prev);
-      if (next.has(propId)) {
-        next.delete(propId);
-      } else {
-        next.add(propId);
-      }
+      if (next.has(propId)) next.delete(propId);
+      else next.add(propId);
       return next;
     });
   };
 
-  // Handle root-level drop
   const handleDragEnter = (e: React.DragEvent) => {
+    if (content.class_id) return;
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current++;
     setIsDragOver(true);
   };
-
   const handleDragOver = (e: React.DragEvent) => {
+    if (content.class_id) return;
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(true);
+    e.dataTransfer.dropEffect = 'copy';
   };
-
   const handleDragLeave = (e: React.DragEvent) => {
+    if (content.class_id) return;
     e.preventDefault();
     e.stopPropagation();
     dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDragOver(false);
-    }
+    if (dragCounterRef.current === 0) setIsDragOver(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -328,66 +343,192 @@ function InlineSchemaViewer({
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsDragOver(false);
-
-    if (!onPropertyDrop) return;
-
+    if (content.class_id) return;
     const dataStr = e.dataTransfer.getData('application/json');
-    if (dataStr) {
-      try {
-        const dropData = JSON.parse(dataStr);
-        if (dropData.type === 'property') {
-          onPropertyDrop(dropData, undefined);
+    if (!dataStr) return;
+    try {
+      const dropData = JSON.parse(dataStr);
+      if (dropData.type === 'property' && onPropertyDrop) {
+        onPropertyDrop(dropData, undefined);
+      } else if (dropData.type === 'class') {
+        if (onShowClassDropDialog) {
+          onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
+            if (onClassDrop) onClassDrop(dropData, action);
+          });
+        } else if (onClassDrop) {
+          onClassDrop(dropData, 'copy');
         }
-      } catch (err) {
-        console.error('Failed to parse drop data:', err);
       }
+    } catch (err) {
+      console.error('Failed to parse drop data:', err);
     }
   };
 
-  if (propertyTree.length === 0) {
+  const handleNestedDrop = (propertyData: any, parentId?: string) => {
+    if (onPropertyDrop) onPropertyDrop(propertyData, parentId);
+  };
+
+  // $ref: show read-only class + drop zone "Drop a class or property to replace this $ref"
+  if (content.class_id) {
+    const handleRefDragEnter = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      refDragCounterRef.current++;
+      setRefDragOver(true);
+    };
+    const handleRefDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setRefDragOver(true);
+      e.dataTransfer.dropEffect = 'copy';
+    };
+    const handleRefDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      refDragCounterRef.current--;
+      if (refDragCounterRef.current === 0) setRefDragOver(false);
+    };
+    const handleRefDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      refDragCounterRef.current = 0;
+      setRefDragOver(false);
+      try {
+        const dataStr = e.dataTransfer.getData('application/json');
+        if (!dataStr) return;
+        const dropData = JSON.parse(dataStr);
+        if (dropData.type === 'property' && onPropertyDrop) {
+          onPropertyDrop(dropData);
+        } else if (dropData.type === 'class') {
+          if (onShowClassDropDialog) {
+            onShowClassDropDialog(dropData, (action: 'copy' | 'reference') => {
+              if (onClassDrop) onClassDrop(dropData, action);
+            });
+          } else if (onClassDrop) {
+            onClassDrop(dropData, 'copy');
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing dropped data:', err);
+      }
+    };
+    const classProps = content.classProperties || [];
+    const getTypeLabel = (p: ClassPropertyDisplay) => {
+      const d = p.data as { type?: string; $ref?: string; items?: { $ref?: string } } | undefined;
+      if (!d) return 'any';
+      if (d.$ref) return d.$ref.split('/').pop() || 'ref';
+      if (d.type === 'array' && d.items?.$ref) return `${d.items.$ref.split('/').pop()}[]`;
+      return d.type || 'any';
+    };
+    // Same design as PathResponseBodyNode $ref block: one blue box (header + properties list), then draggable section below
     return (
-      <div
-        className={`p-3 text-center text-xs text-gray-400 dark:text-gray-500 border border-dashed rounded transition-colors ${
-          isDragOver 
-            ? 'border-green-400 bg-green-50 dark:bg-green-900/20' 
-            : 'border-gray-300 dark:border-gray-600'
-        }`}
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <Plus className="w-4 h-4 mx-auto mb-1 opacity-50" />
-        Drop properties here
+      <div className="space-y-2" data-drop-zone="request-body-content-type">
+        <div className="p-3 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+            <Link2 className="w-4 h-4" />
+            <span className="font-medium">$ref: {content.class_name || 'Unknown'}</span>
+          </div>
+          <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+            Read-only; changes to the class will update this request body.
+          </p>
+          {classProps.length > 0 && (
+            <div className="mt-2 rounded border border-blue-200/60 dark:border-blue-700/60 bg-white/50 dark:bg-gray-800/50 p-2 max-h-[200px] overflow-y-auto">
+              <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400 mb-1.5">Properties (read-only)</div>
+              <ul className="space-y-1">
+                {classProps.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <span className="font-mono truncate">{p.name}</span>
+                    <span className="text-gray-500 dark:text-gray-400 font-mono text-[10px] shrink-0">{getTypeLabel(p)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div
+          onDragEnter={handleRefDragEnter}
+          onDragOver={handleRefDragOver}
+          onDragLeave={handleRefDragLeave}
+          onDrop={handleRefDrop}
+          className={`p-3 rounded-lg border-2 border-dashed text-center transition-colors text-xs ${
+            refDragOver
+              ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+              : 'border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          <Plus className="w-4 h-4 mx-auto mb-1 opacity-70" />
+          Drop a class or property to replace this $ref
+        </div>
       </div>
     );
   }
 
+  // Inline schema: "Drop class or property to add properties to this schema"
+  if (propertyTree.length === 0) {
+    return (
+      <div
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`p-4 rounded-lg border-2 border-dashed text-center transition-all ${
+          isDragOver
+            ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30'
+            : 'border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50'
+        }`}
+      >
+        <Plus className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Drop class or property to add properties to this schema
+        </p>
+      </div>
+    );
+  }
+
+  // Inline schema with properties: same layout as response – properties list first, then draggable section below
   return (
-    <div
-      className={`rounded border transition-colors ${
-        isDragOver 
-          ? 'border-green-400 bg-green-50 dark:bg-green-900/20' 
-          : 'border-gray-200 dark:border-gray-700'
-      }`}
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <div className="py-1 max-h-[200px] overflow-y-auto">
-        {propertyTree.map((prop) => (
-          <PropertyTreeItem
-            key={prop.id}
-            property={prop}
-            depth={0}
-            expanded={expandedProps.has(prop.id)}
-            onToggle={() => toggleExpanded(prop.id)}
-            onEdit={onPropertyEdit ? () => onPropertyEdit(prop.id) : undefined}
-            onDelete={onPropertyDelete ? () => onPropertyDelete(prop.id) : undefined}
-            onDrop={onPropertyDrop}
-          />
-        ))}
+    <div className="space-y-2" data-drop-zone="request-body-content-type">
+      <div
+        className={`rounded-lg border transition-all ${
+          isDragOver
+            ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-900/20'
+            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+        }`}
+      >
+        <div
+          className="p-2 space-y-0.5 max-h-[300px] overflow-y-auto min-h-[60px]"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {propertyTree.map((prop) => (
+            <PropertyTreeItem
+              key={prop.id}
+              property={prop}
+              depth={0}
+              expanded={expandedProps.has(prop.id)}
+              onToggle={() => toggleExpanded(prop.id)}
+              onEdit={onPropertyEdit ? () => onPropertyEdit(prop.id) : undefined}
+              onDelete={onPropertyDelete ? () => onPropertyDelete(prop.id) : undefined}
+              onDrop={handleNestedDrop}
+            />
+          ))}
+        </div>
+      </div>
+      <div
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`p-3 rounded-lg border-2 border-dashed text-center transition-colors text-xs ${
+          isDragOver
+            ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+            : 'border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400'
+        }`}
+      >
+        <Plus className="w-4 h-4 mx-auto mb-1 opacity-70" />
+        Drop class or property to add to this schema
       </div>
     </div>
   );
@@ -400,7 +541,6 @@ function InlineSchemaViewer({
 export default function PathRequestBodyNode({ data }: { data: PathRequestBodyData }) {
   const [selectedContentIndex, setSelectedContentIndex] = useState(0);
 
-  // Reset selected content when content types change
   useEffect(() => {
     if (selectedContentIndex >= data.contentTypes.length) {
       setSelectedContentIndex(0);
@@ -408,11 +548,18 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
   }, [data.contentTypes.length, selectedContentIndex]);
 
   const selectedContent = data.contentTypes[selectedContentIndex];
-  const hasMultipleContentTypes = data.contentTypes.length > 1;
+
+  // Schema summary for header (match response body: "$ref: ClassName" or "N props")
+  const schemaLabel = selectedContent
+    ? (selectedContent.class_id
+        ? `$ref: ${selectedContent.class_name || 'Unknown'}`
+        : (selectedContent.inline_schema?.properties?.length ?? 0) > 0
+          ? `${selectedContent.inline_schema!.properties!.length} props`
+          : 'Object')
+    : null;
 
   return (
     <>
-      {/* Input handle at TOP - not connectable (request bodies don't have inputs) */}
       <Handle
         type="target"
         position={Position.Top}
@@ -421,146 +568,121 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
         className="!w-3 !h-2 !rounded-t-md !rounded-b-none bg-indigo-500 !cursor-not-allowed opacity-50"
       />
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl border-2 border-indigo-500 shadow-xl min-w-[240px] max-w-[320px] cursor-pointer relative group">
-        {/* Delete button */}
-        {data.onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              data.onDelete?.();
-            }}
-            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600 z-10"
-            title="Delete request body"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2.5 rounded-t-lg">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-indigo-500 dark:border-indigo-600 min-w-[320px] max-w-[400px]">
+        {/* Header: Request + schema summary (same layout as response body node) */}
+        <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileJson className="w-4 h-4" />
-              <span className="font-bold text-sm truncate">{data.name}</span>
-            </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 flex-wrap">
               {data.required && (
-                <div className="px-1.5 py-0.5 bg-red-500/80 rounded text-[10px] font-bold">
+                <div className="px-2 py-0.5 rounded text-white text-xs font-bold bg-red-500/90">
                   REQ
                 </div>
               )}
-              {data.onEdit && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    data.onEdit?.();
-                  }}
-                  className="p-1 hover:bg-white/20 rounded"
-                  title="Edit request body"
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
+              <span className="text-white font-semibold text-sm">Request</span>
+              {schemaLabel && (
+                <span className="text-indigo-100 text-xs font-medium truncate max-w-[140px]" title={`Schema: ${schemaLabel}`}>
+                  → {schemaLabel}
+                </span>
               )}
             </div>
+            {data.onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onDelete?.();
+                }}
+                className="p-1 hover:bg-white/20 rounded transition-colors"
+                title="Delete request body"
+              >
+                <Trash2 className="w-4 h-4 text-white" />
+              </button>
+            )}
           </div>
           {data.description && (
-            <div className="text-xs text-white/80 mt-1 line-clamp-2">
-              {data.description}
-            </div>
+            <p className="text-xs text-indigo-50 mt-1 truncate">{data.description}</p>
           )}
         </div>
 
-        {/* Content Types */}
-        <div className="p-3">
+        {/* Content type tabs (same as response body: show when more than one) */}
+        {data.contentTypes.length > 1 && (
+          <div className="px-3 pt-2 flex gap-1 overflow-x-auto">
+            {data.contentTypes.map((ct, index) => (
+              <button
+                key={ct.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedContentIndex(index);
+                }}
+                className={`
+                  px-2 py-1 text-[10px] rounded-t transition-colors whitespace-nowrap
+                  ${selectedContentIndex === index
+                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-medium'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }
+                `}
+              >
+                {ct.media_type}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Content: badge (e.g. $ref: BlogPost json) + panel with drop zone */}
+        <div className="p-3 space-y-2">
           {data.contentTypes.length === 0 ? (
-            <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 py-4">
               <AlertCircle className="w-4 h-4" />
               <span>No content types defined</span>
             </div>
-          ) : (
+          ) : selectedContent ? (
             <>
-              {/* Content type tabs/badges */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {data.contentTypes.map((content, index) => (
-                  <button
-                    key={content.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedContentIndex(index);
-                    }}
-                    className={`transition-all ${
-                      selectedContentIndex === index
-                        ? 'ring-2 ring-indigo-400 ring-offset-1'
-                        : 'opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <ContentTypeBadge content={content} />
-                  </button>
-                ))}
-                {data.onAddContentType && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      data.onAddContentType?.();
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
-                    title="Add content type"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Add</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Selected content type details */}
-              {selectedContent && (
-                <div>
-                  {selectedContent.class_id ? (
-                    // Class reference view
-                    <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                      <div className="flex items-center gap-2 text-xs">
-                        <Link2 className="w-4 h-4 text-indigo-500" />
-                        <span className="text-gray-600 dark:text-gray-400">References:</span>
-                        <code className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded font-mono text-[11px]">
-                          {selectedContent.class_name || 'Unknown Class'}
-                        </code>
-                      </div>
-                    </div>
-                  ) : selectedContent.inline_schema ? (
-                    // Inline schema view with property tree
-                    <InlineSchemaViewer
-                      content={selectedContent}
-                      onPropertyDrop={
-                        data.onPropertyDrop
-                          ? (propData, parentId) =>
-                              data.onPropertyDrop?.(selectedContent.id, propData, parentId)
-                          : undefined
-                      }
-                      onPropertyEdit={
-                        data.onPropertyEdit
-                          ? (propId) => data.onPropertyEdit?.(selectedContent.id, propId)
-                          : undefined
-                      }
-                      onPropertyDelete={
-                        data.onPropertyDelete
-                          ? (propId) => data.onPropertyDelete?.(selectedContent.id, propId)
-                          : undefined
-                      }
-                    />
-                  ) : (
-                    // Empty state
-                    <div className="p-3 text-center text-xs text-gray-400 dark:text-gray-500">
-                      No schema defined
-                    </div>
-                  )}
-                </div>
-              )}
+              <ContentTypeBadge content={selectedContent} />
+              <RequestBodyContentTypePanel
+                content={selectedContent}
+                onPropertyDrop={
+                  data.onPropertyDrop && selectedContent.id
+                    ? (propData, parentId) => data.onPropertyDrop!(selectedContent.id, propData, parentId)
+                    : undefined
+                }
+                onClassDrop={
+                  data.onClassDrop && selectedContent.id
+                    ? (classData, action) => data.onClassDrop!(selectedContent.id, classData, action)
+                    : undefined
+                }
+                onShowClassDropDialog={data.onShowClassDropDialog}
+                onPropertyEdit={
+                  data.onPropertyEdit
+                    ? (propId) => data.onPropertyEdit?.(selectedContent.id, propId)
+                    : undefined
+                }
+                onPropertyDelete={
+                  data.onPropertyDelete
+                    ? (propId) => data.onPropertyDelete?.(selectedContent.id, propId)
+                    : undefined
+                }
+              />
             </>
+          ) : null}
+        </div>
+
+        {/* Footer (same as response body) */}
+        <div className="px-3 pb-2 flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
+          <span>{data.contentTypes.length} content type(s)</span>
+          {data.onEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onEdit?.();
+              }}
+              className="flex items-center gap-1 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            >
+              <Pencil className="w-3 h-3" />
+              Edit
+            </button>
           )}
         </div>
       </div>
 
-      {/* Output handle at BOTTOM - connects TO operations for vertical flow */}
       <Handle
         type="source"
         position={Position.Bottom}

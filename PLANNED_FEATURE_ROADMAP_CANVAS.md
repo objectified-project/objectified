@@ -364,19 +364,6 @@
 
 ---
 
-### 7. Canvas Performance
-
-#### Level of Detail (LOD) 📋 PARTIALLY IMPLEMENTED
-- ✅ Simplified nodes when zoomed out >200%
-- ✅ Hide property details at high zoom, show only class names
-- ✅ Dynamic detail based on zoom level
-- ✅ Fade transitions between LOD levels
-- 📋 Show property references even when nodes are collapsed
-
-| Ticket | Feature                                                      |
-|--------|--------------------------------------------------------------|
-| #199   | Show property references even when class nodes are collapsed |
-
 ---
 
 ### 8. Canvas Export
@@ -577,3 +564,12 @@
   - ✅ Close with Escape key or X button
 - ✅ **Search Focus Mode**: Dim everything except search results
 - ✅ **Focus Mode**: Isolate selected classes and relationships, blur non-focused
+
+### 7. Canvas Performance ✅ IMPLEMENTED
+
+#### Level of Detail (LOD) 📋 PARTIALLY IMPLEMENTED
+- ✅ Simplified nodes when zoomed out >200%
+- ✅ Hide property details at high zoom, show only class names
+- ✅ Dynamic detail based on zoom level
+- ✅ Fade transitions between LOD levels
+- ✅ Show property references even when nodes are collapsed
