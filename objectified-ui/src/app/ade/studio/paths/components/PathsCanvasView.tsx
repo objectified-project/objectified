@@ -43,7 +43,7 @@ import {
   updateSharedPathParameter,
   deleteSharedPathParameter,
 } from '../../../../../../lib/db/helper-shared-path-parameters';
-import { extractPathParameters, isValidPath } from '../../../../../../lib/utils/path-params';
+import { extractPathParameters, isValidPath, getPathWithSampleValues } from '../../../../../../lib/utils/path-params';
 import {
   getLinkedResponsesForOperation,
   getSharedPathResponses,
@@ -60,7 +60,7 @@ import PathRequestBodyNode, { PathRequestBodyData } from './PathRequestBodyNode'
 import PathResponseBodyNode, { PathResponseBodyData } from './PathResponseBodyNode';
 import ClassDropChoiceDialog, { ClassDropAction } from '../../../../components/dialogs/ClassDropChoiceDialog';
 import { OPERATION_COLORS } from './paths-operation-colors';
-import { Trash2, Lock, Unlock, AlertTriangle } from 'lucide-react';
+import { Trash2, Lock, Unlock, AlertTriangle, Eye, Copy, Check } from 'lucide-react';
 import {
   getClassesWithPropertiesAndTags,
 } from '../../../../../../lib/db/helper';
@@ -403,6 +403,29 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
   // State for path variable drop target (property drag from sidebar for type binding)
   const [dragOverPathVariable, setDragOverPathVariable] = useState<string | null>(null);
   const pathVariableDragCounterRef = useRef(0);
+
+  // Path parameters for sample-value preview (#360)
+  const [pathParamsForPreview, setPathParamsForPreview] = useState<Array<{ name: string; in_location: string; data?: Record<string, unknown> }>>([]);
+  const [samplePathCopied, setSamplePathCopied] = useState(false);
+  useEffect(() => {
+    if (!selectedPathId || !pathname || extractPathParameters(pathname).length === 0) {
+      setPathParamsForPreview([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getSharedPathParameters(selectedPathId);
+        const data = JSON.parse(res);
+        if (cancelled || !data.success || !Array.isArray(data.parameters)) return;
+        const pathParams = data.parameters.filter((p: { in_location: string }) => p.in_location === 'path');
+        if (!cancelled) setPathParamsForPreview(pathParams);
+      } catch {
+        if (!cancelled) setPathParamsForPreview([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedPathId, pathname, refreshKey]);
 
   // Refs to hold the latest handler functions
   // This prevents stale closures when nodes are moved or canvas is refreshed
@@ -3449,83 +3472,122 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     <div ref={reactFlowWrapper} className="flex-1 flex flex-col h-full">
       {/* Path header with clickable variables - click to edit schema, or drag a property here for type binding */}
       {selectedPathId && pathname && (
-        <div
-          className={`relative flex-shrink-0 px-4 py-2 border-b bg-white/95 dark:bg-gray-800/95 flex items-center gap-1 flex-wrap font-mono text-sm ${
-            !isValidPath(pathname)
-              ? 'border-2 border-red-600 ring-2 ring-red-500/50 dark:border-red-500 dark:ring-red-400/50'
-              : 'border-gray-200 dark:border-gray-700'
-          }`}
-          title={
-            !isValidPath(pathname)
-              ? 'Invalid path: must start with / and use valid {param} placeholders'
-              : 'Click a variable to edit its schema, or drag a property from the sidebar for type binding'
-          }
-        >
-          {!isValidPath(pathname) && (
-            <div className="absolute top-1.5 right-2 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
-              <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
-            </div>
-          )}
-          <span className="text-gray-500 dark:text-gray-400 mr-1">Path:</span>
-          {parsePathSegments(pathname).map((seg, i) =>
-            seg.type === 'literal' ? (
-              <span key={i} className="text-gray-700 dark:text-gray-300">
-                {seg.value}
-              </span>
-            ) : (
-              <button
-                key={i}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePathVariableClick(seg.value);
-                }}
-                onDragEnter={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  pathVariableDragCounterRef.current++;
-                  setDragOverPathVariable(seg.value);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  e.dataTransfer.dropEffect = 'copy';
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  pathVariableDragCounterRef.current--;
-                  if (pathVariableDragCounterRef.current === 0) {
-                    setDragOverPathVariable(null);
-                  }
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  pathVariableDragCounterRef.current = 0;
-                  setDragOverPathVariable(null);
-                  const dataStr = e.dataTransfer.getData('application/json');
-                  if (dataStr) {
-                    try {
-                      const dropData = JSON.parse(dataStr);
-                      handlePropertyDropOnPathVariable(seg.value, dropData);
-                    } catch (err) {
-                      console.error('Failed to parse drop data:', err);
+        <>
+          <div
+            className={`relative flex-shrink-0 px-4 py-2 border-b bg-white/95 dark:bg-gray-800/95 flex items-center gap-1 flex-wrap font-mono text-sm ${
+              !isValidPath(pathname)
+                ? 'border-2 border-red-600 ring-2 ring-red-500/50 dark:border-red-500 dark:ring-red-400/50'
+                : 'border-gray-200 dark:border-gray-700'
+            }`}
+            title={
+              !isValidPath(pathname)
+                ? 'Invalid path: must start with / and use valid {param} placeholders'
+                : 'Click a variable to edit its schema, or drag a property from the sidebar for type binding'
+            }
+          >
+            {!isValidPath(pathname) && (
+              <div className="absolute top-1.5 right-2 flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow ring-2 ring-red-400/80" title="Path is misconfigured">
+                <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden />
+              </div>
+            )}
+            <span className="text-gray-500 dark:text-gray-400 mr-1">Path:</span>
+            {parsePathSegments(pathname).map((seg, i) =>
+              seg.type === 'literal' ? (
+                <span key={i} className="text-gray-700 dark:text-gray-300">
+                  {seg.value}
+                </span>
+              ) : (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePathVariableClick(seg.value);
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pathVariableDragCounterRef.current++;
+                    setDragOverPathVariable(seg.value);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pathVariableDragCounterRef.current--;
+                    if (pathVariableDragCounterRef.current === 0) {
+                      setDragOverPathVariable(null);
                     }
-                  }
-                }}
-                className={`px-1.5 py-0.5 rounded font-medium cursor-pointer transition-colors ${
-                  dragOverPathVariable === seg.value
-                    ? 'bg-indigo-300 dark:bg-indigo-600 text-indigo-900 dark:text-indigo-100 ring-2 ring-indigo-500 dark:ring-indigo-400'
-                    : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/50'
-                }`}
-                title={`Edit schema for ${seg.value}, or drop a property here for type binding`}
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pathVariableDragCounterRef.current = 0;
+                    setDragOverPathVariable(null);
+                    const dataStr = e.dataTransfer.getData('application/json');
+                    if (dataStr) {
+                      try {
+                        const dropData = JSON.parse(dataStr);
+                        handlePropertyDropOnPathVariable(seg.value, dropData);
+                      } catch (err) {
+                        console.error('Failed to parse drop data:', err);
+                      }
+                    }
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-medium cursor-pointer transition-colors ${
+                    dragOverPathVariable === seg.value
+                      ? 'bg-indigo-300 dark:bg-indigo-600 text-indigo-900 dark:text-indigo-100 ring-2 ring-indigo-500 dark:ring-indigo-400'
+                      : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/50'
+                  }`}
+                  title={`Edit schema for ${seg.value}, or drop a property here for type binding`}
+                >
+                  {seg.value}
+                </button>
+              )
+            )}
+          </div>
+          {/* #360: Path template preview with sample values */}
+          {extractPathParameters(pathname).length > 0 && (() => {
+            const paramSchemas: Record<string, { type?: string; format?: string; enum?: unknown[] } | null> = {};
+            for (const p of pathParamsForPreview) {
+              const data = typeof p.data === 'string' ? (() => { try { return JSON.parse(p.data as unknown as string); } catch { return {}; } })() : (p.data || {});
+              paramSchemas[p.name] = { type: data.type, format: data.format, enum: data.enum };
+            }
+            const { samplePath } = getPathWithSampleValues(pathname, paramSchemas);
+            return (
+              <div
+                className="flex-shrink-0 px-4 py-1.5 border-b bg-gray-50/95 dark:bg-gray-900/95 flex items-center gap-2 flex-wrap font-mono text-xs border-gray-200 dark:border-gray-700"
+                title="Path with sample values substituted. Copy to use as example URL."
               >
-                {seg.value}
-              </button>
-            )
-          )}
-        </div>
+                <Eye className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" aria-hidden />
+                <span className="text-gray-500 dark:text-gray-400">Sample:</span>
+                <span className="text-gray-700 dark:text-gray-300 break-all">{samplePath}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(samplePath).then(() => {
+                      setSamplePathCopied(true);
+                      setTimeout(() => setSamplePathCopied(false), 2000);
+                    });
+                  }}
+                  className={`ml-auto flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    samplePathCopied
+                      ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200'
+                      : 'bg-gray-200/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                  title="Copy sample URL"
+                >
+                  {samplePathCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {samplePathCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            );
+          })()}
+        </>
       )}
         <ReactFlow
         nodes={nodes}

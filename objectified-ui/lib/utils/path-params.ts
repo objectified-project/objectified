@@ -37,6 +37,57 @@ export function replacePathParameters(
 }
 
 /**
+ * Generate a sample value for a path parameter based on schema (type/format).
+ * Used for path template preview with sample values.
+ */
+export function getSampleValueForSchema(schema?: {
+  type?: string;
+  format?: string;
+  enum?: unknown[];
+} | null): string {
+  if (!schema) return 'value';
+  const type = (schema.type || 'string').toLowerCase();
+  const format = (schema.format || '').toLowerCase();
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    const first = schema.enum[0];
+    return String(typeof first === 'object' && first !== null && 'value' in first ? (first as { value: string }).value : first);
+  }
+  if (type === 'integer') return '1';
+  if (type === 'number') return '1.0';
+  if (type === 'boolean') return 'true';
+  if (type === 'string') {
+    if (format === 'uuid') return '550e8400-e29b-41d4-a716-446655440000';
+    if (format === 'date') return '2025-01-15';
+    if (format === 'date-time') return '2025-01-15T12:00:00Z';
+    if (format === 'email') return 'user@example.com';
+    if (format === 'uri') return 'https://example.com';
+    if (format === 'hostname') return 'api.example.com';
+    return 'value';
+  }
+  return 'value';
+}
+
+/**
+ * Build a path with sample values for each path parameter.
+ * paramSchemas: optional map of parameter name -> schema (type, format) for type-aware samples.
+ */
+export function getPathWithSampleValues(
+  pathname: string,
+  paramSchemas?: Record<string, { type?: string; format?: string; enum?: unknown[] } | null>
+): { samplePath: string; values: Record<string, string> } {
+  const paramNames = extractPathParameters(pathname);
+  const values: Record<string, string> = {};
+  for (const name of paramNames) {
+    const schema = paramSchemas?.[name];
+    values[name] = getSampleValueForSchema(schema ?? undefined);
+  }
+  return {
+    samplePath: replacePathParameters(pathname, values),
+    values,
+  };
+}
+
+/**
  * Check if a path template is valid (OpenAPI-style).
  * Invalid: empty/whitespace, does not start with /, unclosed or empty braces.
  */

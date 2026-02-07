@@ -29,20 +29,6 @@ structure immediately recognizable.
 - 📋 Common parameters inherited by all operations
 - ✅ External documentation links
 
-**Features**: 📋 PLANNED
-- ✅ Click on `{variable}` to open inline schema editor
-- ✅ Drag schema property onto variable for type binding
-- ✅ Visual validation: invalid paths show red border
-- 📋 Path template preview with sample values
-
-| Ticket | Feature                                                                  |
-|--------|--------------------------------------------------------------------------|
-| #360   | Add path template preview with sample values                             |
-
-#### 2.2 Method Nodes (HTTP Operations) 📋 PLANNED
-
-**Visual Design**: Color-coded badges attached to path nodes
-
 #### 2.4 Parameter Nodes 📋 PLANNED
 
 **Visual Design**: Small chips/tags color-coded by parameter location
@@ -630,6 +616,14 @@ DROP TARGET STATE:
 - ✅ Serialization style (form, spaceDelimited, pipeDelimited, deepObject)
 - ✅ Explode flag for arrays/objects
 - ✅ Deprecated flag
+
+#### 2.1
+
+**Features**: 📋 PLANNED
+- ✅ Click on `{variable}` to open inline schema editor
+- ✅ Drag schema property onto variable for type binding
+- ✅ Visual validation: invalid paths show red border
+- ✅ Path template preview with sample values
 
 #### 2.2.1 Color Representations
 
