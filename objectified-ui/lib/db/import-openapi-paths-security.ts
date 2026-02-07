@@ -138,7 +138,9 @@ export async function importOpenAPIPathsAndSecurity(
                RETURNING id`,
               [versionPathId, p.name, inLoc, null, p.description || null, JSON.stringify(data)]
             );
-            paramId = pr.rows[0].id;
+            const insertedId = pr.rows[0]?.id;
+            if (typeof insertedId !== 'string') throw new Error('Insert shared_path_parameter failed');
+            paramId = insertedId;
             paramIdsByKey.set(key, paramId);
           }
           await client.query(

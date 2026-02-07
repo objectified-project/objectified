@@ -1083,7 +1083,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                         )}
                       </Box>
                       <Box>
-                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom">
+                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
                           Total Properties
                         </Typography>
                         <Typography variant="h4" color="success.dark">

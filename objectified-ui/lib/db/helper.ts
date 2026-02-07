@@ -1428,8 +1428,8 @@ export interface OpenAPIImportOptions {
   }>;
   securitySchemes?: Array<{
     scheme_name: string;
-    scheme_type: string;
-    in_location?: string;
+    scheme_type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
+    in_location?: 'header' | 'query' | 'cookie';
     param_name?: string;
     http_scheme?: string;
     description?: string;
