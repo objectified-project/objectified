@@ -45,7 +45,7 @@ structure immediately recognizable.
 **Visual Design**: Input port icon with blue accent, shows content types
 
 **Configurable Properties**:
-- 📋 Content type map (application/json, multipart/form-data, etc.)
+- ✅ Content type map (application/json, multipart/form-data, etc.)
 - 📋 Schema binding per content type
 - 📋 Required flag
 - 📋 Description
@@ -61,7 +61,6 @@ structure immediately recognizable.
 
 | Ticket | Feature                                                        |
 |--------|----------------------------------------------------------------|
-| #386   | Content type map (application/json, multipart/form-data, etc.) |
 | #387   | Schema binding per content type                                |
 | #388   | Add required flag to request body                              |
 | #389   | Add description to request body                                |

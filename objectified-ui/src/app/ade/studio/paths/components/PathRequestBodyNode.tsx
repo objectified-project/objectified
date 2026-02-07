@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   buildPropertyTreeFromInlineSchema,
   type InlineSchema,
@@ -46,7 +47,8 @@ export interface PathRequestBodyData {
   onClassDrop?: (contentId: string, classData: any, action: 'copy' | 'reference') => void;
   onPropertyEdit?: (contentId: string, propertyId: string) => void;
   onPropertyDelete?: (contentId: string, propertyId: string) => void;
-  onAddContentType?: () => void;
+  /** Called with the selected media type when user adds a new content type branch (e.g. application/json, multipart/form-data). */
+  onAddContentType?: (mediaType: string) => void;
   onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   [key: string]: unknown; // Index signature for React Flow compatibility
 }
@@ -62,6 +64,16 @@ const MEDIA_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   'application/x-www-form-urlencoded': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300' },
   'text/plain': { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300' },
 };
+
+/** Options for adding a new content type branch (application/json, multipart/form-data, etc.) */
+const ADD_CONTENT_TYPE_OPTIONS = [
+  { value: 'application/json', label: 'application/json' },
+  { value: 'application/xml', label: 'application/xml' },
+  { value: 'multipart/form-data', label: 'multipart/form-data' },
+  { value: 'application/x-www-form-urlencoded', label: 'application/x-www-form-urlencoded' },
+  { value: 'text/plain', label: 'text/plain' },
+  { value: 'application/octet-stream', label: 'application/octet-stream' },
+];
 
 function ContentTypeBadge({ content }: { content: ContentTypeInfo }) {
   const colors = MEDIA_TYPE_COLORS[content.media_type] || {
@@ -535,6 +547,64 @@ function RequestBodyContentTypePanel({
 }
 
 // =============================================================================
+// ADD CONTENT TYPE DROPDOWN
+// =============================================================================
+
+interface AddContentTypeDropdownProps {
+  existingMediaTypes: string[];
+  onSelect: (mediaType: string) => void;
+  triggerClassName?: string;
+  triggerLabel?: string;
+}
+
+function AddContentTypeDropdown({
+  existingMediaTypes,
+  onSelect,
+  triggerClassName = 'flex items-center gap-1 px-2 py-1 text-[10px] hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors text-gray-600 dark:text-gray-400',
+  triggerLabel = 'Add content type',
+}: AddContentTypeDropdownProps) {
+  const available = ADD_CONTENT_TYPE_OPTIONS.filter(
+    (opt) => !existingMediaTypes.includes(opt.value)
+  );
+
+  if (available.length === 0) return null;
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className={triggerClassName}
+        >
+          <Plus className="w-3 h-3" />
+          {triggerLabel}
+          <ChevronDown className="w-3 h-3 opacity-70" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          className="min-w-[220px] rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg py-1 z-[10000]"
+          sideOffset={4}
+          align="start"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {available.map((opt) => (
+            <DropdownMenu.Item
+              key={opt.value}
+              className="flex cursor-pointer px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 outline-none"
+              onSelect={() => onSelect(opt.value)}
+            >
+              {opt.label}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
@@ -630,9 +700,16 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
         {/* Content: badge (e.g. $ref: BlogPost json) + panel with drop zone */}
         <div className="p-3 space-y-2">
           {data.contentTypes.length === 0 ? (
-            <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 py-4">
+            <div className="flex flex-col items-center gap-2 text-xs text-gray-500 dark:text-gray-400 py-4">
               <AlertCircle className="w-4 h-4" />
               <span>No content types defined</span>
+              {data.onAddContentType && (
+                <AddContentTypeDropdown
+                  existingMediaTypes={[]}
+                  onSelect={data.onAddContentType}
+                  triggerClassName="mt-2 px-3 py-1.5 text-xs bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                />
+              )}
             </div>
           ) : selectedContent ? (
             <>
@@ -665,21 +742,29 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
           ) : null}
         </div>
 
-        {/* Footer (same as response body) */}
-        <div className="px-3 pb-2 flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
+        {/* Footer: content type count, Add content type dropdown, Edit */}
+        <div className="px-3 pb-2 flex items-center justify-between gap-2 text-[10px] text-gray-500 dark:text-gray-400">
           <span>{data.contentTypes.length} content type(s)</span>
-          {data.onEdit && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onEdit?.();
-              }}
-              className="flex items-center gap-1 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-            >
-              <Pencil className="w-3 h-3" />
-              Edit
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {data.onAddContentType && (
+              <AddContentTypeDropdown
+                existingMediaTypes={data.contentTypes.map((ct) => ct.media_type)}
+                onSelect={data.onAddContentType}
+              />
+            )}
+            {data.onEdit && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onEdit?.();
+                }}
+                className="flex items-center gap-1 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              >
+                <Pencil className="w-3 h-3" />
+                Edit
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

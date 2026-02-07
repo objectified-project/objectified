@@ -1121,6 +1121,35 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     }
   }, [confirmDialog, alertDialog, setNodes, setEdges, onRefresh]);
 
+  // Add a content type branch to a request body (application/json, multipart/form-data, etc.)
+  const handleAddRequestBodyContentType = useCallback(async (requestBodyId: string, mediaType: string) => {
+    try {
+      const result = await addRequestBodyContentType(
+        requestBodyId,
+        mediaType,
+        undefined,
+        { type: 'object', properties: {} }
+      );
+      const parsed = JSON.parse(result);
+      if (parsed.success) {
+        if (onRefresh) onRefresh();
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to add content type',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error adding request body content type:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to add content type',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
   // Handle request body property drop (add to inline schema; if content is $ref, convert first then add)
   const handleRequestBodyPropertyDrop = useCallback(async (
     contentId: string,
@@ -2645,6 +2674,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 required: rb.required,
                 contentTypes: contentTypes,
                 onDelete: () => handleDeleteRequestBody(rb.id, rb.name),
+                onAddContentType: (mediaType: string) => handleAddRequestBodyContentType(rb.id, mediaType),
                 onPropertyDrop: stableHandleRequestBodyPropertyDrop,
                 onClassDrop: stableHandleRequestBodyClassDrop,
                 onPropertyDelete: stableHandleRequestBodyPropertyDelete,
@@ -2664,6 +2694,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
 
           if (linkedRbData.success && linkedRbData.requestBody) {
             const rbNodeId = `request-body-${linkedRbData.requestBody.id}`;
+            const rbContentTypes = linkedRbData.requestBody.content_types || [];
+            const contentTypeLabel = getContentTypeEdgeLabel(rbContentTypes);
 
             const edgeType = edgeRouting === 'straight' ? 'straight'
               : edgeRouting === 'bezier' ? 'default'
@@ -2678,6 +2710,9 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
               targetHandle: 'operation-input',
               type: edgeType,
               animated: edgeAnimation !== 'none',
+              label: contentTypeLabel,
+              labelStyle: { fontSize: 10, fill: '#5b21b6' },
+              labelBgStyle: { fill: '#ede9fe', stroke: '#8b5cf6' },
               style: {
                 stroke: '#8b5cf6',
                 strokeWidth: 2,
@@ -2702,7 +2737,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
 
   // Detect dark mode
   useEffect(() => {

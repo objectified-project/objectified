@@ -55,6 +55,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added the ability to define a catch-all response for error responses in HTTP Operations
   - Added indicator to paths that are invalid (or not completely defined)
   - Added display of sample URL for each path that is created in the canvas
+  - Added content type definitions for request body schemas
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
   - Dragging a class to a response schema allows the class to be copied or referenced
 - OpenAPI Support:
