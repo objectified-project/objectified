@@ -783,7 +783,7 @@ function RequestBodyExamplesPanel({ contentId, content, examples, onSave }: Requ
     const entry: ExampleEntry = { summary: editSummary.trim() || undefined, value };
     if (editingIndex === -1) {
       newExamples.push(entry);
-    } else {
+    } else if (editingIndex !== null) {
       newExamples[editingIndex] = entry;
     }
     onSave(newExamples);
