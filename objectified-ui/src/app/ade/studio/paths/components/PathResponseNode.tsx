@@ -215,24 +215,24 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
         onDragLeave={(e) => { e.stopPropagation(); handleDragLeave(e); }}
         onDrop={(e) => { e.stopPropagation(); handleDrop(e); }}
       >
-        {/* Delete button */}
-        {data.onDelete && (
-          <button
-            onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
-            className="absolute top-2 right-2 rounded p-1 text-white hover:opacity-80 z-10"
-            title="Delete response"
-          >
-            <Trash2 size={12} />
-          </button>
-        )}
-
-        {/* Header - Status code + description + icon */}
-        <div className={`${config.headerBg} text-white px-3 py-2 rounded-t-md flex items-center justify-between`}>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm">{data.statusCode}</span>
-            <span className="text-xs opacity-90">{getDescription()}</span>
+        {/* Header - Status code + description + status icon + delete (separated to avoid overlap) */}
+        <div className={`${config.headerBg} text-white px-3 py-2 rounded-t-md flex items-center justify-between gap-2`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-bold text-sm shrink-0">{data.statusCode}</span>
+            <span className="text-xs opacity-90 truncate">{getDescription()}</span>
           </div>
-          <span className="text-lg">{config.icon}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-lg" aria-hidden>{config.icon}</span>
+            {data.onDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); data.onDelete?.(); }}
+                className="rounded p-1 text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-white/50"
+                title="Delete response"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content type map with schema bindings */}

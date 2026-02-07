@@ -16,29 +16,18 @@
 Each OpenAPI concept is represented as a distinct node type with color-coded visual identity, making API 
 structure immediately recognizable.
 
-#### 2.1 Path Nodes 📋 PARTIALLY IMPLEMENTED
-
-**Visual Design**: Rounded rectangle with URL path as header, gray-blue gradient background
-
-**Configurable Properties**: ✅ PARTIALLY IMPLEMENTED
-- ✅ Path pattern with inline variable extraction: `/users/{userId}/posts/{postId}`
-- ✅ Summary and description (markdown support with Monaco Editor)
-- 📋 Server overrides for multi-environment routing
-- ✅ Deprecated flag with visual strikethrough and warning badge
-- ✅ Path tags for logical grouping (multi-select from project-defined tags)
-- 📋 Common parameters inherited by all operations
-- ✅ External documentation links
-
-#### 2.4 Parameter Nodes 📋 PLANNED
+#### 2.4 Parameter Nodes ✅ IMPLEMENTED
 
 **Visual Design**: Small chips/tags color-coded by parameter location
 
 | Location | Color  | Icon       |
 |----------|--------|------------|
 | Query    | Blue   | ? icon     |
-| Path     | Green  | {} icon    |
+| Path     | Green  | {} icon (Braces) |
 | Header   | Purple | H icon     |
 | Cookie   | Orange | 🍪 icon    |
+
+Implemented in `PathParameterNode.tsx`: compact chip layout with location-based background/border colors, Lucide Braces for path, tooltip for type/required/default/description.
 
 #### 2.5 Request Body Nodes 📋 PLANNED
 
@@ -60,33 +49,6 @@ structure immediately recognizable.
 - Insomnia Collection v4
 - HAR (HTTP Archive) files
 - cURL commands (converts to operation)
-
-### 3.5 OpenAPI Specification Output 📋 PLANNED
-
-**Full Spec Generation** ✅ IMPLEMENTED (#424)
-- **Specification Components**:
-    - ✅ `info` (title, version, description, contact, license, termsOfService)
-    - ✅ `servers` (multiple environments with variables)
-    - ✅ `paths` (all operations with full configuration)
-    - ✅ `components/schemas` (from classes)
-    - ✅ `components/parameters` (optional; included when passed via options.components)
-    - ✅ `components/requestBodies` (optional; included when passed via options.components)
-    - ✅ `components/responses` (optional; included when passed via options.components)
-    - ✅ `components/headers` (optional; included when passed via options.components)
-    - ✅ `components/securitySchemes` (from version security schemes)
-    - ✅ `components/links` (optional; included when passed via options.components)
-    - ✅ `components/callbacks` (optional; included when passed via options.components)
-    - ✅ `components/examples` (optional; included when passed via options.components)
-    - ✅ `components/pathItems` (optional; included when passed via options.components)
-    - ✅ `security` (global security requirements; Code tab passes when schemes exist)
-    - ✅ `tags` (optional; structure supported; Code tab can pass when available)
-    - ✅ `externalDocs` (optional; structure supported; Code tab can pass when available)
-
-| Ticket | Feature Description                                | Status |
-|--------|----------------------------------------------------|--------|
-| #424   | Update OpenAPI Generator to include missing fields | ✅ Done – Generator and template output all OpenAPI 3.1 component sections when provided; Code tab passes global security and supports tags/externalDocs |
-
----
 
 ---
 
@@ -642,6 +604,27 @@ DROP TARGET STATE:
 | 3XX Redirect | Blue   | 301, 302, 304 Not Modified          |
 | 4XX Client   | Yellow | 400, 401, 403, 404, 422             |
 | 5XX Server   | Red    | 500, 502, 503, 504                  |
+
+### 3.5 OpenAPI Specification Output ✅ IMPLEMENTED
+
+**Full Spec Generation** ✅ IMPLEMENTED
+- **Specification Components**:
+    - ✅ `info` (title, version, description, contact, license, termsOfService)
+    - ✅ `servers` (multiple environments with variables)
+    - ✅ `paths` (all operations with full configuration)
+    - ✅ `components/schemas` (from classes)
+    - ✅ `components/parameters` (optional; included when passed via options.components)
+    - ✅ `components/requestBodies` (optional; included when passed via options.components)
+    - ✅ `components/responses` (optional; included when passed via options.components)
+    - ✅ `components/headers` (optional; included when passed via options.components)
+    - ✅ `components/securitySchemes` (from version security schemes)
+    - ✅ `components/links` (optional; included when passed via options.components)
+    - ✅ `components/callbacks` (optional; included when passed via options.components)
+    - ✅ `components/examples` (optional; included when passed via options.components)
+    - ✅ `components/pathItems` (optional; included when passed via options.components)
+    - ✅ `security` (global security requirements; Code tab passes when schemes exist)
+    - ✅ `tags` (optional; structure supported; Code tab can pass when available)
+    - ✅ `externalDocs` (optional; structure supported; Code tab can pass when available)
 
 ## Security & Authentication
 
