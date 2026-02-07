@@ -1121,27 +1121,34 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
           />
         )}
 
-        {/* Content type tabs (same as response body: show when more than one) */}
+        {/* Content type tabs with schema binding hint (#387) */}
         {data.contentTypes.length > 1 && (
           <div className="px-3 pt-2 flex gap-1 overflow-x-auto">
-            {data.contentTypes.map((ct, index) => (
-              <button
-                key={ct.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedContentIndex(index);
-                }}
-                className={`
-                  px-2 py-1 text-[10px] rounded-t transition-colors whitespace-nowrap
-                  ${selectedContentIndex === index
-                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-medium'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }
-                `}
-              >
-                {ct.media_type}
-              </button>
-            ))}
+            {data.contentTypes.map((ct, index) => {
+              const schemaHint = ct.class_id && ct.class_name
+                ? ct.class_name
+                : (ct.inline_schema?.properties?.length != null ? `${ct.inline_schema.properties.length} props` : null);
+              const label = schemaHint ? `${ct.media_type.replace(/^[^/]+\//, '')} → ${schemaHint}` : ct.media_type;
+              return (
+                <button
+                  key={ct.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedContentIndex(index);
+                  }}
+                  title={ct.media_type + (schemaHint ? ` (${schemaHint})` : '')}
+                  className={`
+                    px-2 py-1 text-[10px] rounded-t transition-colors whitespace-nowrap truncate max-w-[140px]
+                    ${selectedContentIndex === index
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-medium'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    }
+                  `}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         )}
 

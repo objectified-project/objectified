@@ -46,7 +46,7 @@ structure immediately recognizable.
 
 **Configurable Properties**:
 - ✅ Content type map (application/json, multipart/form-data, etc.)
-- 📋 Schema binding per content type
+- ✅ Schema binding per content type (#387)
 - ✅ Required flag
 - ✅ Description
 - ✅ Example values
@@ -59,9 +59,9 @@ structure immediately recognizable.
 - File upload configuration with encoding options
 - Example value editor with JSON/YAML/XML toggle
 
-| Ticket | Feature                                                        |
-|--------|----------------------------------------------------------------|
-| #387   | Schema binding per content type                                |
+| Ticket | Feature                         |
+|--------|---------------------------------|
+| #387   | Schema binding per content type ✅ |
 
 #### 2.6 Response Nodes 📋 PLANNED
 

@@ -432,6 +432,8 @@ export default function RequestBodySection({
   const [newRequired, setNewRequired] = useState(true);
   const [addContentDialogOpen, setAddContentDialogOpen] = useState(false);
   const [newMediaType, setNewMediaType] = useState('application/json');
+  const [newContentSchemaType, setNewContentSchemaType] = useState<'reference' | 'inline'>('inline');
+  const [newContentClassId, setNewContentClassId] = useState('');
   const [addPropertyDialogOpen, setAddPropertyDialogOpen] = useState(false);
   const [newPropertyName, setNewPropertyName] = useState('');
   const [newPropertyType, setNewPropertyType] = useState('string');
@@ -648,18 +650,29 @@ export default function RequestBodySection({
   const handleAddContentType = async () => {
     if (!linkedRequestBody) return;
 
+    if (newContentSchemaType === 'reference' && !newContentClassId) {
+      await alertDialog({
+        title: 'Select a class',
+        message: 'Please select a class for the schema reference.',
+        variant: 'error',
+      });
+      return;
+    }
+
     try {
       const result = await addRequestBodyContentType(
         linkedRequestBody.id,
         newMediaType,
-        undefined,
-        { type: 'object', properties: [] }
+        newContentSchemaType === 'reference' ? newContentClassId : undefined,
+        newContentSchemaType === 'inline' ? { type: 'object', properties: [] } : undefined
       );
       const data = JSON.parse(result);
 
       if (data.success) {
         setAddContentDialogOpen(false);
         setNewMediaType('application/json');
+        setNewContentSchemaType('inline');
+        setNewContentClassId('');
         await loadData();
       } else {
         await alertDialog({
@@ -872,12 +885,22 @@ export default function RequestBodySection({
           </div>
         )}
 
-        {/* Add Content Type Dialog */}
-        <Dialog.Root open={addContentDialogOpen} onOpenChange={setAddContentDialogOpen}>
+        {/* Add Content Type Dialog — schema binding per content type (#387) */}
+        <Dialog.Root
+          open={addContentDialogOpen}
+          onOpenChange={(open) => {
+            setAddContentDialogOpen(open);
+            if (!open) {
+              setNewContentSchemaType('inline');
+              setNewContentClassId('');
+            }
+          }}
+        >
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
-            <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-xs -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+            <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
               <Dialog.Title className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Add Content Type</Dialog.Title>
+
               <Label className="text-xs font-medium mb-1 block">Media Type</Label>
               <Select value={newMediaType} onValueChange={setNewMediaType}>
                 <SelectTrigger className="h-9 text-sm mt-1">
@@ -891,9 +914,60 @@ export default function RequestBodySection({
                   ))}
                 </SelectContent>
               </Select>
+
+              <Label className="text-xs font-medium mb-1 block mt-4">Schema binding</Label>
+              <div className="flex gap-2 mt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={newContentSchemaType === 'reference' ? 'default' : 'outline'}
+                  onClick={() => setNewContentSchemaType('reference')}
+                  className={`flex-1 text-xs ${newContentSchemaType === 'reference' ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
+                >
+                  <Link2 className="w-3 h-3 mr-1" />
+                  Class Reference
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={newContentSchemaType === 'inline' ? 'default' : 'outline'}
+                  onClick={() => setNewContentSchemaType('inline')}
+                  className={`flex-1 text-xs ${newContentSchemaType === 'inline' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                >
+                  <Pencil className="w-3 h-3 mr-1" />
+                  Inline Schema
+                </Button>
+              </div>
+
+              {newContentSchemaType === 'reference' && (
+                <div className="mt-3">
+                  <Label className="text-xs font-medium mb-1 block">Class</Label>
+                  <Select value={newContentClassId} onValueChange={setNewContentClassId}>
+                    <SelectTrigger className="h-9 text-sm mt-1">
+                      <SelectValue placeholder="Select a class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id} className="text-xs">
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setAddContentDialogOpen(false)}>Cancel</Button>
-                <Button type="button" variant="default" size="sm" onClick={handleAddContentType}>Add</Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={handleAddContentType}
+                  disabled={newContentSchemaType === 'reference' && !newContentClassId}
+                >
+                  Add
+                </Button>
               </div>
             </Dialog.Content>
           </Dialog.Portal>
