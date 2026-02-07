@@ -47,8 +47,8 @@ structure immediately recognizable.
 **Configurable Properties**:
 - ✅ Content type map (application/json, multipart/form-data, etc.)
 - 📋 Schema binding per content type
-- 📋 Required flag
-- 📋 Description
+- ✅ Required flag
+- ✅ Description
 - 📋 Example values
 - 📋 Encoding options (for multipart)
 
@@ -62,8 +62,6 @@ structure immediately recognizable.
 | Ticket | Feature                                                        |
 |--------|----------------------------------------------------------------|
 | #387   | Schema binding per content type                                |
-| #388   | Add required flag to request body                              |
-| #389   | Add description to request body                                |
 | #390   | Add examples to request body node                              |
 | #391   | Add encoding options for multipart                             |
 

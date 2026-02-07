@@ -71,6 +71,7 @@ import {
   linkRequestBodyToOperation,
   unlinkRequestBodyFromOperation,
   deleteSharedPathRequestBody,
+  updateSharedPathRequestBody,
   addRequestBodyContentType,
   addPropertyToInlineSchema,
   updateInlineSchemaProperty,
@@ -1145,6 +1146,30 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
       await alertDialog({
         title: 'Error',
         message: 'Failed to add content type',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
+  // Update request body description (for request body node mapping #389)
+  const handleUpdateRequestBodyDescription = useCallback(async (requestBodyId: string, description: string) => {
+    try {
+      const result = await updateSharedPathRequestBody(requestBodyId, { description: description || '' });
+      const parsed = JSON.parse(result);
+      if (parsed.success) {
+        if (onRefresh) onRefresh();
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to update description',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating request body description:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to update description',
         variant: 'error',
       });
     }
@@ -2675,6 +2700,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 contentTypes: contentTypes,
                 onDelete: () => handleDeleteRequestBody(rb.id, rb.name),
                 onAddContentType: (mediaType: string) => handleAddRequestBodyContentType(rb.id, mediaType),
+                onDescriptionChange: (description: string) => handleUpdateRequestBodyDescription(rb.id, description),
                 onPropertyDrop: stableHandleRequestBodyPropertyDrop,
                 onClassDrop: stableHandleRequestBodyClassDrop,
                 onPropertyDelete: stableHandleRequestBodyPropertyDelete,
@@ -2737,7 +2763,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
 
   // Detect dark mode
   useEffect(() => {

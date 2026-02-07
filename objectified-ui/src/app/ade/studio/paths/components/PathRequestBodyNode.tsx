@@ -49,6 +49,8 @@ export interface PathRequestBodyData {
   onPropertyDelete?: (contentId: string, propertyId: string) => void;
   /** Called with the selected media type when user adds a new content type branch (e.g. application/json, multipart/form-data). */
   onAddContentType?: (mediaType: string) => void;
+  /** Called when the user saves a new or updated description for the request body. */
+  onDescriptionChange?: (description: string) => void;
   onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   [key: string]: unknown; // Index signature for React Flow compatibility
 }
@@ -605,17 +607,113 @@ function AddContentTypeDropdown({
 }
 
 // =============================================================================
+// DESCRIPTION EDITOR (for request body node mapping)
+// =============================================================================
+
+interface DescriptionEditorProps {
+  description: string | undefined;
+  isEditing: boolean;
+  onStartEdit: () => void;
+  onCancel: () => void;
+  onSave: (value: string) => void;
+  draft: string;
+  onDraftChange: (value: string) => void;
+}
+
+function DescriptionEditor({
+  description,
+  isEditing,
+  onStartEdit,
+  onCancel,
+  onSave,
+  draft,
+  onDraftChange,
+}: DescriptionEditorProps) {
+  if (isEditing) {
+    return (
+      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50" onClick={(e) => e.stopPropagation()}>
+        <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 block mb-1">Description</label>
+        <textarea
+          value={draft}
+          onChange={(e) => onDraftChange(e.target.value)}
+          placeholder="Describe the request body..."
+          className="w-full px-2 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 min-h-[60px] resize-y"
+          rows={2}
+        />
+        <div className="flex justify-end gap-1 mt-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-2 py-1 text-[10px] rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(draft.trim())}
+            className="px-2 py-1 text-[10px] rounded bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (description) {
+    return (
+      <div
+        className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between gap-2 group"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs text-gray-600 dark:text-gray-400 flex-1 min-w-0 break-words line-clamp-3">{description}</p>
+        <button
+          type="button"
+          onClick={onStartEdit}
+          className="flex-shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400"
+          title="Edit description"
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 py-1.5 border-b border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={onStartEdit}
+        className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+      >
+        <Plus className="w-3 h-3" />
+        Add description
+      </button>
+    </div>
+  );
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
 export default function PathRequestBodyNode({ data }: { data: PathRequestBodyData }) {
   const [selectedContentIndex, setSelectedContentIndex] = useState(0);
+  const [descriptionEditing, setDescriptionEditing] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState(data.description ?? '');
 
   useEffect(() => {
     if (selectedContentIndex >= data.contentTypes.length) {
       setSelectedContentIndex(0);
     }
   }, [data.contentTypes.length, selectedContentIndex]);
+
+  // Sync draft when data.description changes (e.g. after save from parent)
+  useEffect(() => {
+    if (!descriptionEditing) {
+      setDescriptionDraft(data.description ?? '');
+    }
+  }, [data.description, descriptionEditing]);
 
   const selectedContent = data.contentTypes[selectedContentIndex];
 
@@ -668,10 +766,28 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
               </button>
             )}
           </div>
-          {data.description && (
-            <p className="text-xs text-indigo-50 mt-1 truncate">{data.description}</p>
+          {/* Show truncated description in header only when description is not editable (no onDescriptionChange) */}
+          {data.description && !data.onDescriptionChange && (
+            <p className="text-xs text-indigo-50 mt-1 truncate" title={data.description}>{data.description}</p>
           )}
         </div>
+
+        {/* Description: editable when onDescriptionChange is provided */}
+        {data.onDescriptionChange && (
+          <DescriptionEditor
+            description={data.description}
+            isEditing={descriptionEditing}
+            onStartEdit={() => setDescriptionEditing(true)}
+            onCancel={() => { setDescriptionEditing(false); setDescriptionDraft(data.description ?? ''); }}
+            onSave={(value) => {
+              data.onDescriptionChange?.(value);
+              setDescriptionEditing(false);
+              setDescriptionDraft(value);
+            }}
+            draft={descriptionDraft}
+            onDraftChange={setDescriptionDraft}
+          />
+        )}
 
         {/* Content type tabs (same as response body: show when more than one) */}
         {data.contentTypes.length > 1 && (
