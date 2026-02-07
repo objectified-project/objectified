@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import {
   ArrowRight,
   Building2,
@@ -13,6 +16,113 @@ import {
   HelpCircle
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
+
+function formatCurrency(n: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(n);
+}
+
+function ROICalculator() {
+  const [teamSize, setTeamSize] = useState(5);
+  const [hourlyRate, setHourlyRate] = useState(100);
+  const [projectsPerYear, setProjectsPerYear] = useState(4);
+
+  const savings = useMemo(() => {
+    const scale = (teamSize / 5) * (hourlyRate / 100) * (projectsPerYear / 4);
+    const devTime = Math.round(32000 * scale);
+    const techDebt = Math.round(15000 * scale);
+    const onboarding = Math.round(10000 * scale);
+    const bugPrevention = Math.round(15000 * scale);
+    const total = devTime + techDebt + onboarding + bugPrevention;
+    return { devTime, techDebt, onboarding, bugPrevention, total };
+  }, [teamSize, hourlyRate, projectsPerYear]);
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="mb-8 space-y-6">
+        <div>
+          <label htmlFor="roi-team-size" className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Number of developers on your team
+          </label>
+          <input
+            id="roi-team-size"
+            type="number"
+            min={1}
+            max={100}
+            value={teamSize}
+            onChange={(e) => setTeamSize(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+            className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="roi-hourly-rate" className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Average developer hourly rate ($)
+          </label>
+          <input
+            id="roi-hourly-rate"
+            type="number"
+            min={50}
+            max={500}
+            value={hourlyRate}
+            onChange={(e) => setHourlyRate(Math.max(50, Math.min(500, Number(e.target.value) || 50)))}
+            className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="roi-projects" className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Number of API projects per year
+          </label>
+          <input
+            id="roi-projects"
+            type="number"
+            min={1}
+            max={20}
+            value={projectsPerYear}
+            onChange={(e) => setProjectsPerYear(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+            className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-6 dark:from-blue-950/30 dark:to-indigo-950/30">
+        <div className="mb-2 text-center text-sm font-medium text-zinc-600 dark:text-zinc-400">
+          Estimated Annual Savings
+        </div>
+        <div className="mb-4 text-center text-4xl font-bold text-blue-600 dark:text-blue-400">
+          {formatCurrency(savings.total)}
+        </div>
+        <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <div className="flex justify-between">
+            <span>Development time saved:</span>
+            <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(savings.devTime)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Technical debt reduced:</span>
+            <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(savings.techDebt)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Faster onboarding:</span>
+            <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(savings.onboarding)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Bug prevention:</span>
+            <span className="font-semibold text-zinc-900 dark:text-zinc-50">{formatCurrency(savings.bugPrevention)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-500">
+        * Estimates based on industry averages and typical usage patterns
+      </div>
+    </div>
+  );
+}
 
 export default function ForTeamsPage() {
   return (
@@ -538,76 +648,7 @@ export default function ForTeamsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="mb-8 space-y-6">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Number of developers on your team
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g., 5"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                  defaultValue="5"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Average developer hourly rate ($)
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g., 100"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                  defaultValue="100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Number of API projects per year
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g., 4"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                  defaultValue="4"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-6 dark:from-blue-950/30 dark:to-indigo-950/30">
-              <div className="mb-2 text-center text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                Estimated Annual Savings
-              </div>
-              <div className="mb-4 text-center text-4xl font-bold text-blue-600 dark:text-blue-400">
-                $72,000
-              </div>
-              <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-                <div className="flex justify-between">
-                  <span>Development time saved:</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">$32,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Technical debt reduced:</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">$15,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Faster onboarding:</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">$10,000</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Bug prevention:</span>
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-50">$15,000</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center text-xs text-zinc-500 dark:text-zinc-500">
-              * Estimates based on industry averages and typical usage patterns
-            </div>
-          </div>
+          <ROICalculator />
         </div>
       </section>
 

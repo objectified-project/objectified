@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { Twitter, Linkedin, Youtube } from 'lucide-react';
 
 export function Footer() {
@@ -95,6 +96,22 @@ export function Footer() {
                 </a>
               </li>
               <li>
+                <Link
+                  href="/features"
+                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                >
+                  Features
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/for-teams"
+                  className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                >
+                  For Teams
+                </Link>
+              </li>
+              <li>
                 <a
                   href="https://browse.objectified.dev"
                   target="_blank"
@@ -104,16 +121,6 @@ export function Footer() {
                   Browse APIs
                 </a>
               </li>
-              {/*<li>*/}
-              {/*  <a*/}
-              {/*    href="https://docs.objectified.dev"*/}
-              {/*    target="_blank"*/}
-              {/*    rel="noopener noreferrer"*/}
-              {/*    className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"*/}
-              {/*  >*/}
-              {/*    Documentation*/}
-              {/*  </a>*/}
-              {/*</li>*/}
             </ul>
           </div>
 

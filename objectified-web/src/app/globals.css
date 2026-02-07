@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for next-themes (Tailwind v4 defaults to media query only) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -13,10 +16,22 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+/* When next-themes sets class="dark" on html, use dark variables */
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* When next-themes sets class="light" on html, use light variables */
+html.light {
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
 html {
@@ -48,13 +63,21 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
+  :root:not(.light) ::-webkit-scrollbar-thumb {
     background: #4b5563;
   }
 
-  ::-webkit-scrollbar-thumb:hover {
+  :root:not(.light) ::-webkit-scrollbar-thumb:hover {
     background: #6b7280;
   }
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 /* Animations */

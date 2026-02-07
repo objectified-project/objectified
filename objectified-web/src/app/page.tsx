@@ -6,8 +6,13 @@ import {
   Zap,
   Lock,
   Star,
-  GitBranch
+  GitBranch,
+  Route,
+  Import,
+  LayoutGrid,
+  Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "./components/ui/Button";
 
 export default function Home() {
@@ -33,7 +38,7 @@ export default function Home() {
             </p>
             <p className="mb-12 text-xl text-zinc-600 dark:text-zinc-400">
               The modern platform for creating OpenAPI specifications and database schemas.<br/>
-              Build faster with our intuitive visual editor, publish, and scale with confidence.
+              Design schemas on an interactive canvas, author API paths visually, import from anywhere, and export production-ready specs.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
@@ -73,83 +78,92 @@ export default function Home() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {/* Feature 1 */}
+            {/* Feature 1 — Schema Canvas */}
             <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-blue-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-blue-700">
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-                <Code2 className="h-6 w-6" />
+                <LayoutGrid className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Visual API Designer
+                Visual Schema Canvas
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Design your schemas visually with drag-and-drop. Full OpenAPI 3.1.0 support with automatic specification generation.
+                Design data models on an interactive canvas with drag-and-drop, smart auto-layout, color-coded groups, animated edges, and 10+ themes.
               </p>
             </div>
 
-            {/* Feature 2 */}
+            {/* Feature 2 — Paths Designer */}
+            <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-emerald-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-emerald-700">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
+                <Route className="h-6 w-6" />
+              </div>
+              <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                Paths Designer
+              </h3>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Author API endpoints visually with HTTP method color coding, parameter editing, response schema binding, and real-time OpenAPI validation.
+              </p>
+            </div>
+
+            {/* Feature 3 — Enterprise Import */}
             <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-purple-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-purple-700">
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
-                <Database className="h-6 w-6" />
+                <Import className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Database Schema Editor
+                Enterprise Import
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Create and modify database schemas with an intuitive visual interface. Support for SQL, MongoDB, Redis, and more.
+                Import from file, URL, Git, SwaggerHub, clipboard, or AI. Guided wizard with quality scoring, validation, and transaction-based execution.
               </p>
             </div>
 
-            {/* Feature 3 */}
-            <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-green-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-green-700">
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400">
-                <Layers className="h-6 w-6" />
-              </div>
-              <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Multi-Tenant Architecture
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                Organize your projects with teams and organizations. Share schemas, collaborate, and manage permissions easily.
-              </p>
-            </div>
-
-            {/* Feature 4 */}
+            {/* Feature 4 — Code Generation */}
             <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-orange-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-orange-700">
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400">
                 <Zap className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Code Generation
+                Export &amp; Code Generation
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Generate DTO stubs, database migrations, and multiple database exports from your specifications automatically.
+                Export to OpenAPI YAML/JSON, PNG, SVG, PDF, Mermaid, PlantUML, and more. Generate DTO stubs and database migrations automatically.
               </p>
             </div>
 
-            {/* Feature 5 */}
+            {/* Feature 5 — Version Control */}
             <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-indigo-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-indigo-700">
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                <GitBranch className="h-4 w-4" />
+                <GitBranch className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Version Control
+                Version Control &amp; Diff
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Track changes, compare versions, and roll back when needed. Full history of all your API modifications.
+                Track changes with full version history. Compare versions side by side with diff highlighting for added, modified, and removed schemas.
               </p>
             </div>
 
-            {/* Feature 6 */}
-            <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-rose-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-rose-700">
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400">
-                <Lock className="h-6 w-6" />
+            {/* Feature 6 — AI-Powered */}
+            <div className="group rounded-2xl border border-zinc-200 bg-white p-8 transition-all hover:border-sky-300 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-sky-700">
+              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400">
+                <Sparkles className="h-6 w-6" />
               </div>
               <h3 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Enterprise Security
+                AI-Powered Design
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Role-based access control, SSO integration, audit logs, and compliance features for enterprise teams.
+                Describe your API in plain English and let AI generate a complete OpenAPI specification. Quality scoring grades your spec from A to F.
               </p>
             </div>
+          </div>
+
+          <div className="mt-12 text-center">
+            <Link href="/features">
+              <Button size="lg" variant="outline" className="group">
+                See All Features
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -166,40 +180,52 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid gap-12 lg:grid-cols-3">
+          <div className="grid gap-12 lg:grid-cols-4">
             <div className="text-center">
               <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-2xl font-bold text-white">
                 1
               </div>
               <h3 className="mb-3 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Design Visually
+                Design Schemas
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Use our drag-and-drop interface to create database schemas and API endpoints. No code required.
+                Drag classes onto the canvas, define properties and types, and draw relationships — or import an existing OpenAPI spec.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-600 text-2xl font-bold text-white">
+                2
+              </div>
+              <h3 className="mb-3 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
+                Author Paths
+              </h3>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Switch to the Paths Designer to create endpoints, bind schemas to request bodies and responses, and configure security.
               </p>
             </div>
 
             <div className="text-center">
               <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-purple-600 text-2xl font-bold text-white">
-                2
+                3
               </div>
               <h3 className="mb-3 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Generate Code
+                Validate &amp; Score
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Automatically generate OpenAPI specs, database migrations, and API documentation from your designs.
+                Run real-time OpenAPI validation, review quality scores from A to F, and fix issues before exporting.
               </p>
             </div>
 
             <div className="text-center">
-              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-600 text-2xl font-bold text-white">
-                3
+              <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-orange-600 text-2xl font-bold text-white">
+                4
               </div>
               <h3 className="mb-3 text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-                Deploy & Scale
+                Export &amp; Ship
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400">
-                Export to your favorite framework or use our built-in deployment options. Scale with confidence.
+                Export as OpenAPI YAML/JSON, generate code stubs, or share your API documentation with your team and consumers.
               </p>
             </div>
           </div>
@@ -344,7 +370,7 @@ export default function Home() {
               Ready to build better APIs?
             </h2>
             <p className="mb-8 text-xl text-blue-100">
-              Join thousands of developers already using Objectified to design and manage their APIs
+              Join developers and teams already using Objectified to visually design, validate, and ship their API specifications.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <a href="https://app.objectified.dev" target="_blank" rel="noopener noreferrer">
