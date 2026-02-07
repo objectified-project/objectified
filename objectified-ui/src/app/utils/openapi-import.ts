@@ -28,6 +28,61 @@ export interface ParsedClass {
   schema?: any; // Original schema structure (may include allOf/anyOf/oneOf)
 }
 
+/** Parsed OpenAPI path item: path pattern + operations (#425) */
+export interface ParsedPath {
+  path: string;
+  summary?: string;
+  description?: string;
+  parameters?: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Record<string, unknown> }>;
+  operations: ParsedOperation[];
+}
+
+/** Parsed OpenAPI operation (get, post, etc.) */
+export interface ParsedOperation {
+  method: string;
+  operationId?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  deprecated?: boolean;
+  parameters: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Record<string, unknown> }>;
+  requestBody?: {
+    required?: boolean;
+    description?: string;
+    content: Record<string, { schema?: Record<string, unknown>; $ref?: string }>;
+  };
+  responses: Record<string, { description?: string; content?: Record<string, { schema?: Record<string, unknown>; $ref?: string }>; headers?: Record<string, unknown>; links?: Record<string, unknown> }>;
+  security?: Record<string, string[]>;
+}
+
+/** Parsed OpenAPI security scheme (components.securitySchemes) */
+export interface ParsedSecurityScheme {
+  scheme_name: string;
+  scheme_type: 'apiKey' | 'http' | 'oauth2' | 'openIdConnect' | 'mutualTLS';
+  in_location?: 'header' | 'query' | 'cookie';
+  param_name?: string;
+  http_scheme?: string;
+  description?: string;
+  data?: Record<string, unknown>;
+}
+
+/** OpenAPI info object (title, version, description, etc.) */
+export interface ParsedOpenAPIInfo {
+  title?: string;
+  version?: string;
+  description?: string;
+  termsOfService?: string;
+  contact?: { name?: string; url?: string; email?: string };
+  license?: { name: string; identifier?: string; url?: string };
+}
+
+/** OpenAPI server entry */
+export interface ParsedOpenAPIServer {
+  url: string;
+  description?: string;
+  variables?: Record<string, { default: string; enum?: string[]; description?: string }>;
+}
+
 export interface OpenAPIParseResult {
   success: boolean;
   classes: ParsedClass[];
@@ -36,6 +91,16 @@ export interface OpenAPIParseResult {
   version?: string;
   title?: string;
   description?: string;
+  /** OpenAPI 3.1 paths (pathing) - #425 */
+  paths?: ParsedPath[];
+  /** OpenAPI 3.1 components.securitySchemes - #425 */
+  securitySchemes?: ParsedSecurityScheme[];
+  /** Full info object for import */
+  info?: ParsedOpenAPIInfo;
+  /** Servers array for import */
+  servers?: ParsedOpenAPIServer[];
+  /** Top-level tags */
+  tags?: Array<{ name: string; description?: string }>;
 }
 
 /**
@@ -424,85 +489,279 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
   }
 }
 
+/** Extract $ref schema name from reference string */
+function getRefSchemaName(ref: string | undefined): string | null {
+  if (!ref || typeof ref !== 'string') return null;
+  const m = ref.match(/#\/components\/schemas\/(.+)/);
+  return m ? m[1] : null;
+}
+
+/** Normalize OpenAPI schema for storage (inline or $ref) */
+function normalizeContentSchema(mediaObj: any): { schema?: Record<string, unknown>; $ref?: string } | undefined {
+  if (!mediaObj || typeof mediaObj !== 'object') return undefined;
+  const s = mediaObj.schema;
+  if (!s) return undefined;
+  if (s.$ref) return { $ref: s.$ref };
+  return { schema: s };
+}
+
+/**
+ * Extract paths from OpenAPI spec.paths (OpenAPI 3.1 pathing - #425)
+ */
+function extractPaths(spec: any): ParsedPath[] {
+  const pathObj = spec.paths;
+  if (!pathObj || typeof pathObj !== 'object') return [];
+
+  const methods = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
+  const result: ParsedPath[] = [];
+
+  for (const path of Object.keys(pathObj)) {
+    if (path.startsWith('/') === false) continue;
+    const pathItem = pathObj[path];
+    if (!pathItem || typeof pathItem !== 'object') continue;
+
+    const pathParams = Array.isArray(pathItem.parameters)
+      ? pathItem.parameters.map((p: any) => ({
+          name: p.name || '',
+          in: (p.in || 'query').toLowerCase(),
+          required: p.required === true,
+          description: p.description,
+          schema: p.schema,
+        }))
+      : [];
+
+    const operations: ParsedOperation[] = [];
+
+    for (const method of methods) {
+      const op = pathItem[method];
+      if (!op || typeof op !== 'object') continue;
+
+      const opParams = Array.isArray(op.parameters)
+        ? op.parameters.map((p: any) => ({
+            name: p.name || '',
+            in: (p.in || 'query').toLowerCase(),
+            required: p.required === true,
+            description: p.description,
+            schema: p.schema,
+          }))
+        : [];
+
+      const allParams = [...pathParams];
+      for (const p of opParams) {
+        const existing = allParams.findIndex((x: { name: string; in: string }) => x.name === p.name && x.in === p.in);
+        if (existing >= 0) allParams[existing] = p;
+        else allParams.push(p);
+      }
+
+      let requestBody: ParsedOperation['requestBody'] | undefined;
+      if (op.requestBody && typeof op.requestBody === 'object') {
+        const content = op.requestBody.content;
+        if (content && typeof content === 'object') {
+          const contentMap: Record<string, { schema?: Record<string, unknown>; $ref?: string }> = {};
+          for (const [mediaType, mediaObj] of Object.entries(content)) {
+            const norm = normalizeContentSchema(mediaObj as any);
+            if (norm) contentMap[mediaType] = norm;
+          }
+          if (Object.keys(contentMap).length > 0) {
+            requestBody = {
+              required: op.requestBody.required === true,
+              description: op.requestBody.description,
+              content: contentMap,
+            };
+          }
+        }
+      }
+
+      const responses: ParsedOperation['responses'] = {};
+      if (op.responses && typeof op.responses === 'object') {
+        for (const [status, res] of Object.entries(op.responses)) {
+          const r = res as any;
+          if (!r || typeof r !== 'object') continue;
+          const content: Record<string, { schema?: Record<string, unknown>; $ref?: string }> = {};
+          if (r.content && typeof r.content === 'object') {
+            for (const [mediaType, mediaObj] of Object.entries(r.content)) {
+              const norm = normalizeContentSchema(mediaObj as any);
+              if (norm) content[mediaType] = norm;
+            }
+          }
+          responses[status] = {
+            description: r.description,
+            content: Object.keys(content).length > 0 ? content : undefined,
+            headers: r.headers,
+            links: r.links,
+          };
+        }
+      }
+
+      operations.push({
+        method: method.toUpperCase(),
+        operationId: op.operationId,
+        summary: op.summary,
+        description: op.description,
+        tags: Array.isArray(op.tags) ? op.tags : undefined,
+        deprecated: op.deprecated === true,
+        parameters: allParams,
+        requestBody,
+        responses,
+        security: op.security && op.security[0] && typeof op.security[0] === 'object' ? op.security[0] : undefined,
+      });
+    }
+
+    if (operations.length > 0) {
+      result.push({
+        path,
+        summary: pathItem.summary,
+        description: pathItem.description,
+        parameters: pathParams.length > 0 ? pathParams : undefined,
+        operations,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract security schemes from OpenAPI spec.components.securitySchemes (#425)
+ */
+function extractSecuritySchemes(spec: any): ParsedSecurityScheme[] {
+  const schemes = spec.components?.securitySchemes;
+  if (!schemes || typeof schemes !== 'object') return [];
+
+  const result: ParsedSecurityScheme[] = [];
+
+  for (const name of Object.keys(schemes)) {
+    const def = schemes[name];
+    if (!def || typeof def !== 'object') continue;
+
+    const rawType = (def.type || (def.scheme ? 'http' : 'apiKey')).toString().toLowerCase();
+    const schemeType: ParsedSecurityScheme['scheme_type'] =
+      rawType === 'apikey' ? 'apiKey'
+      : rawType === 'http' ? 'http'
+      : rawType === 'oauth2' ? 'oauth2'
+      : rawType === 'openidconnect' ? 'openIdConnect'
+      : rawType === 'mutualtls' ? 'mutualTLS'
+      : 'apiKey';
+
+    const parsed: ParsedSecurityScheme = {
+      scheme_name: name,
+      scheme_type: schemeType,
+      description: def.description,
+    };
+
+    if (schemeType === 'apiKey') {
+      parsed.in_location = (def.in || 'header') as 'header' | 'query' | 'cookie';
+      parsed.param_name = def.name || name;
+    } else if (schemeType === 'http') {
+      parsed.http_scheme = (def.scheme || 'bearer').toString().toLowerCase();
+      parsed.data = {};
+      if (def.bearerFormat) (parsed.data as any).bearerFormat = def.bearerFormat;
+    } else if (schemeType === 'oauth2') {
+      parsed.data = { flows: def.flows || {} };
+    } else if (schemeType === 'openIdConnect') {
+      parsed.data = { openIdConnectUrl: def.openIdConnectUrl || '' };
+    } else if (schemeType === 'mutualTLS') {
+      parsed.data = {};
+    }
+
+    result.push(parsed);
+  }
+
+  return result;
+}
+
 /**
  * Internal function that parses an already-validated OpenAPI 3.x specification
+ * Supports full OpenAPI 3.1.0: schemas, paths, securitySchemes, info, servers, tags (#425)
  */
 function parseOpenAPISpecInternal(spec: any, initialWarnings: string[]): OpenAPIParseResult {
   const globalWarnings: string[] = [...initialWarnings];
 
-  // Extract components/schemas
-  if (!spec.components || !spec.components.schemas) {
-    return {
-      success: false,
-      classes: [],
-      warnings: globalWarnings,
-      error: 'No schemas found in OpenAPI specification'
-    };
-  }
-
-  const schemas = spec.components.schemas;
+  const schemas = spec.components?.schemas;
+  const hasSchemas = schemas && typeof schemas === 'object' && Object.keys(schemas).length > 0;
   const classes: ParsedClass[] = [];
 
-  // Get all schema names for reference validation
-  const allSchemaNames = new Set(Object.keys(schemas));
+  if (hasSchemas) {
+    const allSchemaNames = new Set(Object.keys(schemas));
 
-  // Convert each schema to a class
-  for (const schemaName in schemas) {
-    const originalSchema = schemas[schemaName];
-    const warnings: string[] = [];
-    let isSupported = true;
+    for (const schemaName in schemas) {
+      const originalSchema = schemas[schemaName];
+      const warnings: string[] = [];
+      let isSupported = true;
 
-    // Resolve allOf compositions for validation and reference checking
-    const resolvedSchema = resolveAllOf(originalSchema, schemas);
+      const resolvedSchema = resolveAllOf(originalSchema, schemas);
+      const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
+      if (unresolvedRefs.length > 0) {
+        warnings.push(
+          `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
+          `These referenced schemas do not exist in the specification.`
+        );
+        isSupported = false;
+      }
 
-    // Check for unresolved $ref references
-    const unresolvedRefs = findUnresolvedReferences(resolvedSchema, allSchemaNames);
-    if (unresolvedRefs.length > 0) {
-      warnings.push(
-        `References undefined schemas: ${unresolvedRefs.join(', ')}. ` +
-        `These referenced schemas do not exist in the specification.`
-      );
-      isSupported = false;
-    }
+      const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
+      const properties: ParsedProperty[] = [];
+      for (const propName in directProperties) {
+        const propSchema = directProperties[propName];
+        properties.push(convertSchemaProperty(propName, propSchema, directRequired));
+      }
 
-    // Extract ONLY direct properties (not inherited via $ref in allOf)
-    // This prevents storing duplicate properties that come from parent schemas
-    const { properties: directProperties, required: directRequired } = extractDirectProperties(originalSchema);
+      classes.push({
+        name: schemaName,
+        description: originalSchema.description || resolvedSchema.description,
+        properties,
+        selected: isSupported,
+        warnings,
+        isSupported,
+        schema: originalSchema,
+      });
 
-    const properties: ParsedProperty[] = [];
-
-    // Convert only the direct properties for storage
-    for (const propName in directProperties) {
-      const propSchema = directProperties[propName];
-      properties.push(convertSchemaProperty(propName, propSchema, directRequired));
-    }
-
-    classes.push({
-      name: schemaName,
-      description: originalSchema.description || resolvedSchema.description,
-      properties,
-      selected: isSupported, // Only select supported classes by default
-      warnings,
-      isSupported,
-      schema: originalSchema // Preserve original schema with compositions
-    });
-
-    // Add to global warnings if unsupported
-    if (!isSupported) {
-      globalWarnings.push(`${schemaName}: ${warnings.join(' ')}`);
+      if (!isSupported) {
+        globalWarnings.push(`${schemaName}: ${warnings.join(' ')}`);
+      }
     }
   }
 
   const supportedClasses = classes.filter(c => c.isSupported);
+  const hasPaths = spec.paths && typeof spec.paths === 'object' && Object.keys(spec.paths).length > 0;
+  const paths = hasPaths ? extractPaths(spec) : [];
+  const securitySchemes = extractSecuritySchemes(spec);
+  const hasSecuritySchemes = securitySchemes.length > 0;
 
-  if (supportedClasses.length === 0) {
+  const hasImportableContent = supportedClasses.length > 0 || paths.length > 0 || hasSecuritySchemes;
+  if (!hasImportableContent) {
     return {
       success: false,
-      classes: [],
+      classes,
       warnings: globalWarnings,
-      error: 'No supported schemas found to import. All schemas have unresolved references.'
+      error: hasSchemas
+        ? 'No supported schemas found to import. All schemas have unresolved references.'
+        : 'No schemas, paths, or security schemes found in OpenAPI specification.',
     };
   }
+
+  const info: ParsedOpenAPIInfo | undefined = spec.info && typeof spec.info === 'object'
+    ? {
+        title: spec.info.title,
+        version: spec.info.version,
+        description: spec.info.description,
+        termsOfService: spec.info.termsOfService,
+        contact: spec.info.contact,
+        license: spec.info.license,
+      }
+    : undefined;
+
+  const servers: ParsedOpenAPIServer[] = Array.isArray(spec.servers)
+    ? spec.servers.map((s: any) => ({
+        url: s.url || '',
+        description: s.description,
+        variables: s.variables,
+      })).filter((s: ParsedOpenAPIServer) => s.url)
+    : [];
+
+  const tags = Array.isArray(spec.tags)
+    ? spec.tags.map((t: any) => ({ name: t.name || '', description: t.description }))
+    : undefined;
 
   return {
     success: true,
@@ -510,7 +769,12 @@ function parseOpenAPISpecInternal(spec: any, initialWarnings: string[]): OpenAPI
     warnings: globalWarnings,
     version: spec.info?.version,
     title: spec.info?.title,
-    description: spec.info?.description
+    description: spec.info?.description,
+    paths: paths.length > 0 ? paths : undefined,
+    securitySchemes: securitySchemes.length > 0 ? securitySchemes : undefined,
+    info,
+    servers: servers.length > 0 ? servers : undefined,
+    tags,
   };
 }
 

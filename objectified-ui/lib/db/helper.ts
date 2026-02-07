@@ -1406,6 +1406,38 @@ export async function addPropertyToClass(classId: string, propertyId: string | n
 
 // OpenAPI Import Functions
 
+/** Options for OpenAPI import: paths, securitySchemes, servers (#425) */
+export interface OpenAPIImportOptions {
+  paths?: Array<{
+    path: string;
+    summary?: string;
+    description?: string;
+    parameters?: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Record<string, unknown> }>;
+    operations: Array<{
+      method: string;
+      operationId?: string;
+      summary?: string;
+      description?: string;
+      tags?: string[];
+      deprecated?: boolean;
+      parameters: Array<{ name: string; in: string; required?: boolean; description?: string; schema?: Record<string, unknown> }>;
+      requestBody?: { required?: boolean; description?: string; content: Record<string, { schema?: Record<string, unknown>; $ref?: string }> };
+      responses: Record<string, { description?: string; content?: Record<string, { schema?: Record<string, unknown>; $ref?: string }>; headers?: Record<string, unknown>; links?: Record<string, unknown> }>;
+      security?: Record<string, string[]>;
+    }>;
+  }>;
+  securitySchemes?: Array<{
+    scheme_name: string;
+    scheme_type: string;
+    in_location?: string;
+    param_name?: string;
+    http_scheme?: string;
+    description?: string;
+    data?: Record<string, unknown>;
+  }>;
+  servers?: Array<{ url: string; description?: string; variables?: Record<string, { default: string; enum?: string[]; description?: string }> }>;
+}
+
 export async function importProjectFromOpenAPI(
   tenantId: string,
   creatorId: string,
@@ -1414,7 +1446,8 @@ export async function importProjectFromOpenAPI(
   projectDescription: string | null,
   versionId: string,
   versionDescription: string | null,
-  classes: any[]
+  classes: any[],
+  options?: OpenAPIImportOptions
 ) {
   const client = await connectionPool.connect();
 
@@ -1510,6 +1543,20 @@ export async function importProjectFromOpenAPI(
       [project.id, creatorId, versionId.trim(), versionDescription?.trim() || null]
     );
     const version = versionResult.rows[0];
+
+    // 2b. Import servers (OpenAPI 3.1 servers array) - #425
+    if (options?.servers?.length) {
+      for (let i = 0; i < options.servers.length; i++) {
+        const s = options.servers[i];
+        if (!s?.url) continue;
+        const variablesJson = s.variables && Object.keys(s.variables).length > 0 ? JSON.stringify(s.variables) : null;
+        await client.query(
+          `INSERT INTO odb.version_server (version_id, name, url, description, sort_order, variables)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+          [version.id, null, s.url.trim(), s.description?.trim() || null, i, variablesJson || '{}']
+        );
+      }
+    }
 
     // 3. Flatten properties (include nested)
     type PropertyInfo = { name: string; data: any; description?: string; _className?: string };
@@ -1648,6 +1695,20 @@ export async function importProjectFromOpenAPI(
     }
 
     await client.query('COMMIT');
+
+    // Import paths and security schemes (OpenAPI 3.1 pathing + components.securitySchemes) - #425
+    if (options?.paths?.length || options?.securitySchemes?.length) {
+      const { importOpenAPIPathsAndSecurity } = await import('./import-openapi-paths-security');
+      const pathResult = await importOpenAPIPathsAndSecurity(
+        version.id,
+        options.paths ?? [],
+        options.securitySchemes ?? []
+      );
+      if (!pathResult.success) {
+        return JSON.stringify({ success: false, error: pathResult.error || 'Failed to import paths or security schemes' });
+      }
+    }
+
     return JSON.stringify({ success: true, projectId: project.id, versionId: version.id });
   } catch (error: any) {
     try { await client.query('ROLLBACK'); } catch {}

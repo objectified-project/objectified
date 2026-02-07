@@ -54,17 +54,12 @@ structure immediately recognizable.
 #### 3.4 OpenAPI Export & Import 📋 PLANNED
 
 **Import Support**:
-- OpenAPI 3.0/3.1 JSON/YAML
-- Swagger 2.0 JSON/YAML
+- ✅ OpenAPI 3.0/3.1 JSON/YAML
+- ✅ Swagger 2.0 JSON/YAML
 - Postman Collection v2.1
 - Insomnia Collection v4
 - HAR (HTTP Archive) files
 - cURL commands (converts to operation)
-
-| Ticket | Feature                                             |
-|--------|-----------------------------------------------------|
-| #425   | Improve OpenAPI Specification import handling       |
-| #566   | Add OpenAPI importing to capture and generate paths |
 
 ### 3.5 OpenAPI Specification Output 📋 PLANNED
 

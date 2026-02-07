@@ -19,7 +19,7 @@ import Tab from '@mui/material/Tab';
 import CircularProgress from '@mui/material/CircularProgress';
 import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft, Lock, Search } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
-import { parseOpenAPISpec, ParsedClass } from '../../../utils/openapi-import';
+import { parseOpenAPISpec, ParsedClass, type ParsedPath, type ParsedSecurityScheme, type ParsedOpenAPIServer } from '../../../utils/openapi-import';
 import { importProjectFromOpenAPI, getLinkedAccountsForUser } from '../../../../../lib/db/helper';
 import { filterSlugInput, generateSlug } from '../../../utils/slug';
 
@@ -54,6 +54,9 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [openAPIInfo, setOpenAPIInfo] = useState<any>(null);
+  const [parsedPaths, setParsedPaths] = useState<ParsedPath[]>([]);
+  const [parsedSecuritySchemes, setParsedSecuritySchemes] = useState<ParsedSecurityScheme[]>([]);
+  const [parsedServers, setParsedServers] = useState<ParsedOpenAPIServer[]>([]);
 
   // SSO Repository Browser state
   const [selectedAccount, setSelectedAccount] = useState<any>(null);
@@ -97,6 +100,9 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     setIsLoading(false);
     setIsDragging(false);
     setOpenAPIInfo(null);
+    setParsedPaths([]);
+    setParsedSecuritySchemes([]);
+    setParsedServers([]);
     setSelectedAccount(null);
     setRepositories([]);
     setSelectedRepo(null);
@@ -147,6 +153,9 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
       setClasses(parseResult.classes);
       setWarnings(parseResult.warnings || []);
+      setParsedPaths(parseResult.paths ?? []);
+      setParsedSecuritySchemes(parseResult.securitySchemes ?? []);
+      setParsedServers(parseResult.servers ?? []);
       setOpenAPIInfo({
         title: parseResult.title,
         version: parseResult.version,
@@ -405,9 +414,11 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
     }
 
     const selectedClasses = classes.filter(c => c.selected);
+    const hasPaths = parsedPaths.length > 0;
+    const hasSecuritySchemes = parsedSecuritySchemes.length > 0;
 
-    if (selectedClasses.length === 0) {
-      setErrorMessage('Please select at least one class to import');
+    if (selectedClasses.length === 0 && !hasPaths && !hasSecuritySchemes) {
+      setErrorMessage('Select at least one class to import, or ensure the spec has paths or security schemes.');
       return;
     }
 
@@ -423,7 +434,12 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
         projectDescription || null,
         versionId,
         versionDescription || null,
-        selectedClasses
+        selectedClasses,
+        {
+          paths: hasPaths ? parsedPaths : undefined,
+          securitySchemes: hasSecuritySchemes ? parsedSecuritySchemes : undefined,
+          servers: parsedServers.length > 0 ? parsedServers : undefined,
+        }
       );
 
       const response = JSON.parse(result);
@@ -1067,7 +1083,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                         )}
                       </Box>
                       <Box>
-                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                        <Typography variant="caption" color="text.secondary" display="block" gutterBottom">
                           Total Properties
                         </Typography>
                         <Typography variant="h4" color="success.dark">
@@ -1077,6 +1093,30 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                           ({stats.uniqueProperties} unique, {stats.sharedProperties} shared)
                         </Typography>
                       </Box>
+                      {(parsedPaths.length > 0 || parsedSecuritySchemes.length > 0) && (
+                        <>
+                          {parsedPaths.length > 0 && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                                Paths
+                              </Typography>
+                              <Typography variant="h4" color="success.dark">
+                                {parsedPaths.length}
+                              </Typography>
+                            </Box>
+                          )}
+                          {parsedSecuritySchemes.length > 0 && (
+                            <Box>
+                              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                                Security Schemes
+                              </Typography>
+                              <Typography variant="h4" color="success.dark">
+                                {parsedSecuritySchemes.length}
+                              </Typography>
+                            </Box>
+                          )}
+                        </>
+                      )}
                     </Box>
                     {stats.sharedProperties > 0 && (
                       <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'success.main' }}>
@@ -1284,7 +1324,10 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
             <Button
               onClick={() => setStep('summary')}
               variant="contained"
-              disabled={classes.filter(c => c.selected).length === 0 || isLoading}
+              disabled={
+                (classes.filter(c => c.selected).length === 0 && parsedPaths.length === 0 && parsedSecuritySchemes.length === 0) ||
+                isLoading
+              }
             >
               Next
             </Button>

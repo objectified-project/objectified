@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertTriangle, FileUp } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Select,
@@ -27,6 +27,8 @@ import {
 import { isValidPath } from '../../../../../../lib/utils/path-params';
 import { useDarkMode } from '../../../../hooks/useDarkMode';
 import { AVAILABLE_OPERATIONS } from './paths-operation-colors';
+import { parseOpenAPISpec } from '../../../../utils/openapi-import';
+import { importPathsFromOpenAPIForVersion } from '../../../../../../lib/db/import-openapi-paths-security';
 
 interface ClassItem {
   id: string;
@@ -78,6 +80,12 @@ export default function PathsSidebar({
   const [editingPath, setEditingPath] = useState<PathItem | null>(null);
   const [pathNameInput, setPathNameInput] = useState('');
   const [autoCreateCrud, setAutoCreateCrud] = useState(false);
+
+  // Import from OpenAPI dialog (#566)
+  const [importOpenAPIOpen, setImportOpenAPIOpen] = useState(false);
+  const [importOpenAPIContent, setImportOpenAPIContent] = useState('');
+  const [importOpenAPIError, setImportOpenAPIError] = useState('');
+  const [importOpenAPILoading, setImportOpenAPILoading] = useState(false);
 
   // Load paths
   useEffect(() => {
@@ -294,6 +302,73 @@ export default function PathsSidebar({
 
   const handleTabChange = (value: string) => {
     onTabChange(value as 'paths' | 'operations' | 'classes' | 'properties' | 'security' | 'servers');
+  };
+
+  const handleImportFromOpenAPI = () => {
+    setImportOpenAPIError('');
+    setImportOpenAPIContent('');
+    setImportOpenAPIOpen(true);
+  };
+
+  const handleImportOpenAPIFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.json') && !name.endsWith('.yaml') && !name.endsWith('.yml')) {
+      setImportOpenAPIError('Please choose a JSON or YAML file.');
+      return;
+    }
+    setImportOpenAPIError('');
+    try {
+      const text = await file.text();
+      setImportOpenAPIContent(text);
+    } catch (err: unknown) {
+      setImportOpenAPIError(err instanceof Error ? err.message : 'Failed to read file.');
+    }
+    e.target.value = '';
+  };
+
+  const handleImportOpenAPISubmit = async () => {
+    if (!selectedVersionId) {
+      setImportOpenAPIError('No version selected.');
+      return;
+    }
+    const content = importOpenAPIContent.trim();
+    if (!content) {
+      setImportOpenAPIError('Paste or upload an OpenAPI spec (JSON or YAML).');
+      return;
+    }
+    setImportOpenAPIError('');
+    setImportOpenAPILoading(true);
+    try {
+      const parseResult = parseOpenAPISpec(content);
+      if (!parseResult.success) {
+        setImportOpenAPIError(parseResult.error || 'Failed to parse OpenAPI specification.');
+        return;
+      }
+      const paths = parseResult.paths ?? [];
+      const securitySchemes = parseResult.securitySchemes ?? [];
+      if (!paths.length && !securitySchemes.length) {
+        setImportOpenAPIError('Spec has no paths or security schemes to import.');
+        return;
+      }
+      const result = await importPathsFromOpenAPIForVersion(selectedVersionId, paths, securitySchemes);
+      if (!result.success) {
+        setImportOpenAPIError(result.error || 'Import failed.');
+        return;
+      }
+      setImportOpenAPIOpen(false);
+      setImportOpenAPIContent('');
+      const listResult = await getPathsForVersionRest(selectedVersionId);
+      if (listResult.success && listResult.data) {
+        setPaths(listResult.data as PathItem[]);
+      }
+      onSecurityRefresh?.();
+    } catch (err: unknown) {
+      setImportOpenAPIError(err instanceof Error ? err.message : 'Import failed.');
+    } finally {
+      setImportOpenAPILoading(false);
+    }
   };
 
   const TAB_OPTIONS = [
@@ -767,16 +842,31 @@ export default function PathsSidebar({
           )}
         </div>
 
-        {/* Add Button (Paths Tab Only) - Bottom Right */}
+        {/* Paths actions (Paths Tab Only) - Bottom */}
         {activeTab === 'paths' && (
-          <button
-            type="button"
-            onClick={handleAddPath}
-            className="absolute bottom-4 right-4 flex items-center justify-center w-10 h-10 rounded-full text-white shadow-lg transition-all hover:shadow-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            aria-label="Add path"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+          <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleImportFromOpenAPI}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                isDark
+                  ? 'text-slate-200 bg-slate-700 hover:bg-slate-600 border border-slate-600'
+                  : 'text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200'
+              }`}
+              aria-label="Import from OpenAPI"
+            >
+              <FileUp className="w-4 h-4" />
+              Import from OpenAPI
+            </button>
+            <button
+              type="button"
+              onClick={handleAddPath}
+              className="flex items-center justify-center w-10 h-10 rounded-full text-white shadow-lg transition-all hover:shadow-xl bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              aria-label="Add path"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
         )}
 
       {/* Add/Edit Path Dialog */}
@@ -881,6 +971,90 @@ export default function PathsSidebar({
                 }`}
               >
                 {editingPath ? 'Save' : 'Add'}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Import from OpenAPI Dialog (#566) */}
+      <Dialog.Root open={importOpenAPIOpen} onOpenChange={(open) => { setImportOpenAPIOpen(open); if (!open) setImportOpenAPIError(''); setImportOpenAPIContent(''); }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
+          <Dialog.Content
+            className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-full max-w-lg rounded-lg shadow-lg ${
+              isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+            }`}
+          >
+            <Dialog.Title
+              className={`px-6 py-4 text-lg font-semibold border-b ${
+                isDark ? 'text-gray-100 border-gray-700' : 'text-gray-900 border-gray-200'
+              }`}
+            >
+              Import paths from OpenAPI
+            </Dialog.Title>
+            <div className="px-6 py-4 space-y-3">
+              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Paste or upload an OpenAPI 3.x spec to add paths and security schemes to this version.
+              </p>
+              <div className="flex gap-2">
+                <label
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer ${
+                    isDark ? 'border-gray-600 bg-gray-700 text-gray-200 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <FileUp className="w-4 h-4" />
+                  Upload file
+                  <input
+                    type="file"
+                    accept=".json,.yaml,.yml"
+                    className="sr-only"
+                    onChange={handleImportOpenAPIFile}
+                  />
+                </label>
+              </div>
+              <textarea
+                placeholder="Paste OpenAPI JSON or YAML here..."
+                value={importOpenAPIContent}
+                onChange={(e) => { setImportOpenAPIContent(e.target.value); setImportOpenAPIError(''); }}
+                rows={10}
+                className={`w-full px-3 py-2 rounded-md border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                  isDark ? 'bg-gray-900 border-gray-600 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                }`}
+              />
+              {importOpenAPIError && (
+                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  {importOpenAPIError}
+                </p>
+              )}
+            </div>
+            <div
+              className={`px-6 py-4 flex justify-end gap-3 border-t ${
+                isDark ? 'border-gray-700' : 'border-gray-200'
+              }`}
+            >
+              <Dialog.Close asChild>
+                <button
+                  type="button"
+                  disabled={importOpenAPILoading}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Cancel
+                </button>
+              </Dialog.Close>
+              <button
+                type="button"
+                onClick={handleImportOpenAPISubmit}
+                disabled={importOpenAPILoading || !importOpenAPIContent.trim()}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors ${
+                  importOpenAPILoading || !importOpenAPIContent.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
+                }`}
+              >
+                {importOpenAPILoading ? 'Importing…' : 'Import'}
               </button>
             </div>
           </Dialog.Content>
