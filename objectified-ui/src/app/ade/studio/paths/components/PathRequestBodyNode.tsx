@@ -2,14 +2,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle } from 'lucide-react';
+import { Link2, Pencil, Trash2, ChevronRight, ChevronDown, Plus, AlertCircle, Sparkles } from 'lucide-react';
 import { Handle, Position } from '@xyflow/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   buildPropertyTreeFromInlineSchema,
+  buildSchemaFromInlineProperties,
   type InlineSchema,
   type PropertyTreeNode,
 } from '../../../../../../lib/utils/inline-schema-utils';
+import jsf from 'json-schema-faker';
 
 // =============================================================================
 // TYPES
@@ -51,6 +53,8 @@ export interface PathRequestBodyData {
   onAddContentType?: (mediaType: string) => void;
   /** Called when the user saves a new or updated description for the request body. */
   onDescriptionChange?: (description: string) => void;
+  /** Called when the user saves examples for a content type (contentId, examples array). */
+  onExamplesChange?: (contentId: string, examples: Array<{ summary?: string; value: unknown }>) => void;
   onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   [key: string]: unknown; // Index signature for React Flow compatibility
 }
@@ -694,6 +698,198 @@ function DescriptionEditor({
 }
 
 // =============================================================================
+// REQUEST BODY EXAMPLES PANEL (per content type)
+// =============================================================================
+
+type ExampleEntry = { summary?: string; value: unknown };
+
+interface RequestBodyExamplesPanelProps {
+  contentId: string;
+  content: ContentTypeInfo;
+  examples: ExampleEntry[] | null | undefined;
+  onSave: (examples: ExampleEntry[]) => void;
+}
+
+/** Generate a single example value from inline schema using json-schema-faker */
+function generateExampleFromSchema(inlineSchema: InlineSchema | null | undefined): unknown {
+  const schema = buildSchemaFromInlineProperties(inlineSchema || null);
+  if (!schema || typeof schema !== 'object') {
+    return {};
+  }
+  return jsf.generate(schema);
+}
+
+function RequestBodyExamplesPanel({ contentId, content, examples, onSave }: RequestBodyExamplesPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editSummary, setEditSummary] = useState('');
+  const [editValueStr, setEditValueStr] = useState('{}');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  const list = Array.isArray(examples) ? examples : [];
+
+  const hasInlineSchema = !!(
+    content.inline_schema &&
+    typeof content.inline_schema === 'object'
+  );
+
+  const handleGenerateFromSchema = () => {
+    setGenerateError(null);
+    try {
+      const value = generateExampleFromSchema(content.inline_schema as InlineSchema | null);
+      const newExamples = [...list, { summary: 'Generated from schema', value }];
+      onSave(newExamples);
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate example');
+    }
+  };
+
+  const startAdd = () => {
+    setEditingIndex(-1);
+    setEditSummary('');
+    setEditValueStr('{}');
+    setEditError(null);
+  };
+
+  const startEdit = (index: number) => {
+    const ex = list[index];
+    setEditingIndex(index);
+    setEditSummary((ex && typeof ex.summary === 'string') ? ex.summary : '');
+    try {
+      setEditValueStr(typeof ex?.value !== 'undefined' ? JSON.stringify(ex.value, null, 2) : '{}');
+    } catch {
+      setEditValueStr('{}');
+    }
+    setEditError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditError(null);
+  };
+
+  const saveEdit = () => {
+    let value: unknown;
+    try {
+      value = JSON.parse(editValueStr || '{}');
+    } catch {
+      setEditError('Invalid JSON');
+      return;
+    }
+    const newExamples = [...list];
+    const entry: ExampleEntry = { summary: editSummary.trim() || undefined, value };
+    if (editingIndex === -1) {
+      newExamples.push(entry);
+    } else {
+      newExamples[editingIndex] = entry;
+    }
+    onSave(newExamples);
+    setEditingIndex(null);
+    setEditError(null);
+  };
+
+  const removeExample = (index: number) => {
+    const newExamples = list.filter((_, i) => i !== index);
+    onSave(newExamples);
+    if (editingIndex === index) setEditingIndex(null);
+    else if (editingIndex !== null && editingIndex > index) setEditingIndex(editingIndex - 1);
+  };
+
+  const valuePreview = (val: unknown): string => {
+    try {
+      const s = typeof val === 'string' ? val : JSON.stringify(val);
+      return s.length > 36 ? s.slice(0, 33) + '...' : s;
+    } catch {
+      return '...';
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center justify-between w-full text-left text-[10px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+      >
+        <span>Examples ({list.length})</span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {editingIndex !== null ? (
+            <div className="p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 space-y-2">
+              <input
+                type="text"
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                placeholder="Summary (optional)"
+                className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+              />
+              <textarea
+                value={editValueStr}
+                onChange={(e) => setEditValueStr(e.target.value)}
+                placeholder='{"key": "value"}'
+                className="w-full px-2 py-1 text-xs font-mono rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 min-h-[80px] resize-y"
+                rows={3}
+              />
+              {editError && <p className="text-[10px] text-red-500">{editError}</p>}
+              <div className="flex justify-end gap-1">
+                <button type="button" onClick={cancelEdit} className="px-2 py-1 text-[10px] rounded border border-gray-300 dark:border-gray-600">Cancel</button>
+                <button type="button" onClick={saveEdit} className="px-2 py-1 text-[10px] rounded bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div className="flex gap-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={startAdd}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add example
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateFromSchema}
+                  disabled={!hasInlineSchema}
+                  title={hasInlineSchema ? 'Generate example from schema using json-schema-faker' : 'Switch to inline schema (or add one) to generate an example'}
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] rounded disabled:opacity-50 disabled:cursor-not-allowed text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Generate from schema
+                </button>
+              </div>
+              {generateError && (
+                <p className="text-[10px] text-red-500">{generateError}</p>
+              )}
+            </div>
+          )}
+          {list.length > 0 && (
+            <ul className="space-y-1 max-h-[160px] overflow-y-auto">
+              {list.map((ex, i) => (
+                <li key={i} className="flex items-center gap-2 px-2 py-1 rounded bg-gray-50 dark:bg-gray-800/50 text-[10px]">
+                  <span className="flex-1 min-w-0 truncate text-gray-700 dark:text-gray-300">
+                    {ex.summary || `Example ${i + 1}`}: {valuePreview(ex.value)}
+                  </span>
+                  {editingIndex === null && (
+                    <>
+                      <button type="button" onClick={() => startEdit(i)} className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600" title="Edit"><Pencil className="w-3 h-3 text-gray-500" /></button>
+                      <button type="button" onClick={() => removeExample(i)} className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30" title="Delete"><Trash2 className="w-3 h-3 text-red-500" /></button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
@@ -854,6 +1050,14 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
                     : undefined
                 }
               />
+              {data.onExamplesChange && selectedContent.id && (
+                <RequestBodyExamplesPanel
+                  contentId={selectedContent.id}
+                  content={selectedContent}
+                  examples={selectedContent.examples}
+                  onSave={(examples) => data.onExamplesChange!(selectedContent.id, examples)}
+                />
+              )}
             </>
           ) : null}
         </div>

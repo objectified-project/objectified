@@ -1175,6 +1175,33 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     }
   }, [alertDialog, onRefresh]);
 
+  // Update request body content type examples (#390)
+  const handleUpdateRequestBodyExamples = useCallback(async (
+    contentId: string,
+    examples: Array<{ summary?: string; value: unknown }>
+  ) => {
+    try {
+      const result = await updateRequestBodyContentType(contentId, { examples });
+      const parsed = JSON.parse(result);
+      if (parsed.success) {
+        if (onRefresh) onRefresh();
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to update examples',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating request body examples:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to update examples',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
   // Handle request body property drop (add to inline schema; if content is $ref, convert first then add)
   const handleRequestBodyPropertyDrop = useCallback(async (
     contentId: string,
@@ -2701,6 +2728,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 onDelete: () => handleDeleteRequestBody(rb.id, rb.name),
                 onAddContentType: (mediaType: string) => handleAddRequestBodyContentType(rb.id, mediaType),
                 onDescriptionChange: (description: string) => handleUpdateRequestBodyDescription(rb.id, description),
+                onExamplesChange: (contentId: string, examples: Array<{ summary?: string; value: unknown }>) =>
+                  handleUpdateRequestBodyExamples(contentId, examples),
                 onPropertyDrop: stableHandleRequestBodyPropertyDrop,
                 onClassDrop: stableHandleRequestBodyClassDrop,
                 onPropertyDelete: stableHandleRequestBodyPropertyDelete,
@@ -2763,7 +2792,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, handleUpdateRequestBodyExamples, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
 
   // Detect dark mode
   useEffect(() => {
