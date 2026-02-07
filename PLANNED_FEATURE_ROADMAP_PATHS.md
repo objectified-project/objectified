@@ -49,7 +49,7 @@ structure immediately recognizable.
 - 📋 Schema binding per content type
 - ✅ Required flag
 - ✅ Description
-- 📋 Example values
+- ✅ Example values
 - 📋 Encoding options (for multipart)
 
 **Advanced Features**:
@@ -62,7 +62,6 @@ structure immediately recognizable.
 | Ticket | Feature                                                        |
 |--------|----------------------------------------------------------------|
 | #387   | Schema binding per content type                                |
-| #390   | Add examples to request body node                              |
 | #391   | Add encoding options for multipart                             |
 
 #### 2.6 Response Nodes 📋 PLANNED
