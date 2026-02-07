@@ -44,24 +44,12 @@ structure immediately recognizable.
 
 **Visual Design**: Input port icon with blue accent, shows content types
 
-**Configurable Properties**:
-- ✅ Content type map (application/json, multipart/form-data, etc.)
-- ✅ Schema binding per content type (#387)
-- ✅ Required flag
-- ✅ Description
-- ✅ Example values
-- ✅ Encoding options (for multipart)
-
 **Advanced Features**:
 - Multiple content types per operation (JSON vs XML vs form-data)
 - Polymorphic schemas with oneOf/anyOf/allOf visualization
 - Discriminator configuration for union types
 - File upload configuration with encoding options
 - Example value editor with JSON/YAML/XML toggle
-
-| Ticket | Feature                         |
-|--------|---------------------------------|
-| #387   | Schema binding per content type ✅ |
 
 #### 2.6 Response Nodes 📋 PLANNED
 
@@ -70,12 +58,11 @@ structure immediately recognizable.
 **Advanced Features**:
 - ✅ Response range patterns: 2XX, 4XX, 5XX wildcards
 - ✅ Default response for catch-all error handling
-- 📋 Link objects for response-driven navigation
+- ✅ Link objects for response-driven navigation (#400)
 - 📋 Header templates (pagination, rate limiting, CORS)
 
 | Ticket | Feature                                                |
 |--------|--------------------------------------------------------|
-| #400   | Add link objects for response-driven navigation        |
 | #401   | Add header templates (pagination, rate limiting, CORS) |
 
 #### 3.4 OpenAPI Export & Import 📋 PLANNED
@@ -614,7 +601,7 @@ DROP TARGET STATE:
 
 #### 2.1
 
-**Features**: 📋 PLANNED
+**Features**: ✅ IMPLEMENTED
 - ✅ Click on `{variable}` to open inline schema editor
 - ✅ Drag schema property onto variable for type binding
 - ✅ Visual validation: invalid paths show red border
@@ -632,7 +619,19 @@ DROP TARGET STATE:
 | HEAD     | Gray   | Metadata retrieval            |
 | OPTIONS  | Gray   | CORS preflight                |
 
-#### 2.6 Response Nodes 📋 PLANNED
+#### 2.5 Request Body Nodes ✅ IMPLEMENTED
+
+**Visual Design**: Input port icon with blue accent, shows content types
+
+**Configurable Properties**:
+- ✅ Content type map (application/json, multipart/form-data, etc.)
+- ✅ Schema binding per content type (#387)
+- ✅ Required flag
+- ✅ Description
+- ✅ Example values
+- ✅ Encoding options (for multipart)
+
+#### 2.6 Response Nodes ✅ IMPLEMENTED
 
 **Visual Design**: Output port icon, color-coded by status code family
 
@@ -655,7 +654,7 @@ DROP TARGET STATE:
 
 ## Security & Authentication
 
-### 4. Security Scheme Integration 📋 PLANNED
+### 4. Security Scheme Integration ✅ IMPLEMENTED
 
 #### 4.1 Global Security Schemes
 

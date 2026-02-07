@@ -2377,7 +2377,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
 
             // Parse response headers and links from data (OpenAPI: headers/links are maps)
             let headers: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }> | undefined;
-            let links: Array<{ name: string; operationId?: string; operationRef?: string; description?: string }> | undefined;
+            let links: Array<{ name: string; operationId?: string; operationRef?: string; description?: string; parameters?: Record<string, string> }> | undefined;
             if (response.data) {
               try {
                 const data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
@@ -2394,6 +2394,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                     operationId: link?.operationId,
                     operationRef: link?.operationRef,
                     description: link?.description,
+                    parameters: link?.parameters && typeof link.parameters === 'object' ? link.parameters : undefined,
                   }));
                 }
               } catch (_) {

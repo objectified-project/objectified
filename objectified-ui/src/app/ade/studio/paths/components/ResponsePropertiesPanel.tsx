@@ -121,7 +121,14 @@ function linksArrayToDataMap(links: ResponseLinkItem[]): Record<string, { operat
     if (link.operationId?.trim()) map[key].operationId = link.operationId.trim();
     if (link.operationRef?.trim()) map[key].operationRef = link.operationRef.trim();
     if (link.description?.trim()) map[key].description = link.description.trim();
-    if (link.parameters && Object.keys(link.parameters).length > 0) map[key].parameters = link.parameters;
+    if (link.parameters && typeof link.parameters === 'object') {
+      const filtered = Object.fromEntries(
+        Object.entries(link.parameters).filter(
+          ([k, v]) => k.trim() !== '' && v.trim() !== '' && !String(k).startsWith('__new_')
+        )
+      );
+      if (Object.keys(filtered).length > 0) map[key].parameters = filtered;
+    }
   }
   return map;
 }
@@ -1270,7 +1277,7 @@ export default function ResponsePropertiesPanel({
               </Button>
             </div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-              Link relations to other operations (operationId or operationRef).
+              Response-driven navigation: link relations to other operations (operationId or operationRef). Use parameters to pass values (e.g. <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">$request.path.id</code>, <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">$response.body#/uuid</code>).
             </p>
             <div className="space-y-3">
               {links.map((link, idx) => (
@@ -1326,8 +1333,79 @@ export default function ResponsePropertiesPanel({
                       next[idx] = { ...next[idx], description: e.target.value || undefined };
                       setLinks(next);
                     }}
-                    className="text-xs h-7"
+                    className="mb-1.5 text-xs h-7"
                   />
+                  {/* Link parameters (OpenAPI 3.1: parameters map for response-driven navigation) */}
+                  <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">Parameters</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 text-[10px] px-1.5"
+                        onClick={() => {
+                          const next = [...links];
+                          const params = { ...(next[idx].parameters || {}) };
+                          params[`__new_${Date.now()}__`] = '';
+                          next[idx] = { ...next[idx], parameters: params };
+                          setLinks(next);
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-0.5" />
+                        Add
+                      </Button>
+                    </div>
+                    <div className="space-y-1">
+                      {Object.entries(link.parameters || {}).map(([paramKey, paramVal], pidx) => (
+                        <div key={paramKey || pidx} className="flex gap-1 items-center">
+                          <Input
+                            placeholder="name (e.g. userId)"
+                            value={paramKey.startsWith('__new_') ? '' : paramKey}
+                            onChange={(e) => {
+                              const next = [...links];
+                              const params = { ...(next[idx].parameters || {}) };
+                              delete params[paramKey];
+                              const newKey = e.target.value.trim();
+                              if (newKey) params[newKey] = paramVal;
+                              next[idx] = { ...next[idx], parameters: Object.keys(params).length ? params : undefined };
+                              setLinks(next);
+                            }}
+                            className="flex-1 min-w-0 text-[10px] h-6 font-mono"
+                          />
+                          <span className="text-gray-400 text-[10px]">→</span>
+                          <Input
+                            placeholder="$request.path.id"
+                            value={paramVal}
+                            onChange={(e) => {
+                              const next = [...links];
+                              const params = { ...(next[idx].parameters || {}) };
+                              const val = e.target.value.trim();
+                              if (val) params[paramKey] = val;
+                              else delete params[paramKey];
+                              next[idx] = { ...next[idx], parameters: Object.keys(params).length ? params : undefined };
+                              setLinks(next);
+                            }}
+                            className="flex-1 min-w-0 text-[10px] h-6 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...links];
+                              const params = { ...(next[idx].parameters || {}) };
+                              delete params[paramKey];
+                              next[idx] = { ...next[idx], parameters: Object.keys(params).length ? params : undefined };
+                              setLinks(next);
+                            }}
+                            className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            aria-label="Remove parameter"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ))}
               {links.length === 0 && (

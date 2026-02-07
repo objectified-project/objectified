@@ -51,8 +51,14 @@ export interface PathResponseData {
   } | null;
   /** Response headers (OpenAPI: name, description, schema) */
   headers?: Array<{ name: string; description?: string; schema?: { type?: string; format?: string } }>;
-  /** Response links (OpenAPI 3.1 Link Object - HATEOAS navigation) */
-  links?: Array<{ name: string; operationId?: string; operationRef?: string; description?: string }>;
+  /** Response links (OpenAPI 3.1 Link Object - response-driven navigation) */
+  links?: Array<{
+    name: string;
+    operationId?: string;
+    operationRef?: string;
+    description?: string;
+    parameters?: Record<string, string>;
+  }>;
 }
 
 // Helper to get schema display text for primitives and arrays
@@ -404,18 +410,26 @@ export default function PathResponseNode({ data }: { data: PathResponseData }) {
             </>
           )}
 
-          {/* Links (HATEOAS) Section */}
+          {/* Links (response-driven navigation) Section (#400) */}
           {hasLinks && (
             <>
               <div className="text-[10px] font-medium text-gray-600 dark:text-gray-400 mt-3 mb-1">Links:</div>
               <div className="space-y-0.5">
                 {data.links!.map((link, idx) => (
-                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                    <span className="font-mono">{link.name}</span>
-                    {(link.operationId || link.operationRef) && (
-                      <span className="text-gray-500 dark:text-gray-500 font-mono truncate">
-                        → {link.operationId || link.operationRef}
-                      </span>
+                  <div key={idx} className="text-[10px] text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono">{link.name}</span>
+                      {(link.operationId || link.operationRef) && (
+                        <span className="text-gray-500 dark:text-gray-500 font-mono truncate max-w-[120px]">
+                          → {link.operationId || link.operationRef}
+                        </span>
+                      )}
+                    </div>
+                    {link.parameters && Object.keys(link.parameters).length > 0 && (
+                      <div className="ml-2 mt-0.5 text-[9px] text-gray-500 dark:text-gray-500 font-mono truncate" title={Object.entries(link.parameters).map(([k, v]) => `${k}: ${v}`).join(', ')}>
+                        {Object.entries(link.parameters).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                        {Object.keys(link.parameters).length > 2 ? '…' : ''}
+                      </div>
                     )}
                   </div>
                 ))}
