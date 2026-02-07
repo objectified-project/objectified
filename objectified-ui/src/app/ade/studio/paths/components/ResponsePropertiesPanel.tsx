@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Save, Plus, Trash2, FileJson, Link2 } from 'lucide-react';
+import { X, Save, Plus, Trash2, FileJson, Link2, LayoutList } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { Textarea } from '../../../../components/ui/Textarea';
 import { Input } from '../../../../components/ui/Input';
@@ -60,6 +60,44 @@ export interface ResponseHeaderItem {
   description?: string;
   schema?: { type?: string; format?: string };
 }
+
+/** Header templates for common patterns (#401): pagination, rate limiting, CORS */
+const HEADER_TEMPLATES: Array<{ id: string; label: string; description: string; headers: ResponseHeaderItem[] }> = [
+  {
+    id: 'pagination',
+    label: 'Pagination',
+    description: 'Page info and Link header (RFC 5988)',
+    headers: [
+      { name: 'X-Total-Count', description: 'Total number of items across all pages', schema: { type: 'integer' } },
+      { name: 'X-Page', description: 'Current page number (1-based)', schema: { type: 'integer' } },
+      { name: 'X-Per-Page', description: 'Number of items per page', schema: { type: 'integer' } },
+      { name: 'Link', description: 'RFC 5988 link header for prev, next, first, last', schema: { type: 'string' } },
+    ],
+  },
+  {
+    id: 'rate-limiting',
+    label: 'Rate limiting',
+    description: 'Rate limit and retry headers',
+    headers: [
+      { name: 'X-RateLimit-Limit', description: 'Maximum requests allowed per window', schema: { type: 'integer' } },
+      { name: 'X-RateLimit-Remaining', description: 'Remaining requests in current window', schema: { type: 'integer' } },
+      { name: 'X-RateLimit-Reset', description: 'Unix timestamp or seconds when the limit resets', schema: { type: 'integer' } },
+      { name: 'Retry-After', description: 'Seconds until client can retry (e.g. 429)', schema: { type: 'integer' } },
+    ],
+  },
+  {
+    id: 'cors',
+    label: 'CORS',
+    description: 'Cross-Origin response headers',
+    headers: [
+      { name: 'Access-Control-Allow-Origin', description: 'Allowed origin(s) or *', schema: { type: 'string' } },
+      { name: 'Access-Control-Expose-Headers', description: 'Headers exposed to the client', schema: { type: 'string' } },
+      { name: 'Access-Control-Allow-Methods', description: 'Allowed methods for preflight', schema: { type: 'string' } },
+      { name: 'Access-Control-Allow-Headers', description: 'Allowed request headers', schema: { type: 'string' } },
+      { name: 'Access-Control-Max-Age', description: 'Seconds to cache preflight result', schema: { type: 'integer' } },
+    ],
+  },
+];
 
 /** Single response link (OpenAPI 3.1 Link Object - HATEOAS) */
 export interface ResponseLinkItem {
@@ -1157,25 +1195,49 @@ export default function ResponsePropertiesPanel({
             )}
           </div>
 
-          {/* Response Headers (name, description, schema) */}
+          {/* Response Headers + Header templates (#401) */}
           <div className={`mt-4 pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                 Response headers
               </label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setHeaders([...headers, { name: '' }])}
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                Add header
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    const template = HEADER_TEMPLATES.find((t) => t.id === value);
+                    if (!template) return;
+                    const existingNames = new Set(headers.map((h) => h.name.trim()).filter(Boolean));
+                    const toAdd = template.headers.filter((h) => !existingNames.has(h.name));
+                    if (toAdd.length > 0) setHeaders([...headers, ...toAdd]);
+                  }}
+                >
+                  <SelectTrigger className="h-7 w-[140px] text-xs" aria-label="Add from template">
+                    <LayoutList className="w-3 h-3 mr-1 shrink-0" />
+                    <SelectValue placeholder="Add from template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HEADER_TEMPLATES.map((t) => (
+                      <SelectItem key={t.id} value={t.id} className="text-xs">
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setHeaders([...headers, { name: '' }])}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add header
+                </Button>
+              </div>
             </div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-              Headers returned with this response (name, description, schema).
+              Headers returned with this response. Use templates for pagination, rate limiting, or CORS.
             </p>
             <div className="space-y-3">
               {headers.map((header, idx) => (

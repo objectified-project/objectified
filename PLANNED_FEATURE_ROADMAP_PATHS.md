@@ -51,20 +51,6 @@ structure immediately recognizable.
 - File upload configuration with encoding options
 - Example value editor with JSON/YAML/XML toggle
 
-#### 2.6 Response Nodes 📋 PLANNED
-
-**Visual Design**: Output port icon, color-coded by status code family
-
-**Advanced Features**:
-- ✅ Response range patterns: 2XX, 4XX, 5XX wildcards
-- ✅ Default response for catch-all error handling
-- ✅ Link objects for response-driven navigation (#400)
-- 📋 Header templates (pagination, rate limiting, CORS)
-
-| Ticket | Feature                                                |
-|--------|--------------------------------------------------------|
-| #401   | Add header templates (pagination, rate limiting, CORS) |
-
 #### 3.4 OpenAPI Export & Import 📋 PLANNED
 
 **Import Support**:
@@ -642,6 +628,14 @@ DROP TARGET STATE:
 - ✅ Content type map with schema bindings
 - ✅ Links (HATEOAS navigation)
 - ✅ Examples per content type
+
+**Visual Design**: Output port icon, color-coded by status code family
+
+**Advanced Features**:
+- ✅ Response range patterns: 2XX, 4XX, 5XX wildcards
+- ✅ Default response for catch-all error handling
+- ✅ Link objects for response-driven navigation (#400)
+- ✅ Header templates (pagination, rate limiting, CORS) (#401)
 
 #### 2.6.1 Color designations
 
