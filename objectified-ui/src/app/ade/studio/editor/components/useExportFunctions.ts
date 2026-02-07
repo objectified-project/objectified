@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { useReactFlow } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import type { Project, Version } from './types';
 
@@ -33,6 +34,23 @@ export function useExportFunctions({
   setIsLoadingCanvas,
   setExportDropdownOpen,
 }: UseExportFunctionsProps) {
+  const { fitView, getViewport, setViewport } = useReactFlow();
+
+  /** Fit view to entire canvas, run fn (capture), then restore previous viewport. */
+  const withFullCanvasView = useCallback(
+    async <T,>(fn: () => Promise<T>): Promise<T> => {
+      const previous = getViewport();
+      fitView({ padding: 0.2, duration: 0 });
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 50));
+      try {
+        return await fn();
+      } finally {
+        setViewport(previous, { duration: 0 });
+      }
+    },
+    [fitView, getViewport, setViewport]
+  );
 
   const getFilenameBase = useCallback(() => {
     const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -67,12 +85,14 @@ export function useExportFunctions({
       setLoadingMessage('Exporting canvas as PNG...');
       setIsLoadingCanvas(true);
 
-      const dataUrl = await toPng(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 1.0,
-        pixelRatio: 2,
-        filter: imageExportFilter,
-      });
+      const dataUrl = await withFullCanvasView(() =>
+        toPng(viewportElement, {
+          backgroundColor: isDark ? '#111827' : '#ffffff',
+          quality: 1.0,
+          pixelRatio: 2,
+          filter: imageExportFilter,
+        })
+      );
 
       const link = document.createElement('a');
       link.download = filename;
@@ -90,7 +110,7 @@ export function useExportFunctions({
       setLoadingMessage('');
       await alertDialog({ message: 'Failed to export canvas as PNG. Please try again.', variant: 'error' });
     }
-  }, [getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter]);
+  }, [getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter, withFullCanvasView]);
 
   // Handle SVG export
   const handleExportSvg = useCallback(async () => {
@@ -105,11 +125,13 @@ export function useExportFunctions({
       setLoadingMessage('Exporting canvas as SVG...');
       setIsLoadingCanvas(true);
 
-      const dataUrl = await toSvg(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 1.0,
-        filter: imageExportFilter,
-      });
+      const dataUrl = await withFullCanvasView(() =>
+        toSvg(viewportElement, {
+          backgroundColor: isDark ? '#111827' : '#ffffff',
+          quality: 1.0,
+          filter: imageExportFilter,
+        })
+      );
 
       const link = document.createElement('a');
       link.download = filename;
@@ -127,7 +149,7 @@ export function useExportFunctions({
       setLoadingMessage('');
       await alertDialog({ message: 'Failed to export canvas as SVG. Please try again.', variant: 'error' });
     }
-  }, [getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter]);
+  }, [getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter, withFullCanvasView]);
 
   // Handle JPEG export
   const handleExportJpeg = useCallback(async () => {
@@ -142,12 +164,14 @@ export function useExportFunctions({
       setLoadingMessage('Exporting canvas as JPEG...');
       setIsLoadingCanvas(true);
 
-      const dataUrl = await toJpeg(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 0.95,
-        pixelRatio: 2,
-        filter: imageExportFilter,
-      });
+      const dataUrl = await withFullCanvasView(() =>
+        toJpeg(viewportElement, {
+          backgroundColor: isDark ? '#111827' : '#ffffff',
+          quality: 0.95,
+          pixelRatio: 2,
+          filter: imageExportFilter,
+        })
+      );
 
       const link = document.createElement('a');
       link.download = filename;
@@ -165,7 +189,7 @@ export function useExportFunctions({
       setLoadingMessage('');
       await alertDialog({ message: 'Failed to export canvas as JPEG. Please try again.', variant: 'error' });
     }
-  }, [getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter]);
+  }, [getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter, withFullCanvasView]);
 
   // Handle PDF export
   const handleExportPdf = useCallback(async () => {
@@ -183,12 +207,14 @@ export function useExportFunctions({
       setLoadingMessage('Exporting canvas as PDF...');
       setIsLoadingCanvas(true);
 
-      const imageDataUrl = await toPng(viewportElement, {
-        backgroundColor: isDark ? '#111827' : '#ffffff',
-        quality: 1.0,
-        pixelRatio: 2,
-        filter: imageExportFilter,
-      });
+      const imageDataUrl = await withFullCanvasView(() =>
+        toPng(viewportElement, {
+          backgroundColor: isDark ? '#111827' : '#ffffff',
+          quality: 1.0,
+          pixelRatio: 2,
+          filter: imageExportFilter,
+        })
+      );
 
       const viewportRect = viewportElement.getBoundingClientRect();
       const imgWidth = viewportRect.width;
@@ -248,7 +274,7 @@ export function useExportFunctions({
       setLoadingMessage('');
       await alertDialog({ message: 'Failed to export canvas as PDF. Please try again.', variant: 'error' });
     }
-  }, [projects, versions, selectedProjectId, selectedVersionId, getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter]);
+  }, [projects, versions, selectedProjectId, selectedVersionId, getFilenameBase, getViewportElement, isDark, alertDialog, setLoadingMessage, setIsLoadingCanvas, setExportDropdownOpen, imageExportFilter, withFullCanvasView]);
 
   // Handle Mermaid export
   const handleExportMermaid = useCallback(async () => {

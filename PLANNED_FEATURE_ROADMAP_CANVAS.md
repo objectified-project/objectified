@@ -394,7 +394,7 @@
   - Export only selected nodes
   - 📋 Export current viewport
   - 📋 Export specific groups
-  - 📋 Export entire canvas
+  - ✅ Export entire canvas
 - **Export Options**:
   - ✅ Export wizard interface (replaces dropdown)
   - 📋 Include/exclude UI elements
@@ -418,7 +418,6 @@
 |--------|--------------------------------------------|
 | #403   | Export the current viewport                |
 | #404   | Export specific groups                     |
-| #405   | Export entire canvas                       |
 | #406   | Include/exclude UI elements                |
 | #407   | Include/exclude grid                       |
 | #408   | Export option to add watermark             |

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { useReactFlow } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 
 // Export format types
@@ -128,6 +129,24 @@ export default function ExportWizard({
   const [previewText, setPreviewText] = useState<string | null>(null);
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const { fitView, getViewport, setViewport } = useReactFlow();
+
+  /** Fit view to entire canvas, run fn (capture), then restore previous viewport. */
+  const withFullCanvasView = useCallback(
+    async <T,>(fn: () => Promise<T>): Promise<T> => {
+      const previous = getViewport();
+      fitView({ padding: 0.2, duration: 0 });
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 50));
+      try {
+        return await fn();
+      } finally {
+        setViewport(previous, { duration: 0 });
+      }
+    },
+    [fitView, getViewport, setViewport]
+  );
+
   const getFilenameBase = useCallback(() => {
     return `${projectName || 'canvas'}-v${versionId || '1'}`;
   }, [projectName, versionId]);
@@ -170,7 +189,7 @@ export default function ExportWizard({
   const generatePreview = useCallback(async () => {
     const viewportElement = getViewportElement();
 
-    // For image formats, generate a preview image
+    // For image formats, generate a preview image (full canvas)
     if (['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) {
       if (!viewportElement) {
         setPreviewDataUrl(null);
@@ -178,13 +197,15 @@ export default function ExportWizard({
       }
 
       try {
-        const dataUrl = await toPng(viewportElement, {
-          backgroundColor: options.includeBackground
-            ? (isDark ? '#111827' : options.backgroundColor)
-            : 'transparent',
-          quality: 0.5, // Lower quality for preview
-          pixelRatio: 1,
-          filter: imageExportFilter,
+        const dataUrl = await withFullCanvasView(async () => {
+          return toPng(viewportElement, {
+            backgroundColor: options.includeBackground
+              ? (isDark ? '#111827' : options.backgroundColor)
+              : 'transparent',
+            quality: 0.5, // Lower quality for preview
+            pixelRatio: 1,
+            filter: imageExportFilter,
+          });
         });
         setPreviewDataUrl(dataUrl);
         setPreviewText(null);
@@ -198,7 +219,7 @@ export default function ExportWizard({
       const text = generateTextExport(selectedFormat);
       setPreviewText(text.substring(0, 2000) + (text.length > 2000 ? '\n...' : ''));
     }
-  }, [selectedFormat, options, isDark, getViewportElement, imageExportFilter, nodes, edges]);
+  }, [selectedFormat, options, isDark, getViewportElement, imageExportFilter, nodes, edges, withFullCanvasView]);
 
   const generateTextExport = useCallback((format: ExportFormat): string => {
     const classNodes = nodes.filter(n => n.type !== 'groupNode');
@@ -344,50 +365,58 @@ export default function ExportWizard({
       switch (selectedFormat) {
         case 'png': {
           if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await toPng(viewportElement, {
-            backgroundColor: options.includeBackground
-              ? (isDark ? '#111827' : options.backgroundColor)
-              : 'transparent',
-            quality: options.quality,
-            pixelRatio: options.scale,
-            filter: imageExportFilter,
-          });
+          const dataUrl = await withFullCanvasView(async () =>
+            toPng(viewportElement, {
+              backgroundColor: options.includeBackground
+                ? (isDark ? '#111827' : options.backgroundColor)
+                : 'transparent',
+              quality: options.quality,
+              pixelRatio: options.scale,
+              filter: imageExportFilter,
+            })
+          );
           downloadDataUrl(dataUrl, `${filename}.png`);
           break;
         }
 
         case 'jpeg': {
           if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await toJpeg(viewportElement, {
-            backgroundColor: isDark ? '#111827' : options.backgroundColor,
-            quality: options.quality,
-            pixelRatio: options.scale,
-            filter: imageExportFilter,
-          });
+          const dataUrl = await withFullCanvasView(async () =>
+            toJpeg(viewportElement, {
+              backgroundColor: isDark ? '#111827' : options.backgroundColor,
+              quality: options.quality,
+              pixelRatio: options.scale,
+              filter: imageExportFilter,
+            })
+          );
           downloadDataUrl(dataUrl, `${filename}.jpg`);
           break;
         }
 
         case 'svg': {
           if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await toSvg(viewportElement, {
-            backgroundColor: options.includeBackground
-              ? (isDark ? '#111827' : options.backgroundColor)
-              : 'transparent',
-            filter: imageExportFilter,
-          });
+          const dataUrl = await withFullCanvasView(async () =>
+            toSvg(viewportElement, {
+              backgroundColor: options.includeBackground
+                ? (isDark ? '#111827' : options.backgroundColor)
+                : 'transparent',
+              filter: imageExportFilter,
+            })
+          );
           downloadDataUrl(dataUrl, `${filename}.svg`);
           break;
         }
 
         case 'pdf': {
           if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await toPng(viewportElement, {
-            backgroundColor: isDark ? '#111827' : options.backgroundColor,
-            quality: 1.0,
-            pixelRatio: options.scale,
-            filter: imageExportFilter,
-          });
+          const dataUrl = await withFullCanvasView(async () =>
+            toPng(viewportElement, {
+              backgroundColor: isDark ? '#111827' : options.backgroundColor,
+              quality: 1.0,
+              pixelRatio: options.scale,
+              filter: imageExportFilter,
+            })
+          );
 
           const img = new window.Image();
           img.src = dataUrl;
@@ -436,7 +465,7 @@ export default function ExportWizard({
     } finally {
       setIsExporting(false);
     }
-  }, [selectedFormat, options, isDark, getViewportElement, getFilenameBase, imageExportFilter, generateTextExport, alertDialog, onClose]);
+  }, [selectedFormat, options, isDark, getViewportElement, getFilenameBase, imageExportFilter, generateTextExport, alertDialog, onClose, withFullCanvasView]);
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
