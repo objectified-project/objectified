@@ -271,13 +271,17 @@ export default function CodePage() {
         const currentProject = projects.find(p => p.id === selectedProjectId);
         const currentVersion = versions.find(v => v.id === selectedVersionId);
 
-        // Generate all specs
+        // Generate all specs (#424: include tags, security, externalDocs when available)
+        const hasSecuritySchemes = Object.keys(securitySchemes).length > 0;
         const openApiContent = await generateOpenApiSpec(classesWithProperties, {
           projectName: currentProject?.name || 'API',
           version: currentVersion?.version_id || '1.0.0',
           description: currentVersion?.description || '',
           servers: servers.length > 0 ? servers : undefined,
-        }, pathsObject, Object.keys(securitySchemes).length > 0 ? securitySchemes : undefined);
+          tags: [], // Top-level tags; can be populated from version/project when available
+          security: hasSecuritySchemes ? Object.keys(securitySchemes).map((name) => ({ [name]: [] })) : undefined,
+          externalDocs: undefined, // Version/project externalDocs when available
+        }, pathsObject, hasSecuritySchemes ? securitySchemes : undefined);
         setOpenApiSpec(openApiContent);
 
         const arazzoContent = await generateArazzoSpec(classesWithProperties, {

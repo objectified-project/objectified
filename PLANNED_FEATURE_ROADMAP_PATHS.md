@@ -63,26 +63,28 @@ structure immediately recognizable.
 
 ### 3.5 OpenAPI Specification Output 📋 PLANNED
 
-**Full Spec Generation** ✅ PARTIALLY IMPLEMENTED
+**Full Spec Generation** ✅ IMPLEMENTED (#424)
 - **Specification Components**:
     - ✅ `info` (title, version, description, contact, license, termsOfService)
     - ✅ `servers` (multiple environments with variables)
     - ✅ `paths` (all operations with full configuration)
-    - `components/schemas` (existing schema support)
-    - `components/parameters` (reusable parameters)
-    - `components/requestBodies` (reusable request bodies)
-    - `components/responses` (reusable responses)
-    - `components/headers` (reusable headers)
-    - `components/securitySchemes` (auth definitions)
-    - `components/links` (HATEOAS links)
-    - `components/callbacks` (webhooks)
-    - ✅ `security` (global security requirements)
-    - `tags` (tag definitions with descriptions)
-    - `externalDocs` (external documentation)
+    - ✅ `components/schemas` (from classes)
+    - ✅ `components/parameters` (optional; included when passed via options.components)
+    - ✅ `components/requestBodies` (optional; included when passed via options.components)
+    - ✅ `components/responses` (optional; included when passed via options.components)
+    - ✅ `components/headers` (optional; included when passed via options.components)
+    - ✅ `components/securitySchemes` (from version security schemes)
+    - ✅ `components/links` (optional; included when passed via options.components)
+    - ✅ `components/callbacks` (optional; included when passed via options.components)
+    - ✅ `components/examples` (optional; included when passed via options.components)
+    - ✅ `components/pathItems` (optional; included when passed via options.components)
+    - ✅ `security` (global security requirements; Code tab passes when schemes exist)
+    - ✅ `tags` (optional; structure supported; Code tab can pass when available)
+    - ✅ `externalDocs` (optional; structure supported; Code tab can pass when available)
 
-| Ticket | Feature Description                                |
-|--------|----------------------------------------------------|
-| #424   | Update OpenAPI Generator to include missing fields |
+| Ticket | Feature Description                                | Status |
+|--------|----------------------------------------------------|--------|
+| #424   | Update OpenAPI Generator to include missing fields | ✅ Done – Generator and template output all OpenAPI 3.1 component sections when provided; Code tab passes global security and supports tags/externalDocs |
 
 ---
 

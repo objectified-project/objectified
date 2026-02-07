@@ -249,6 +249,19 @@ export function buildClassSchema(classData: any): any {
  * @param paths - Optional paths object (OpenAPI paths section)
  * @returns OpenAPI spec as JSON string
  */
+/** OpenAPI 3.1 components (optional sections for #424) */
+export interface OpenAPIComponents {
+  parameters?: Record<string, unknown>;
+  requestBodies?: Record<string, unknown>;
+  responses?: Record<string, unknown>;
+  headers?: Record<string, unknown>;
+  examples?: Record<string, unknown>;
+  securitySchemes?: Record<string, unknown>;
+  links?: Record<string, unknown>;
+  callbacks?: Record<string, unknown>;
+  pathItems?: Record<string, unknown>;
+}
+
 export async function generateOpenApiSpec(
   classes: any[],
   options?: {
@@ -264,6 +277,8 @@ export async function generateOpenApiSpec(
     security?: Array<Record<string, string[]>>;
     /** OpenAPI external documentation */
     externalDocs?: { url: string; description?: string };
+    /** Optional reusable components (#424) */
+    components?: OpenAPIComponents;
     metadata?: {
       summary?: string;
       termsOfService?: string;
@@ -322,14 +337,44 @@ export async function generateOpenApiSpec(
     }
   }
 
+  // Build full components object (#424: all OpenAPI 3.1 component sections)
+  const components: Record<string, unknown> = {
+    schemas,
+  };
+  if (securitySchemes && Object.keys(securitySchemes).length > 0) {
+    components.securitySchemes = securitySchemes;
+  }
+  if (options?.components?.parameters && Object.keys(options.components.parameters).length > 0) {
+    components.parameters = options.components.parameters;
+  }
+  if (options?.components?.requestBodies && Object.keys(options.components.requestBodies).length > 0) {
+    components.requestBodies = options.components.requestBodies;
+  }
+  if (options?.components?.responses && Object.keys(options.components.responses).length > 0) {
+    components.responses = options.components.responses;
+  }
+  if (options?.components?.headers && Object.keys(options.components.headers).length > 0) {
+    components.headers = options.components.headers;
+  }
+  if (options?.components?.examples && Object.keys(options.components.examples).length > 0) {
+    components.examples = options.components.examples;
+  }
+  if (options?.components?.links && Object.keys(options.components.links).length > 0) {
+    components.links = options.components.links;
+  }
+  if (options?.components?.callbacks && Object.keys(options.components.callbacks).length > 0) {
+    components.callbacks = options.components.callbacks;
+  }
+  if (options?.components?.pathItems && Object.keys(options.components.pathItems).length > 0) {
+    components.pathItems = options.components.pathItems;
+  }
 
   // Prepare template data
   const templateData: any = {
     openapi: versionConfig.version,
     info,
-    schemas,
+    components,
     paths: paths || {},  // Include paths in template data, default to empty object
-    ...(securitySchemes && Object.keys(securitySchemes).length > 0 ? { securitySchemes } : {}),
     ...(options?.servers && options.servers.length > 0 ? { servers: options.servers } : {}),
     ...(options?.tags && options.tags.length > 0 ? { tags: options.tags } : {}),
     ...(options?.security && options.security.length > 0 ? { security: options.security } : {}),
@@ -499,11 +544,11 @@ export async function generateClassOpenApiSpec(
     }
   }
 
-  // Prepare template data
+  // Prepare template data (use same components shape as generateOpenApiSpec #424)
   const templateData: any = {
     openapi: versionConfig.version,
     info,
-    schemas,
+    components: { schemas },
     paths: {}  // Include paths in template data, default to empty object
   };
 

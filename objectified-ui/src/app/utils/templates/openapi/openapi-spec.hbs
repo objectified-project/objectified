@@ -7,13 +7,5 @@
 {{/if}}{{#if security}}  "security": {{{json security}}},
 {{/if}}{{#if externalDocs}}  "externalDocs": {{{json externalDocs}}},
 {{/if}}  "paths": {{{json paths}}},
-  "components": {
-    "schemas": {
-{{#each schemas}}
-      "{{@key}}": {{{json this}}}{{#unless @last}},{{/unless}}
-{{/each}}
-    }{{#if securitySchemes}},
-    "securitySchemes": {{{json securitySchemes}}}
-{{/if}}
-  }
+  "components": {{{json components}}}
 }
