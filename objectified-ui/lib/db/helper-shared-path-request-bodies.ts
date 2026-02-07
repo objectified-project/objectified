@@ -714,8 +714,19 @@ export async function addPropertyToInlineSchema(
     if (!inlineSchema) {
       inlineSchema = { type: 'object', properties: [] };
     }
-    if (!inlineSchema.properties) {
-      inlineSchema.properties = [];
+    if (!Array.isArray(inlineSchema.properties)) {
+      // Normalize: properties may be an object (OpenAPI-style) from import or legacy data
+      if (inlineSchema.properties && typeof inlineSchema.properties === 'object') {
+        inlineSchema.properties = Object.entries(inlineSchema.properties).map(([name, data]: [string, any]) => ({
+          id: crypto.randomUUID(),
+          name,
+          description: data?.description ?? null,
+          data: typeof data === 'object' && data !== null ? data : { type: 'string' },
+          parent_id: null,
+        }));
+      } else {
+        inlineSchema.properties = [];
+      }
     }
 
     // Check for duplicate property name at the same level
@@ -795,6 +806,12 @@ export async function updateInlineSchemaProperty(
     }
     if (!inlineSchema || !inlineSchema.properties) {
       return JSON.stringify({ success: false, error: 'No inline schema properties found' });
+    }
+    if (!Array.isArray(inlineSchema.properties)) {
+      return JSON.stringify({
+        success: false,
+        error: 'Inline schema properties are in an unexpected format. Use "Add property" on the request body to normalize the schema first.',
+      });
     }
 
     // Find and update the property
@@ -876,6 +893,12 @@ export async function deleteInlineSchemaProperty(
     }
     if (!inlineSchema || !inlineSchema.properties) {
       return JSON.stringify({ success: false, error: 'No inline schema properties found' });
+    }
+    if (!Array.isArray(inlineSchema.properties)) {
+      return JSON.stringify({
+        success: false,
+        error: 'Inline schema properties are in an unexpected format. Use "Add property" on the request body to normalize the schema first.',
+      });
     }
 
     // Find all properties to delete (the target and optionally its children)

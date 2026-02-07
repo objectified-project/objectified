@@ -50,7 +50,7 @@ structure immediately recognizable.
 - ✅ Required flag
 - ✅ Description
 - ✅ Example values
-- 📋 Encoding options (for multipart)
+- ✅ Encoding options (for multipart)
 
 **Advanced Features**:
 - Multiple content types per operation (JSON vs XML vs form-data)
@@ -62,7 +62,6 @@ structure immediately recognizable.
 | Ticket | Feature                                                        |
 |--------|----------------------------------------------------------------|
 | #387   | Schema binding per content type                                |
-| #391   | Add encoding options for multipart                             |
 
 #### 2.6 Response Nodes 📋 PLANNED
 

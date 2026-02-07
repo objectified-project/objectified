@@ -55,6 +55,8 @@ export interface PathRequestBodyData {
   onDescriptionChange?: (description: string) => void;
   /** Called when the user saves examples for a content type (contentId, examples array). */
   onExamplesChange?: (contentId: string, examples: Array<{ summary?: string; value: unknown }>) => void;
+  /** Called when the user saves encoding options for a content type (multipart/form-data, etc.). */
+  onEncodingChange?: (contentId: string, encoding: Record<string, Record<string, unknown>> | null) => void;
   onShowClassDropDialog?: (classData: any, onConfirm: (action: 'copy' | 'reference') => void) => void;
   [key: string]: unknown; // Index signature for React Flow compatibility
 }
@@ -890,6 +892,140 @@ function RequestBodyExamplesPanel({ contentId, content, examples, onSave }: Requ
 }
 
 // =============================================================================
+// REQUEST BODY ENCODING PANEL (multipart/form-data, application/x-www-form-urlencoded)
+// =============================================================================
+
+const ENCODING_STYLE_OPTIONS = [
+  { value: '', label: '(default)' },
+  { value: 'form', label: 'form' },
+  { value: 'spaceDelimited', label: 'spaceDelimited' },
+  { value: 'pipeDelimited', label: 'pipeDelimited' },
+  { value: 'deepObject', label: 'deepObject' },
+] as const;
+
+interface RequestBodyEncodingPanelProps {
+  contentId: string;
+  content: ContentTypeInfo;
+  onSave: (encoding: Record<string, Record<string, unknown>> | null) => void;
+}
+
+function RequestBodyEncodingPanel({ contentId, content, onSave }: RequestBodyEncodingPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const propertyNames = React.useMemo(() => {
+    if (content.inline_schema?.properties && Array.isArray(content.inline_schema.properties)) {
+      const tree = buildPropertyTreeFromInlineSchema(content.inline_schema);
+      return tree.map((n) => n.name);
+    }
+    if (content.classProperties?.length) {
+      return content.classProperties.map((p: ClassPropertyDisplay) => p.name);
+    }
+    return [];
+  }, [content.inline_schema, content.classProperties]);
+
+  const encoding = (content.encoding && typeof content.encoding === 'object') ? content.encoding as Record<string, Record<string, unknown>> : {};
+
+  const updateEncodingForProperty = (propName: string, field: string, value: string | boolean) => {
+    const next = { ...encoding };
+    const current = next[propName] ? { ...next[propName] } : {};
+    if (value === '' || value === false) {
+      delete (current as any)[field];
+    } else {
+      (current as any)[field] = value;
+    }
+    if (Object.keys(current).length === 0) {
+      delete next[propName];
+    } else {
+      next[propName] = current;
+    }
+    const toSave = Object.keys(next).length === 0 ? null : next;
+    onSave(toSave);
+  };
+
+  const getEnc = (propName: string, field: string): string | boolean => {
+    const enc = encoding[propName];
+    if (!enc || typeof enc !== 'object') return field === 'explode' ? false : '';
+    const v = (enc as any)[field];
+    if (field === 'explode' || field === 'allowReserved') return v === true;
+    return typeof v === 'string' ? v : '';
+  };
+
+  const showEncoding = content.media_type === 'multipart/form-data' || content.media_type === 'application/x-www-form-urlencoded';
+
+  if (!showEncoding) return null;
+
+  return (
+    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center justify-between w-full text-left text-[10px] font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+      >
+        <span>Encoding options</span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {propertyNames.length === 0 ? (
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">Add properties to the schema to set encoding per property.</p>
+          ) : (
+            <div className="space-y-2 max-h-[220px] overflow-y-auto">
+              {propertyNames.map((propName) => (
+                <div key={propName} className="p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 space-y-1.5">
+                  <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300">{propName}</div>
+                  <div className="grid gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] text-gray-500 dark:text-gray-400 w-20 shrink-0">Content-Type</label>
+                      <input
+                        type="text"
+                        value={getEnc(propName, 'contentType') as string}
+                        onChange={(e) => updateEncodingForProperty(propName, 'contentType', e.target.value.trim())}
+                        placeholder="e.g. image/png"
+                        className="flex-1 min-w-0 px-2 py-1 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] text-gray-500 dark:text-gray-400 w-20 shrink-0">Style</label>
+                      <select
+                        value={(getEnc(propName, 'style') as string) || ''}
+                        onChange={(e) => updateEncodingForProperty(propName, 'style', e.target.value)}
+                        className="flex-1 min-w-0 px-2 py-1 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+                      >
+                        {ENCODING_STYLE_OPTIONS.map((opt) => (
+                          <option key={opt.value || '_'} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] text-gray-500 dark:text-gray-400 w-20 shrink-0">Explode</label>
+                      <input
+                        type="checkbox"
+                        checked={getEnc(propName, 'explode') as boolean}
+                        onChange={(e) => updateEncodingForProperty(propName, 'explode', e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] text-gray-500 dark:text-gray-400 w-20 shrink-0">Allow reserved</label>
+                      <input
+                        type="checkbox"
+                        checked={getEnc(propName, 'allowReserved') as boolean}
+                        onChange={(e) => updateEncodingForProperty(propName, 'allowReserved', e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
@@ -1056,6 +1192,13 @@ export default function PathRequestBodyNode({ data }: { data: PathRequestBodyDat
                   content={selectedContent}
                   examples={selectedContent.examples}
                   onSave={(examples) => data.onExamplesChange!(selectedContent.id, examples)}
+                />
+              )}
+              {data.onEncodingChange && selectedContent.id && (
+                <RequestBodyEncodingPanel
+                  contentId={selectedContent.id}
+                  content={selectedContent}
+                  onSave={(encoding) => data.onEncodingChange!(selectedContent.id, encoding)}
                 />
               )}
             </>

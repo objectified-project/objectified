@@ -58,6 +58,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added content type definitions for request body schemas
   - Added display of description to the request body schema definitions
   - Added examples to schema request nodes in paths
+  - Added encoding options for multipart in schema property nodes
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
   - Dragging a class to a response schema allows the class to be copied or referenced
 - OpenAPI Support:

@@ -1202,6 +1202,33 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     }
   }, [alertDialog, onRefresh]);
 
+  // Update request body content type encoding options (#391, multipart/form-data etc.)
+  const handleUpdateRequestBodyEncoding = useCallback(async (
+    contentId: string,
+    encoding: Record<string, Record<string, unknown>> | null
+  ) => {
+    try {
+      const result = await updateRequestBodyContentType(contentId, { encoding });
+      const parsed = JSON.parse(result);
+      if (parsed.success) {
+        if (onRefresh) onRefresh();
+      } else {
+        await alertDialog({
+          title: 'Error',
+          message: parsed.error || 'Failed to update encoding',
+          variant: 'error',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating request body encoding:', error);
+      await alertDialog({
+        title: 'Error',
+        message: 'Failed to update encoding',
+        variant: 'error',
+      });
+    }
+  }, [alertDialog, onRefresh]);
+
   // Handle request body property drop (add to inline schema; if content is $ref, convert first then add)
   const handleRequestBodyPropertyDrop = useCallback(async (
     contentId: string,
@@ -2730,6 +2757,8 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
                 onDescriptionChange: (description: string) => handleUpdateRequestBodyDescription(rb.id, description),
                 onExamplesChange: (contentId: string, examples: Array<{ summary?: string; value: unknown }>) =>
                   handleUpdateRequestBodyExamples(contentId, examples),
+                onEncodingChange: (contentId: string, encoding: Record<string, Record<string, unknown>> | null) =>
+                  handleUpdateRequestBodyEncoding(contentId, encoding),
                 onPropertyDrop: stableHandleRequestBodyPropertyDrop,
                 onClassDrop: stableHandleRequestBodyClassDrop,
                 onPropertyDelete: stableHandleRequestBodyPropertyDelete,
@@ -2792,7 +2821,7 @@ function PathsCanvasInner({ selectedPathId, pathname, onOperationSelect, onParam
     };
 
     loadOperationsAndParameters();
-  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, handleUpdateRequestBodyExamples, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
+  }, [selectedPathId, selectedVersionId, setNodes, setEdges, refreshKey, edgeRouting, edgeAnimation, handleDeleteOperation, handleDeleteParameter, handleDeleteResponse, handleDeleteSharedResponse, handleUnlinkResponse, handleClassDropOnResponse, handlePropertyDropOnResponse, handleClassUnlinkFromResponse, handleSchemaTypeChange, handleDeleteRequestBody, handleAddRequestBodyContentType, handleUpdateRequestBodyDescription, handleUpdateRequestBodyExamples, handleUpdateRequestBodyEncoding, stableHandleRequestBodyPropertyDrop, stableHandleRequestBodyPropertyDelete, stableHandleRequestBodyClassDrop, stableHandleResponseBodyPropertyDrop, stableHandleResponseBodyPropertyDelete, stableHandleResponseBodyClassDrop, stableHandleCreateContentTypeWithProperty, stableHandleCreateContentTypeWithClass, handleShowClassDropDialog]);
 
   // Detect dark mode
   useEffect(() => {
