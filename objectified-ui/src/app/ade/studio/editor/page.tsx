@@ -270,6 +270,10 @@ const StudioContent = () => {
   // #489: Focus degree (1 = selection + 1st-degree neighbors, 2 = + 2nd-degree, etc.); user can expand incrementally
   const [focusModeDegree, setFocusModeDegree] = useState(1);
   const FOCUS_MODE_MAX_DEGREE = 10;
+  // #490: When set, focus mode shows only this group's members ("Focus on group")
+  const [focusModeGroupId, setFocusModeGroupId] = useState<string | null>(null);
+  // Inline hover expansion for "Focus on group" list (show groups inside dropdown on hover)
+  const [focusOnGroupHovered, setFocusOnGroupHovered] = useState(false);
 
   // #488: Show only connected nodes (hide nodes with no edges)
   const [showOnlyConnectedNodes, setShowOnlyConnectedNodes] = useState(false);
@@ -693,9 +697,14 @@ const StudioContent = () => {
     return set;
   }, [edges]);
 
-  // Focus mode: focused set = current selection + neighbors up to focusModeDegree steps (BFS)
+  // Focus mode: focused set = either group members (#490) or selection + neighbors up to degree (BFS)
   const focusModeFocusedSet = useMemo(() => {
     if (!focusModeEnabled) return new Set<string>();
+    // #490: Focus on group – only show this group's members
+    if (focusModeGroupId) {
+      const group = groups.find(g => g.id === focusModeGroupId);
+      return group ? new Set<string>(group.nodeIds) : new Set<string>();
+    }
     const classNodeIds = selectedNodeIds.filter(id => {
       const node = nodes.find(n => n.id === id);
       return node && node.type !== 'groupNode';
@@ -717,7 +726,7 @@ const StudioContent = () => {
       current = next;
     }
     return focusedSet;
-  }, [focusModeEnabled, focusModeDegree, selectedNodeIds, nodes, edges]);
+  }, [focusModeEnabled, focusModeGroupId, groups, focusModeDegree, selectedNodeIds, nodes, edges]);
 
   const toggleFocusMode = useCallback(() => {
     setFocusModeEnabled(prev => !prev);
@@ -726,6 +735,17 @@ const StudioContent = () => {
   const exitFocusMode = useCallback(() => {
     setFocusModeEnabled(false);
     setFocusModeDegree(1);
+    setFocusModeGroupId(null);
+  }, []);
+
+  const focusOnGroup = useCallback((groupId: string) => {
+    setFocusModeEnabled(true);
+    setFocusModeGroupId(groupId);
+    setFocusOnGroupHovered(false);
+  }, []);
+
+  const focusOnSelection = useCallback(() => {
+    setFocusModeGroupId(null);
   }, []);
 
   const expandFocusDegree = useCallback(() => {
@@ -4873,44 +4893,63 @@ const StudioContent = () => {
               </Panel>
             )}
 
-            {/* Focus mode indicator - expand/reduce degree (#489), exit with Esc or X */}
+            {/* Focus mode indicator - by selection+degree (#489) or by group (#490), exit with Esc or X */}
             {focusModeEnabled && (
               <Panel position="top-center" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700/80 px-4 py-2">
                 <div className="flex items-center gap-2">
                   <Focus className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Focus mode</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-                    {focusModeDegree === 1 ? '1st' : focusModeDegree === 2 ? '2nd' : focusModeDegree === 3 ? '3rd' : `${focusModeDegree}th`} degree
-                  </span>
-                  <div className="flex items-center gap-0.5 border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden">
-                    <button
-                      onClick={reduceFocusDegree}
-                      disabled={focusModeDegree <= 1}
-                      className="p-1.5 rounded-none hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:pointer-events-none"
-                      title="Reduce focus (fewer connections)"
-                      aria-label="Reduce focus degree"
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={expandFocusDegree}
-                      disabled={focusModeDegree >= FOCUS_MODE_MAX_DEGREE}
-                      className="p-1.5 rounded-none hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:pointer-events-none"
-                      title="Expand focus (include more connections)"
-                      aria-label="Expand focus degree"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <button
-                    onClick={resetFocusDegree}
-                    disabled={focusModeDegree <= 1}
-                    className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 disabled:opacity-40 disabled:pointer-events-none"
-                    title="Reset focus to 1st degree"
-                    aria-label="Reset focus degree"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </button>
+                  {focusModeGroupId ? (
+                    <>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Group:</span>
+                      <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 truncate max-w-[140px]" title={groups.find(g => g.id === focusModeGroupId)?.name}>
+                        {groups.find(g => g.id === focusModeGroupId)?.name ?? 'Unknown'}
+                      </span>
+                      <button
+                        onClick={focusOnSelection}
+                        className="px-2 py-1 text-xs rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400"
+                        title="Switch to selection focus"
+                        aria-label="Focus by selection"
+                      >
+                        Selection
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Focus mode</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                        {focusModeDegree === 1 ? '1st' : focusModeDegree === 2 ? '2nd' : focusModeDegree === 3 ? '3rd' : `${focusModeDegree}th`} degree
+                      </span>
+                      <div className="flex items-center gap-0.5 border border-gray-200 dark:border-gray-600 rounded-md overflow-hidden">
+                        <button
+                          onClick={reduceFocusDegree}
+                          disabled={focusModeDegree <= 1}
+                          className="p-1.5 rounded-none hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:pointer-events-none"
+                          title="Reduce focus (fewer connections)"
+                          aria-label="Reduce focus degree"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={expandFocusDegree}
+                          disabled={focusModeDegree >= FOCUS_MODE_MAX_DEGREE}
+                          className="p-1.5 rounded-none hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 disabled:opacity-40 disabled:pointer-events-none"
+                          title="Expand focus (include more connections)"
+                          aria-label="Expand focus degree"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={resetFocusDegree}
+                        disabled={focusModeDegree <= 1}
+                        className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 disabled:opacity-40 disabled:pointer-events-none"
+                        title="Reset focus to 1st degree"
+                        aria-label="Reset focus degree"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={exitFocusMode}
                     className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -4966,7 +5005,7 @@ const StudioContent = () => {
                   <Search className="h-3.5 w-3.5" />
                   <span>Search</span>
                 </button>
-                {/* View Mode: dropdown with Focus and Connected options */}
+                {/* View Mode: dropdown with Focus, Focus on group (inline hover list), and Connected options */}
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild>
                     <button
@@ -4985,13 +5024,19 @@ const StudioContent = () => {
                   </DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
-                      className="min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[9999]"
+                      className="min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[9999] overflow-visible"
                       sideOffset={5}
                       align="start"
                     >
                       <DropdownMenu.CheckboxItem
                         checked={focusModeEnabled}
-                        onCheckedChange={(checked) => setFocusModeEnabled(!!checked)}
+                        onCheckedChange={(checked) => {
+                          setFocusModeEnabled(!!checked);
+                          if (!checked) {
+                            setFocusModeGroupId(null);
+                            setFocusModeDegree(1);
+                          }
+                        }}
                         className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
                         onSelect={(e) => e.preventDefault()}
                       >
@@ -5001,6 +5046,39 @@ const StudioContent = () => {
                         <Focus className="h-4 w-4 shrink-0" />
                         <span>Focus</span>
                       </DropdownMenu.CheckboxItem>
+                      {/* Focus on group: hover shows list to the right (side flyout) so other menu items stay easy to reach */}
+                      <div
+                        className="relative rounded-md"
+                        onMouseEnter={() => setFocusOnGroupHovered(true)}
+                        onMouseLeave={() => setFocusOnGroupHovered(false)}
+                      >
+                        <div className="flex items-center gap-3 px-3 py-2 text-sm rounded-md outline-none cursor-pointer text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                          <Folder className="h-4 w-4 shrink-0" />
+                          <span>Focus on group</span>
+                          <ChevronRight className="h-4 w-4 ml-auto shrink-0" />
+                        </div>
+                        {focusOnGroupHovered && (
+                          <div className="absolute left-full top-0 ml-0.5 min-w-[180px] rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 z-10">
+                            {groups.length === 0 ? (
+                              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No groups</div>
+                            ) : (
+                              <div className="max-h-[240px] overflow-y-auto">
+                                {groups.map((g) => (
+                                  <button
+                                    key={g.id}
+                                    type="button"
+                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 outline-none mx-0.5"
+                                    onClick={() => focusOnGroup(g.id)}
+                                  >
+                                    <span className="truncate">{g.name}</span>
+                                    <span className="text-xs text-gray-400 tabular-nums shrink-0">({g.nodeIds.length})</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                       <DropdownMenu.CheckboxItem
                         checked={showOnlyConnectedNodes}
                         onCheckedChange={(checked) => setShowOnlyConnectedNodes(!!checked)}
