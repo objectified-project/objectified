@@ -320,14 +320,78 @@ type ClassProperty = {
   parent_id?: string | null; // Parent property ID for nested properties
 };
 
+export type NodeBorderStyle = 'solid' | 'dashed' | 'dotted';
+
 type ClassNodeTheme = {
   backgroundColor?: string;
   borderColor?: string;
+  borderWidth?: number; // 1-5px
+  borderStyle?: NodeBorderStyle;
   headerGradient?: string;
   textColor?: string;
   headerTextColor?: string;
   icon?: string; // Icon name from lucide-react
 };
+
+// Border options for node style (#342) — includes 1.5 to match default
+const BORDER_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
+const BORDER_STYLE_OPTIONS: Array<{ name: NodeBorderStyle; label: string }> = [
+  { name: 'solid', label: 'Solid' },
+  { name: 'dashed', label: 'Dashed' },
+  { name: 'dotted', label: 'Dotted' },
+];
+
+// --- Custom color picker: derive full theme from a single primary hex ---
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = hex.replace(/^#/, '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
+    || hex.replace(/^#/, '').match(/^([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+  if (!m) return null;
+  const expand = (x: string) => (x.length === 1 ? x + x : x);
+  return {
+    r: parseInt(expand(m[1]), 16),
+    g: parseInt(expand(m[2]), 16),
+    b: parseInt(expand(m[3]), 16),
+  };
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('');
+}
+function darkenHex(hex: string, amount: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const f = 1 - Math.max(0, Math.min(1, amount));
+  return rgbToHex(rgb.r * f, rgb.g * f, rgb.b * f);
+}
+function lightTint(hex: string, mixWhite: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const w = Math.max(0, Math.min(1, mixWhite));
+  return rgbToHex(
+    rgb.r * (1 - w) + 255 * w,
+    rgb.g * (1 - w) + 255 * w,
+    rgb.b * (1 - w) + 255 * w
+  );
+}
+/** Normalize to #rrggbb for input[type=color] and storage */
+function normalizeHex(hex: string): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return '#6366f1';
+  return rgbToHex(rgb.r, rgb.g, rgb.b);
+}
+/** Build full ClassNode theme from a single primary (header/border) color */
+function themeFromPrimaryColor(primaryHex: string): Omit<ClassNodeTheme, 'icon'> {
+  const hex = normalizeHex(primaryHex);
+  const darker = darkenHex(hex, 0.18);
+  const bg = lightTint(hex, 0.92);
+  const text = darkenHex(hex, 0.55);
+  return {
+    backgroundColor: bg,
+    borderColor: hex,
+    headerGradient: `linear-gradient(135deg, ${hex} 0%, ${darker} 100%)`,
+    textColor: text,
+    headerTextColor: '#ffffff',
+  };
+}
 
 type ClassNodeData = {
   id: string;
@@ -427,6 +491,26 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setColorPickerOpen(false);
   };
 
+  // Custom color picker: derive full theme from chosen hex and merge with existing (border, icon)
+  const handleCustomColorChange = (hex: string) => {
+    if (!typedData.onThemeChange) return;
+    const derived = themeFromPrimaryColor(hex);
+    const currentTheme = typedData.theme || {};
+    typedData.onThemeChange(typedData.id, {
+      ...currentTheme,
+      ...derived,
+      // Preserve border and icon
+      borderWidth: currentTheme.borderWidth,
+      borderStyle: currentTheme.borderStyle,
+      icon: currentTheme.icon,
+    });
+  };
+
+  // Current primary color for the color input (borderColor or default)
+  const customColorValue = typedData.theme?.borderColor
+    ? normalizeHex(typedData.theme.borderColor)
+    : '#6366f1';
+
   // Handle icon selection - merges with existing theme
   const handleIconSelect = (iconName: string | null) => {
     if (typedData.onThemeChange) {
@@ -435,6 +519,14 @@ function ClassNode({ id, data, selected }: NodeProps) {
     }
     setIconPickerOpen(false);
     setIconSearchQuery('');
+  };
+
+  // Handle border change - merges with existing theme (#342)
+  const handleBorderChange = (updates: { borderWidth?: number; borderStyle?: NodeBorderStyle }) => {
+    if (typedData.onThemeChange) {
+      const currentTheme = typedData.theme || {};
+      typedData.onThemeChange(typedData.id, { ...currentTheme, ...updates });
+    }
   };
 
   // Get the icon component for the current theme
@@ -784,6 +876,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
   // Get custom colors from theme or defaults
   const backgroundColor = typedData.theme?.backgroundColor || 'white';
   const borderColor = typedData.theme?.borderColor || (selected ? '#6366f1' : '#e2e8f0');
+  const borderWidth = Math.min(5, Math.max(1, typedData.theme?.borderWidth ?? 1.5));
+  const borderStyle = typedData.theme?.borderStyle ?? 'solid';
   const textColor = typedData.theme?.textColor || '#1e293b';
   const headerTextColor = typedData.theme?.headerTextColor || 'white';
 
@@ -796,7 +890,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
       onDoubleClick={handleDoubleClick}
       style={{
         borderRadius: '10px',
-        border: `1.5px solid ${borderColor}`,
+        border: `${borderWidth}px ${borderStyle} ${borderColor}`,
         background: backgroundColor,
         minWidth: '280px',
         maxWidth: '420px',
@@ -971,21 +1065,89 @@ function ClassNode({ id, data, selected }: NodeProps) {
               </Popover.Trigger>
               <Popover.Portal>
                 <Popover.Content
-                  className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3"
+                  className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3 min-w-[200px]"
                   sideOffset={5}
                   onOpenAutoFocus={(e) => e.preventDefault()}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Presets</div>
                   <div className="grid grid-cols-4 gap-2">
                     {colorThemes.map((color) => (
                       <button
                         key={color.name}
                         onClick={() => handleThemeSelect(color)}
-                        className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110"
+                        className="w-6 h-6 rounded-full border-2 border-gray-200 dark:border-gray-600 transition-transform hover:scale-110"
                         style={{ backgroundColor: color.hex }}
                         title={color.name}
                       />
                     ))}
+                  </div>
+                  {/* Custom color picker */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Custom color</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={customColorValue}
+                        onChange={(e) => handleCustomColorChange(e.target.value)}
+                        className="w-9 h-9 rounded cursor-pointer border border-gray-300 dark:border-gray-600 p-0.5 bg-white dark:bg-gray-700"
+                        title="Pick a color"
+                      />
+                      <input
+                        type="text"
+                        value={customColorValue}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          if (/^#[0-9a-fA-F]{3,6}$/.test(v) || /^[0-9a-fA-F]{3,6}$/.test(v)) {
+                            const hex = v.startsWith('#') ? v : '#' + v;
+                            handleCustomColorChange(hex);
+                          }
+                        }}
+                        className="flex-1 min-w-0 px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono"
+                        placeholder="#6366f1"
+                        spellCheck={false}
+                      />
+                    </div>
+                  </div>
+                  {/* Border configuration (#342) */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400">Border</div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Thickness</div>
+                      <div className="flex gap-1">
+                        {BORDER_WIDTH_OPTIONS.map((w) => (
+                          <button
+                            key={w}
+                            onClick={() => handleBorderChange({ borderWidth: w })}
+                            className={`flex-1 min-w-0 py-1 text-[10px] font-medium rounded transition-all ${
+                              (typedData.theme?.borderWidth ?? 1.5) === w
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            {w}px
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Style</div>
+                      <div className="flex gap-1">
+                        {BORDER_STYLE_OPTIONS.map((s) => (
+                          <button
+                            key={s.name}
+                            onClick={() => handleBorderChange({ borderStyle: s.name })}
+                            className={`flex-1 min-w-0 py-1 text-[10px] font-medium rounded transition-all ${
+                              (typedData.theme?.borderStyle ?? 'solid') === s.name
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   <Popover.Arrow className="fill-white dark:fill-gray-800" />
                 </Popover.Content>
@@ -1591,6 +1753,8 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
   if (prevTheme?.headerGradient !== nextTheme?.headerGradient ||
       prevTheme?.backgroundColor !== nextTheme?.backgroundColor ||
       prevTheme?.borderColor !== nextTheme?.borderColor ||
+      prevTheme?.borderWidth !== nextTheme?.borderWidth ||
+      prevTheme?.borderStyle !== nextTheme?.borderStyle ||
       prevTheme?.textColor !== nextTheme?.textColor ||
       prevTheme?.headerTextColor !== nextTheme?.headerTextColor ||
       prevTheme?.icon !== nextTheme?.icon) {

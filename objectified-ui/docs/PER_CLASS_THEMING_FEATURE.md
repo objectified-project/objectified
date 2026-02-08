@@ -17,6 +17,8 @@ Themes are stored in the `canvas_metadata.style` object for each class:
   "style": {
     "backgroundColor": "#eff6ff",
     "borderColor": "#3b82f6",
+    "borderWidth": 2,
+    "borderStyle": "solid",
     "headerGradient": "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
     "textColor": "#1e40af",
     "headerTextColor": "#ffffff"
@@ -34,9 +36,12 @@ Themes are stored in the `canvas_metadata.style` object for each class:
 type ClassNodeTheme = {
   backgroundColor?: string;
   borderColor?: string;
+  borderWidth?: number;   // 1–5px (#342)
+  borderStyle?: 'solid' | 'dashed' | 'dotted';  // (#342)
   headerGradient?: string;
   textColor?: string;
   headerTextColor?: string;
+  icon?: string;
 };
 ```
 
@@ -56,6 +61,7 @@ type ClassNodeTheme = {
 - **Visual Color Swatches**: Each swatch shows the actual gradient color with a small label
 - **Hover Effects**: Swatches scale (1.1x), show blue border, and add shadow on hover
 - **Reset Button**: Restores default theme
+- **Border configuration (#342)**: Border thickness (1, 1.5, 2, 3, 4, 5px) and style (solid, dashed, dotted) in the color picker popover.
 - **Dynamic Styling**: Node background, border, header gradient, and text colors update based on theme
 - **Selection Preservation**: Selected state still shows appropriate highlight
 

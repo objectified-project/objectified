@@ -250,7 +250,7 @@ const StudioContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
-  const { fitView, setCenter, getViewport, setViewport } = useReactFlow();
+  const { fitView, setCenter, getViewport, setViewport, getNodes } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Zoom level state for level-of-detail rendering
@@ -403,17 +403,12 @@ const StudioContent = () => {
   // Handle theme changes for a class node
   const handleThemeChange = useCallback(async (classId: string, theme: any) => {
     try {
-      // Use functional form to get current node
-      let currentMetadata = {};
-      setNodes((currentNodes) => {
-        const currentNode = currentNodes.find(n => n.id === classId);
-        if (currentNode) {
-          currentMetadata = (currentNode.data as any).canvas_metadata || {};
-        }
-        return currentNodes; // No change yet
-      });
+      // Read current metadata synchronously from React Flow (avoids stale state from setState)
+      const currentNodes = getNodes();
+      const currentNode = currentNodes.find((n) => n.id === classId);
+      const currentMetadata = (currentNode?.data as any)?.canvas_metadata || {};
 
-      // Update canvas_metadata with new theme
+      // Update canvas_metadata with new theme (merge so position/dimensions/group are preserved)
       const updatedMetadata = {
         ...currentMetadata,
         style: theme
@@ -423,31 +418,30 @@ const StudioContent = () => {
       const response = await updateClassCanvasMetadataWithSession(classId, updatedMetadata);
 
       if (response.success) {
-        // Update local node data with a completely new object to ensure React detects the change
-        setNodes((nodes) => nodes.map((n) =>
-          n.id === classId
-            ? {
-                ...n,
-                data: {
-                  ...(n.data as any),
-                  theme: { ...theme }, // Create new object reference
-                  canvas_metadata: updatedMetadata
+        // Update local node data so the node re-renders with new theme (border, colors, etc.)
+        setNodes((nodes) =>
+          nodes.map((n) =>
+            n.id === classId
+              ? {
+                  ...n,
+                  data: {
+                    ...(n.data as any),
+                    theme: { ...theme },
+                    canvas_metadata: updatedMetadata
+                  }
                 }
-              }
-            : n
-        ));
+              : n
+          )
+        );
 
-        // Force React Flow to update the node internals
-        setTimeout(() => {
-          updateNodeInternals(classId);
-        }, 0);
+        setTimeout(() => updateNodeInternals(classId), 0);
       } else {
         console.error('Failed to update class theme:', response.error);
       }
     } catch (error) {
       console.error('Error updating class theme:', error);
     }
-  }, [updateNodeInternals]);
+  }, [getNodes, setNodes, updateNodeInternals]);
 
   // Keep ref updated
   handleThemeChangeRef.current = handleThemeChange;

@@ -191,15 +191,14 @@
   - 📋 [TODO] Rectangle (default), Rounded rectangle
   - 📋 [TODO] Circle/ellipse, Hexagon, Diamond
   - 📋 [TODO] Custom SVG shapes
-- 📋 [TODO] **Node Borders**:
-  - 📋 [TODO] Border thickness (1-5px)
-  - 📋 [TODO] Border style (solid, dashed, dotted)
+- ✅ **Node Borders** (#342):
+  - ✅ Border thickness (1, 1.5, 2, 3, 4, 5px)
+  - ✅ Border style (solid, dashed, dotted)
   - 📋 [TODO] Shadow effects (drop shadow, inner shadow)
 
 | Ticket | Feature Description           |
 |--------|-------------------------------|
 | #341   | Custom node sizing            |
-| #342   | Add node border configuration |
 | #343   | Add custom node label styling |
 
 #### Edge/Relationship Styling ✅ PARTIALLY IMPLEMENTED

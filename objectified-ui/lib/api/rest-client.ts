@@ -45,6 +45,8 @@ async function updateClassCanvasMetadata(
     style?: {
       backgroundColor?: string;
       borderColor?: string;
+      borderWidth?: number;
+      borderStyle?: 'solid' | 'dashed' | 'dotted';
       headerGradient?: string;
       textColor?: string;
       headerTextColor?: string;
@@ -90,6 +92,8 @@ export async function updateClassCanvasMetadataWithSession(
     style?: {
       backgroundColor?: string;
       borderColor?: string;
+      borderWidth?: number;
+      borderStyle?: 'solid' | 'dashed' | 'dotted';
       headerGradient?: string;
       textColor?: string;
       headerTextColor?: string;
