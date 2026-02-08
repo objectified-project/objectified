@@ -10989,7 +10989,7 @@ __metadata:
     eslint: "npm:^9"
     eslint-config-next: "npm:16.0.10"
     lucide-react: "npm:^0.562.0"
-    next: "npm:16.1.2"
+    next: "npm:16.1.6"
     next-themes: "npm:^0.4.6"
     react: "npm:19.2.3"
     react-dom: "npm:19.2.3"
