@@ -98,6 +98,7 @@ import {
   getClassWithPropertiesAndTagsWithSession
 } from '../../../../../lib/api/rest-client';
 import ClassNode from '../../../components/ade/studio/ClassNode';
+import EdgeWithWideHit from '../../../components/ade/studio/EdgeWithWideHit';
 import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNode';
 import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
@@ -286,6 +287,10 @@ const StudioContent = () => {
 
   // Show spacing indicators toggle
   const [showSpacingIndicators, setShowSpacingIndicators] = useState(false);
+
+  // #349: Edge hover – tooltip and highlighting
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [edgeTooltipPosition, setEdgeTooltipPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Class-property edit dialog state
   const [editPropertyDialogOpen, setEditPropertyDialogOpen] = useState(false);
@@ -873,6 +878,24 @@ const StudioContent = () => {
 
     return result;
   }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
+
+  // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
+  const edgesWithHover = useMemo(() => {
+    if (!hoveredEdgeId) return displayEdges;
+    return displayEdges.map((edge) => {
+      if (edge.id !== hoveredEdgeId) return edge;
+      const baseWidth = (edge.style?.strokeWidth as number) || 2;
+      return {
+        ...edge,
+        zIndex: (edge.zIndex ?? 0) + 10,
+        style: {
+          ...edge.style,
+          strokeWidth: baseWidth + 2,
+          filter: 'drop-shadow(0 0 4px rgba(99, 102, 241, 0.5))',
+        },
+      };
+    });
+  }, [displayEdges, hoveredEdgeId]);
 
   // Compute canvas background style based on settings (shared util for preview + main canvas)
   const canvasBackgroundStyle = useMemo(
@@ -2951,8 +2974,11 @@ const StudioContent = () => {
     groupNode: GroupNode,
   };
 
-  // Define custom edge types
+  // Define custom edge types (wide hit area for easier hover on default/straight/smoothstep)
   const edgeTypes = {
+    default: EdgeWithWideHit,
+    straight: EdgeWithWideHit,
+    smoothstep: EdgeWithWideHit,
     smart: SmartEdge,
   };
 
@@ -3898,6 +3924,24 @@ const StudioContent = () => {
     console.log('Clicked edge:', edge);
   }, []);
 
+  // #349: Edge hover – show tooltip and track position for highlighting
+  const onEdgeMouseEnter = useCallback((event: React.MouseEvent, edge: Edge) => {
+    setHoveredEdgeId(edge.id);
+    setEdgeTooltipPosition({ x: event.clientX, y: event.clientY });
+  }, []);
+  const onEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+    setEdgeTooltipPosition(null);
+  }, []);
+
+  // #349: Update edge tooltip position to follow cursor while hovering
+  useEffect(() => {
+    if (!hoveredEdgeId) return;
+    const handleMove = (e: MouseEvent) => setEdgeTooltipPosition({ x: e.clientX, y: e.clientY });
+    window.addEventListener('mousemove', handleMove);
+    return () => window.removeEventListener('mousemove', handleMove);
+  }, [hoveredEdgeId]);
+
   // Handle selection change for spacing tools
   const onSelectionChange = useCallback(({ nodes: selectedNodes }: { nodes: Node[] }) => {
     const classNodeIds = selectedNodes
@@ -4138,6 +4182,10 @@ const StudioContent = () => {
           }
         `}</style>
         <style jsx global>{`
+          /* #349 Edge hover - cursor to show interactivity */
+          .react-flow__edge {
+            cursor: pointer;
+          }
           /* Edge Animation Styles */
           .react-flow__edge.edge-animation-flow .react-flow__edge-path {
             stroke-dasharray: 5;
@@ -4467,7 +4515,7 @@ const StudioContent = () => {
 
             <ReactFlow
               nodes={displayNodes}
-              edges={displayEdges}
+              edges={edgesWithHover}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               defaultEdgeOptions={{ zIndex: 0 }}
@@ -4478,6 +4526,8 @@ const StudioContent = () => {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
+              onEdgeMouseEnter={onEdgeMouseEnter}
+              onEdgeMouseLeave={onEdgeMouseLeave}
               onNodeDrag={handleNodeDrag}
               onNodeDragStop={handleNodeDragStop}
               onSelectionChange={onSelectionChange}
@@ -4552,6 +4602,28 @@ const StudioContent = () => {
                 })}
               </defs>
             </svg>
+            {/* #349: Edge hover tooltip */}
+            {hoveredEdgeId && edgeTooltipPosition && (() => {
+              const hoveredEdge = displayEdges.find((e) => e.id === hoveredEdgeId);
+              if (!hoveredEdge) return null;
+              const sourceName = (nodes.find((n) => n.id === hoveredEdge.source)?.data as any)?.name ?? hoveredEdge.source;
+              const targetName = (nodes.find((n) => n.id === hoveredEdge.target)?.data as any)?.name ?? hoveredEdge.target;
+              const label = hoveredEdge.label ?? 'Relationship';
+              return (
+                <div
+                  className="pointer-events-none fixed z-[10000] px-2.5 py-2 rounded-lg shadow-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs max-w-[240px]"
+                  style={{
+                    left: edgeTooltipPosition.x + 12,
+                    top: edgeTooltipPosition.y + 12,
+                  }}
+                >
+                  {typeof label === 'string' && <div className="font-semibold text-indigo-600 dark:text-indigo-400 mb-1">{label}</div>}
+                  <div className="text-gray-500 dark:text-gray-400">
+                    {sourceName} → {targetName}
+                  </div>
+                </div>
+              );
+            })()}
             {canvasBackground.type === 'grid' && showGrid && (
               <Background
                 variant={

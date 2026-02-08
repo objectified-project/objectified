@@ -138,6 +138,9 @@ const SmartEdge: React.FC<EdgeProps> = ({
     };
   }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, obstacles]);
 
+  // Invisible wide path for easier hover (hit area ~20px instead of stroke width)
+  const HIT_AREA_STROKE = 20;
+
   return (
     <>
       <path
@@ -148,6 +151,14 @@ const SmartEdge: React.FC<EdgeProps> = ({
         markerEnd={markerEnd}
         markerStart={markerStart}
         fill="none"
+      />
+      {/* Wider invisible path so hover doesn't require pixel-perfect cursor */}
+      <path
+        d={path}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={HIT_AREA_STROKE}
+        style={{ cursor: 'pointer' }}
       />
       {label && (
         <g transform={`translate(${labelX}, ${labelY})`}>

@@ -205,26 +205,6 @@
 |--------|-------------------------------|
 | #341   | Custom node sizing            |
 
-#### Edge/Relationship Styling ✅ PARTIALLY IMPLEMENTED
-- ✅ Different line styles for relationship types:
-  - ✅ Solid for direct references
-  - ✅ Dashed for optional references
-  - ✅ Dotted for weak references
-  - ✅ Double lines for bidirectional
-- ✅ Edge colors customizable
-- 📋 [TODO] Edge labels (show property name on relationship)
-- ✅ Edge routing options:
-  - ✅ Straight lines
-  - ✅ Curved (Bezier)
-  - ✅ Orthogonal (right angles)
-  - ✅ Smart routing (avoid node overlap)
-- ✅ Arrow styles: Standard, Diamond, Circle, Open arrow
-- ✅ Animated edges (flowing dots for data flow)
-
-| Ticket | Feature Description                   |
-|--------|---------------------------------------|
-| #349   | Adds edge hover effects               |
-
 ---
 
 ### 4.1 Smart Canvas Features
@@ -557,6 +537,23 @@
 - ✅ Search filters: by type, group, properties
 - ✅ Regex search support
 - ✅ Search within property names/descriptions
+
+#### Edge/Relationship Styling ✅ IMPLEMENTED
+- ✅ Different line styles for relationship types:
+  - ✅ Solid for direct references
+  - ✅ Dashed for optional references
+  - ✅ Dotted for weak references
+  - ✅ Double lines for bidirectional
+- ✅ Edge colors customizable
+- ✅ Edge labels (show property name on relationship)
+- ✅ Edge routing options:
+  - ✅ Straight lines
+  - ✅ Curved (Bezier)
+  - ✅ Orthogonal (right angles)
+  - ✅ Smart routing (avoid node overlap)
+- ✅ Arrow styles: Standard, Diamond, Circle, Open arrow
+- ✅ Animated edges (flowing dots for data flow)
+- ✅ **Edge hover effects**: Tooltip (relationship label, source → target) and visual highlighting (thicker stroke, glow)
 
 ### 7. Canvas Performance ✅ IMPLEMENTED
 

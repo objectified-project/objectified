@@ -27,6 +27,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Connected mode now only shows connected nodes
     - View Mode is now a dropdown that combines these modes that can be toggled easily
   - Increased zoom out resolution to 10%
+  - Improved edge information view when hovering over edges from one class to another
   - Nodes now show property references even when not expanded
   - Improved search to include properties and descriptions in the results
   - Canvas changes also apply to the Paths canvas
