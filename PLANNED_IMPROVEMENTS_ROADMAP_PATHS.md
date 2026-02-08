@@ -31,20 +31,20 @@ The Paths Designer is a fully implemented visual API design tool built on React 
 
 ### Key Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `paths/page.tsx` | ~240 | Main page, three-panel layout orchestration |
-| `PathsCanvasView.tsx` | ~3,800 | Canvas, React Flow, node creation, drag/drop, inline OperationNode |
-| `PathsSidebar.tsx` | ~1,067 | Left sidebar with tabs (Paths, Operations, Classes, Properties, Security, Servers) |
-| `OperationPropertiesPanel.tsx` | ~1,687 | Right panel for editing operations |
-| `ParameterPropertiesPanel.tsx` | ~1,015 | Right panel for editing parameters |
-| `ResponsePropertiesPanel.tsx` | ~1,498 | Right panel for editing responses |
-| `PathRequestBodyNode.tsx` | ~1,250 | Request body node with schema editor |
-| `PathResponseBodyNode.tsx` | ~778 | Response body node with schema editor |
-| `PathResponseNode.tsx` | ~464 | Response node with status code colors |
-| `PathParameterNode.tsx` | ~136 | Parameter node with location colors |
-| `PathClassNode.tsx` | ~77 | Class reference node |
-| `paths-operation-colors.ts` | ~33 | HTTP method color definitions |
+| File                           | Lines  | Purpose                                                                            |
+|--------------------------------|--------|------------------------------------------------------------------------------------|
+| `paths/page.tsx`               | ~240   | Main page, three-panel layout orchestration                                        |
+| `PathsCanvasView.tsx`          | ~3,800 | Canvas, React Flow, node creation, drag/drop, inline OperationNode                 |
+| `PathsSidebar.tsx`             | ~1,067 | Left sidebar with tabs (Paths, Operations, Classes, Properties, Security, Servers) |
+| `OperationPropertiesPanel.tsx` | ~1,687 | Right panel for editing operations                                                 |
+| `ParameterPropertiesPanel.tsx` | ~1,015 | Right panel for editing parameters                                                 |
+| `ResponsePropertiesPanel.tsx`  | ~1,498 | Right panel for editing responses                                                  |
+| `PathRequestBodyNode.tsx`      | ~1,250 | Request body node with schema editor                                               |
+| `PathResponseBodyNode.tsx`     | ~778   | Response body node with schema editor                                              |
+| `PathResponseNode.tsx`         | ~464   | Response node with status code colors                                              |
+| `PathParameterNode.tsx`        | ~136   | Parameter node with location colors                                                |
+| `PathClassNode.tsx`            | ~77    | Class reference node                                                               |
+| `paths-operation-colors.ts`    | ~33    | HTTP method color definitions                                                      |
 
 ---
 
