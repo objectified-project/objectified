@@ -112,6 +112,9 @@ interface StudioContextType {
   setGridStyle: (style: 'dots' | 'lines' | 'cross') => void;
   showGrid: boolean;
   setShowGrid: (visible: boolean) => void;
+  /** When set, overrides showGrid for export capture only (e.g. Export Wizard). Do not persist. */
+  exportGridOverride: boolean | null;
+  setExportGridOverride: (visible: boolean | null) => void;
   // Smart guides
   smartGuidesEnabled: boolean;
   setSmartGuidesEnabled: (enabled: boolean) => void;
@@ -200,6 +203,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
     return true;
   });
+
+  /** Temporary override for grid visibility during export (#407). Not persisted. */
+  const [exportGridOverride, setExportGridOverride] = useState<boolean | null>(null);
 
   const [smartGuidesEnabled, setSmartGuidesEnabled] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -431,6 +437,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setGridStyle,
       showGrid,
       setShowGrid,
+      exportGridOverride,
+      setExportGridOverride,
       smartGuidesEnabled,
       setSmartGuidesEnabled,
       edgeStyling,

@@ -301,7 +301,7 @@
 - **Export Options**:
   - ✅ Export wizard interface (replaces dropdown)
   - ✅ Include/exclude UI elements
-  - 📋 [TODO] Include/exclude grid
+  - ✅ Include/exclude grid
   - [TODO] Include/exclude annotations
   - [TODO] Include/exclude hidden nodes
   - ✅ Background color/transparency toggle
@@ -319,7 +319,6 @@
 
 | Ticket | Feature Description                        | Status |
 |--------|--------------------------------------------|--------|
-| #407   | Include/exclude grid                       | [TODO] |
 | #408   | Export option to add watermark             | [TODO] |
 | #409   | Add timestamp and metadata                 | [TODO] |
 

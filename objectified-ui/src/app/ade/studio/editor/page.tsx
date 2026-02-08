@@ -210,6 +210,7 @@ const StudioContent = () => {
     snapToGrid,
     gridStyle,
     showGrid,
+    exportGridOverride,
     smartGuidesEnabled,
     setSmartGuidesEnabled,
     canvasBackground,
@@ -4702,7 +4703,7 @@ const StudioContent = () => {
                 </div>
               );
             })()}
-            {canvasBackground.type === 'grid' && showGrid && (
+            {canvasBackground.type === 'grid' && (exportGridOverride !== null ? exportGridOverride : showGrid) && (
               <Background
                 variant={
                   gridStyle === 'dots'

@@ -19,11 +19,13 @@ import {
   Crop,
   Maximize2,
   Layers,
+  Grid3X3,
 } from 'lucide-react';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useReactFlow } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
+import { useStudio } from '../../../ade/studio/StudioContext';
 
 // Export format types
 type ExportFormat =
@@ -153,6 +155,7 @@ export default function ExportWizard({
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { fitView, fitBounds, getViewport, setViewport } = useReactFlow();
+  const { setExportGridOverride } = useStudio();
 
   /** Fit view to entire canvas, run fn (capture), then restore previous viewport. */
   const withFullCanvasView = useCallback(
@@ -240,6 +243,21 @@ export default function ExportWizard({
     return document.querySelector('.react-flow__renderer') as HTMLElement | null;
   }, []);
 
+  /** (#407) Apply grid include/exclude for export: set override, wait for paint, run fn, then clear. */
+  const withGridOverride = useCallback(
+    async <T,>(includeGrid: boolean, fn: () => Promise<T>): Promise<T> => {
+      setExportGridOverride(includeGrid);
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 80));
+      try {
+        return await fn();
+      } finally {
+        setExportGridOverride(null);
+      }
+    },
+    [setExportGridOverride]
+  );
+
   const imageExportFilter = useCallback((node: Element) => {
     if (node.classList) {
       return !node.classList.contains('react-flow__controls') &&
@@ -287,25 +305,26 @@ export default function ExportWizard({
       }
 
       try {
-        const capture = async () => {
-          const bg = options.includeBackground
-            ? (isDark ? '#111827' : options.backgroundColor)
-            : 'transparent';
-          return toPng(viewportElement, {
-            backgroundColor: bg,
-            quality: 0.5, // Lower quality for preview
-            pixelRatio: 1,
-            filter: options.includeUiElements ? undefined : imageExportFilter,
-          });
-        };
-        let dataUrl: string;
-        if (isViewport) {
-          dataUrl = await capture();
-        } else if (isGroups) {
-          dataUrl = await withGroupsView(options.selectedGroupIds, capture);
-        } else {
-          dataUrl = await withFullCanvasView(capture);
-        }
+        const dataUrl = await withGridOverride(options.includeGrid, async () => {
+          const capture = async () => {
+            const bg = options.includeBackground
+              ? (isDark ? '#111827' : options.backgroundColor)
+              : 'transparent';
+            return toPng(viewportElement, {
+              backgroundColor: bg,
+              quality: 0.5, // Lower quality for preview
+              pixelRatio: 1,
+              filter: options.includeUiElements ? undefined : imageExportFilter,
+            });
+          };
+          if (isViewport) {
+            return capture();
+          }
+          if (isGroups) {
+            return withGroupsView(options.selectedGroupIds, capture);
+          }
+          return withFullCanvasView(capture);
+        });
         setPreviewDataUrl(dataUrl);
         setPreviewText(null);
       } catch (error) {
@@ -322,7 +341,7 @@ export default function ExportWizard({
       const text = generateTextExport(selectedFormat, nodeIdSet);
       setPreviewText(text.substring(0, 2000) + (text.length > 2000 ? '\n...' : ''));
     }
-  }, [selectedFormat, options, isDark, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, getNodeIdsForGroups]);
+  }, [selectedFormat, options, isDark, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups]);
 
   const generateTextExport = useCallback(
     (format: ExportFormat, limitToNodeIds?: Set<string>): string => {
@@ -505,6 +524,13 @@ export default function ExportWizard({
     }
     setIsExporting(true);
 
+    const isImageFormat = ['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat);
+    if (isImageFormat) {
+      setExportGridOverride(options.includeGrid);
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 80));
+    }
+
     try {
       const filename = getFilenameBase();
       const bgPng = options.includeBackground
@@ -616,9 +642,10 @@ export default function ExportWizard({
       console.error('Export error:', error);
       await alertDialog({ message: 'Failed to export. Please try again.', variant: 'error' });
     } finally {
+      setExportGridOverride(null);
       setIsExporting(false);
     }
-  }, [canExportGroups, selectedFormat, options, isDark, getFilenameBase, imageExportFilter, generateTextExport, getNodeIdsForGroups, alertDialog, onClose, captureExportImage]);
+  }, [canExportGroups, selectedFormat, options, isDark, getFilenameBase, imageExportFilter, generateTextExport, getNodeIdsForGroups, alertDialog, onClose, captureExportImage, setExportGridOverride]);
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -910,6 +937,29 @@ export default function ExportWizard({
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Include zoom controls, minimap, attribution, and other canvas overlays in the export.
+                        </p>
+                      </div>
+
+                      {/* Include grid (#407) */}
+                      <div className="col-span-3">
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">
+                          Grid
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="export-include-grid"
+                            checked={options.includeGrid}
+                            onChange={(e) => setOptions(prev => ({ ...prev, includeGrid: e.target.checked }))}
+                            className="rounded border-gray-300 dark:border-gray-600"
+                          />
+                          <label htmlFor="export-include-grid" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                            Include grid
+                          </label>
+                          <Grid3X3 className="w-4 h-4 text-gray-400" aria-hidden />
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Include the canvas dot/line grid in the exported image.
                         </p>
                       </div>
                     </>
