@@ -41,7 +41,9 @@ import {
   X,
   Activity,
   History,
-  Trash2
+  Trash2,
+  Filter,
+  SlidersHorizontal
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -313,8 +315,17 @@ const StudioContent = () => {
   const [canvasSearchOpen, setCanvasSearchOpen] = useState(false);
   const [canvasSearchUseRegex, setCanvasSearchUseRegex] = useState(false);
   const [searchHistoryOpen, setSearchHistoryOpen] = useState(false);
+  const [searchFiltersOpen, setSearchFiltersOpen] = useState(false);
   const canvasSearchInputRef = useRef<HTMLInputElement>(null);
   const searchHistoryRef = useRef<HTMLDivElement>(null);
+  const searchFiltersRef = useRef<HTMLDivElement>(null);
+
+  // Search filter state
+  type SearchFilterType = 'all' | 'class' | 'allOf' | 'oneOf' | 'anyOf';
+  const [searchFilterType, setSearchFilterType] = useState<SearchFilterType>('all');
+  const [searchFilterGroup, setSearchFilterGroup] = useState<string>('all'); // 'all' or group id
+  const [searchFilterHasProperties, setSearchFilterHasProperties] = useState<'all' | 'with' | 'without'>('all');
+  const [searchFilterPropertyName, setSearchFilterPropertyName] = useState('');
 
   // Search history hook
   const { history: searchHistory, addToHistory, removeFromHistory, clearHistory: clearSearchHistory } = useSearchHistory();
@@ -481,9 +492,17 @@ const StudioContent = () => {
   // Canvas search - compute matching node IDs (class + property names and descriptions, basic or regex)
   const matchingNodeIds = useMemo(() => {
     const raw = canvasSearchQuery.trim();
-    if (!raw) return new Set<string>();
+    const hasFilters = searchFilterType !== 'all' ||
+                       searchFilterGroup !== 'all' ||
+                       searchFilterHasProperties !== 'all' ||
+                       searchFilterPropertyName.trim() !== '';
+
+    // If no query and no filters, return empty set
+    if (!raw && !hasFilters) return new Set<string>();
+
     const matching = new Set<string>();
 
+    // Helper to check if properties match search query
     const propsMatch = (props: Array<{ name?: string; description?: string }> | undefined, test: (s: string) => boolean): boolean => {
       if (!props || !Array.isArray(props)) return false;
       return props.some(p => {
@@ -493,38 +512,90 @@ const StudioContent = () => {
       });
     };
 
-    if (canvasSearchUseRegex) {
-      let re: RegExp;
-      try {
-        re = new RegExp(raw, 'i');
-      } catch {
-        return matching; // Invalid regex: no matches
+    // Helper to check if node has a specific property by name
+    const hasPropertyNamed = (props: Array<{ name?: string }> | undefined, propName: string): boolean => {
+      if (!props || !Array.isArray(props) || !propName) return true; // No filter if no propName
+      const lowerPropName = propName.toLowerCase();
+      return props.some(p => (p.name ?? '').toLowerCase().includes(lowerPropName));
+    };
+
+    // Helper to check node type filter
+    const matchesTypeFilter = (nodeData: Record<string, unknown>): boolean => {
+      if (searchFilterType === 'all') return true;
+      const schema = nodeData?.schema as Record<string, unknown> | undefined;
+      const isAllOf = !!schema?.allOf;
+      const isOneOf = !!schema?.oneOf;
+      const isAnyOf = !!schema?.anyOf;
+
+      switch (searchFilterType) {
+        case 'class': return !isAllOf && !isOneOf && !isAnyOf;
+        case 'allOf': return isAllOf;
+        case 'oneOf': return isOneOf;
+        case 'anyOf': return isAnyOf;
+        default: return true;
       }
-      const test = (s: string) => re.test(s);
-      nodes.forEach(node => {
-        if (node.type === 'groupNode') return;
-        const nodeData = node.data as any;
-        const name = nodeData?.name ?? '';
-        const description = nodeData?.description ?? '';
-        if (re.test(name) || re.test(description) || propsMatch(nodeData?.properties, test)) {
-          matching.add(node.id);
+    };
+
+    // Helper to check group filter
+    const matchesGroupFilter = (nodeId: string): boolean => {
+      if (searchFilterGroup === 'all') return true;
+      const group = groups.find(g => g.nodeIds.includes(nodeId));
+      if (searchFilterGroup === 'ungrouped') {
+        return !group;
+      }
+      return group?.id === searchFilterGroup;
+    };
+
+    // Helper to check properties filter (has/doesn't have properties)
+    const matchesPropertiesFilter = (props: Array<unknown> | undefined): boolean => {
+      if (searchFilterHasProperties === 'all') return true;
+      const hasProps = props && Array.isArray(props) && props.length > 0;
+      return searchFilterHasProperties === 'with' ? hasProps : !hasProps;
+    };
+
+    // Build search test function
+    let searchTest: ((s: string) => boolean) | null = null;
+    if (raw) {
+      if (canvasSearchUseRegex) {
+        try {
+          const re = new RegExp(raw, 'i');
+          searchTest = (s: string) => re.test(s);
+        } catch {
+          return matching; // Invalid regex: no matches
         }
-      });
-    } else {
-      const query = raw.toLowerCase();
-      const test = (s: string) => s.toLowerCase().includes(query);
-      nodes.forEach(node => {
-        if (node.type === 'groupNode') return;
-        const nodeData = node.data as any;
-        const name = (nodeData?.name ?? '').toLowerCase();
-        const description = (nodeData?.description ?? '').toLowerCase();
-        if (name.includes(query) || description.includes(query) || propsMatch(nodeData?.properties, (s) => s.toLowerCase().includes(query))) {
-          matching.add(node.id);
-        }
-      });
+      } else {
+        const query = raw.toLowerCase();
+        searchTest = (s: string) => s.toLowerCase().includes(query);
+      }
     }
+
+    // Filter nodes
+    nodes.forEach(node => {
+      if (node.type === 'groupNode') return;
+      const nodeData = node.data as Record<string, unknown>;
+      const name = (nodeData?.name as string) ?? '';
+      const description = (nodeData?.description as string) ?? '';
+      const properties = nodeData?.properties as Array<{ name?: string; description?: string }> | undefined;
+
+      // Apply filters
+      if (!matchesTypeFilter(nodeData)) return;
+      if (!matchesGroupFilter(node.id)) return;
+      if (!matchesPropertiesFilter(properties)) return;
+      if (searchFilterPropertyName.trim() && !hasPropertyNamed(properties, searchFilterPropertyName.trim())) return;
+
+      // Apply search query (if no query but has filters, include all filtered nodes)
+      if (searchTest) {
+        if (searchTest(name) || searchTest(description) || propsMatch(properties, searchTest)) {
+          matching.add(node.id);
+        }
+      } else {
+        // No search query, but filters matched
+        matching.add(node.id);
+      }
+    });
+
     return matching;
-  }, [canvasSearchQuery, canvasSearchUseRegex, nodes]);
+  }, [canvasSearchQuery, canvasSearchUseRegex, nodes, groups, searchFilterType, searchFilterGroup, searchFilterHasProperties, searchFilterPropertyName]);
 
   // Handle opening canvas search
   const openCanvasSearch = useCallback(() => {
@@ -535,6 +606,22 @@ const StudioContent = () => {
     }, 50);
   }, []);
 
+  // Reset all search filters
+  const resetSearchFilters = useCallback(() => {
+    setSearchFilterType('all');
+    setSearchFilterGroup('all');
+    setSearchFilterHasProperties('all');
+    setSearchFilterPropertyName('');
+  }, []);
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return searchFilterType !== 'all' ||
+           searchFilterGroup !== 'all' ||
+           searchFilterHasProperties !== 'all' ||
+           searchFilterPropertyName.trim() !== '';
+  }, [searchFilterType, searchFilterGroup, searchFilterHasProperties, searchFilterPropertyName]);
+
   // Handle closing canvas search
   const closeCanvasSearch = useCallback(() => {
     // Save to history if there was a search query
@@ -544,7 +631,10 @@ const StudioContent = () => {
     setCanvasSearchOpen(false);
     setCanvasSearchQuery('');
     setSearchHistoryOpen(false);
-  }, [canvasSearchQuery, canvasSearchUseRegex, addToHistory]);
+    setSearchFiltersOpen(false);
+    // Reset filters when closing
+    resetSearchFilters();
+  }, [canvasSearchQuery, canvasSearchUseRegex, addToHistory, resetSearchFilters]);
 
   // Handle selecting a search history item
   const selectSearchHistoryItem = useCallback((query: string, isRegex: boolean) => {
@@ -566,6 +656,19 @@ const StudioContent = () => {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [searchHistoryOpen]);
+
+  // Close filters dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchFiltersRef.current && e.target && !searchFiltersRef.current.contains(e.target as globalThis.Node)) {
+        setSearchFiltersOpen(false);
+      }
+    };
+    if (searchFiltersOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [searchFiltersOpen]);
 
   // Keyboard shortcut for canvas search (Cmd+F or Ctrl+F)
   useEffect(() => {
@@ -4715,7 +4818,7 @@ const StudioContent = () => {
                     {/* History toggle button */}
                     {searchHistory.length > 0 && (
                       <button
-                        onClick={() => setSearchHistoryOpen(!searchHistoryOpen)}
+                        onClick={() => { setSearchHistoryOpen(!searchHistoryOpen); setSearchFiltersOpen(false); }}
                         className={`p-1 transition-colors rounded shrink-0 ${
                           searchHistoryOpen 
                             ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' 
@@ -4726,6 +4829,23 @@ const StudioContent = () => {
                         <History className="h-4 w-4" />
                       </button>
                     )}
+                    {/* Filters toggle button */}
+                    <button
+                      onClick={() => { setSearchFiltersOpen(!searchFiltersOpen); setSearchHistoryOpen(false); }}
+                      className={`p-1 transition-colors rounded shrink-0 relative ${
+                        searchFiltersOpen 
+                          ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' 
+                          : hasActiveFilters
+                            ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/30'
+                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title={hasActiveFilters ? 'Filters active - click to modify' : 'Search filters'}
+                    >
+                      <SlidersHorizontal className="h-4 w-4" />
+                      {hasActiveFilters && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-500 rounded-full" />
+                      )}
+                    </button>
                     <ToggleGroup.Root
                       type="single"
                       value={canvasSearchUseRegex ? 'regex' : 'basic'}
@@ -4746,7 +4866,7 @@ const StudioContent = () => {
                         Regex
                       </ToggleGroup.Item>
                     </ToggleGroup.Root>
-                    {canvasSearchQuery && (
+                    {(canvasSearchQuery || hasActiveFilters) && (
                       <>
                         {canvasSearchRegexError ? (
                           <span className="text-xs text-red-600 dark:text-red-400 px-2 py-0.5 shrink-0" title="Pattern is not a valid regular expression">
@@ -4768,8 +4888,159 @@ const StudioContent = () => {
                     </button>
                   </div>
 
+                  {/* Search Filters Dropdown */}
+                  {searchFiltersOpen && (
+                    <div ref={searchFiltersRef} className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 p-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                          <Filter className="h-3.5 w-3.5" />
+                          Search Filters
+                        </span>
+                        {hasActiveFilters && (
+                          <button
+                            onClick={resetSearchFilters}
+                            className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
+                          >
+                            <X className="h-3 w-3" />
+                            Clear filters
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Type Filter */}
+                        <div>
+                          <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                            Class Type
+                          </label>
+                          <div className="flex flex-wrap gap-1">
+                            {[
+                              { value: 'all', label: 'All' },
+                              { value: 'class', label: 'Class' },
+                              { value: 'allOf', label: 'allOf' },
+                              { value: 'oneOf', label: 'oneOf' },
+                              { value: 'anyOf', label: 'anyOf' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setSearchFilterType(opt.value as SearchFilterType)}
+                                className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                                  searchFilterType === opt.value
+                                    ? 'bg-indigo-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Group Filter */}
+                        <div>
+                          <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                            Group
+                          </label>
+                          <select
+                            value={searchFilterGroup}
+                            onChange={(e) => setSearchFilterGroup(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="all">All groups</option>
+                            <option value="ungrouped">Ungrouped only</option>
+                            {groups.map((group) => (
+                              <option key={group.id} value={group.id}>
+                                {group.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Properties Filter */}
+                        <div>
+                          <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                            Properties
+                          </label>
+                          <div className="flex flex-wrap gap-1">
+                            {[
+                              { value: 'all', label: 'Any' },
+                              { value: 'with', label: 'Has properties' },
+                              { value: 'without', label: 'No properties' },
+                            ].map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setSearchFilterHasProperties(opt.value as 'all' | 'with' | 'without')}
+                                className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                                  searchFilterHasProperties === opt.value
+                                    ? 'bg-indigo-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Property Name Filter */}
+                        <div>
+                          <label className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                            Has Property Named
+                          </label>
+                          <input
+                            type="text"
+                            value={searchFilterPropertyName}
+                            onChange={(e) => setSearchFilterPropertyName(e.target.value)}
+                            placeholder="e.g., id, email, createdAt..."
+                            className="w-full px-2 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Active filters summary */}
+                      {hasActiveFilters && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex flex-wrap gap-1">
+                            {searchFilterType !== 'all' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                                Type: {searchFilterType}
+                                <button onClick={() => setSearchFilterType('all')} className="hover:text-indigo-900 dark:hover:text-indigo-100">
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </span>
+                            )}
+                            {searchFilterGroup !== 'all' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                                Group: {searchFilterGroup === 'ungrouped' ? 'Ungrouped' : groups.find(g => g.id === searchFilterGroup)?.name || searchFilterGroup}
+                                <button onClick={() => setSearchFilterGroup('all')} className="hover:text-indigo-900 dark:hover:text-indigo-100">
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </span>
+                            )}
+                            {searchFilterHasProperties !== 'all' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                                {searchFilterHasProperties === 'with' ? 'Has properties' : 'No properties'}
+                                <button onClick={() => setSearchFilterHasProperties('all')} className="hover:text-indigo-900 dark:hover:text-indigo-100">
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </span>
+                            )}
+                            {searchFilterPropertyName.trim() && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded">
+                                Property: {searchFilterPropertyName}
+                                <button onClick={() => setSearchFilterPropertyName('')} className="hover:text-indigo-900 dark:hover:text-indigo-100">
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Search History Dropdown */}
-                  {searchHistoryOpen && searchHistory.length > 0 && (
+                  {searchHistoryOpen && searchHistory.length > 0 && !searchFiltersOpen && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto z-50">
                       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Recent Searches</span>

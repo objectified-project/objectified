@@ -79,27 +79,6 @@
 
 ### 2. Canvas Navigation & Controls
 
-#### Search & Focus ✅ PARTIALLY IMPLEMENTED
-- ✅ Global search box (`Cmd+F`) to find classes
-- ✅ Search as you type with highlighting
-- ✅ Matching nodes highlighted, non-matching nodes dimmed
-- ✅ Click result to focus and zoom to class on canvas
-- ✅ "Focus Mode": Dim everything except search results
-  - ✅ Isolate selected classes and immediate relationships
-  - ✅ Blur/dim non-focused nodes
-  - ✅ Show only 1st-degree connections (or 2nd, 3rd degree)
-  - ✅ Expand focus incrementally
-  - ✅ Focus on group (show only group members)
-  - ✅ Exit focus mode (Esc key)
-- ✅ Search history (recent searches) with clear option
-- 📋 [TODO] Search filters: by type, group, properties
-- ✅ Regex search support
-- ✅ Search within property names/descriptions
-
-| Ticket | Feature                                  |
-|--------|------------------------------------------|
-| #823   | Search filters (type, group, properties) |
-
 #### Node Visibility Controls 📋 PLANNED
 - 📋 [TODO] Hide/show individual nodes
 - 📋 [TODO] Hide all nodes except selected
@@ -565,9 +544,28 @@
 - ✅ **Search Focus Mode**: Dim everything except search results
 - ✅ **Focus Mode**: Isolate selected classes and relationships, blur non-focused
 
+### 2. Canvas Navigation & Controls
+
+#### Search & Focus ✅ IMPLEMENTED
+- ✅ Global search box (`Cmd+F`) to find classes
+- ✅ Search as you type with highlighting
+- ✅ Matching nodes highlighted, non-matching nodes dimmed
+- ✅ Click result to focus and zoom to class on canvas
+- ✅ "Focus Mode": Dim everything except search results
+  - ✅ Isolate selected classes and immediate relationships
+  - ✅ Blur/dim non-focused nodes
+  - ✅ Show only 1st-degree connections (or 2nd, 3rd degree)
+  - ✅ Expand focus incrementally
+  - ✅ Focus on group (show only group members)
+  - ✅ Exit focus mode (Esc key)
+- ✅ Search history (recent searches) with clear option
+- ✅ Search filters: by type, group, properties
+- ✅ Regex search support
+- ✅ Search within property names/descriptions
+
 ### 7. Canvas Performance ✅ IMPLEMENTED
 
-#### Level of Detail (LOD) 📋 PARTIALLY IMPLEMENTED
+#### Level of Detail (LOD) ✅ IMPLEMENTED
 - ✅ Simplified nodes when zoomed out >200%
 - ✅ Hide property details at high zoom, show only class names
 - ✅ Dynamic detail based on zoom level
