@@ -17,6 +17,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added memory profiling and performance improvements for large canvases
   - Added icons to class nodes for better visual distinction of nodes
   - Added node styling to change the border thickness and style
+  - Added node styling to change font attributes
   - Added custom color choice for the node in addition to 16 pre-determined colors
   - Added focus mode to allow nodes to be selected, and to show only the associated nodes and relationships
     - Focus mode can be toggled at any time, toggled off by hitting [ESC]

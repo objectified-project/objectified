@@ -322,6 +322,10 @@ type ClassProperty = {
 
 export type NodeBorderStyle = 'solid' | 'dashed' | 'dotted';
 
+// Label styling for class name in header (#343)
+export type LabelTextAlign = 'left' | 'center' | 'right';
+export type LabelFontWeight = 'normal' | 'bold';
+
 type ClassNodeTheme = {
   backgroundColor?: string;
   borderColor?: string;
@@ -331,6 +335,13 @@ type ClassNodeTheme = {
   textColor?: string;
   headerTextColor?: string;
   icon?: string; // Icon name from lucide-react
+  // Label styling (#343)
+  labelFontSize?: number; // px
+  labelFontFamily?: string;
+  labelFontWeight?: LabelFontWeight;
+  labelFontStyle?: 'normal' | 'italic';
+  labelTextAlign?: LabelTextAlign;
+  labelMultiLine?: boolean;
 };
 
 // Border options for node style (#342) — includes 1.5 to match default
@@ -339,6 +350,16 @@ const BORDER_STYLE_OPTIONS: Array<{ name: NodeBorderStyle; label: string }> = [
   { name: 'solid', label: 'Solid' },
   { name: 'dashed', label: 'Dashed' },
   { name: 'dotted', label: 'Dotted' },
+];
+
+// Label styling options (#343)
+const LABEL_FONT_SIZE_OPTIONS = [10, 11, 12, 13, 14, 16, 18, 20] as const;
+const LABEL_FONT_FAMILY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'inherit', label: 'Default' },
+  { value: 'system-ui, sans-serif', label: 'System' },
+  { value: 'Georgia, serif', label: 'Serif' },
+  { value: 'ui-monospace, monospace', label: 'Mono' },
+  { value: 'Inter, system-ui, sans-serif', label: 'Inter' },
 ];
 
 // --- Custom color picker: derive full theme from a single primary hex ---
@@ -523,6 +544,14 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
   // Handle border change - merges with existing theme (#342)
   const handleBorderChange = (updates: { borderWidth?: number; borderStyle?: NodeBorderStyle }) => {
+    if (typedData.onThemeChange) {
+      const currentTheme = typedData.theme || {};
+      typedData.onThemeChange(typedData.id, { ...currentTheme, ...updates });
+    }
+  };
+
+  // Handle label style change - merges with existing theme (#343)
+  const handleLabelStyleChange = (updates: Partial<Pick<ClassNodeTheme, 'labelFontSize' | 'labelFontFamily' | 'labelFontWeight' | 'labelFontStyle' | 'labelTextAlign' | 'labelMultiLine'>>) => {
     if (typedData.onThemeChange) {
       const currentTheme = typedData.theme || {};
       typedData.onThemeChange(typedData.id, { ...currentTheme, ...updates });
@@ -967,15 +996,18 @@ function ClassNode({ id, data, selected }: NodeProps) {
             })()}
           </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, textAlign: typedData.theme?.labelTextAlign ?? 'left' }}>
             <div style={{
-              fontSize: '13px',
-              fontWeight: 600,
+              fontSize: `${typedData.theme?.labelFontSize ?? 13}px`,
+              fontFamily: typedData.theme?.labelFontFamily ?? 'inherit',
+              fontWeight: typedData.theme?.labelFontWeight === 'bold' ? 600 : (typedData.theme?.labelFontWeight === 'normal' ? 400 : 600),
+              fontStyle: typedData.theme?.labelFontStyle ?? 'normal',
               color: headerTextColor,
               letterSpacing: '-0.01em',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              textOverflow: typedData.theme?.labelMultiLine ? 'clip' : 'ellipsis',
+              whiteSpace: typedData.theme?.labelMultiLine ? 'normal' : 'nowrap',
+              wordBreak: typedData.theme?.labelMultiLine ? 'break-word' : undefined,
               textDecoration: typedData.schema?.deprecated ? 'line-through' : 'none',
               opacity: typedData.schema?.deprecated ? 0.7 : 1,
               lineHeight: 1.3,
@@ -1147,6 +1179,86 @@ function ClassNode({ id, data, selected }: NodeProps) {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                  {/* Label styling (#343) */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400">Label</div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Font size</div>
+                      <select
+                        value={typedData.theme?.labelFontSize ?? 13}
+                        onChange={(e) => handleLabelStyleChange({ labelFontSize: Number(e.target.value) })}
+                        className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      >
+                        {LABEL_FONT_SIZE_OPTIONS.map((s) => (
+                          <option key={s} value={s}>{s}px</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Font family</div>
+                      <select
+                        value={typedData.theme?.labelFontFamily ?? 'inherit'}
+                        onChange={(e) => handleLabelStyleChange({ labelFontFamily: e.target.value })}
+                        className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      >
+                        {LABEL_FONT_FAMILY_OPTIONS.map((f) => (
+                          <option key={f.value} value={f.value}>{f.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleLabelStyleChange({ labelFontWeight: (typedData.theme?.labelFontWeight ?? 'bold') === 'bold' ? 'normal' : 'bold' })}
+                        className={`flex-1 py-1 text-[10px] font-medium rounded transition-all ${
+                          (typedData.theme?.labelFontWeight ?? 'bold') === 'bold'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Bold
+                      </button>
+                      <button
+                        onClick={() => handleLabelStyleChange({ labelFontStyle: (typedData.theme?.labelFontStyle ?? 'normal') === 'italic' ? 'normal' : 'italic' })}
+                        className={`flex-1 py-1 text-[10px] font-medium rounded transition-all ${
+                          (typedData.theme?.labelFontStyle ?? 'normal') === 'italic'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Italic
+                      </button>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Position</div>
+                      <div className="flex gap-1">
+                        {(['left', 'center', 'right'] as const).map((align) => (
+                          <button
+                            key={align}
+                            onClick={() => handleLabelStyleChange({ labelTextAlign: align })}
+                            className={`flex-1 min-w-0 py-1 text-[10px] font-medium rounded transition-all capitalize ${
+                              (typedData.theme?.labelTextAlign ?? 'left') === align
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                          >
+                            {align}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <button
+                        onClick={() => handleLabelStyleChange({ labelMultiLine: !(typedData.theme?.labelMultiLine ?? false) })}
+                        className={`w-full py-1 text-[10px] font-medium rounded transition-all ${
+                          typedData.theme?.labelMultiLine
+                            ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        Multi-line {typedData.theme?.labelMultiLine ? 'on' : 'off'}
+                      </button>
                     </div>
                   </div>
                   <Popover.Arrow className="fill-white dark:fill-gray-800" />
@@ -1757,7 +1869,13 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
       prevTheme?.borderStyle !== nextTheme?.borderStyle ||
       prevTheme?.textColor !== nextTheme?.textColor ||
       prevTheme?.headerTextColor !== nextTheme?.headerTextColor ||
-      prevTheme?.icon !== nextTheme?.icon) {
+      prevTheme?.icon !== nextTheme?.icon ||
+      prevTheme?.labelFontSize !== nextTheme?.labelFontSize ||
+      prevTheme?.labelFontFamily !== nextTheme?.labelFontFamily ||
+      prevTheme?.labelFontWeight !== nextTheme?.labelFontWeight ||
+      prevTheme?.labelFontStyle !== nextTheme?.labelFontStyle ||
+      prevTheme?.labelTextAlign !== nextTheme?.labelTextAlign ||
+      prevTheme?.labelMultiLine !== nextTheme?.labelMultiLine) {
     return false;
   }
 

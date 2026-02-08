@@ -195,11 +195,15 @@
   - ✅ Border thickness (1, 1.5, 2, 3, 4, 5px)
   - ✅ Border style (solid, dashed, dotted)
   - 📋 [TODO] Shadow effects (drop shadow, inner shadow)
+- ✅ **Node Label Styling** (#343):
+  - ✅ Font size (10–20px) and font family (Default, System, Serif, Mono, Inter)
+  - ✅ Bold / Italic
+  - ✅ Position (left, center, right)
+  - ✅ Multi-line (wrap class name)
 
 | Ticket | Feature Description           |
 |--------|-------------------------------|
 | #341   | Custom node sizing            |
-| #343   | Add custom node label styling |
 
 #### Edge/Relationship Styling ✅ PARTIALLY IMPLEMENTED
 - ✅ Different line styles for relationship types:

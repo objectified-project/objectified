@@ -53,6 +53,12 @@ async function updateClassCanvasMetadata(
       icon?: string; // Custom icon from lucide-react
       collapsed?: boolean;
       zIndex?: number;
+      labelFontSize?: number;
+      labelFontFamily?: string;
+      labelFontWeight?: 'normal' | 'bold';
+      labelFontStyle?: 'normal' | 'italic';
+      labelTextAlign?: 'left' | 'center' | 'right';
+      labelMultiLine?: boolean;
     };
     group?: string | null;
   } | null
@@ -100,6 +106,12 @@ export async function updateClassCanvasMetadataWithSession(
       icon?: string; // Custom icon from lucide-react
       collapsed?: boolean;
       zIndex?: number;
+      labelFontSize?: number;
+      labelFontFamily?: string;
+      labelFontWeight?: 'normal' | 'bold';
+      labelFontStyle?: 'normal' | 'italic';
+      labelTextAlign?: 'left' | 'center' | 'right';
+      labelMultiLine?: boolean;
     };
     group?: string | null;
   } | null
