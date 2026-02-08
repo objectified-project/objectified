@@ -132,6 +132,11 @@ interface StudioContextType {
   deleteGroup: (groupId: string) => void;
   addNodeToGroup: (groupId: string, nodeId: string) => void;
   removeNodeFromGroup: (groupId: string, nodeId: string) => void;
+  // Search history
+  searchHistoryCount: number;
+  setSearchHistoryCount: (count: number) => void;
+  clearSearchHistoryFn: (() => void) | null;
+  setClearSearchHistoryFn: (fn: (() => void) | null) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -292,6 +297,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
 
   const [groups, setGroups] = useState<CanvasGroup[]>([]);
 
+  // Search history state
+  const [searchHistoryCount, setSearchHistoryCount] = useState<number>(0);
+  const [clearSearchHistoryFn, setClearSearchHistoryFn] = useState<(() => void) | null>(null);
+
   // Persist grid settings to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -433,7 +442,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       updateGroup,
       deleteGroup,
       addNodeToGroup,
-      removeNodeFromGroup
+      removeNodeFromGroup,
+      searchHistoryCount,
+      setSearchHistoryCount,
+      clearSearchHistoryFn,
+      setClearSearchHistoryFn
     }}>
       {children}
     </StudioContext.Provider>

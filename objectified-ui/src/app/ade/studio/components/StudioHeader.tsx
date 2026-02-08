@@ -63,7 +63,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     edgeRouting,
     setEdgeRouting,
     edgeAnimation,
-    setEdgeAnimation
+    setEdgeAnimation,
+    searchHistoryCount,
+    clearSearchHistoryFn
   } = useStudio();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -408,6 +410,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               edgeRouting={edgeRouting}
               edgeAnimation={edgeAnimation}
               onSave={handleSettingsSave}
+              searchHistoryCount={searchHistoryCount}
+              onClearSearchHistory={clearSearchHistoryFn || undefined}
             />
           </>
         )}

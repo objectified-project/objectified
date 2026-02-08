@@ -212,6 +212,9 @@ interface CanvasSettingsDialogProps {
     edgeRouting: EdgeRoutingType;
     edgeAnimation: EdgeAnimationType;
   }) => void;
+  // Search history
+  searchHistoryCount?: number;
+  onClearSearchHistory?: () => void;
 }
 
 const DEFAULT_CANVAS_BACKGROUND: CanvasBackgroundOptions = {
@@ -244,6 +247,8 @@ export default function CanvasSettingsDialog({
   edgeRouting,
   edgeAnimation,
   onSave,
+  searchHistoryCount = 0,
+  onClearSearchHistory,
 }: CanvasSettingsDialogProps) {
   // Local state for form
   const [localClickToFocus, setLocalClickToFocus] = React.useState(clickToFocusEnabled);
@@ -449,6 +454,49 @@ export default function CanvasSettingsDialog({
                       className="w-4 h-4 text-indigo-500 rounded focus:ring-indigo-500"
                     />
                   </label>
+                </div>
+              </div>
+
+              {/* Data & History Section */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Data & History
+                </h3>
+                <div className="space-y-3">
+                  {/* Search History */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <div>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Search History</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {searchHistoryCount === 0
+                            ? 'No search history'
+                            : `${searchHistoryCount} saved ${searchHistoryCount === 1 ? 'search' : 'searches'}`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (onClearSearchHistory && searchHistoryCount > 0) {
+                          onClearSearchHistory();
+                        }
+                      }}
+                      disabled={searchHistoryCount === 0}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        searchHistoryCount === 0
+                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                          : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30'
+                      }`}
+                    >
+                      Clear History
+                    </button>
+                  </div>
                 </div>
               </div>
 

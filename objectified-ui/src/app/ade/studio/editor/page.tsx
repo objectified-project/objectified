@@ -39,7 +39,9 @@ import {
   MoveHorizontal,
   Search,
   X,
-  Activity
+  Activity,
+  History,
+  Trash2
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -96,6 +98,7 @@ import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import MemoryProfiler from '../components/MemoryProfiler';
+import { useSearchHistory } from '../hooks/useSearchHistory';
 
 // Import extracted components
 import { useExportFunctions } from './components';
@@ -202,7 +205,9 @@ const StudioContent = () => {
     setGroups,
     addGroup,
     updateGroup,
-    deleteGroup: deleteGroupFromContext
+    deleteGroup: deleteGroupFromContext,
+    setSearchHistoryCount,
+    setClearSearchHistoryFn
   } = useStudio();
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
@@ -307,7 +312,22 @@ const StudioContent = () => {
   const [canvasSearchQuery, setCanvasSearchQuery] = useState('');
   const [canvasSearchOpen, setCanvasSearchOpen] = useState(false);
   const [canvasSearchUseRegex, setCanvasSearchUseRegex] = useState(false);
+  const [searchHistoryOpen, setSearchHistoryOpen] = useState(false);
   const canvasSearchInputRef = useRef<HTMLInputElement>(null);
+  const searchHistoryRef = useRef<HTMLDivElement>(null);
+
+  // Search history hook
+  const { history: searchHistory, addToHistory, removeFromHistory, clearHistory: clearSearchHistory } = useSearchHistory();
+
+  // Sync search history with context so StudioHeader can access it
+  useEffect(() => {
+    setSearchHistoryCount(searchHistory.length);
+  }, [searchHistory.length, setSearchHistoryCount]);
+
+  useEffect(() => {
+    setClearSearchHistoryFn(() => clearSearchHistory);
+    return () => setClearSearchHistoryFn(null);
+  }, [clearSearchHistory, setClearSearchHistoryFn]);
 
   // Memory profiler state
   const [memoryProfilerOpen, setMemoryProfilerOpen] = useState(false);
@@ -517,9 +537,35 @@ const StudioContent = () => {
 
   // Handle closing canvas search
   const closeCanvasSearch = useCallback(() => {
+    // Save to history if there was a search query
+    if (canvasSearchQuery.trim()) {
+      addToHistory(canvasSearchQuery.trim(), canvasSearchUseRegex);
+    }
     setCanvasSearchOpen(false);
     setCanvasSearchQuery('');
+    setSearchHistoryOpen(false);
+  }, [canvasSearchQuery, canvasSearchUseRegex, addToHistory]);
+
+  // Handle selecting a search history item
+  const selectSearchHistoryItem = useCallback((query: string, isRegex: boolean) => {
+    setCanvasSearchQuery(query);
+    setCanvasSearchUseRegex(isRegex);
+    setSearchHistoryOpen(false);
+    canvasSearchInputRef.current?.focus();
   }, []);
+
+  // Close history dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchHistoryRef.current && e.target && !searchHistoryRef.current.contains(e.target as globalThis.Node)) {
+        setSearchHistoryOpen(false);
+      }
+    };
+    if (searchHistoryOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [searchHistoryOpen]);
 
   // Keyboard shortcut for canvas search (Cmd+F or Ctrl+F)
   useEffect(() => {
@@ -4653,57 +4699,125 @@ const StudioContent = () => {
                 position="top-center"
                 className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
               >
-                <div className="flex items-center gap-2 p-2">
-                  <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                  <input
-                    ref={canvasSearchInputRef}
-                    type="text"
-                    value={canvasSearchQuery}
-                    onChange={(e) => setCanvasSearchQuery(e.target.value)}
-                    placeholder={canvasSearchUseRegex ? 'Regex pattern...' : 'Search classes...'}
-                    className="w-64 px-2 py-1 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                    autoFocus
-                  />
-                  <ToggleGroup.Root
-                    type="single"
-                    value={canvasSearchUseRegex ? 'regex' : 'basic'}
-                    onValueChange={(v) => v && setCanvasSearchUseRegex(v === 'regex')}
-                    className="inline-flex rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-0.5"
-                    aria-label="Search mode"
-                  >
-                    <ToggleGroup.Item
-                      value="basic"
-                      className="px-2 py-0.5 text-xs rounded data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:shadow data-[state=on]:text-gray-900 dark:data-[state=on]:text-gray-100 text-gray-500 dark:text-gray-400"
+                <div className="relative" ref={searchHistoryRef}>
+                  <div className="flex items-center gap-2 p-2">
+                    <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                    <input
+                      ref={canvasSearchInputRef}
+                      type="text"
+                      value={canvasSearchQuery}
+                      onChange={(e) => setCanvasSearchQuery(e.target.value)}
+                      onFocus={() => searchHistory.length > 0 && setSearchHistoryOpen(true)}
+                      placeholder={canvasSearchUseRegex ? 'Regex pattern...' : 'Search classes...'}
+                      className="w-64 px-2 py-1 text-sm bg-transparent border-none outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                      autoFocus
+                    />
+                    {/* History toggle button */}
+                    {searchHistory.length > 0 && (
+                      <button
+                        onClick={() => setSearchHistoryOpen(!searchHistoryOpen)}
+                        className={`p-1 transition-colors rounded shrink-0 ${
+                          searchHistoryOpen 
+                            ? 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' 
+                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                        title={`Search history (${searchHistory.length} items)`}
+                      >
+                        <History className="h-4 w-4" />
+                      </button>
+                    )}
+                    <ToggleGroup.Root
+                      type="single"
+                      value={canvasSearchUseRegex ? 'regex' : 'basic'}
+                      onValueChange={(v) => v && setCanvasSearchUseRegex(v === 'regex')}
+                      className="inline-flex rounded-md border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 p-0.5"
+                      aria-label="Search mode"
                     >
-                      Basic
-                    </ToggleGroup.Item>
-                    <ToggleGroup.Item
-                      value="regex"
-                      className="px-2 py-0.5 text-xs rounded data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:shadow data-[state=on]:text-gray-900 dark:data-[state=on]:text-gray-100 text-gray-500 dark:text-gray-400"
+                      <ToggleGroup.Item
+                        value="basic"
+                        className="px-2 py-0.5 text-xs rounded data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:shadow data-[state=on]:text-gray-900 dark:data-[state=on]:text-gray-100 text-gray-500 dark:text-gray-400"
+                      >
+                        Basic
+                      </ToggleGroup.Item>
+                      <ToggleGroup.Item
+                        value="regex"
+                        className="px-2 py-0.5 text-xs rounded data-[state=on]:bg-white dark:data-[state=on]:bg-gray-600 data-[state=on]:shadow data-[state=on]:text-gray-900 dark:data-[state=on]:text-gray-100 text-gray-500 dark:text-gray-400"
+                      >
+                        Regex
+                      </ToggleGroup.Item>
+                    </ToggleGroup.Root>
+                    {canvasSearchQuery && (
+                      <>
+                        {canvasSearchRegexError ? (
+                          <span className="text-xs text-red-600 dark:text-red-400 px-2 py-0.5 shrink-0" title="Pattern is not a valid regular expression">
+                            {canvasSearchRegexError}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded shrink-0">
+                            {matchingNodeIds.size} found
+                          </span>
+                        )}
+                      </>
+                    )}
+                    <button
+                      onClick={closeCanvasSearch}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
+                      title="Close search (Esc)"
                     >
-                      Regex
-                    </ToggleGroup.Item>
-                  </ToggleGroup.Root>
-                  {canvasSearchQuery && (
-                    <>
-                      {canvasSearchRegexError ? (
-                        <span className="text-xs text-red-600 dark:text-red-400 px-2 py-0.5 shrink-0" title="Pattern is not a valid regular expression">
-                          {canvasSearchRegexError}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded shrink-0">
-                          {matchingNodeIds.size} found
-                        </span>
-                      )}
-                    </>
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Search History Dropdown */}
+                  {searchHistoryOpen && searchHistory.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto z-50">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Recent Searches</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearSearchHistory();
+                            setSearchHistoryOpen(false);
+                          }}
+                          className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Clear all
+                        </button>
+                      </div>
+                      <div className="py-1">
+                        {searchHistory.map((item, index) => (
+                          <div
+                            key={`${item.query}-${item.isRegex}-${index}`}
+                            className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer group"
+                            onClick={() => selectSearchHistoryItem(item.query, item.isRegex)}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Search className="h-3 w-3 text-gray-400 dark:text-gray-500 shrink-0" />
+                              <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                                {item.query}
+                              </span>
+                              {item.isRegex && (
+                                <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded shrink-0">
+                                  Regex
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFromHistory(item.query, item.isRegex);
+                              }}
+                              className="p-0.5 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              title="Remove from history"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  <button
-                    onClick={closeCanvasSearch}
-                    className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
-                    title="Close search (Esc)"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
                 </div>
               </Panel>
             )}

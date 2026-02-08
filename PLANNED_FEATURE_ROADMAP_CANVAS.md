@@ -83,24 +83,22 @@
 - ✅ Global search box (`Cmd+F`) to find classes
 - ✅ Search as you type with highlighting
 - ✅ Matching nodes highlighted, non-matching nodes dimmed
-- 📋 [TODO] Click result to focus and zoom to class on canvas
-- 📋 [TODO] "Focus Mode": Dim everything except search results
-  - [TODO] Isolate selected classes and immediate relationships
-  - [TODO] Blur/dim non-focused nodes
-  - [TODO] Show only 1st-degree connections (or 2nd, 3rd degree)
-  - [TODO] Expand focus incrementally
-  - [TODO] Focus on group (show only group members)
-  - [TODO] Exit focus mode (Esc key)
-- 📋 [TODO] Search history (recent searches)
+- ✅ Click result to focus and zoom to class on canvas
+- ✅ "Focus Mode": Dim everything except search results
+  - ✅ Isolate selected classes and immediate relationships
+  - ✅ Blur/dim non-focused nodes
+  - ✅ Show only 1st-degree connections (or 2nd, 3rd degree)
+  - ✅ Expand focus incrementally
+  - ✅ Focus on group (show only group members)
+  - ✅ Exit focus mode (Esc key)
+- ✅ Search history (recent searches) with clear option
 - 📋 [TODO] Search filters: by type, group, properties
 - ✅ Regex search support
 - ✅ Search within property names/descriptions
 
-| Ticket | Feature                                              |
-|--------|------------------------------------------------------|
-| #194   | Search highlighting on canvas                        |
-| #195   | Focus mode - dim non-matching results                |
-| #196   | Search history with clear option                     |
+| Ticket | Feature                                  |
+|--------|------------------------------------------|
+| #823   | Search filters (type, group, properties) |
 
 #### Node Visibility Controls 📋 PLANNED
 - 📋 [TODO] Hide/show individual nodes
