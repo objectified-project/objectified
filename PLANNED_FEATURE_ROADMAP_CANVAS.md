@@ -295,7 +295,7 @@
   - 📋 [TODO] Export dimensions in pixels or cm/inches
 - **Selective Export**:
   - [TODO] Export only selected nodes
-  - 📋 [TODO] Export current viewport
+  - ✅ Export current viewport (#403)
   - 📋 [TODO] Export specific groups
   - ✅ Export entire canvas
 - **Export Options**:
@@ -317,14 +317,14 @@
   - [TODO] Adjustable frame rate and duration
   - [TODO] Add narration (audio recording)
 
-| Ticket | Feature Description                        |
-|--------|--------------------------------------------|
-| #403   | Export the current viewport                |
-| #404   | Export specific groups                     |
-| #406   | Include/exclude UI elements                |
-| #407   | Include/exclude grid                       |
-| #408   | Export option to add watermark             |
-| #409   | Add timestamp and metadata                 |
+| Ticket | Feature Description                        | Status |
+|--------|--------------------------------------------|--------|
+| #403   | Export the current viewport                | ✅     |
+| #404   | Export specific groups                     | [TODO] |
+| #406   | Include/exclude UI elements                | [TODO] |
+| #407   | Include/exclude grid                       | [TODO] |
+| #408   | Export option to add watermark             | [TODO] |
+| #409   | Add timestamp and metadata                 | [TODO] |
 
 ---
 

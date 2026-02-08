@@ -14,7 +14,9 @@ import {
   Download,
   Check,
   Settings,
-  Eye
+  Eye,
+  Crop,
+  Maximize2,
 } from 'lucide-react';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -74,7 +76,11 @@ const exportCategories: ExportCategory[] = [
   },
 ];
 
+export type ExportRange = 'full' | 'viewport';
+
 interface ExportOptions {
+  // Export range (#403: full canvas vs current viewport)
+  exportRange: ExportRange;
   // Image options
   quality: number; // 0.1 - 1.0
   scale: number; // 1, 2, 4
@@ -90,6 +96,7 @@ interface ExportOptions {
 }
 
 const defaultOptions: ExportOptions = {
+  exportRange: 'full',
   quality: 1.0,
   scale: 2,
   includeBackground: true,
@@ -155,6 +162,11 @@ export default function ExportWizard({
     return document.querySelector('.react-flow__viewport') as HTMLElement | null;
   }, []);
 
+  /** Element that shows the current visible viewport (for "export current viewport"). */
+  const getPaneElement = useCallback(() => {
+    return document.querySelector('.react-flow__renderer') as HTMLElement | null;
+  }, []);
+
   const imageExportFilter = useCallback((node: Element) => {
     if (node.classList) {
       return !node.classList.contains('react-flow__controls') &&
@@ -188,25 +200,30 @@ export default function ExportWizard({
 
   const generatePreview = useCallback(async () => {
     const viewportElement = getViewportElement();
+    const paneElement = getPaneElement();
 
-    // For image formats, generate a preview image (full canvas)
+    // For image formats, generate a preview image (full canvas or current viewport)
     if (['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) {
-      if (!viewportElement) {
+      const isViewport = options.exportRange === 'viewport';
+      const captureElement = isViewport ? paneElement : viewportElement;
+      if (!captureElement) {
         setPreviewDataUrl(null);
         return;
       }
 
       try {
-        const dataUrl = await withFullCanvasView(async () => {
-          return toPng(viewportElement, {
-            backgroundColor: options.includeBackground
-              ? (isDark ? '#111827' : options.backgroundColor)
-              : 'transparent',
+        const capture = async () => {
+          const bg = options.includeBackground
+            ? (isDark ? '#111827' : options.backgroundColor)
+            : 'transparent';
+          return toPng(captureElement, {
+            backgroundColor: bg,
             quality: 0.5, // Lower quality for preview
             pixelRatio: 1,
             filter: imageExportFilter,
           });
-        });
+        };
+        const dataUrl = isViewport ? await capture() : await withFullCanvasView(capture);
         setPreviewDataUrl(dataUrl);
         setPreviewText(null);
       } catch (error) {
@@ -219,7 +236,7 @@ export default function ExportWizard({
       const text = generateTextExport(selectedFormat);
       setPreviewText(text.substring(0, 2000) + (text.length > 2000 ? '\n...' : ''));
     }
-  }, [selectedFormat, options, isDark, getViewportElement, imageExportFilter, nodes, edges, withFullCanvasView]);
+  }, [selectedFormat, options, isDark, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView]);
 
   const generateTextExport = useCallback((format: ExportFormat): string => {
     const classNodes = nodes.filter(n => n.type !== 'groupNode');
@@ -354,64 +371,73 @@ export default function ExportWizard({
     return dot;
   };
 
+  /** Capture image for export: full canvas (with fitView) or current viewport. */
+  const captureExportImage = useCallback(
+    async (toImage: (el: HTMLElement) => Promise<string>) => {
+      const isViewport = options.exportRange === 'viewport';
+      const viewportElement = getViewportElement();
+      const paneElement = getPaneElement();
+      const el = isViewport ? paneElement : viewportElement;
+      if (!el) throw new Error('Canvas not found');
+      return isViewport ? toImage(el) : withFullCanvasView(() => toImage(viewportElement));
+    },
+    [options.exportRange, getViewportElement, getPaneElement, withFullCanvasView]
+  );
+
   // Handle export
   const handleExport = useCallback(async () => {
     setIsExporting(true);
 
     try {
-      const viewportElement = getViewportElement();
       const filename = getFilenameBase();
+      const bgPng = options.includeBackground
+        ? (isDark ? '#111827' : options.backgroundColor)
+        : 'transparent';
+      const bgJpeg = isDark ? '#111827' : options.backgroundColor;
+      const suffix = options.exportRange === 'viewport' ? '-viewport' : '';
 
       switch (selectedFormat) {
         case 'png': {
-          if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await withFullCanvasView(async () =>
-            toPng(viewportElement, {
-              backgroundColor: options.includeBackground
-                ? (isDark ? '#111827' : options.backgroundColor)
-                : 'transparent',
+          const dataUrl = await captureExportImage((el) =>
+            toPng(el, {
+              backgroundColor: bgPng,
               quality: options.quality,
               pixelRatio: options.scale,
               filter: imageExportFilter,
             })
           );
-          downloadDataUrl(dataUrl, `${filename}.png`);
+          downloadDataUrl(dataUrl, `${filename}${suffix}.png`);
           break;
         }
 
         case 'jpeg': {
-          if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await withFullCanvasView(async () =>
-            toJpeg(viewportElement, {
-              backgroundColor: isDark ? '#111827' : options.backgroundColor,
+          const dataUrl = await captureExportImage((el) =>
+            toJpeg(el, {
+              backgroundColor: bgJpeg,
               quality: options.quality,
               pixelRatio: options.scale,
               filter: imageExportFilter,
             })
           );
-          downloadDataUrl(dataUrl, `${filename}.jpg`);
+          downloadDataUrl(dataUrl, `${filename}${suffix}.jpg`);
           break;
         }
 
         case 'svg': {
-          if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await withFullCanvasView(async () =>
-            toSvg(viewportElement, {
-              backgroundColor: options.includeBackground
-                ? (isDark ? '#111827' : options.backgroundColor)
-                : 'transparent',
+          const dataUrl = await captureExportImage((el) =>
+            toSvg(el, {
+              backgroundColor: bgPng,
               filter: imageExportFilter,
             })
           );
-          downloadDataUrl(dataUrl, `${filename}.svg`);
+          downloadDataUrl(dataUrl, `${filename}${suffix}.svg`);
           break;
         }
 
         case 'pdf': {
-          if (!viewportElement) throw new Error('Canvas not found');
-          const dataUrl = await withFullCanvasView(async () =>
-            toPng(viewportElement, {
-              backgroundColor: isDark ? '#111827' : options.backgroundColor,
+          const dataUrl = await captureExportImage((el) =>
+            toPng(el, {
+              backgroundColor: bgPng,
               quality: 1.0,
               pixelRatio: options.scale,
               filter: imageExportFilter,
@@ -437,7 +463,7 @@ export default function ExportWizard({
           const y = (pageHeight - scaledHeight) / 2;
 
           pdf.addImage(dataUrl, 'PNG', x, y, scaledWidth, scaledHeight);
-          pdf.save(`${filename}.pdf`);
+          pdf.save(`${filename}${suffix}.pdf`);
           break;
         }
 
@@ -465,7 +491,7 @@ export default function ExportWizard({
     } finally {
       setIsExporting(false);
     }
-  }, [selectedFormat, options, isDark, getViewportElement, getFilenameBase, imageExportFilter, generateTextExport, alertDialog, onClose, withFullCanvasView]);
+  }, [selectedFormat, options, isDark, getFilenameBase, imageExportFilter, generateTextExport, alertDialog, onClose, captureExportImage]);
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -589,6 +615,43 @@ export default function ExportWizard({
                 <div className="grid grid-cols-3 gap-4">
                   {isImageFormat && (
                     <>
+                      {/* Export range: full canvas vs current viewport (#403) */}
+                      <div className="col-span-3">
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">
+                          Export range
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setOptions(prev => ({ ...prev, exportRange: 'full' }))}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                              options.exportRange === 'full'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
+                                : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                            }`}
+                          >
+                            <Maximize2 className="w-4 h-4" />
+                            Full canvas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOptions(prev => ({ ...prev, exportRange: 'viewport' }))}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                              options.exportRange === 'viewport'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
+                                : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                            }`}
+                          >
+                            <Crop className="w-4 h-4" />
+                            Current viewport
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                          {options.exportRange === 'viewport'
+                            ? 'Export only what is visible on screen (current pan and zoom).'
+                            : 'Fit and export the entire canvas.'}
+                        </p>
+                      </div>
                       {/* Scale */}
                       <div>
                         <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">
