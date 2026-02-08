@@ -179,8 +179,10 @@
   - ✅ Color by stereotype (entity, service, DTO)
   - ✅ Color gradients for nodes
   - ✅ Color themes (Material, Pastel, Corporate)
-- 📋 [TODO] **Node Icons**:
-  - 📋 [TODO] Built-in icon library (1000+ icons)
+- ✅ **Node Icons**:
+  - ✅ Built-in icon library (100+ icons)
+  - ✅ Icon picker with search by name/category
+  - ✅ Remove icon option (show initials)
   - 📋 [TODO] Custom icon upload
   - 📋 [TODO] Icons from icon packs (Font Awesome, Material Icons)
   - 📋 [TODO] Icon position (left, center, badge)
@@ -201,7 +203,6 @@
 
 | Ticket | Feature Description               |
 |--------|-----------------------------------|
-| #340   | Add custom node icons for styling |
 | #341   | Custom node sizing                |
 | #342   | Add node border configuration     |
 | #343   | Add custom node label styling     |

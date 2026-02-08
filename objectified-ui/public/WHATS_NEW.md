@@ -15,6 +15,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added ability to enable/disable grid
   - Added ability to search using regular expressions in the canvas
   - Added memory profiling and performance improvements for large canvases
+  - Added icons to class nodes for better visual distinction of nodes
   - Nodes now show property references even when not expanded
   - Improved search to include properties and descriptions in the results
   - Canvas changes also apply to the Paths canvas

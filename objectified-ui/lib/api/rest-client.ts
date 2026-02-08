@@ -48,6 +48,7 @@ async function updateClassCanvasMetadata(
       headerGradient?: string;
       textColor?: string;
       headerTextColor?: string;
+      icon?: string; // Custom icon from lucide-react
       collapsed?: boolean;
       zIndex?: number;
     };
@@ -92,6 +93,7 @@ export async function updateClassCanvasMetadataWithSession(
       headerGradient?: string;
       textColor?: string;
       headerTextColor?: string;
+      icon?: string; // Custom icon from lucide-react
       collapsed?: boolean;
       zIndex?: number;
     };

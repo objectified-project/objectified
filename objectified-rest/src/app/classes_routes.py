@@ -173,6 +173,8 @@ async def update_class(
         updates['schema'] = request.schema
     if request.enabled is not None:
         updates['enabled'] = request.enabled
+    if request.canvas_metadata is not None:
+        updates['canvas_metadata'] = request.canvas_metadata
 
     try:
         class_data = db.update_class(

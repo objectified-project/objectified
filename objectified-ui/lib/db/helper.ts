@@ -1061,6 +1061,7 @@ export async function updateClassCanvasMetadata(classId: string, canvasMetadata:
     headerGradient?: string;
     textColor?: string;
     headerTextColor?: string;
+    icon?: string; // Custom icon from lucide-react
     collapsed?: boolean;
     zIndex?: number;
   };

@@ -1,8 +1,314 @@
 import React, { memo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, type NodeProps, useUpdateNodeInternals } from '@xyflow/react';
-import { Edit, Trash2, ChevronRight, ChevronDown, Palette } from 'lucide-react';
+import {
+  Edit,
+  Trash2,
+  ChevronRight,
+  ChevronDown,
+  Palette,
+  Smile,
+  // Node icon options - organized by category
+  User,
+  Users,
+  UserCircle,
+  UserCheck,
+  Building,
+  Building2,
+  Home,
+  Store,
+  Factory,
+  Landmark,
+  ShoppingCart,
+  ShoppingBag,
+  CreditCard,
+  Wallet,
+  DollarSign,
+  Receipt,
+  Package,
+  Box,
+  Boxes,
+  Archive,
+  FileText,
+  File,
+  Files,
+  Folder,
+  FolderOpen,
+  Database,
+  HardDrive,
+  Server,
+  Cloud,
+  Globe,
+  Map as MapIcon,
+  MapPin,
+  Navigation,
+  Mail,
+  MessageSquare,
+  MessageCircle,
+  Send,
+  Bell,
+  BellRing,
+  Calendar,
+  CalendarDays,
+  Clock,
+  Timer,
+  AlarmClock,
+  Settings,
+  Cog,
+  Wrench,
+  Hammer,
+  Key,
+  Lock,
+  Unlock,
+  Shield,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  Search,
+  Filter,
+  Tag,
+  Tags,
+  Bookmark,
+  Star,
+  Heart,
+  ThumbsUp,
+  Award,
+  Trophy,
+  Medal,
+  Zap,
+  Bolt,
+  Activity,
+  TrendingUp,
+  BarChart,
+  PieChart,
+  LineChart,
+  Layers,
+  Layout,
+  Grid,
+  List,
+  Table,
+  Columns,
+  Link,
+  Link2,
+  Unlink,
+  Share,
+  Share2,
+  Download,
+  Upload,
+  Image,
+  Camera,
+  Video,
+  Music,
+  Headphones,
+  Mic,
+  Phone,
+  Smartphone,
+  Tablet,
+  Monitor,
+  Laptop,
+  Printer,
+  Cpu,
+  Wifi,
+  Bluetooth,
+  Battery,
+  Power,
+  Play,
+  Pause,
+  RefreshCw,
+  RotateCcw,
+  Repeat,
+  Shuffle,
+  Code,
+  Terminal,
+  Hash,
+  AtSign,
+  Percent,
+  Plus,
+  Minus,
+  X,
+  Check,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  HelpCircle,
+  CircleDot,
+  Circle,
+  Square,
+  Triangle,
+  Hexagon,
+  Octagon,
+  Diamond,
+  Gem,
+  Crown,
+  Flag,
+  Bookmark as BookmarkIcon,
+  Paperclip,
+  Scissors,
+  Clipboard,
+  ClipboardList,
+  ClipboardCheck,
+  FileCheck,
+  FilePlus,
+  FileX,
+  FileCode,
+  FileJson,
+  Briefcase,
+  GraduationCap,
+  BookOpen,
+  Book,
+  Library,
+  Newspaper,
+  Rss,
+  Radio,
+  Tv,
+  Cast,
+  Airplay,
+  Speaker,
+  Volume2,
+  type LucideIcon,
+} from 'lucide-react';
 import { useDialog } from '../../providers/DialogProvider';
 import * as Popover from '@radix-ui/react-popover';
+
+// Icon options for class nodes - curated list organized by category
+const NODE_ICON_OPTIONS: Array<{ name: string; icon: LucideIcon; category: string }> = [
+  // People & Organizations
+  { name: 'User', icon: User, category: 'People' },
+  { name: 'Users', icon: Users, category: 'People' },
+  { name: 'UserCircle', icon: UserCircle, category: 'People' },
+  { name: 'UserCheck', icon: UserCheck, category: 'People' },
+  { name: 'Building', icon: Building, category: 'People' },
+  { name: 'Building2', icon: Building2, category: 'People' },
+  { name: 'Home', icon: Home, category: 'People' },
+  { name: 'Store', icon: Store, category: 'People' },
+  { name: 'Factory', icon: Factory, category: 'People' },
+  { name: 'Landmark', icon: Landmark, category: 'People' },
+  // Commerce & Finance
+  { name: 'ShoppingCart', icon: ShoppingCart, category: 'Commerce' },
+  { name: 'ShoppingBag', icon: ShoppingBag, category: 'Commerce' },
+  { name: 'CreditCard', icon: CreditCard, category: 'Commerce' },
+  { name: 'Wallet', icon: Wallet, category: 'Commerce' },
+  { name: 'DollarSign', icon: DollarSign, category: 'Commerce' },
+  { name: 'Receipt', icon: Receipt, category: 'Commerce' },
+  // Storage & Data
+  { name: 'Package', icon: Package, category: 'Storage' },
+  { name: 'Box', icon: Box, category: 'Storage' },
+  { name: 'Boxes', icon: Boxes, category: 'Storage' },
+  { name: 'Archive', icon: Archive, category: 'Storage' },
+  { name: 'Database', icon: Database, category: 'Storage' },
+  { name: 'HardDrive', icon: HardDrive, category: 'Storage' },
+  { name: 'Server', icon: Server, category: 'Storage' },
+  { name: 'Cloud', icon: Cloud, category: 'Storage' },
+  // Files & Documents
+  { name: 'FileText', icon: FileText, category: 'Files' },
+  { name: 'File', icon: File, category: 'Files' },
+  { name: 'Files', icon: Files, category: 'Files' },
+  { name: 'Folder', icon: Folder, category: 'Files' },
+  { name: 'FolderOpen', icon: FolderOpen, category: 'Files' },
+  { name: 'FileCode', icon: FileCode, category: 'Files' },
+  { name: 'FileJson', icon: FileJson, category: 'Files' },
+  { name: 'ClipboardList', icon: ClipboardList, category: 'Files' },
+  // Communication
+  { name: 'Mail', icon: Mail, category: 'Communication' },
+  { name: 'MessageSquare', icon: MessageSquare, category: 'Communication' },
+  { name: 'MessageCircle', icon: MessageCircle, category: 'Communication' },
+  { name: 'Send', icon: Send, category: 'Communication' },
+  { name: 'Bell', icon: Bell, category: 'Communication' },
+  { name: 'BellRing', icon: BellRing, category: 'Communication' },
+  { name: 'Phone', icon: Phone, category: 'Communication' },
+  // Time & Scheduling
+  { name: 'Calendar', icon: Calendar, category: 'Time' },
+  { name: 'CalendarDays', icon: CalendarDays, category: 'Time' },
+  { name: 'Clock', icon: Clock, category: 'Time' },
+  { name: 'Timer', icon: Timer, category: 'Time' },
+  { name: 'AlarmClock', icon: AlarmClock, category: 'Time' },
+  // Security & Access
+  { name: 'Key', icon: Key, category: 'Security' },
+  { name: 'Lock', icon: Lock, category: 'Security' },
+  { name: 'Unlock', icon: Unlock, category: 'Security' },
+  { name: 'Shield', icon: Shield, category: 'Security' },
+  { name: 'ShieldCheck', icon: ShieldCheck, category: 'Security' },
+  { name: 'Eye', icon: Eye, category: 'Security' },
+  // Settings & Tools
+  { name: 'Settings', icon: Settings, category: 'Tools' },
+  { name: 'Cog', icon: Cog, category: 'Tools' },
+  { name: 'Wrench', icon: Wrench, category: 'Tools' },
+  { name: 'Hammer', icon: Hammer, category: 'Tools' },
+  // Location
+  { name: 'Globe', icon: Globe, category: 'Location' },
+  { name: 'Map', icon: MapIcon, category: 'Location' },
+  { name: 'MapPin', icon: MapPin, category: 'Location' },
+  { name: 'Navigation', icon: Navigation, category: 'Location' },
+  // Organization
+  { name: 'Tag', icon: Tag, category: 'Organization' },
+  { name: 'Tags', icon: Tags, category: 'Organization' },
+  { name: 'Bookmark', icon: Bookmark, category: 'Organization' },
+  { name: 'Filter', icon: Filter, category: 'Organization' },
+  { name: 'Search', icon: Search, category: 'Organization' },
+  { name: 'Layers', icon: Layers, category: 'Organization' },
+  // Status & Feedback
+  { name: 'Star', icon: Star, category: 'Status' },
+  { name: 'Heart', icon: Heart, category: 'Status' },
+  { name: 'ThumbsUp', icon: ThumbsUp, category: 'Status' },
+  { name: 'Award', icon: Award, category: 'Status' },
+  { name: 'Trophy', icon: Trophy, category: 'Status' },
+  { name: 'CheckCircle', icon: CheckCircle, category: 'Status' },
+  { name: 'AlertCircle', icon: AlertCircle, category: 'Status' },
+  { name: 'AlertTriangle', icon: AlertTriangle, category: 'Status' },
+  { name: 'Info', icon: Info, category: 'Status' },
+  // Analytics
+  { name: 'Activity', icon: Activity, category: 'Analytics' },
+  { name: 'TrendingUp', icon: TrendingUp, category: 'Analytics' },
+  { name: 'BarChart', icon: BarChart, category: 'Analytics' },
+  { name: 'PieChart', icon: PieChart, category: 'Analytics' },
+  { name: 'LineChart', icon: LineChart, category: 'Analytics' },
+  { name: 'Zap', icon: Zap, category: 'Analytics' },
+  // Layout
+  { name: 'Layout', icon: Layout, category: 'Layout' },
+  { name: 'Grid', icon: Grid, category: 'Layout' },
+  { name: 'List', icon: List, category: 'Layout' },
+  { name: 'Table', icon: Table, category: 'Layout' },
+  { name: 'Columns', icon: Columns, category: 'Layout' },
+  // Connections
+  { name: 'Link', icon: Link, category: 'Connections' },
+  { name: 'Link2', icon: Link2, category: 'Connections' },
+  { name: 'Share', icon: Share, category: 'Connections' },
+  { name: 'Share2', icon: Share2, category: 'Connections' },
+  // Media
+  { name: 'Image', icon: Image, category: 'Media' },
+  { name: 'Camera', icon: Camera, category: 'Media' },
+  { name: 'Video', icon: Video, category: 'Media' },
+  { name: 'Music', icon: Music, category: 'Media' },
+  // Devices
+  { name: 'Smartphone', icon: Smartphone, category: 'Devices' },
+  { name: 'Tablet', icon: Tablet, category: 'Devices' },
+  { name: 'Monitor', icon: Monitor, category: 'Devices' },
+  { name: 'Laptop', icon: Laptop, category: 'Devices' },
+  { name: 'Printer', icon: Printer, category: 'Devices' },
+  // Tech
+  { name: 'Code', icon: Code, category: 'Tech' },
+  { name: 'Terminal', icon: Terminal, category: 'Tech' },
+  { name: 'Cpu', icon: Cpu, category: 'Tech' },
+  { name: 'Wifi', icon: Wifi, category: 'Tech' },
+  // Shapes
+  { name: 'Circle', icon: Circle, category: 'Shapes' },
+  { name: 'Square', icon: Square, category: 'Shapes' },
+  { name: 'Triangle', icon: Triangle, category: 'Shapes' },
+  { name: 'Hexagon', icon: Hexagon, category: 'Shapes' },
+  { name: 'Diamond', icon: Diamond, category: 'Shapes' },
+  { name: 'Gem', icon: Gem, category: 'Shapes' },
+  { name: 'Crown', icon: Crown, category: 'Shapes' },
+  // Education
+  { name: 'GraduationCap', icon: GraduationCap, category: 'Education' },
+  { name: 'BookOpen', icon: BookOpen, category: 'Education' },
+  { name: 'Book', icon: Book, category: 'Education' },
+  { name: 'Library', icon: Library, category: 'Education' },
+  // Business
+  { name: 'Briefcase', icon: Briefcase, category: 'Business' },
+  { name: 'Flag', icon: Flag, category: 'Business' },
+  { name: 'Newspaper', icon: Newspaper, category: 'Business' },
+];
 
 // Define custom node data type for classes
 type ClassProperty = {
@@ -20,6 +326,7 @@ type ClassNodeTheme = {
   headerGradient?: string;
   textColor?: string;
   headerTextColor?: string;
+  icon?: string; // Icon name from lucide-react
 };
 
 type ClassNodeData = {
@@ -53,6 +360,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [iconSearchQuery, setIconSearchQuery] = useState('');
   const nodeRef = useRef<HTMLDivElement>(null);
 
   // Use ResizeObserver to detect when the node's actual DOM size changes
@@ -117,6 +426,32 @@ function ClassNode({ id, data, selected }: NodeProps) {
     // Close the color picker after selection
     setColorPickerOpen(false);
   };
+
+  // Handle icon selection - merges with existing theme
+  const handleIconSelect = (iconName: string | null) => {
+    if (typedData.onThemeChange) {
+      const currentTheme = typedData.theme || {};
+      typedData.onThemeChange(typedData.id, { ...currentTheme, icon: iconName || undefined });
+    }
+    setIconPickerOpen(false);
+    setIconSearchQuery('');
+  };
+
+  // Get the icon component for the current theme
+  const getIconComponent = (): LucideIcon | null => {
+    const iconName = typedData.theme?.icon;
+    if (!iconName) return null;
+    const iconOption = NODE_ICON_OPTIONS.find(opt => opt.name === iconName);
+    return iconOption?.icon || null;
+  };
+
+  // Filter icons based on search query
+  const filteredIcons = iconSearchQuery.trim()
+    ? NODE_ICON_OPTIONS.filter(opt =>
+        opt.name.toLowerCase().includes(iconSearchQuery.toLowerCase()) ||
+        opt.category.toLowerCase().includes(iconSearchQuery.toLowerCase())
+      )
+    : NODE_ICON_OPTIONS;
 
   // Level of detail calculations based on zoom
   // At zoom < 0.5 (50% - zoomed out), show minimal detail (class name only)
@@ -529,7 +864,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
             flexShrink: 0,
             letterSpacing: '-0.3px',
           }}>
-            {typedData.name.substring(0, 2).toUpperCase()}
+            {(() => {
+              const IconComponent = getIconComponent();
+              if (IconComponent) {
+                return <IconComponent size={14} strokeWidth={2.5} />;
+              }
+              return typedData.name.substring(0, 2).toUpperCase();
+            })()}
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -650,6 +991,139 @@ function ClassNode({ id, data, selected }: NodeProps) {
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>
+
+            {/* Icon picker button using Popover */}
+            <Popover.Root open={iconPickerOpen} onOpenChange={(open) => {
+              setIconPickerOpen(open);
+              if (!open) setIconSearchQuery('');
+            }}>
+              <Popover.Trigger asChild>
+                <button
+                  style={{
+                    background: typedData.theme?.icon
+                      ? 'rgba(99, 102, 241, 0.3)'
+                      : 'rgba(255, 255, 255, 0.12)',
+                    border: typedData.theme?.icon
+                      ? '1px solid rgba(99, 102, 241, 0.5)'
+                      : '1px solid rgba(255, 255, 255, 0.18)',
+                    borderRadius: '5px',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '12px',
+                    lineHeight: 1,
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    position: 'relative',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = typedData.theme?.icon
+                      ? 'rgba(99, 102, 241, 0.4)'
+                      : 'rgba(255, 255, 255, 0.22)';
+                    e.currentTarget.style.borderColor = typedData.theme?.icon
+                      ? 'rgba(99, 102, 241, 0.6)'
+                      : 'rgba(255, 255, 255, 0.35)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = typedData.theme?.icon
+                      ? 'rgba(99, 102, 241, 0.3)'
+                      : 'rgba(255, 255, 255, 0.12)';
+                    e.currentTarget.style.borderColor = typedData.theme?.icon
+                      ? 'rgba(99, 102, 241, 0.5)'
+                      : 'rgba(255, 255, 255, 0.18)';
+                  }}
+                  title={typedData.theme?.icon ? `Icon: ${typedData.theme.icon}` : "Change icon"}
+                >
+                  {(() => {
+                    const CurrentIcon = getIconComponent();
+                    return CurrentIcon ? <CurrentIcon size={12} /> : <Smile size={12} />;
+                  })()}
+                  {/* Active indicator dot */}
+                  {typedData.theme?.icon && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-2px',
+                      right: '-2px',
+                      width: '6px',
+                      height: '6px',
+                      background: '#22c55e',
+                      borderRadius: '50%',
+                      border: '1px solid rgba(255, 255, 255, 0.8)',
+                    }} />
+                  )}
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3 w-72"
+                  sideOffset={5}
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="space-y-2">
+                    {/* Search input */}
+                    <input
+                      type="text"
+                      placeholder="Search icons..."
+                      value={iconSearchQuery}
+                      onChange={(e) => setIconSearchQuery(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+
+                    {/* Remove icon button */}
+                    {typedData.theme?.icon && (
+                      <button
+                        onClick={() => handleIconSelect(null)}
+                        className="w-full px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors text-left"
+                      >
+                        ✕ Remove icon (show initials)
+                      </button>
+                    )}
+
+                    {/* Icon grid */}
+                    <div className="max-h-48 overflow-y-auto">
+                      <div className="grid grid-cols-8 gap-1">
+                        {filteredIcons.map((iconOpt) => {
+                          const IconComp = iconOpt.icon;
+                          const isSelected = typedData.theme?.icon === iconOpt.name;
+                          return (
+                            <button
+                              key={iconOpt.name}
+                              onClick={() => handleIconSelect(iconOpt.name)}
+                              className={`w-7 h-7 rounded flex items-center justify-center transition-all hover:scale-110 ${
+                                isSelected 
+                                  ? 'bg-indigo-500 text-white ring-2 ring-indigo-300' 
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                              }`}
+                              title={iconOpt.name}
+                            >
+                              <IconComp size={14} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {filteredIcons.length === 0 && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                          No icons found
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Category hint */}
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-700">
+                      Search by name or category (People, Commerce, Storage, Files, Security, etc.)
+                    </div>
+                  </div>
+                  <Popover.Arrow className="fill-white dark:fill-gray-800" />
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+
             {/* Delete button */}
             <button
               style={{
@@ -1118,7 +1592,8 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
       prevTheme?.backgroundColor !== nextTheme?.backgroundColor ||
       prevTheme?.borderColor !== nextTheme?.borderColor ||
       prevTheme?.textColor !== nextTheme?.textColor ||
-      prevTheme?.headerTextColor !== nextTheme?.headerTextColor) {
+      prevTheme?.headerTextColor !== nextTheme?.headerTextColor ||
+      prevTheme?.icon !== nextTheme?.icon) {
     return false;
   }
 
