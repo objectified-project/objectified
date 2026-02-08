@@ -215,25 +215,6 @@
 |--------|--------------------------------------------|
 | #471   | Preview layout suggestions before applying |
 
-**Canvas Analysis** ✅ PARTIALLY IMPLEMENTED
-- **Schema Metrics**:
-  - ✅ Total classes, properties, relationships
-  - ✅ Average properties per class
-  - ✅ Most connected classes (hubs)
-  - ✅ Isolated classes (no relationships)
-  - ✅ Deepest dependency chains
-  - ✅ Circular dependencies count
-- **Layout Quality Score**:
-  - ✅ Edge crossing count (lower is better)
-  - ✅ Node spacing uniformity
-  - ✅ Layout symmetry
-  - ✅ Visual balance
-- **Suggestions**:
-  - ✅ "Reduce edge crossings by switching to hierarchical layout"
-  - ✅ "Group these 5 classes - they're all related"
-  - ✅ "Class X is isolated - consider adding relationships"
-  - ✅ "Large clusters detected - consider splitting into groups"
-
 **Canvas Performance Optimizations** 📋 PARTIALLY IMPLEMENTED
 - **Virtual Rendering**:
   - ✅ Render only visible nodes (viewport culling)
@@ -290,12 +271,11 @@
 #### Charts & Metrics ✅ PARTIALLY COMPLETE
 - ✅ **Quality score gauge**: Visual score indicator (0-100)
 - ✅ **Complexity charts**: Schema complexity visualization
-- 📋 [TODO] **Relationship graphs**: Visual dependency maps
+- ✅ **Relationship graphs**: Visual dependency maps
 - 📋 [TODO] **Timeline views**: Schema evolution over time
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #322   | Display the relationship graph for a schema  |
 | #323   | Timeline view of schema changes over time    |
 
 ---
@@ -544,6 +524,25 @@
 - ✅ Arrow styles: Standard, Diamond, Circle, Open arrow
 - ✅ Animated edges (flowing dots for data flow)
 - ✅ **Edge hover effects**: Tooltip (relationship label, source → target) and visual highlighting (thicker stroke, glow)
+
+**Canvas Analysis** ✅ IMPLEMENTED
+- **Schema Metrics**:
+  - ✅ Total classes, properties, relationships
+  - ✅ Average properties per class
+  - ✅ Most connected classes (hubs)
+  - ✅ Isolated classes (no relationships)
+  - ✅ Deepest dependency chains
+  - ✅ Circular dependencies count
+- **Layout Quality Score**:
+  - ✅ Edge crossing count (lower is better)
+  - ✅ Node spacing uniformity
+  - ✅ Layout symmetry
+  - ✅ Visual balance
+- **Suggestions**:
+  - ✅ "Reduce edge crossings by switching to hierarchical layout"
+  - ✅ "Group these 5 classes - they're all related"
+  - ✅ "Class X is isolated - consider adding relationships"
+  - ✅ "Large clusters detected - consider splitting into groups"
 
 ### 7. Canvas Performance ✅ IMPLEMENTED
 

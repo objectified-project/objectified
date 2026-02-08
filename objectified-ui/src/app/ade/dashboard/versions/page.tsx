@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -34,6 +34,7 @@ import { generateOpenApiSpec } from '../../../utils/openapi';
 import YAML from 'yaml';
 import { diffLines, Change } from 'diff';
 import { compareSchemas, type DiffSummary, getPathLabel } from '../../../../../lib/schema-diff';
+import RelationshipGraphDialog from './RelationshipGraphDialog';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -105,6 +106,11 @@ const Versions = () => {
     showModified: boolean;
   }>({ showAdded: true, showRemoved: true, showModified: true });
   const [activeCompareTab, setActiveCompareTab] = useState<'diff' | 'summary'>('diff');
+
+  const [showRelationshipGraphDialog, setShowRelationshipGraphDialog] = useState(false);
+  const [relationshipGraphVersion, setRelationshipGraphVersion] = useState<Version | null>(null);
+  const [relationshipGraphClasses, setRelationshipGraphClasses] = useState<Array<{ id: string; name: string; properties?: Array<{ id: string; name: string; data: unknown }> }> | null>(null);
+  const [isLoadingRelationshipGraph, setIsLoadingRelationshipGraph] = useState(false);
 
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
@@ -283,6 +289,26 @@ const Versions = () => {
     finally { setIsLoadingSpec(false); }
   };
 
+  const handleShowRelationshipGraph = async (version: Version) => {
+    setRelationshipGraphVersion(version);
+    setShowRelationshipGraphDialog(true);
+    setIsLoadingRelationshipGraph(true);
+    setRelationshipGraphClasses(null);
+    try {
+      const classesResult = await getClassesForVersion(version.id);
+      const classesData = JSON.parse(classesResult);
+      const classesWithProperties = await Promise.all(classesData.map(async (cls: any) => {
+        const propsResult = await getPropertiesForClass(cls.id);
+        return { ...cls, properties: JSON.parse(propsResult) };
+      }));
+      setRelationshipGraphClasses(classesWithProperties);
+    } catch {
+      setRelationshipGraphClasses([]);
+    } finally {
+      setIsLoadingRelationshipGraph(false);
+    }
+  };
+
   const loadVersionSpec = async (versionId: string): Promise<string> => {
     const version = versions.find(v => v.id === versionId);
     if (!version) throw new Error('Version not found');
@@ -357,6 +383,7 @@ const Versions = () => {
     const canUnpub = isPublished && canModify(version);
     switch (action) {
       case 'view': await handleViewOpenApi(version); break;
+      case 'relationshipGraph': await handleShowRelationshipGraph(version); break;
       case 'edit': if (!isPublished) handleEditClick(version); else setErrorMessage('Cannot edit published version'); break;
       case 'publish': if (canPub) await handlePublish(version.id); else await alertDialog({ message: 'Only owner or admin can publish', variant: 'warning' }); break;
       case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else await alertDialog({ message: 'Only owner or admin can unpublish', variant: 'warning' }); break;
@@ -537,6 +564,17 @@ const Versions = () => {
                               >
                                 <Eye className="w-4 h-4 text-purple-500" />
                                 View Spec
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenVersionDropdown(null);
+                                  handleRowAction('relationshipGraph', version);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                              >
+                                <Network className="w-4 h-4 text-teal-500" />
+                                Relationship graph
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1089,6 +1127,16 @@ const Versions = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Relationship graph (#322) */}
+      <RelationshipGraphDialog
+        open={showRelationshipGraphDialog}
+        onOpenChange={setShowRelationshipGraphDialog}
+        version={relationshipGraphVersion}
+        projectName={projects.find(p => p.id === relationshipGraphVersion?.project_id)?.name ?? ''}
+        classesWithProperties={relationshipGraphClasses}
+        isLoading={isLoadingRelationshipGraph}
+      />
     </div>
   );
 };
