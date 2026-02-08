@@ -229,14 +229,10 @@
   - ✅ Layout symmetry
   - ✅ Visual balance
 - **Suggestions**:
-  - 📋 [TODO] "Reduce edge crossings by switching to hierarchical layout"
-  - 📋 [TODO] "Group these 5 classes - they're all related"
-  - 📋 [TODO] "Class X is isolated - consider adding relationships"
-  - 📋 [TODO] "Large clusters detected - consider splitting into groups"
-
-| Ticket | Feature Description                    |
-|--------|----------------------------------------|
-| #474   | Canvas improvement suggestions         |
+  - ✅ "Reduce edge crossings by switching to hierarchical layout"
+  - ✅ "Group these 5 classes - they're all related"
+  - ✅ "Class X is isolated - consider adding relationships"
+  - ✅ "Large clusters detected - consider splitting into groups"
 
 **Canvas Performance Optimizations** 📋 PARTIALLY IMPLEMENTED
 - **Virtual Rendering**:

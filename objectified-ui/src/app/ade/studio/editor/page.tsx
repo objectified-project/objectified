@@ -104,6 +104,7 @@ import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
+import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
 import { computeSchemaMetrics } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
@@ -385,6 +386,21 @@ const StudioContent = () => {
     if (classNodes.length === 0) return null;
     return computeLayoutQuality(nodes, edges);
   }, [nodes, edges]);
+
+  // Canvas improvement suggestions (#474)
+  const groupMemberIds = useMemo(() => {
+    if (!groups.length) return undefined;
+    return new Set(groups.flatMap((g) => g.nodeIds));
+  }, [groups]);
+  const canvasSuggestions = useMemo(() => {
+    return computeCanvasSuggestions({
+      nodes,
+      edges,
+      metrics: schemaMetrics,
+      layoutQuality,
+      groupMemberIds,
+    });
+  }, [nodes, edges, schemaMetrics, layoutQuality, groupMemberIds]);
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -2957,6 +2973,16 @@ const StudioContent = () => {
   const handleAutoArrange = useCallback(() => {
     handleAutoArrangeWithDirection('TB');
   }, [handleAutoArrangeWithDirection]);
+
+  // Suggestion action: e.g. apply hierarchical layout when user clicks "Try Auto-organize" (#474)
+  const handleSuggestionAction = useCallback(
+    (suggestion: { action?: { type: string; direction?: 'TB' | 'LR' } }) => {
+      if (suggestion.action?.type === 'apply_hierarchical_layout') {
+        handleAutoArrangeWithDirection(suggestion.action.direction ?? 'TB');
+      }
+    },
+    [handleAutoArrangeWithDirection]
+  );
 
   // ============================================================================
   // END LAYOUT SAVE/LOAD HANDLERS
@@ -5658,6 +5684,8 @@ const StudioContent = () => {
                 <SchemaMetricsPanel
                   metrics={schemaMetrics}
                   layoutQuality={layoutQuality}
+                  suggestions={canvasSuggestions}
+                  onSuggestionAction={handleSuggestionAction}
                   onClose={() => setSchemaMetricsOpen(false)}
                   isMinimized={schemaMetricsMinimized}
                   onMinimizeToggle={() => setSchemaMetricsMinimized(!schemaMetricsMinimized)}

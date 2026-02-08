@@ -1,14 +1,19 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import type { CanvasSuggestion } from '@/app/utils/canvas-suggestions';
 
 interface SchemaMetricsPanelProps {
   metrics: SchemaMetricsResult | null;
   layoutQuality?: LayoutQualityResult | null;
+  /** Canvas improvement suggestions (#474) */
+  suggestions?: CanvasSuggestion[];
+  /** Called when user triggers an action (e.g. apply layout) */
+  onSuggestionAction?: (suggestion: CanvasSuggestion) => void;
   onClose?: () => void;
   isMinimized?: boolean;
   onMinimizeToggle?: () => void;
@@ -17,6 +22,8 @@ interface SchemaMetricsPanelProps {
 export default function SchemaMetricsPanel({
   metrics,
   layoutQuality,
+  suggestions = [],
+  onSuggestionAction,
   onClose,
   isMinimized = false,
   onMinimizeToggle,
@@ -295,6 +302,46 @@ export default function SchemaMetricsPanel({
                 </div>
               </div>
             </>
+          )}
+
+          {/* Suggestions (#474) */}
+          {suggestions.length > 0 && (
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                <Lightbulb className="w-3 h-3" />
+                Suggestions
+              </div>
+              <ul className="space-y-2">
+                {suggestions.map((s) => (
+                  <li
+                    key={s.id}
+                    className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200/80 dark:border-amber-700/50 px-2.5 py-2"
+                  >
+                    <div className="font-medium text-xs text-amber-900 dark:text-amber-200">
+                      {s.title}
+                    </div>
+                    <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                      {s.description}
+                    </p>
+                    {s.detail && (
+                      <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1 truncate" title={s.detail}>
+                        {s.detail}
+                      </p>
+                    )}
+                    {s.action?.type === 'apply_hierarchical_layout' && onSuggestionAction && (
+                      <button
+                        type="button"
+                        onClick={() => onSuggestionAction(s)}
+                        className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-300 hover:text-amber-800 dark:hover:text-amber-200 hover:underline"
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        Try Auto-organize
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {/* Summary line */}
