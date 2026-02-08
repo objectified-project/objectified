@@ -306,7 +306,7 @@
   - [TODO] Include/exclude hidden nodes
   - ✅ Background color/transparency toggle
   - 📋 [TODO] Add watermark
-  - 📋 [TODO] Add timestamp and metadata
+  - ✅ Add timestamp and metadata
 - **Batch Export**:
   - [TODO] Export all groups separately
   - [TODO] Export each layout snapshot
@@ -320,7 +320,6 @@
 | Ticket | Feature Description                        | Status |
 |--------|--------------------------------------------|--------|
 | #408   | Export option to add watermark             | [TODO] |
-| #409   | Add timestamp and metadata                 | [TODO] |
 
 ---
 

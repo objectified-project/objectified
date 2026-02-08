@@ -20,6 +20,7 @@ import {
   Maximize2,
   Layers,
   Grid3X3,
+  Clock,
 } from 'lucide-react';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -107,6 +108,8 @@ interface ExportOptions {
   includeGrid: boolean;
   includeWatermark: boolean;
   watermarkText: string;
+  // #409: include timestamp and metadata on image/PDF exports
+  includeTimestampAndMetadata: boolean;
 }
 
 const defaultOptions: ExportOptions = {
@@ -122,7 +125,68 @@ const defaultOptions: ExportOptions = {
   includeGrid: false,
   includeWatermark: false,
   watermarkText: '',
+  includeTimestampAndMetadata: false,
 };
+
+/** #409: Build timestamp and metadata lines for export overlay. */
+function getTimestampAndMetadataLines(projectName: string, versionId: string): string[] {
+  const now = new Date();
+  const dateStr = now.toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+  return [
+    `${projectName || 'canvas'} · v${versionId || '1'}`,
+    `Exported ${dateStr}`,
+  ];
+}
+
+/** #409: Draw timestamp and metadata on a raster image (data URL), return new data URL. */
+function drawTimestampAndMetadataOnImage(
+  dataUrl: string,
+  projectName: string,
+  versionId: string,
+  pixelRatio: number = 1,
+  outputFormat: { mime: 'image/png' } | { mime: 'image/jpeg'; quality: number } = { mime: 'image/png' }
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const w = img.width;
+      const h = img.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Canvas 2d context not available'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const lines = getTimestampAndMetadataLines(projectName, versionId);
+      const fontSize = Math.max(10, 12 * pixelRatio);
+      const padding = 12 * pixelRatio;
+      const lineHeight = fontSize * 1.2;
+      ctx.font = `${fontSize}px system-ui, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 2;
+      const x = w - padding;
+      const yStart = h - padding - lineHeight * lines.length;
+      lines.forEach((line, i) => {
+        const y = yStart + (i + 1) * lineHeight;
+        ctx.strokeText(line, x, y);
+        ctx.fillText(line, x, y);
+      });
+      const outUrl =
+        outputFormat.mime === 'image/jpeg'
+          ? canvas.toDataURL('image/jpeg', outputFormat.quality)
+          : canvas.toDataURL('image/png');
+      resolve(outUrl);
+    };
+    img.onerror = () => reject(new Error('Failed to load image for overlay'));
+    img.src = dataUrl;
+  });
+}
 
 interface ExportWizardProps {
   open: boolean;
@@ -325,7 +389,21 @@ export default function ExportWizard({
           }
           return withFullCanvasView(capture);
         });
-        setPreviewDataUrl(dataUrl);
+        let finalDataUrl = dataUrl;
+        if (options.includeTimestampAndMetadata) {
+          try {
+            finalDataUrl = await drawTimestampAndMetadataOnImage(
+              dataUrl,
+              projectName,
+              versionId,
+              1,
+              { mime: 'image/png' }
+            );
+          } catch {
+            // keep original preview on error
+          }
+        }
+        setPreviewDataUrl(finalDataUrl);
         setPreviewText(null);
       } catch (error) {
         console.error('Error generating preview:', error);
@@ -341,7 +419,7 @@ export default function ExportWizard({
       const text = generateTextExport(selectedFormat, nodeIdSet);
       setPreviewText(text.substring(0, 2000) + (text.length > 2000 ? '\n...' : ''));
     }
-  }, [selectedFormat, options, isDark, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups]);
+  }, [selectedFormat, options, isDark, projectName, versionId, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups]);
 
   const generateTextExport = useCallback(
     (format: ExportFormat, limitToNodeIds?: Set<string>): string => {
@@ -546,7 +624,7 @@ export default function ExportWizard({
 
       switch (selectedFormat) {
         case 'png': {
-          const dataUrl = await captureExportImage((el) =>
+          let dataUrl = await captureExportImage((el) =>
             toPng(el, {
               backgroundColor: bgPng,
               quality: options.quality,
@@ -554,12 +632,21 @@ export default function ExportWizard({
               filter: options.includeUiElements ? undefined : imageExportFilter,
             })
           );
+          if (options.includeTimestampAndMetadata) {
+            dataUrl = await drawTimestampAndMetadataOnImage(
+              dataUrl,
+              projectName,
+              versionId,
+              options.scale,
+              { mime: 'image/png' }
+            );
+          }
           downloadDataUrl(dataUrl, `${filename}${suffix}.png`);
           break;
         }
 
         case 'jpeg': {
-          const dataUrl = await captureExportImage((el) =>
+          let dataUrl = await captureExportImage((el) =>
             toJpeg(el, {
               backgroundColor: bgJpeg,
               quality: options.quality,
@@ -567,6 +654,15 @@ export default function ExportWizard({
               filter: options.includeUiElements ? undefined : imageExportFilter,
             })
           );
+          if (options.includeTimestampAndMetadata) {
+            dataUrl = await drawTimestampAndMetadataOnImage(
+              dataUrl,
+              projectName,
+              versionId,
+              options.scale,
+              { mime: 'image/jpeg', quality: options.quality }
+            );
+          }
           downloadDataUrl(dataUrl, `${filename}${suffix}.jpg`);
           break;
         }
@@ -611,6 +707,17 @@ export default function ExportWizard({
           const y = (pageHeight - scaledHeight) / 2;
 
           pdf.addImage(dataUrl, 'PNG', x, y, scaledWidth, scaledHeight);
+
+          if (options.includeTimestampAndMetadata) {
+            const lines = getTimestampAndMetadataLines(projectName, versionId);
+            const padding = 12;
+            pdf.setFontSize(8);
+            pdf.setTextColor(100, 100, 100);
+            lines.forEach((line, i) => {
+              pdf.text(line, pageWidth - padding, pageHeight - padding - i * 10, { align: 'right' });
+            });
+          }
+
           pdf.save(`${filename}${suffix}.pdf`);
           break;
         }
@@ -645,7 +752,7 @@ export default function ExportWizard({
       setExportGridOverride(null);
       setIsExporting(false);
     }
-  }, [canExportGroups, selectedFormat, options, isDark, getFilenameBase, imageExportFilter, generateTextExport, getNodeIdsForGroups, alertDialog, onClose, captureExportImage, setExportGridOverride]);
+  }, [canExportGroups, selectedFormat, options, isDark, projectName, versionId, getFilenameBase, imageExportFilter, generateTextExport, getNodeIdsForGroups, alertDialog, onClose, captureExportImage, setExportGridOverride]);
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -960,6 +1067,34 @@ export default function ExportWizard({
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Include the canvas dot/line grid in the exported image.
+                        </p>
+                      </div>
+
+                      {/* #409: Timestamp and metadata */}
+                      <div className="col-span-3">
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">
+                          Timestamp & metadata
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="export-include-timestamp-metadata"
+                            checked={options.includeTimestampAndMetadata}
+                            onChange={(e) =>
+                              setOptions((prev) => ({ ...prev, includeTimestampAndMetadata: e.target.checked }))
+                            }
+                            className="rounded border-gray-300 dark:border-gray-600"
+                          />
+                          <label
+                            htmlFor="export-include-timestamp-metadata"
+                            className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Clock className="w-4 h-4 text-gray-400" aria-hidden />
+                            Include timestamp and metadata
+                          </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Show project name, version, and export date in the bottom-right corner of the export.
                         </p>
                       </div>
                     </>
