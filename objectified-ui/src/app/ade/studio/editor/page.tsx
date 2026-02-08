@@ -262,9 +262,8 @@ const StudioContent = () => {
   // Selected nodes for spacing tools
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
 
-  // Focus mode: isolate selected classes and their immediate relationships (frozen at enter)
+  // Focus mode: isolate selected classes and their immediate relationships (live from current selection)
   const [focusModeEnabled, setFocusModeEnabled] = useState(false);
-  const [focusModeFrozenNodeIds, setFocusModeFrozenNodeIds] = useState<string[]>([]);
 
   // Spacing indicators state
   const [spacingIndicators, setSpacingIndicators] = useState<{
@@ -675,16 +674,14 @@ const StudioContent = () => {
     }
   }, [searchFiltersOpen]);
 
-  // Focus mode: frozen set for quick lookup when applying dimming
-  const focusModeFrozenSet = useMemo(() => new Set(focusModeFrozenNodeIds), [focusModeFrozenNodeIds]);
-
-  // Enter focus mode: isolate selected classes and their immediate relationships (1st-degree)
-  const enterFocusMode = useCallback(() => {
+  // Focus mode: focused set = current selection + immediate neighbors (updates when selection changes)
+  const focusModeFocusedSet = useMemo(() => {
+    if (!focusModeEnabled) return new Set<string>();
     const classNodeIds = selectedNodeIds.filter(id => {
       const node = nodes.find(n => n.id === id);
       return node && node.type !== 'groupNode';
     });
-    if (classNodeIds.length === 0) return;
+    if (classNodeIds.length === 0) return new Set<string>();
     const focusedSet = new Set<string>(classNodeIds);
     edges.forEach(edge => {
       if (focusedSet.has(edge.source) || focusedSet.has(edge.target)) {
@@ -692,13 +689,15 @@ const StudioContent = () => {
         focusedSet.add(edge.target);
       }
     });
-    setFocusModeFrozenNodeIds(Array.from(focusedSet));
-    setFocusModeEnabled(true);
-  }, [selectedNodeIds, nodes, edges]);
+    return focusedSet;
+  }, [focusModeEnabled, selectedNodeIds, nodes, edges]);
+
+  const toggleFocusMode = useCallback(() => {
+    setFocusModeEnabled(prev => !prev);
+  }, []);
 
   const exitFocusMode = useCallback(() => {
     setFocusModeEnabled(false);
-    setFocusModeFrozenNodeIds([]);
   }, []);
 
   // Keyboard shortcut for canvas search (Cmd+F or Ctrl+F) and focus mode (Esc)
@@ -746,11 +745,11 @@ const StudioContent = () => {
       });
     }
 
-    // Apply focus mode dimming when focus mode is on (isolate selected + immediate relationships)
-    if (focusModeEnabled && focusModeFrozenSet.size > 0) {
+    // Apply focus mode dimming when focus mode is on (current selection + immediate relationships)
+    if (focusModeEnabled && focusModeFocusedSet.size > 0) {
       result = result.map(node => {
         if (node.type === 'groupNode') return node;
-        const inFocus = focusModeFrozenSet.has(node.id);
+        const inFocus = focusModeFocusedSet.has(node.id);
         const existingClassName = node.className || '';
         const focusClass = inFocus ? '' : 'focus-dimmed';
         return {
@@ -761,7 +760,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFrozenSet]);
+  }, [nodes, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -785,9 +784,9 @@ const StudioContent = () => {
     }
 
     // Dim edges not between focused nodes when focus mode is on
-    if (focusModeEnabled && focusModeFrozenSet.size > 0) {
+    if (focusModeEnabled && focusModeFocusedSet.size > 0) {
       result = result.map(edge => {
-        const bothFocused = focusModeFrozenSet.has(edge.source) && focusModeFrozenSet.has(edge.target);
+        const bothFocused = focusModeFocusedSet.has(edge.source) && focusModeFocusedSet.has(edge.target);
         if (!bothFocused) {
           const existingClassName = edge.className || '';
           return {
@@ -800,7 +799,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFrozenSet]);
+  }, [edges, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
 
   // Compute canvas background style based on settings (shared util for preview + main canvas)
   const canvasBackgroundStyle = useMemo(
@@ -4123,14 +4122,16 @@ const StudioContent = () => {
             transition: opacity 0.2s ease !important;
           }
 
-          /* Focus mode - dim non-focused nodes and edges (same visual as search) */
+          /* Focus mode (#487) - dim and blur non-focused nodes */
           .react-flow__node.focus-dimmed {
-            opacity: 0.25 !important;
-            filter: grayscale(50%) !important;
+            opacity: 0.2 !important;
+            filter: blur(2px) grayscale(60%) !important;
             transition: opacity 0.2s ease, filter 0.2s ease !important;
+            pointer-events: none !important;
           }
           .react-flow__edge.focus-dimmed path {
-            opacity: 0.15 !important;
+            opacity: 0.12 !important;
+            stroke-dasharray: 4 4 !important;
             transition: opacity 0.2s ease !important;
           }
         `}</style>
@@ -4874,12 +4875,15 @@ const StudioContent = () => {
                   <Search className="h-3.5 w-3.5" />
                   <span>Search</span>
                 </button>
-                {/* Focus Mode: isolate selected classes and immediate relationships */}
+                {/* Focus Mode: toggle view that dims non-focused nodes (selection + neighbors stay in focus) */}
                 <button
-                  onClick={enterFocusMode}
-                  disabled={selectedNodeIds.length === 0}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border border-transparent disabled:opacity-50 disabled:cursor-not-allowed bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:hover:bg-gray-50 disabled:hover:text-gray-700 dark:disabled:hover:bg-gray-700 dark:disabled:hover:text-gray-300"
-                  title="Focus mode: isolate selected classes and their immediate relationships (Esc to exit)"
+                  onClick={toggleFocusMode}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
+                    focusModeEnabled
+                      ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
+                      : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
+                  }`}
+                  title="Focus mode: dim nodes outside selection and their connections (Esc to exit)"
                 >
                   <Focus className="h-3.5 w-3.5" />
                   <span>Focus</span>
