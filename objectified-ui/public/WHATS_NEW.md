@@ -39,6 +39,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Export improvements:
     - Added ability to export the entire viewport, or the current viewport
     - Added ability to export selected groups in the viewport
+    - Added ability to include styling elements in the export options
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)
   - Added inline variable editor that can click parameters in the header of the path studio

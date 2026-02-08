@@ -300,7 +300,7 @@
   - ✅ Export entire canvas
 - **Export Options**:
   - ✅ Export wizard interface (replaces dropdown)
-  - 📋 [TODO] Include/exclude UI elements
+  - ✅ Include/exclude UI elements
   - 📋 [TODO] Include/exclude grid
   - [TODO] Include/exclude annotations
   - [TODO] Include/exclude hidden nodes
@@ -319,7 +319,6 @@
 
 | Ticket | Feature Description                        | Status |
 |--------|--------------------------------------------|--------|
-| #406   | Include/exclude UI elements                | [TODO] |
 | #407   | Include/exclude grid                       | [TODO] |
 | #408   | Export option to add watermark             | [TODO] |
 | #409   | Add timestamp and metadata                 | [TODO] |

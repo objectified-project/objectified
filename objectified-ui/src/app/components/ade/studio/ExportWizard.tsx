@@ -9,6 +9,7 @@ import {
   FileText,
   BarChart3,
   Layout,
+  LayoutDashboard,
   Network,
   Zap,
   Download,
@@ -99,7 +100,8 @@ interface ExportOptions {
   // PDF options
   pageSize: 'a4' | 'letter' | 'auto';
   orientation: 'portrait' | 'landscape';
-  // General options
+  // General options (#406: include/exclude UI elements)
+  includeUiElements: boolean;
   includeGrid: boolean;
   includeWatermark: boolean;
   watermarkText: string;
@@ -114,6 +116,7 @@ const defaultOptions: ExportOptions = {
   backgroundColor: '#ffffff',
   pageSize: 'auto',
   orientation: 'landscape',
+  includeUiElements: false,
   includeGrid: false,
   includeWatermark: false,
   watermarkText: '',
@@ -292,7 +295,7 @@ export default function ExportWizard({
             backgroundColor: bg,
             quality: 0.5, // Lower quality for preview
             pixelRatio: 1,
-            filter: imageExportFilter,
+            filter: options.includeUiElements ? undefined : imageExportFilter,
           });
         };
         let dataUrl: string;
@@ -522,7 +525,7 @@ export default function ExportWizard({
               backgroundColor: bgPng,
               quality: options.quality,
               pixelRatio: options.scale,
-              filter: imageExportFilter,
+              filter: options.includeUiElements ? undefined : imageExportFilter,
             })
           );
           downloadDataUrl(dataUrl, `${filename}${suffix}.png`);
@@ -535,7 +538,7 @@ export default function ExportWizard({
               backgroundColor: bgJpeg,
               quality: options.quality,
               pixelRatio: options.scale,
-              filter: imageExportFilter,
+              filter: options.includeUiElements ? undefined : imageExportFilter,
             })
           );
           downloadDataUrl(dataUrl, `${filename}${suffix}.jpg`);
@@ -546,7 +549,7 @@ export default function ExportWizard({
           const dataUrl = await captureExportImage((el) =>
             toSvg(el, {
               backgroundColor: bgPng,
-              filter: imageExportFilter,
+              filter: options.includeUiElements ? undefined : imageExportFilter,
             })
           );
           downloadDataUrl(dataUrl, `${filename}${suffix}.svg`);
@@ -559,7 +562,7 @@ export default function ExportWizard({
               backgroundColor: bgPng,
               quality: 1.0,
               pixelRatio: options.scale,
-              filter: imageExportFilter,
+              filter: options.includeUiElements ? undefined : imageExportFilter,
             })
           );
 
@@ -885,6 +888,29 @@ export default function ExportWizard({
                           />
                           <span className="text-sm text-gray-700 dark:text-gray-300">Include</span>
                         </div>
+                      </div>
+
+                      {/* Include UI elements (#406) */}
+                      <div className="col-span-3">
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-1">
+                          UI elements
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="export-include-ui"
+                            checked={options.includeUiElements}
+                            onChange={(e) => setOptions(prev => ({ ...prev, includeUiElements: e.target.checked }))}
+                            className="rounded border-gray-300 dark:border-gray-600"
+                          />
+                          <label htmlFor="export-include-ui" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                            Include UI elements
+                          </label>
+                          <LayoutDashboard className="w-4 h-4 text-gray-400" aria-hidden />
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Include zoom controls, minimap, attribution, and other canvas overlays in the export.
+                        </p>
                       </div>
                     </>
                   )}
