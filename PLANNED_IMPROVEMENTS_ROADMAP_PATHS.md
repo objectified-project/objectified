@@ -552,6 +552,260 @@ The Paths Designer is a fully implemented visual API design tool built on React 
 
 ---
 
+## 16. Advanced Edge Routing Engine 📋 PLANNED
+
+[TODO] The current SmartEdge component uses a basic A*-inspired pathfinding algorithm with horizontal-first / vertical-first / around-obstacle strategies. While functional, it produces suboptimal routing for dense canvases — edges overlap, crossings accumulate, and connection paths feel cluttered. A production-grade routing engine should produce clean, orthogonal paths with minimal crossings, proper port assignments, and visual bundling for parallel connections.
+
+### Orthogonal (Manhattan) Routing
+
+- [TODO] **Strict Right-Angle Routing**: Replace the current free-form waypoint routing with a strict orthogonal router where every edge segment is either perfectly horizontal or perfectly vertical — no diagonal segments allowed. This produces the clean, schematic look expected in enterprise architecture diagrams
+- [TODO] **Configurable Corner Radius**: Allow a global corner radius setting (default 10px, range 0–20px) for the 90-degree turns, controlled via a canvas settings slider. The current hardcoded `borderRadius: 8` in `getSmoothStepPath` should become configurable
+- [TODO] **Minimum Segment Length**: Enforce a minimum segment length (default 20px) so that short jogs are eliminated. When two turns would be closer than the minimum, merge them into a single offset
+- [TODO] **Preferred Routing Direction**: Allow edges to declare a preferred direction (e.g., operation→parameter edges prefer downward routing, operation→response edges prefer rightward), producing more predictable visual patterns aligned with the layout direction
+- [TODO] **Routing Channel Allocation**: Assign parallel edges to distinct routing channels (spaced 12px apart) so that when multiple edges run alongside each other, they maintain consistent spacing rather than stacking on top of one another
+
+### Edge Crossing Minimization
+
+- [TODO] **Layer-Based Crossing Reduction**: After initial routing, run a Barycenter heuristic or median heuristic pass to reorder node ports and reduce the total number of edge crossings across the canvas
+- [TODO] **Post-Layout Re-Routing**: After auto-layout or manual node repositioning, automatically re-run the routing engine to minimize crossings introduced by the new node positions. Debounce at 200ms after drag-end
+- [TODO] **Crossing Count Display**: Show the current edge crossing count in the canvas status bar (e.g., "12 crossings"). Highlight crossing points with subtle red dots when a "Show Crossings" debug toggle is enabled
+- [TODO] **Iterative Improvement**: Apply 2-opt or sifting passes (up to 5 iterations) to progressively reduce crossings after each layout change
+- [TODO] **Crossing-Free Focus Mode**: When in Operation Focus Mode (Section 1), guarantee zero crossings among the focused operation's edges by re-routing them in isolation
+
+### Port-Based Connection Points
+
+- [TODO] **Multi-Port Nodes**: Replace the current single top/bottom `Handle` pairs with multi-port layouts:
+  - **Operation nodes**: Left-side ports for inbound connections (request body), right-side ports for outbound connections (responses), bottom ports for parameters. Each port is a 6px circle positioned at calculated intervals along the node edge
+  - **Parameter nodes**: Single top port (input from operation)
+  - **Response nodes**: Single top port (input from operation), optional right-side port (output to response body or class)
+  - **Request Body nodes**: Single right port (output to operation)
+  - **Response Body nodes**: Single left port (input from response)
+  - **Class nodes**: Top port (input from response or request body binding)
+- [TODO] **Port Auto-Assignment**: When creating an edge, automatically assign it to the nearest available port on both source and target nodes. If all ports on one side are occupied, dynamically add a new port
+- [TODO] **Port Ordering**: Order ports by the vertical/horizontal position of their connected node to minimize edge crossings at the node boundary
+- [TODO] **Port Color Coding**: Ports inherit the edge color for their relationship type (gray for parameters, purple for responses, blue for response bodies, indigo for class refs), providing a visual cue for what connects where
+- [TODO] **Port Hover Preview**: Hovering over an unconnected port shows a tooltip indicating what can connect to it (e.g., "Drop a Response node here") and highlights compatible nodes on the canvas
+
+### Edge Bundling & Grouping
+
+- [TODO] **Automatic Edge Bundling**: When 3+ edges share a common source or target and follow similar paths, merge them into a single bundled trunk that fans out near the terminal nodes. The trunk uses a thicker stroke (4px) and each fan-out branch returns to the standard stroke width (2px)
+- [TODO] **Bundle Expansion on Hover**: Hovering over an edge bundle smoothly expands it (300ms ease-out) to reveal individual edges, each labeled with its relationship type
+- [TODO] **Bundle Color Blending**: The bundled trunk uses a blended color derived from its constituent edges (e.g., gray + purple = muted lavender), reverting to individual colors on expansion
+- [TODO] **Manual Bundle/Unbundle**: Right-click a group of selected edges → "Bundle Edges" / "Unbundle Edges" to manually control bundling
+- [TODO] **Bundle Label**: Show a count label on the bundle trunk (e.g., "4 connections") with a semi-transparent pill background
+
+### Edge Z-Ordering & Layering
+
+- [TODO] **Edges Behind Nodes**: By default, render all edges behind (below) node elements so that nodes are never obscured by edge paths. Currently React Flow renders edges and nodes in the same SVG layer
+- [TODO] **Selected Edge Promotion**: When an edge is selected or hovered, promote it to the top layer so it renders above all other edges and shows its full path clearly
+- [TODO] **Focus Mode Edge Layering**: In Operation Focus Mode, focused edges render in a top layer with full opacity; dimmed edges render in a bottom layer at 15% opacity with `pointer-events: none`
+- [TODO] **Edge Layer Toggle**: Canvas settings option to toggle between "Edges Behind Nodes" (cleaner) and "Edges Above Nodes" (more visible) rendering modes
+
+### Dynamic Re-Routing on Drag
+
+- [TODO] **Live Re-Route During Drag**: While dragging a node, connected edges should re-route in real-time (throttled at 16ms / 60fps) so the developer can see how the edge path changes as they reposition the node
+- [TODO] **Snap-to-Route**: When dragging a node near an alignment position that would produce a cleaner edge route (straight segment instead of bend), show a blue alignment guide and snap the node to that position
+- [TODO] **Post-Drag Optimization**: After releasing a node drag, run a single optimization pass on all connected edges to clean up any suboptimal routing introduced during the drag (eliminate unnecessary bends, straighten segments where possible)
+
+### Edge Style Presets
+
+- [TODO] **"Blueprint" Edge Style**: Thin (1.5px) steel-blue edges with sharp 90-degree corners and no radius, suited for technical schematic look
+- [TODO] **"Modern" Edge Style**: Medium (2px) edges with 12px corner radius, subtle gradient from source color to target color along the path, and a very faint drop shadow (`filter: drop-shadow(0 1px 2px rgba(0,0,0,0.05))`)
+- [TODO] **"Minimal" Edge Style**: Thin (1px) light-gray edges with 6px corner radius, no labels (labels appear on hover only), no animations — maximum canvas cleanliness
+- [TODO] **"Neon" Edge Style**: For dark mode; edges use bright saturated colors with a `filter: drop-shadow(0 0 4px <edgeColor>)` glow effect, producing a cyberpunk/IDE aesthetic
+- [TODO] **"Hand-Drawn" Edge Style**: Use a `rough.js`-style renderer to give edges a hand-sketched appearance, useful for early design/whiteboard sessions
+- [TODO] **Preset Selector**: Dropdown in canvas settings → "Edge Style" with the above presets; each preset adjusts stroke width, color, corner radius, shadow, and animation simultaneously
+
+---
+
+## 17. Node Visual Design System 📋 PLANNED
+
+[TODO] The current node components use ad-hoc Tailwind classes with inconsistent sizing (`shadow-sm` on parameters vs. `shadow-xl` on operations), variable width ranges (`min-w-[220px]`–`max-w-[280px]` on operations vs. `min-w-[320px]`–`max-w-[400px]` on request bodies), and mixed design patterns (gradient headers on some, solid headers on others). A unified visual design system should bring consistency, hierarchy, and polish across all node types while maintaining clear type differentiation.
+
+### Unified Node Shell
+
+- [TODO] **Base Node Component**: Create a shared `PathsBaseNode` wrapper component that all node types extend. It provides consistent outer styling:
+  - Border radius: `rounded-xl` (12px) on all nodes
+  - Border: `border` (1px) by default, `border-2` (2px) when selected
+  - Shadow: `shadow-md` by default, `shadow-lg` on hover, `shadow-xl` when selected. Use a consistent shadow scale instead of per-node ad-hoc shadows
+  - Transition: `transition-shadow duration-150 ease-in-out` for smooth hover/selection effects
+  - Background: `bg-white dark:bg-zinc-900` (replacing the current `dark:bg-gray-800` for better contrast)
+- [TODO] **Consistent Width Grid**: Standardize all nodes to a 280px width (± 20px for content overflow). The current wildly varying widths (200–400px) create a chaotic canvas. Parameters and class nodes should match the operation node width so that vertical alignment works cleanly
+- [TODO] **Node Type Icon in Corner**: Each node type gets a small (16px) type-identifying icon in the top-right corner of the header:
+  - Operation: HTTP method pill (already exists, refine)
+  - Parameter: `Settings2` Lucide icon
+  - Response: `Reply` Lucide icon
+  - Request Body: `ArrowUpFromLine` Lucide icon
+  - Response Body: `ArrowDownToLine` Lucide icon
+  - Class: `Box` Lucide icon
+- [TODO] **Elevation Hierarchy**: Use shadow depth to communicate node importance:
+  - Operation nodes: `shadow-lg` (primary, highest elevation)
+  - Response/Request Body nodes: `shadow-md` (secondary)
+  - Parameter/Response Body/Class nodes: `shadow-sm` (tertiary)
+  - On hover, all nodes increase one level (e.g., `shadow-md` → `shadow-lg`)
+
+### Operation Node Visual Overhaul
+
+- [TODO] **Refined Header**: Replace the current full-width solid-color header with a two-tone design:
+  - Left 4px vertical accent bar in the HTTP method color (replacing the full background flood)
+  - Header background: `bg-zinc-50 dark:bg-zinc-800` with the method name as a compact pill badge (`px-2 py-0.5 rounded text-xs font-bold text-white`) in the method color
+  - Path displayed in `font-mono text-sm` adjacent to the method pill
+  - This reduces visual noise from the large blocks of saturated color currently dominating the canvas
+- [TODO] **Method Color Accent Bar**: A 4px-wide vertical bar on the left edge of the entire node (not just the header) in the HTTP method color, extending from top to bottom. This provides method identification at a glance without overwhelming color
+- [TODO] **Compact Summary Section**: Below the header, show the operationId in `text-xs text-zinc-500 font-mono` and the summary (if set) in `text-xs text-zinc-600 dark:text-zinc-400` truncated to one line with `text-ellipsis overflow-hidden whitespace-nowrap`
+- [TODO] **Inline Status Indicators**: A horizontal row of micro-badges below the summary:
+  - Parameter count: `📋 3` in `text-[10px]`
+  - Response count: `📬 2` in `text-[10px]`
+  - Security: 🔒/🔓 icon (8px)
+  - Deprecated: ⚠️ with `line-through` on the path text
+  - Each badge uses `bg-zinc-100 dark:bg-zinc-800 rounded px-1` for a subtle chip appearance
+- [TODO] **Selected State**: When selected, the node border color changes to the method color, border width becomes `3px`, and a subtle outer ring (`ring-2 ring-<methodColor>/30 ring-offset-2`) appears. Current selected styling is minimal and hard to distinguish
+- [TODO] **Hover State**: On hover, increase shadow by one level, add `scale-[1.01]` with `transition-transform duration-100`, and show connection-point indicators (small dots) on all four sides of the node
+
+### Connection Point (Handle) Visual Redesign
+
+- [TODO] **Circular Handles**: Replace the current rectangular handles (`!w-3 !h-2 !rounded-t-md !rounded-b-none`) with circular handles (`w-3 h-3 rounded-full`) for a cleaner, more universal look. The rectangular tab-style handles look dated compared to modern diagramming tools
+- [TODO] **Handle Visibility**: Handles should be hidden by default (`opacity-0`) and appear (`opacity-100`) with a 100ms fade when the node is hovered or selected. This reduces visual clutter when browsing the canvas
+- [TODO] **Handle Glow on Drag**: When the user is dragging from a handle to create a new connection, the compatible target handles on other nodes should pulse with a subtle glow animation (`animate-pulse` with the edge relationship color) to indicate valid drop targets
+- [TODO] **Handle Tooltips**: On handle hover, show a tiny tooltip (`text-[10px]`) indicating the connection type: "Connect Parameter", "Connect Response", "Connect Schema"
+- [TODO] **Handle Position**: Move handles from the strict top-center/bottom-center positions to side-aware positions:
+  - Input handles: left-center or top-center depending on layout direction
+  - Output handles: right-center or bottom-center depending on layout direction
+  - When layout direction changes (TB vs LR), handles automatically reposition
+- [TODO] **Active Handle Ring**: When a handle is being hovered for connection, show a 2px ring around it in the relationship color with `ring-offset-1`
+
+### Parameter Node Refinement
+
+- [TODO] **Compact Chip Design**: Reduce the parameter node to a compact chip layout:
+  - Height: fixed 36px (single-line display)
+  - Layout: `[location-dot] name : type [required-star]` all on one line
+  - Location dot: 8px colored circle (green for path, blue for query, purple for header, orange for cookie) instead of the current colored background
+  - Name: `font-mono text-sm font-medium`
+  - Type: `text-xs text-zinc-500`
+  - Required: red asterisk `*` suffix on the name
+- [TODO] **Parameter Location Left Bar**: Similar to the operation method bar, a 3px left border in the location color (green/blue/purple/orange) instead of the full background tint, reducing visual noise
+- [TODO] **Expanded Parameter View**: On double-click or hover, expand the chip to show description, constraints (min/max/pattern), example value, and serialization style in a dropdown panel below the chip
+
+### Response Node Refinement
+
+- [TODO] **Status Code Pill Design**: Reduce the response header to a compact status code pill:
+  - Status code in a rounded pill (`px-2 py-0.5 rounded-full text-xs font-bold text-white`) using the status color
+  - Description text next to the pill in `text-sm`
+  - This replaces the current full-width colored header which consumes significant vertical space
+- [TODO] **Status Color Left Bar**: A 3px left border in the status code color (green/blue/yellow/red) extending the full height of the node, consistent with the operation node accent bar pattern
+- [TODO] **Response Content Preview**: Show a compact one-line preview of the response schema: `{ Pet }` or `[ Pet ]` or `string` in `font-mono text-xs text-zinc-500`, giving developers a quick glance at what the response returns
+- [TODO] **Headers Badge**: If the response defines custom headers, show a small `H` badge with a count (e.g., `H:3`) in the top-right corner
+
+### Request/Response Body Node Refinement
+
+- [TODO] **Unified Body Node Design**: Make request and response body nodes follow the same accent-bar design pattern:
+  - Request body: 4px left bar in indigo (`border-l-4 border-indigo-500`)
+  - Response body: 4px left bar in emerald (`border-l-4 border-emerald-500`)
+  - Replace the current gradient headers (`bg-gradient-to-r from-indigo-500 to-purple-600`) with a clean solid header using the accent color as a left bar. Gradients are visually heavy and inconsistent with the leaner accent-bar style on operations
+- [TODO] **Content Type Tabs**: Show content types as small tab pills in the header (e.g., `[JSON] [XML] [form-data]`) with the active type highlighted, replacing the current dropdown or full-width display
+- [TODO] **Schema Snippet**: Show a 2-3 line JSON schema snippet of the body content in a `font-mono text-[11px] bg-zinc-50 dark:bg-zinc-950 rounded p-1` block within the node, providing immediate context about the body structure
+
+### Class Node Refinement
+
+- [TODO] **Schema Card Design**: Redesign class nodes as compact "schema cards":
+  - 4px left bar in indigo (matching the schema canvas styling)
+  - Header: Class name in `font-mono text-sm font-semibold` with a small `Box` icon
+  - Body: Show the first 3-4 property names in `text-[11px] font-mono text-zinc-500` as a comma-separated list (e.g., `id, name, email, ...+5`)
+  - This gives developers an at-a-glance understanding of the referenced schema without opening an editor
+- [TODO] **Property Count Badge**: Small badge showing total property count (e.g., `8 props`) in the bottom-right corner
+- [TODO] **Link to Schema Canvas**: Small external-link icon in the top-right corner that navigates to this class on the Schema Canvas
+
+### Node Interaction States
+
+- [TODO] **Idle State**: Default appearance with `shadow-md`, `border` (1px), handles hidden
+- [TODO] **Hover State**: `shadow-lg`, `scale-[1.01]`, handles visible at `opacity-60`, border darkens slightly
+- [TODO] **Selected State**: `shadow-xl`, `border-2` in node accent color, handles visible at `opacity-100`, outer `ring-2` in accent color at 30% opacity
+- [TODO] **Dragging State**: `shadow-2xl`, `scale-[1.02]`, `opacity-90`, cursor `grabbing`
+- [TODO] **Focused (Focus Mode) State**: Full opacity, `ring-2` in accent color, all connected edges glow
+- [TODO] **Dimmed (Focus Mode) State**: `opacity-20`, `pointer-events: none`, `grayscale(50%)`, shadow removed
+- [TODO] **Error State**: `ring-2 ring-red-500/50`, small red error badge in top-right corner with tooltip showing the validation error
+- [TODO] **Drop Target State**: When a draggable item hovers over a valid drop target node, show a dashed `border-2 border-dashed border-blue-400` with `bg-blue-50/30 dark:bg-blue-950/20` background tint
+
+### Dark Mode Node Palette
+
+- [TODO] **Dark Mode Color Adjustments**: The current dark mode uses `dark:bg-gray-800` which lacks contrast against typical dark canvas backgrounds. Switch to:
+  - Node background: `dark:bg-zinc-900` (darker, more contrast)
+  - Node border: `dark:border-zinc-700` (visible but not harsh)
+  - Header background: `dark:bg-zinc-800/80` (slightly lighter than body)
+  - Text: `dark:text-zinc-100` (primary), `dark:text-zinc-400` (secondary)
+  - Method/status color pills: Increase saturation by 10% and lightness by 15% in dark mode so colors remain vibrant against the dark background
+- [TODO] **Dark Mode Accent Bar Colors**: Slightly lighten the accent bar colors in dark mode:
+  - GET: `#4ade80` (from `#22c55e`)
+  - POST: `#60a5fa` (from `#3b82f6`)
+  - PUT: `#fb923c` (from `#f97316`)
+  - PATCH: `#c084fc` (from `#a855f7`)
+  - DELETE: `#f87171` (from `#ef4444`)
+- [TODO] **Dark Mode Shadows**: Replace traditional `box-shadow` in dark mode with subtle colored glows. E.g., operation nodes get `shadow-[0_0_12px_rgba(99,102,241,0.08)]` (indigo tint) in dark mode instead of the black box-shadow that is invisible against dark backgrounds
+- [TODO] **Dark Mode Handle Colors**: Increase handle brightness in dark mode so connection points remain discoverable; use the lightened accent colors from above
+
+### Node Design Presets
+
+- [TODO] **"Professional" Preset** (default): Clean accent bars, minimal shadows, zinc color palette, hidden handles. Suited for enterprise presentations and documentation screenshots
+- [TODO] **"Developer" Preset**: Higher information density, monospace fonts throughout, visible handles, code-style borders (`border border-zinc-300 dark:border-zinc-600`), terminal-inspired aesthetic
+- [TODO] **"Colorful" Preset**: Full-width colored headers (current style), larger shadows, visible handles, bolder fonts. Suited for workshops, demos, and quick visual scanning
+- [TODO] **"Blueprint" Preset**: Navy/cyan color scheme, thin borders, no shadows, grid-aligned nodes, technical drawing aesthetic. Works best with the "Blueprint" edge style preset (Section 16)
+- [TODO] **Preset Selector**: Canvas settings → "Node Style" dropdown with live preview thumbnails showing how each preset renders a sample operation node
+
+---
+
+## 18. Canvas Visual Polish & Presentation 📋 PLANNED
+
+[TODO] Beyond individual node and edge styling, the overall canvas needs cohesive visual polish to feel like a premium, enterprise-grade design tool.
+
+### Grid & Background
+
+- [TODO] **Dot Grid Option**: In addition to the current line grid, offer a dot grid (small dots at grid intersections) which is less visually dominant and preferred in modern design tools (Figma, Miro)
+- [TODO] **Grid Fade at Zoom**: Fade the grid out when zoom level drops below 40% (the grid becomes too dense to be useful) and fade it in when zoom rises above 50%, using `opacity` transitions
+- [TODO] **Isometric Grid**: Optional isometric (30-degree angled) grid for a distinctive 3D-perspective look
+- [TODO] **Canvas Region Shading**: Subtly shade canvas regions by path group (e.g., the area around all `/users` operations gets a `bg-blue-500/3` tint, `/products` gets `bg-green-500/3`), providing visual clustering without explicit group containers
+
+### Visual Grouping
+
+- [TODO] **Auto-Generated Group Containers**: Automatically draw rounded-rectangle group containers around operations that share the same base path. Each container gets:
+  - Header: Path prefix in `font-mono text-xs text-zinc-500` with a left-colored accent matching the group color
+  - Background: `bg-<color>-50/30 dark:bg-<color>-950/20` (very subtle tint)
+  - Border: `border border-<color>-200/50 dark:border-<color>-800/50` (dashed)
+  - Collapse/expand toggle in the header
+- [TODO] **Group Color Auto-Assignment**: Assign group colors from a preset palette (blue, green, amber, violet, rose, cyan, orange, teal) based on path prefix hash, ensuring consistent colors across sessions
+- [TODO] **Nested Group Indentation**: For nested paths like `/users/{id}/posts`, show the group container indented within the parent `/users` group container
+
+### Canvas Status Bar
+
+- [TODO] **Bottom Status Bar**: A 28px-tall status bar at the bottom of the canvas showing:
+  - Left: Total operations count, parameter count, response count (e.g., "24 operations · 67 parameters · 52 responses")
+  - Center: Current edge crossing count and validation status (e.g., "3 crossings · 2 warnings")
+  - Right: Zoom level percentage (e.g., "75%"), grid snap status ("Snap: On"), current layout mode ("Layout: Vertical")
+- [TODO] **Status Bar Click Actions**: Clicking the zoom percentage opens a zoom dropdown; clicking the validation status opens the validation panel; clicking the crossing count highlights crossing points
+
+### Zoom-Based Detail Levels (Semantic Zoom)
+
+- [TODO] **Zoom Level 100%+ (Detail View)**: Show all node content — method pill, path, operationId, summary, inline parameters, inline responses, status indicators, tags. Full edge labels visible
+- [TODO] **Zoom Level 60-100% (Standard View)**: Show method pill + path + status indicators. Collapse inline parameters/responses to count badges only. Edge labels visible
+- [TODO] **Zoom Level 30-60% (Overview)**: Show only method pill + path. Hide all interior content. Edge labels hidden. Nodes render as compact cards (fixed 200×40px)
+- [TODO] **Zoom Level <30% (Map View)**: Nodes render as small colored rectangles (80×20px) with only the method color visible. Edges render as thin 1px lines. Useful for navigating large API surfaces
+- [TODO] **Smooth Level Transitions**: Crossfade between detail levels using `opacity` transitions (150ms) so content doesn't abruptly appear/disappear during zoom
+
+### Animation & Motion
+
+- [TODO] **Node Entrance Animation**: When new nodes are added to the canvas (via drag-and-drop or auto-create), animate them in with `scale-0 → scale-100` and `opacity-0 → opacity-100` over 200ms with a slight `ease-out` bounce
+- [TODO] **Node Exit Animation**: When nodes are deleted, animate out with `scale-100 → scale-0` and `opacity-100 → opacity-0` over 150ms
+- [TODO] **Edge Draw Animation**: When a new edge is created, animate the path drawing from source to target using SVG `stroke-dasharray` and `stroke-dashoffset` animation over 300ms
+- [TODO] **Layout Transition**: When applying auto-layout, animate nodes from their current positions to their new positions over 400ms with `ease-in-out` easing (instead of instant repositioning)
+- [TODO] **Reduce Motion Respect**: When the OS-level `prefers-reduced-motion` setting is enabled, disable all animations and apply instant state changes
+
+### Canvas Export Polish
+
+- [TODO] **Export-Optimized Rendering**: When exporting the canvas as PNG/SVG/PDF, render at 2x resolution with anti-aliased edges, hidden handles (connection points), visible edge labels, and a 40px padding around all content
+- [TODO] **Light Mode Export**: Always export in light mode (regardless of current theme) unless the user explicitly selects "Export in Dark Mode", since light backgrounds reproduce better in documents and presentations
+- [TODO] **Watermark Option**: Optional project name/logo watermark in the bottom-right corner of exported images, configurable in canvas settings
+
+---
+
 # Completed Features Reference
 
 The following features are fully implemented in the Paths Designer:
