@@ -337,6 +337,10 @@ const StudioContent = () => {
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
 
+  // #471: Preview layout suggestions before applying
+  const [layoutPreviewNodes, setLayoutPreviewNodes] = useState<Node[] | null>(null);
+  const [layoutPreviewLabel, setLayoutPreviewLabel] = useState<string>('');
+
   // Canvas search state
   const [canvasSearchQuery, setCanvasSearchQuery] = useState('');
   const [canvasSearchOpen, setCanvasSearchOpen] = useState(false);
@@ -821,9 +825,9 @@ const StudioContent = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, canvasSearchOpen, openCanvasSearch, closeCanvasSearch, focusModeEnabled, exitFocusMode]);
 
-  // Compute nodes with search and/or focus mode styling applied
+  // Compute nodes with search and/or focus mode styling applied (#471: use preview nodes when in layout preview)
   const displayNodes = useMemo(() => {
-    let result = nodes;
+    let result = layoutPreviewNodes ?? nodes;
 
     // #488: Show only nodes that have at least one connection (hide isolated nodes)
     if (showOnlyConnectedNodes) {
@@ -866,7 +870,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -2898,90 +2902,90 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, currentUserId, reloadClasses, setNodes, setGroups, setViewport, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh, updateNodeInternals]);
 
-  // Auto-arrange nodes using hierarchical layout algorithm with specified direction
-  const handleAutoArrangeWithDirection = useCallback((direction: 'TB' | 'LR') => {
+  // #471: Preview layout before applying — compute layout and show preview (do not commit)
+  const handlePreviewLayout = useCallback((direction: 'TB' | 'LR') => {
     if (nodes.length === 0) return;
+    setLayoutDropdownOpen(false);
+    try {
+      const layoutedNodes = applyAutoLayout(nodes, edges, {
+        nodeSpacingX: direction === 'LR' ? 150 : 100,
+        nodeSpacingY: direction === 'LR' ? 100 : 150,
+        direction: direction,
+        padding: 80,
+        centerNodes: true,
+        minimizeCrossings: true,
+      });
+      setLayoutPreviewNodes(layoutedNodes);
+      setLayoutPreviewLabel(direction === 'TB' ? 'Top to Bottom' : 'Left to Right');
+    } catch (error) {
+      console.error('Error computing layout preview:', error);
+    }
+  }, [nodes, edges]);
 
-    setLoadingMessage(`Arranging nodes (${direction === 'TB' ? 'Top to Bottom' : 'Left to Right'})...`);
-    setIsLoadingCanvas(true);
-
-    // Use setTimeout to allow the loading state to render
-    setTimeout(() => {
-      try {
-        // Apply auto-layout algorithm with specified direction
-        const layoutedNodes = applyAutoLayout(nodes, edges, {
-          nodeSpacingX: direction === 'LR' ? 150 : 100,
-          nodeSpacingY: direction === 'LR' ? 100 : 150,
-          direction: direction,
-          padding: 80,
-          centerNodes: true,
-          minimizeCrossings: true,
-        });
-
-        // Update nodes with new positions
-        setNodes(layoutedNodes);
-
-        // Sync groups state with the updated group node positions and dimensions
-        const updatedGroupNodes = layoutedNodes.filter(n => n.type === 'groupNode');
-        if (updatedGroupNodes.length > 0 && groups.length > 0) {
-          const updatedGroups = groups.map(group => {
-            const groupNode = updatedGroupNodes.find(n => n.id === group.id);
-            if (groupNode) {
-              // Update groupPositionsRef to prevent jump on next drag
-              groupPositionsRef.current.set(groupNode.id, { x: groupNode.position.x, y: groupNode.position.y });
-
-              return {
-                ...group,
-                position: groupNode.position,
-                dimensions: {
-                  width: (groupNode.style as any)?.width || (groupNode.data as any)?.width || group.dimensions?.width || 300,
-                  height: (groupNode.style as any)?.height || (groupNode.data as any)?.height || group.dimensions?.height || 200,
-                },
-              };
-            }
-            return group;
-          });
-          setGroups(updatedGroups);
+  // #471: Apply the previewed layout (commit and sync groups)
+  const handleApplyLayoutPreview = useCallback(() => {
+    if (!layoutPreviewNodes) return;
+    setNodes(layoutPreviewNodes);
+    const updatedGroupNodes = layoutPreviewNodes.filter(n => n.type === 'groupNode');
+    if (updatedGroupNodes.length > 0 && groups.length > 0) {
+      const updatedGroups = groups.map(group => {
+        const groupNode = updatedGroupNodes.find(n => n.id === group.id);
+        if (groupNode) {
+          groupPositionsRef.current.set(groupNode.id, { x: groupNode.position.x, y: groupNode.position.y });
+          return {
+            ...group,
+            position: groupNode.position,
+            dimensions: {
+              width: (groupNode.style as any)?.width || (groupNode.data as any)?.width || group.dimensions?.width || 300,
+              height: (groupNode.style as any)?.height || (groupNode.data as any)?.height || group.dimensions?.height || 200,
+            },
+          };
         }
+        return group;
+      });
+      setGroups(updatedGroups);
+    }
+    setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 100);
+    setLayoutPreviewNodes(null);
+    setLayoutPreviewLabel('');
+  }, [layoutPreviewNodes, groups, setNodes, setGroups, fitView]);
 
-        // Fit view to show all nodes after a short delay
-        setTimeout(() => {
-          fitView({ padding: 0.1, duration: 300 });
-        }, 100);
+  // #471: Cancel layout preview and revert to current positions
+  const handleCancelLayoutPreview = useCallback(() => {
+    setLayoutPreviewNodes(null);
+    setLayoutPreviewLabel('');
+  }, []);
 
-        setLayoutDropdownOpen(false);
-      } catch (error) {
-        console.error('Error auto-arranging nodes:', error);
-      } finally {
-        setIsLoadingCanvas(false);
-        setLoadingMessage('');
-      }
-    }, 50);
-  }, [nodes, edges, groups, setNodes, setGroups, fitView]);
+  // Fit view to previewed layout when entering preview mode so user sees full suggestion
+  useEffect(() => {
+    if (!layoutPreviewNodes?.length) return;
+    const t = setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 150);
+    return () => clearTimeout(t);
+  }, [layoutPreviewNodes, fitView]);
 
-  // Auto-arrange Top to Bottom
+  // Auto-arrange Top to Bottom — show preview first (#471)
   const handleAutoArrangeTB = useCallback(() => {
-    handleAutoArrangeWithDirection('TB');
-  }, [handleAutoArrangeWithDirection]);
+    handlePreviewLayout('TB');
+  }, [handlePreviewLayout]);
 
-  // Auto-arrange Left to Right
+  // Auto-arrange Left to Right — show preview first (#471)
   const handleAutoArrangeLR = useCallback(() => {
-    handleAutoArrangeWithDirection('LR');
-  }, [handleAutoArrangeWithDirection]);
+    handlePreviewLayout('LR');
+  }, [handlePreviewLayout]);
 
   // Legacy handler - defaults to Top to Bottom
   const handleAutoArrange = useCallback(() => {
-    handleAutoArrangeWithDirection('TB');
-  }, [handleAutoArrangeWithDirection]);
+    handlePreviewLayout('TB');
+  }, [handlePreviewLayout]);
 
-  // Suggestion action: e.g. apply hierarchical layout when user clicks "Try Auto-organize" (#474)
+  // Suggestion action: e.g. apply hierarchical layout when user clicks "Try Auto-organize" (#474, #471 preview)
   const handleSuggestionAction = useCallback(
     (suggestion: { action?: { type: string; direction?: 'TB' | 'LR' } }) => {
       if (suggestion.action?.type === 'apply_hierarchical_layout') {
-        handleAutoArrangeWithDirection(suggestion.action.direction ?? 'TB');
+        handlePreviewLayout(suggestion.action.direction ?? 'TB');
       }
     },
-    [handleAutoArrangeWithDirection]
+    [handlePreviewLayout]
   );
 
   // ============================================================================
@@ -4558,6 +4562,35 @@ const StudioContent = () => {
               </div>
             )}
 
+            {/* #471: Layout preview bar — Apply or Cancel suggested layout */}
+            {layoutPreviewNodes && (
+              <Panel position="top-center" className="!mt-4 z-[1001]">
+                <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-teal-200 dark:border-teal-700 px-4 py-3 flex items-center gap-4">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Previewing layout: <span className="text-teal-700 dark:text-teal-300">{layoutPreviewLabel}</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleApplyLayoutPreview}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                      Apply
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelLayoutPreview}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </Panel>
+            )}
+
             <ReactFlow
               nodes={displayNodes}
               edges={edgesWithHover}
@@ -4584,7 +4617,7 @@ const StudioContent = () => {
               fitView
               attributionPosition="bottom-left"
               className={isAnimating ? 'layout-animating' : ''}
-              nodesDraggable={true}
+              nodesDraggable={!layoutPreviewNodes}
               nodesConnectable={!isReadOnly}
               elementsSelectable={true}
               selectionOnDrag={true}

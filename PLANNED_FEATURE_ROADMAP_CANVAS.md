@@ -206,14 +206,8 @@
 ### 4.1 Smart Canvas Features
 
 **Intelligent Layout Suggestions** ✅ PARTIALLY IMPLEMENTED
-- ✅ "Auto-organize" button with multiple suggestions (8 layout algorithms)
-- 📋 [TODO] Preview suggestions before applying
 - [TODO] Rating system for suggestions (thumbs up/down to improve)
 - [TODO] Machine learning from user preferences
-
-| Ticket | Feature Description                        |
-|--------|--------------------------------------------|
-| #471   | Preview layout suggestions before applying |
 
 **Canvas Performance Optimizations** 📋 PARTIALLY IMPLEMENTED
 - **Virtual Rendering**:
@@ -243,14 +237,9 @@
   - ✅ Batch DOM updates
   - ✅ Throttle mouse move events
 - **Memory Management**:
-  - 📋 [TODO] Lazy load node properties
   - [TODO] Unload off-screen nodes
   - [TODO] Garbage collect unused elements
   - ✅ Memory profiling tools
-
-| Ticket | Feature Description             |
-|--------|---------------------------------|
-| #475   | Lazy loading of node properties |
 
 ---
 
@@ -543,6 +532,12 @@
   - ✅ "Group these 5 classes - they're all related"
   - ✅ "Class X is isolated - consider adding relationships"
   - ✅ "Large clusters detected - consider splitting into groups"
+
+### 4.1 Smart Canvas Features
+
+**Intelligent Layout Suggestions** ✅ PARTIALLY IMPLEMENTED
+- ✅ "Auto-organize" button with multiple suggestions
+- ✅ Preview suggestions before applying
 
 ### 7. Canvas Performance ✅ IMPLEMENTED
 

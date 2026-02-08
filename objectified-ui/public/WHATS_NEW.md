@@ -7,6 +7,7 @@ We continue to improve the platform based on your feedback with improvements and
 ## New Features and Improvements
 
 - Canvas Improvements:
+  - Preview layout suggestions before applying: try Top-to-Bottom or Left-to-Right from the Layout menu or “Try Auto-organize” in suggestions, then Apply or Cancel (#471)
   - Added top-to-bottom and left-to-right layout options
   - Added focused searching functionality for focused searching in canvases with large structures
   - Added export form for exporting canvas diagrams with multiple output options
@@ -20,6 +21,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added node styling to change the border thickness and style
   - Added node styling to change font attributes
   - Added custom color choice for the node in addition to 16 pre-determined colors
+  - Added ability to preview auto layout effect before applying
   - Added focus mode to allow nodes to be selected, and to show only the associated nodes and relationships
     - Focus mode can be toggled at any time, toggled off by hitting [ESC]
     - Focus mode now blurs non-focused nodes
