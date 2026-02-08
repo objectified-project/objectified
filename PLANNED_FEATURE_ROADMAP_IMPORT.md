@@ -19,18 +19,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 |--------|--------------------------------------|
 | #498   | Adds multi-file upload functionality |
 
-##### URL Import 📋 PLANNED
-- ✅ **Direct URL Import**: Fetch spec from public URL
-- ✅ **Authenticated URL**: Support for Bearer, API Key, Basic Auth
-- ✅ **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket, Private Repos
-- ✅ **Branch/Tag Selection**: Import specific versions from git
-- ✅ **Swagger Hub Integration**: Direct import from SwaggerHub
-- 📋 **Postman Collection Import**: Import from Postman workspace URL
-
-| Ticket | Feature Description                                |
-|--------|----------------------------------------------------|
-| #333   | Ability to import Postman Collection               |
-
 ##### Integration Import 📋 PLANNED
 - 📋 **API Gateway Import**: AWS API Gateway, Azure APIM, Kong
 - [TODO] **CI/CD Pipeline Integration**: Import from build artifacts
@@ -575,7 +563,13 @@ The import flow is designed as a multi-step wizard with clear visual progression
 ##### AI Import ✅ IMPLEMENTED
 - ✅ **Natural Language to Spec**: Generate OpenAPI from text description
 
----
+##### URL Import ✅ IMPLEMENTED
+- ✅ **Direct URL Import**: Fetch spec from public URL
+- ✅ **Authenticated URL**: Support for Bearer, API Key, Basic Auth
+- ✅ **Git Repository Import**: Clone from GitHub, GitLab, Bitbucket, Private Repos
+- ✅ **Branch/Tag Selection**: Import specific versions from git
+- ✅ **Swagger Hub Integration**: Direct import from SwaggerHub
+- ✅ **Postman Collection Import**: Import from Postman workspace URL
 
 ---
 

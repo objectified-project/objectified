@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react';
+import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2, Sparkles, FileJson } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import UrlImportPanel from './UrlImportPanel';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import SwaggerHubImportPanel from './SwaggerHubImportPanel';
+import PostmanImportPanel from './PostmanImportPanel';
 import LLMImportDialog from './LLMImportDialog';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
 import { generateSlug } from '../../../utils/slug';
@@ -60,6 +61,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [swaggerHubContent, setSwaggerHubContent] = useState<string | null>(null);
   const [swaggerHubFilename, setSwaggerHubFilename] = useState<string | null>(null);
   const [swaggerHubMetadata, setSwaggerHubMetadata] = useState<FileMetadataPreview | null>(null);
+  const [postmanContent, setPostmanContent] = useState<string | null>(null);
+  const [postmanFilename, setPostmanFilename] = useState<string | null>(null);
+  const [postmanMetadata, setPostmanMetadata] = useState<FileMetadataPreview | null>(null);
   const [showLLMDialog, setShowLLMDialog] = useState(false);
 
   const handleSourceClick = (source: string) => {
@@ -107,6 +111,9 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setSwaggerHubContent(null);
       setSwaggerHubFilename(null);
       setSwaggerHubMetadata(null);
+      setPostmanContent(null);
+      setPostmanFilename(null);
+      setPostmanMetadata(null);
     }
   };
 
@@ -143,11 +150,17 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setGitContent(null);
     setGitFilename(null);
     setGitMetadata(null);
+    setSwaggerHubContent(null);
+    setSwaggerHubFilename(null);
+    setSwaggerHubMetadata(null);
+    setPostmanContent(null);
+    setPostmanFilename(null);
+    setPostmanMetadata(null);
     onClose();
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile && !urlContent && !clipboardContent && !gitContent && !swaggerHubContent) return;
+    if (!selectedFile && !urlContent && !clipboardContent && !gitContent && !swaggerHubContent && !postmanContent) return;
 
     console.log('Starting analysis...', {
       selectedFile: selectedFile?.name,
@@ -155,15 +168,17 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       clipboardFilename,
       gitFilename,
       swaggerHubFilename,
+      postmanFilename,
       hasUrlContent: !!urlContent,
       hasClipboardContent: !!clipboardContent,
       hasGitContent: !!gitContent,
-      hasSwaggerHubContent: !!swaggerHubContent
+      hasSwaggerHubContent: !!swaggerHubContent,
+      hasPostmanContent: !!postmanContent
     });
     setIsAnalyzing(true);
     try {
-      const content = urlContent || clipboardContent || gitContent || swaggerHubContent || await selectedFile!.text();
-      const filename = urlFilename || clipboardFilename || gitFilename || swaggerHubFilename || selectedFile?.name || 'openapi-spec.yaml';
+      const content = urlContent || clipboardContent || gitContent || swaggerHubContent || postmanContent || await selectedFile!.text();
+      const filename = urlFilename || clipboardFilename || gitFilename || swaggerHubFilename || postmanFilename || selectedFile?.name || 'openapi-spec.yaml';
       console.log('Content loaded, length:', content.length);
       const result = await analyzeSpecification(content, filename);
       console.log('Analysis complete:', result);
@@ -202,6 +217,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setSwaggerHubFilename(filename);
     setSwaggerHubMetadata(metadata || null);
     // Don't auto-analyze - user needs to click "Analyze →" button
+  };
+
+  const handlePostmanSpecificationFetched = (content: string, filename: string, metadata?: FileMetadataPreview) => {
+    setPostmanContent(content);
+    setPostmanFilename(filename);
+    setPostmanMetadata(metadata || null);
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -620,6 +641,34 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   </div>
                 </button>
 
+                {/* Postman Collection */}
+                <button
+                  onClick={() => handleSourceClick('postman')}
+                  className={`group relative p-6 rounded-lg border-2 transition-all duration-200 ${
+                    selectedSource === 'postman'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex flex-col items-center text-center">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                      selectedSource === 'postman'
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'
+                    }`}>
+                      <FileJson className="h-6 w-6" />
+                    </div>
+                    <div className={`font-semibold mb-1 ${
+                      selectedSource === 'postman' ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-900 dark:text-white'
+                    }`}>
+                      Postman Collection
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Import from Postman v2.1
+                    </div>
+                  </div>
+                </button>
+
                 {/*/!* Registry Import *!/*/}
                 {/*<button*/}
                 {/*  disabled*/}
@@ -964,6 +1013,13 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   onSpecificationFetched={handleSwaggerHubSpecificationFetched}
                 />
               );
+            } else if (currentStep === 'file-upload' && selectedSource === 'postman') {
+              console.log('Rendering: Postman import panel');
+              return (
+                <PostmanImportPanel
+                  onSpecificationFetched={handlePostmanSpecificationFetched}
+                />
+              );
             } else if (selectedSource) {
               console.log('Rendering: Placeholder for', selectedSource);
               return (
@@ -1074,6 +1130,15 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                   <Button
                     onClick={handleAnalyze}
                     disabled={!swaggerHubContent || isAnalyzing || (swaggerHubMetadata !== null && !swaggerHubMetadata.formatSupported)}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                  >
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
+                  </Button>
+                )}
+                {currentStep === 'file-upload' && selectedSource === 'postman' && (
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={!postmanContent || isAnalyzing || (postmanMetadata !== null && !postmanMetadata.formatSupported)}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
