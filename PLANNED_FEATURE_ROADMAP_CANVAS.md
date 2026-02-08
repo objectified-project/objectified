@@ -327,13 +327,11 @@
   - 📋 [TODO] Lazy load node properties
   - [TODO] Unload off-screen nodes
   - [TODO] Garbage collect unused elements
-  - 📋 [TODO] Memory profiling tools
+  - ✅ Memory profiling tools
 
-| Ticket | Feature Description                                          |
-|--------|--------------------------------------------------------------|
-| #199   | Show property references even when class nodes are collapsed |
-| #475   | Lazy loading of node properties                              |
-| #476   | Memory profiling tooling                                     |
+| Ticket | Feature Description             |
+|--------|---------------------------------|
+| #475   | Lazy loading of node properties |
 
 ---
 
@@ -361,8 +359,6 @@
 |--------|----------------------------------------------|
 | #322   | Display the relationship graph for a schema  |
 | #323   | Timeline view of schema changes over time    |
-
----
 
 ---
 

@@ -38,7 +38,8 @@ import {
   MoveVertical,
   MoveHorizontal,
   Search,
-  X
+  X,
+  Activity
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -94,6 +95,7 @@ import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
+import MemoryProfiler from '../components/MemoryProfiler';
 
 // Import extracted components
 import { useExportFunctions } from './components';
@@ -306,6 +308,10 @@ const StudioContent = () => {
   const [canvasSearchOpen, setCanvasSearchOpen] = useState(false);
   const [canvasSearchUseRegex, setCanvasSearchUseRegex] = useState(false);
   const canvasSearchInputRef = useRef<HTMLInputElement>(null);
+
+  // Memory profiler state
+  const [memoryProfilerOpen, setMemoryProfilerOpen] = useState(false);
+  const [memoryProfilerMinimized, setMemoryProfilerMinimized] = useState(false);
 
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
@@ -4832,6 +4838,40 @@ const StudioContent = () => {
                 <Download className="w-5 h-5" />
               </button>
             </Panel>
+
+            {/* Memory Profiler Toggle Button */}
+            <Panel
+              position="bottom-right"
+              className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 mb-2"
+              style={{ marginBottom: '120px', marginRight: '10px' }}
+            >
+              {!memoryProfilerOpen && (
+                <button
+                  onClick={() => setMemoryProfilerOpen(true)}
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  title="Open Memory Profiler"
+                >
+                  <Activity className="w-5 h-5" />
+                </button>
+              )}
+            </Panel>
+
+            {/* Memory Profiler Panel */}
+            {memoryProfilerOpen && (
+              <Panel
+                position="bottom-right"
+                style={{ marginBottom: '120px', marginRight: '10px' }}
+              >
+                <MemoryProfiler
+                  nodeCount={nodes.filter(n => n.type !== 'groupNode').length}
+                  edgeCount={edges.length}
+                  groupCount={nodes.filter(n => n.type === 'groupNode').length}
+                  onClose={() => setMemoryProfilerOpen(false)}
+                  isMinimized={memoryProfilerMinimized}
+                  onMinimizeToggle={() => setMemoryProfilerMinimized(!memoryProfilerMinimized)}
+                />
+              </Panel>
+            )}
           </ReactFlow>
 
           {/* Export Wizard Dialog */}
