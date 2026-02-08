@@ -15,6 +15,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added ability to enable/disable grid
   - Added ability to search using regular expressions in the canvas
   - Added memory profiling and performance improvements for large canvases
+  - Added canvas metrics display
   - Added icons to class nodes for better visual distinction of nodes
   - Added node styling to change the border thickness and style
   - Added node styling to change font attributes

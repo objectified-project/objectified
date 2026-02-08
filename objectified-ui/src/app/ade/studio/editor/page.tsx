@@ -104,7 +104,10 @@ import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
+import { computeSchemaMetrics } from '@/app/utils/schema-metrics';
+import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
+import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 
 // Import extracted components
@@ -365,7 +368,15 @@ const StudioContent = () => {
   // Memory profiler state
   const [memoryProfilerOpen, setMemoryProfilerOpen] = useState(false);
   const [memoryProfilerMinimized, setMemoryProfilerMinimized] = useState(false);
+  const [schemaMetricsOpen, setSchemaMetricsOpen] = useState(false);
+  const [schemaMetricsMinimized, setSchemaMetricsMinimized] = useState(false);
 
+  // Schema metrics (for Schema Metrics panel #472)
+  const schemaMetrics = useMemo(() => {
+    const classNodes = nodes.filter((n) => n.type !== 'groupNode');
+    if (classNodes.length === 0) return null;
+    return computeSchemaMetrics(nodes, edges);
+  }, [nodes, edges]);
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
@@ -5602,40 +5613,63 @@ const StudioContent = () => {
               </button>
             </Panel>
 
-            {/* Memory Profiler Toggle Button */}
+            {/* Schema Metrics & Memory Profiler buttons - next to map controls (bottom-left) */}
             <Panel
-              position="bottom-right"
-              className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 mb-2"
-              style={{ marginBottom: '120px', marginRight: '10px' }}
+              position="bottom-left"
+              className="flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
+              style={{ marginBottom: '15px', marginLeft: '52px' }}
             >
+              {!schemaMetricsOpen && (
+                <button
+                  onClick={() => setSchemaMetricsOpen(true)}
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  title="Schema Metrics"
+                >
+                  <BarChart3 className="w-5 h-5" />
+                </button>
+              )}
               {!memoryProfilerOpen && (
                 <button
                   onClick={() => setMemoryProfilerOpen(true)}
                   className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
-                  title="Open Memory Profiler"
+                  title="Memory Profiler"
                 >
                   <Activity className="w-5 h-5" />
                 </button>
               )}
             </Panel>
 
-            {/* Memory Profiler Panel */}
-            {memoryProfilerOpen && (
-              <Panel
-                position="bottom-right"
-                style={{ marginBottom: '120px', marginRight: '10px' }}
-              >
-                <MemoryProfiler
-                  nodeCount={nodes.filter(n => n.type !== 'groupNode').length}
-                  edgeCount={edges.length}
-                  groupCount={nodes.filter(n => n.type === 'groupNode').length}
-                  onClose={() => setMemoryProfilerOpen(false)}
-                  isMinimized={memoryProfilerMinimized}
-                  onMinimizeToggle={() => setMemoryProfilerMinimized(!memoryProfilerMinimized)}
-                />
-              </Panel>
-            )}
           </ReactFlow>
+
+          {/* Draggable panels (outside ReactFlow so position:fixed is viewport-relative) */}
+          {schemaMetricsOpen && (
+            <DraggablePanel
+              storageKey="schema-metrics-panel"
+              defaultPosition={{ left: 20, top: 120 }}
+            >
+              <SchemaMetricsPanel
+                metrics={schemaMetrics}
+                onClose={() => setSchemaMetricsOpen(false)}
+                isMinimized={schemaMetricsMinimized}
+                onMinimizeToggle={() => setSchemaMetricsMinimized(!schemaMetricsMinimized)}
+              />
+            </DraggablePanel>
+          )}
+          {memoryProfilerOpen && (
+            <DraggablePanel
+              storageKey="memory-profiler-panel"
+              defaultPosition={{ left: 20, top: 120 }}
+            >
+              <MemoryProfiler
+                nodeCount={nodes.filter(n => n.type !== 'groupNode').length}
+                edgeCount={edges.length}
+                groupCount={nodes.filter(n => n.type === 'groupNode').length}
+                onClose={() => setMemoryProfilerOpen(false)}
+                isMinimized={memoryProfilerMinimized}
+                onMinimizeToggle={() => setMemoryProfilerMinimized(!memoryProfilerMinimized)}
+              />
+            </DraggablePanel>
+          )}
 
           {/* Export Wizard Dialog */}
           <ExportWizard

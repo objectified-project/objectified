@@ -201,10 +201,6 @@
   - ✅ Position (left, center, right)
   - ✅ Multi-line (wrap class name)
 
-| Ticket | Feature Description           |
-|--------|-------------------------------|
-| #341   | Custom node sizing            |
-
 ---
 
 ### 4.1 Smart Canvas Features
@@ -222,11 +218,11 @@
 **Canvas Analysis** ✅ PARTIALLY IMPLEMENTED
 - **Schema Metrics**:
   - ✅ Total classes, properties, relationships
-  - 📋 [TODO] Average properties per class
-  - 📋 [TODO] Most connected classes (hubs)
-  - 📋 [TODO] Isolated classes (no relationships)
-  - 📋 [TODO] Deepest dependency chains
-  - 📋 [TODO] Circular dependencies count
+  - ✅ Average properties per class
+  - ✅ Most connected classes (hubs)
+  - ✅ Isolated classes (no relationships)
+  - ✅ Deepest dependency chains
+  - ✅ Circular dependencies count
 - **Layout Quality Score**:
   - 📋 [TODO] Edge crossing count (lower is better)
   - 📋 [TODO] Node spacing uniformity
@@ -240,7 +236,6 @@
 
 | Ticket | Feature Description                    |
 |--------|----------------------------------------|
-| #472   | Add Schema Metrics view to the canvas  |
 | #473   | Layout Quality Score calculation       |
 | #474   | Canvas improvement suggestions         |
 
