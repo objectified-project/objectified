@@ -19,6 +19,8 @@ We continue to improve the platform based on your feedback with improvements and
   - Added focus mode to allow nodes to be selected, and to show only the associated nodes and relationships
     - Focus mode can be toggled at any time, toggled off by hitting [ESC]
     - Focus mode now blurs non-focused nodes
+    - Connected mode now only shows connected nodes
+    - View Mode is now a dropdown that combines these modes that can be toggled easily
   - Increased zoom out resolution to 10%
   - Nodes now show property references even when not expanded
   - Improved search to include properties and descriptions in the results

@@ -101,14 +101,13 @@
 #### Focus Mode 📋 PLANNED
 - ✅ Isolate selected classes and immediate relationships
 - ✅ Blur/dim non-focused nodes
-- 📋 [TODO] Show only 1st-degree connections (or 2nd, 3rd degree)
+- ✅ Show only 1st-degree connections (or 2nd, 3rd degree)
 - 📋 [TODO] Expand focus incrementally
 - 📋 [TODO] Focus on group (show only group members)
 - 📋 [TODO] Exit focus mode with Esc key
 
 | Ticket | Feature Description                        |
 |--------|--------------------------------------------|
-| #488   | Show only Nth-degree connections           |
 | #489   | Expand focus incrementally                 |
 | #490   | Focus on group members                     |
 | #491   | Exit focus mode with Esc key               |

@@ -265,6 +265,9 @@ const StudioContent = () => {
   // Focus mode: isolate selected classes and their immediate relationships (live from current selection)
   const [focusModeEnabled, setFocusModeEnabled] = useState(false);
 
+  // #488: Show only connected nodes (hide nodes with no edges)
+  const [showOnlyConnectedNodes, setShowOnlyConnectedNodes] = useState(false);
+
   // Spacing indicators state
   const [spacingIndicators, setSpacingIndicators] = useState<{
     horizontal: Array<{ x1: number; x2: number; y: number; distance: number }>;
@@ -674,6 +677,16 @@ const StudioContent = () => {
     }
   }, [searchFiltersOpen]);
 
+  // #488: Node IDs that have at least one edge (for "show only connected" filter)
+  const connectedNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    edges.forEach(edge => {
+      set.add(edge.source);
+      set.add(edge.target);
+    });
+    return set;
+  }, [edges]);
+
   // Focus mode: focused set = current selection + immediate neighbors (updates when selection changes)
   const focusModeFocusedSet = useMemo(() => {
     if (!focusModeEnabled) return new Set<string>();
@@ -731,6 +744,18 @@ const StudioContent = () => {
   const displayNodes = useMemo(() => {
     let result = nodes;
 
+    // #488: Show only nodes that have at least one connection (hide isolated nodes)
+    if (showOnlyConnectedNodes) {
+      const visibleGroupIds = new Set(
+        groups.filter(g => g.nodeIds.some(id => connectedNodeIds.has(id))).map(g => g.id)
+      );
+      result = result.filter(node =>
+        node.type === 'groupNode'
+          ? visibleGroupIds.has(node.id)
+          : connectedNodeIds.has(node.id)
+      );
+    }
+
     // Apply search classes when search is active
     if (canvasSearchQuery.trim() && canvasSearchOpen) {
       result = result.map(node => {
@@ -760,11 +785,18 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
+  }, [nodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
     let result = edges;
+
+    // #488: Show only edges between visible (connected) nodes when filter is on
+    if (showOnlyConnectedNodes) {
+      result = result.filter(
+        edge => connectedNodeIds.has(edge.source) && connectedNodeIds.has(edge.target)
+      );
+    }
 
     // Dim edges that don't connect to matching nodes when search is active
     if (canvasSearchQuery.trim() && canvasSearchOpen) {
@@ -799,7 +831,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
+  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
 
   // Compute canvas background style based on settings (shared util for preview + main canvas)
   const canvasBackgroundStyle = useMemo(
@@ -4875,19 +4907,56 @@ const StudioContent = () => {
                   <Search className="h-3.5 w-3.5" />
                   <span>Search</span>
                 </button>
-                {/* Focus Mode: toggle view that dims non-focused nodes (selection + neighbors stay in focus) */}
-                <button
-                  onClick={toggleFocusMode}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
-                    focusModeEnabled
-                      ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
-                      : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
-                  }`}
-                  title="Focus mode: dim nodes outside selection and their connections (Esc to exit)"
-                >
-                  <Focus className="h-3.5 w-3.5" />
-                  <span>Focus</span>
-                </button>
+                {/* View Mode: dropdown with Focus and Connected options */}
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
+                        focusModeEnabled || showOnlyConnectedNodes
+                          ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
+                          : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
+                      }`}
+                      title="View mode options"
+                      aria-label="View mode"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>View Mode</span>
+                      <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      className="min-w-[200px] bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[9999]"
+                      sideOffset={5}
+                      align="start"
+                    >
+                      <DropdownMenu.CheckboxItem
+                        checked={focusModeEnabled}
+                        onCheckedChange={(checked) => setFocusModeEnabled(!!checked)}
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <DropdownMenu.ItemIndicator className="inline-flex w-5 items-center justify-center">
+                          <Check className="h-4 w-4" />
+                        </DropdownMenu.ItemIndicator>
+                        <Focus className="h-4 w-4 shrink-0" />
+                        <span>Focus</span>
+                      </DropdownMenu.CheckboxItem>
+                      <DropdownMenu.CheckboxItem
+                        checked={showOnlyConnectedNodes}
+                        onCheckedChange={(checked) => setShowOnlyConnectedNodes(!!checked)}
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        <DropdownMenu.ItemIndicator className="inline-flex w-5 items-center justify-center">
+                          <Check className="h-4 w-4" />
+                        </DropdownMenu.ItemIndicator>
+                        <Network className="h-4 w-4 shrink-0" />
+                        <span>Connected</span>
+                      </DropdownMenu.CheckboxItem>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
                 {/* Manage Tags Button */}
                 {!isReadOnly && (
                   <button
