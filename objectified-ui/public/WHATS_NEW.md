@@ -18,6 +18,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Nodes now show property references even when not expanded
   - Improved search to include properties and descriptions in the results
   - Canvas changes also apply to the Paths canvas
+    - Added blur and background opacity settings
   - Search results now save history, and have filtering options for more complex search operations
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)

@@ -226,14 +226,6 @@
 |--------|---------------------------------------|
 | #349   | Adds edge hover effects               |
 
-#### Canvas Background ✅ IMPLEMENTED
-- ✅ Background options (solid color, grid pattern, custom image, gradient, textures)
-- 📋 [TODO] Background opacity and blur
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-| #330   | Add background opacity and blur      |
-
 ---
 
 ### 4.1 Smart Canvas Features
@@ -543,6 +535,10 @@
   - ✅ Close with Escape key or X button
 - ✅ **Search Focus Mode**: Dim everything except search results
 - ✅ **Focus Mode**: Isolate selected classes and relationships, blur non-focused
+
+#### Canvas Background ✅ IMPLEMENTED
+- ✅ Background options (solid color, grid pattern, custom image, gradient, textures)
+- ✅ Background opacity and blur
 
 ### 2. Canvas Navigation & Controls
 

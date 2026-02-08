@@ -549,7 +549,7 @@ const StudioContent = () => {
     // Helper to check properties filter (has/doesn't have properties)
     const matchesPropertiesFilter = (props: Array<unknown> | undefined): boolean => {
       if (searchFilterHasProperties === 'all') return true;
-      const hasProps = props && Array.isArray(props) && props.length > 0;
+      const hasProps = !!(props && Array.isArray(props) && props.length > 0);
       return searchFilterHasProperties === 'with' ? hasProps : !hasProps;
     };
 

@@ -231,6 +231,8 @@ const DEFAULT_CANVAS_BACKGROUND: CanvasBackgroundOptions = {
   textureType: 'noise',
   textureOpacity: 0.1,
   textureColor: '#64748b',
+  backgroundOpacity: 1,
+  backgroundBlur: 0,
 };
 
 export default function CanvasSettingsDialog({
@@ -851,6 +853,67 @@ export default function CanvasSettingsDialog({
                       </div>
                     </div>
                   )}
+
+                  {/* Background Opacity & Blur */}
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-3">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block">Effects</span>
+
+                    {/* Background Opacity */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Opacity</span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-medium">
+                          {Math.round((localCanvasBackground.backgroundOpacity ?? 1) * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="1"
+                        step="0.05"
+                        value={localCanvasBackground.backgroundOpacity ?? 1}
+                        onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, backgroundOpacity: Number(e.target.value) }))}
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>10%</span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+
+                    {/* Background Blur */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Blur</span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-medium">
+                          {localCanvasBackground.backgroundBlur ?? 0}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="1"
+                        value={localCanvasBackground.backgroundBlur ?? 0}
+                        onChange={(e) => setLocalCanvasBackground((b) => ({ ...b, backgroundBlur: Number(e.target.value) }))}
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>None</span>
+                        <span>20px</span>
+                      </div>
+                    </div>
+
+                    {/* Reset button */}
+                    {((localCanvasBackground.backgroundOpacity ?? 1) < 1 || (localCanvasBackground.backgroundBlur ?? 0) > 0) && (
+                      <button
+                        onClick={() => setLocalCanvasBackground((b) => ({ ...b, backgroundOpacity: 1, backgroundBlur: 0 }))}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+                      >
+                        Reset effects
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

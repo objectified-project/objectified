@@ -61,6 +61,9 @@ export interface CanvasBackgroundOptions {
   textureType: TextureType;
   textureOpacity: number;
   textureColor: string;
+  // New: background-level opacity and blur
+  backgroundOpacity: number; // 0-1
+  backgroundBlur: number; // 0-20 (px)
 }
 
 export interface EdgeStylingOptions {
@@ -277,6 +280,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     textureType: 'noise',
     textureOpacity: 0.1,
     textureColor: '#64748b',
+    backgroundOpacity: 1,
+    backgroundBlur: 0,
   };
 
   const [canvasBackground, setCanvasBackground] = useState<CanvasBackgroundOptions>(() => {
