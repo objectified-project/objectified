@@ -38,6 +38,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Search results now save history, and have filtering options for more complex search operations
   - Export improvements:
     - Added ability to export the entire viewport, or the current viewport
+    - Added ability to export selected groups in the viewport
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)
   - Added inline variable editor that can click parameters in the header of the path studio

@@ -5747,6 +5747,7 @@ const StudioContent = () => {
             onClose={() => setExportWizardOpen(false)}
             nodes={nodes}
             edges={edges}
+            groups={groups.map((g) => ({ id: g.id, name: g.name, nodeIds: g.nodeIds }))}
             isDark={isDark}
             projectName={projects.find(p => p.id === selectedProjectId)?.name || 'canvas'}
             versionId={versions.find(v => v.version_id === selectedVersionId)?.version_id || '1'}

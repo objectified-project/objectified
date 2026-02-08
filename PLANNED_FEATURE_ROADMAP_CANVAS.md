@@ -295,8 +295,8 @@
   - 📋 [TODO] Export dimensions in pixels or cm/inches
 - **Selective Export**:
   - [TODO] Export only selected nodes
-  - ✅ Export current viewport (#403)
-  - 📋 [TODO] Export specific groups
+  - ✅ Export current viewport
+  - ✅ Export specific groups (#404)
   - ✅ Export entire canvas
 - **Export Options**:
   - ✅ Export wizard interface (replaces dropdown)
@@ -319,8 +319,6 @@
 
 | Ticket | Feature Description                        | Status |
 |--------|--------------------------------------------|--------|
-| #403   | Export the current viewport                | ✅     |
-| #404   | Export specific groups                     | [TODO] |
 | #406   | Include/exclude UI elements                | [TODO] |
 | #407   | Include/exclude grid                       | [TODO] |
 | #408   | Export option to add watermark             | [TODO] |

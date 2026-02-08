@@ -17,6 +17,7 @@ import {
   Eye,
   Crop,
   Maximize2,
+  Layers,
 } from 'lucide-react';
 import { toPng, toSvg, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -76,11 +77,20 @@ const exportCategories: ExportCategory[] = [
   },
 ];
 
-export type ExportRange = 'full' | 'viewport';
+export type ExportRange = 'full' | 'viewport' | 'groups';
+
+/** Minimal group shape for export (id, name, nodeIds). */
+export interface ExportGroup {
+  id: string;
+  name: string;
+  nodeIds: string[];
+}
 
 interface ExportOptions {
-  // Export range (#403: full canvas vs current viewport)
+  // Export range (#403 full/viewport, #404 groups)
   exportRange: ExportRange;
+  // #404: when exportRange === 'groups', which group IDs to include
+  selectedGroupIds: string[];
   // Image options
   quality: number; // 0.1 - 1.0
   scale: number; // 1, 2, 4
@@ -97,6 +107,7 @@ interface ExportOptions {
 
 const defaultOptions: ExportOptions = {
   exportRange: 'full',
+  selectedGroupIds: [],
   quality: 1.0,
   scale: 2,
   includeBackground: true,
@@ -113,6 +124,7 @@ interface ExportWizardProps {
   onClose: () => void;
   nodes: Node[];
   edges: Edge[];
+  groups?: ExportGroup[];
   isDark: boolean;
   projectName: string;
   versionId: string;
@@ -124,6 +136,7 @@ export default function ExportWizard({
   onClose,
   nodes,
   edges,
+  groups = [],
   isDark,
   projectName,
   versionId,
@@ -136,7 +149,7 @@ export default function ExportWizard({
   const [previewText, setPreviewText] = useState<string | null>(null);
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { fitView, getViewport, setViewport } = useReactFlow();
+  const { fitView, fitBounds, getViewport, setViewport } = useReactFlow();
 
   /** Fit view to entire canvas, run fn (capture), then restore previous viewport. */
   const withFullCanvasView = useCallback(
@@ -152,6 +165,63 @@ export default function ExportWizard({
       }
     },
     [fitView, getViewport, setViewport]
+  );
+
+  /** Node IDs that belong to the given groups (group node ids + their class node ids). */
+  const getNodeIdsForGroups = useCallback(
+    (groupIds: string[]) => {
+      const set = new Set<string>();
+      for (const g of groups) {
+        if (!groupIds.includes(g.id)) continue;
+        set.add(g.id); // group node itself
+        g.nodeIds.forEach((id) => set.add(id));
+      }
+      return set;
+    },
+    [groups]
+  );
+
+  /** Compute bounding box of nodes by id. Returns null if no nodes or invalid. */
+  const getBoundsForNodeIds = useCallback(
+    (nodeIds: Set<string>): { x: number; y: number; width: number; height: number } | null => {
+      const toInclude = nodes.filter((n) => nodeIds.has(n.id));
+      if (toInclude.length === 0) return null;
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      for (const node of toInclude) {
+        const w = (node.measured?.width ?? node.style?.width ?? 0) as number;
+        const h = (node.measured?.height ?? node.style?.height ?? 0) as number;
+        minX = Math.min(minX, node.position.x);
+        minY = Math.min(minY, node.position.y);
+        maxX = Math.max(maxX, node.position.x + (w || 200));
+        maxY = Math.max(maxY, node.position.y + (h || 120));
+      }
+      const width = Math.max(1, maxX - minX);
+      const height = Math.max(1, maxY - minY);
+      return { x: minX, y: minY, width, height };
+    },
+    [nodes]
+  );
+
+  /** Fit view to selected groups' bounds, run fn (capture), then restore. (#404) */
+  const withGroupsView = useCallback(
+    async <T,>(groupIds: string[], fn: () => Promise<T>): Promise<T> => {
+      const nodeIds = getNodeIdsForGroups(groupIds);
+      const bounds = getBoundsForNodeIds(nodeIds);
+      if (!bounds) return fn(); // fallback: no change
+      const previous = getViewport();
+      fitBounds(bounds, { padding: 0.2, duration: 0 });
+      await new Promise((r) => requestAnimationFrame(r));
+      await new Promise((r) => setTimeout(r, 50));
+      try {
+        return await fn();
+      } finally {
+        setViewport(previous, { duration: 0 });
+      }
+    },
+    [getNodeIdsForGroups, getBoundsForNodeIds, fitBounds, getViewport, setViewport]
   );
 
   const getFilenameBase = useCallback(() => {
@@ -202,9 +272,11 @@ export default function ExportWizard({
     const viewportElement = getViewportElement();
     const paneElement = getPaneElement();
 
-    // For image formats, generate a preview image (full canvas or current viewport)
+    // For image formats, generate a preview image (full canvas, viewport, or groups)
     if (['png', 'jpeg', 'svg', 'pdf'].includes(selectedFormat)) {
       const isViewport = options.exportRange === 'viewport';
+      const isGroups =
+        options.exportRange === 'groups' && options.selectedGroupIds.length > 0;
       const captureElement = isViewport ? paneElement : viewportElement;
       if (!captureElement) {
         setPreviewDataUrl(null);
@@ -216,14 +288,21 @@ export default function ExportWizard({
           const bg = options.includeBackground
             ? (isDark ? '#111827' : options.backgroundColor)
             : 'transparent';
-          return toPng(captureElement, {
+          return toPng(viewportElement, {
             backgroundColor: bg,
             quality: 0.5, // Lower quality for preview
             pixelRatio: 1,
             filter: imageExportFilter,
           });
         };
-        const dataUrl = isViewport ? await capture() : await withFullCanvasView(capture);
+        let dataUrl: string;
+        if (isViewport) {
+          dataUrl = await capture();
+        } else if (isGroups) {
+          dataUrl = await withGroupsView(options.selectedGroupIds, capture);
+        } else {
+          dataUrl = await withFullCanvasView(capture);
+        }
         setPreviewDataUrl(dataUrl);
         setPreviewText(null);
       } catch (error) {
@@ -231,36 +310,50 @@ export default function ExportWizard({
         setPreviewDataUrl(null);
       }
     } else {
-      // For text-based formats, generate preview text
+      // For text-based formats, generate preview text (optionally filtered by groups)
       setPreviewDataUrl(null);
-      const text = generateTextExport(selectedFormat);
+      const nodeIdSet =
+        options.exportRange === 'groups' && options.selectedGroupIds.length > 0
+          ? getNodeIdsForGroups(options.selectedGroupIds)
+          : undefined;
+      const text = generateTextExport(selectedFormat, nodeIdSet);
       setPreviewText(text.substring(0, 2000) + (text.length > 2000 ? '\n...' : ''));
     }
-  }, [selectedFormat, options, isDark, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView]);
+  }, [selectedFormat, options, isDark, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, getNodeIdsForGroups]);
 
-  const generateTextExport = useCallback((format: ExportFormat): string => {
-    const classNodes = nodes.filter(n => n.type !== 'groupNode');
+  const generateTextExport = useCallback(
+    (format: ExportFormat, limitToNodeIds?: Set<string>): string => {
+      let classNodes = nodes.filter((n) => n.type !== 'groupNode');
+      let edgesFiltered = edges;
+      if (limitToNodeIds?.size) {
+        classNodes = classNodes.filter((n) => limitToNodeIds.has(n.id));
+        edgesFiltered = edges.filter(
+          (e) => limitToNodeIds.has(e.source) && limitToNodeIds.has(e.target)
+        );
+      }
 
-    switch (format) {
-      case 'json':
-        return JSON.stringify({ nodes: classNodes, edges }, null, 2);
+      switch (format) {
+        case 'json':
+          return JSON.stringify({ nodes: classNodes, edges: edgesFiltered }, null, 2);
 
-      case 'mermaid':
-        return generateMermaid(classNodes, edges);
+        case 'mermaid':
+          return generateMermaid(classNodes, edgesFiltered);
 
-      case 'plantuml':
-        return generatePlantUml(classNodes, edges);
+        case 'plantuml':
+          return generatePlantUml(classNodes, edgesFiltered);
 
-      case 'graphml':
-        return generateGraphMl(classNodes, edges);
+        case 'graphml':
+          return generateGraphMl(classNodes, edgesFiltered);
 
-      case 'dot':
-        return generateDot(classNodes, edges);
+        case 'dot':
+          return generateDot(classNodes, edgesFiltered);
 
-      default:
-        return '';
-    }
-  }, [nodes, edges]);
+        default:
+          return '';
+      }
+    },
+    [nodes, edges]
+  );
 
   // Generate Mermaid diagram
   const generateMermaid = (classNodes: Node[], edges: Edge[]): string => {
@@ -371,21 +464,42 @@ export default function ExportWizard({
     return dot;
   };
 
-  /** Capture image for export: full canvas (with fitView) or current viewport. */
+  /** Capture image for export: full canvas, current viewport, or selected groups. */
   const captureExportImage = useCallback(
     async (toImage: (el: HTMLElement) => Promise<string>) => {
       const isViewport = options.exportRange === 'viewport';
+      const isGroups =
+        options.exportRange === 'groups' && options.selectedGroupIds.length > 0;
       const viewportElement = getViewportElement();
       const paneElement = getPaneElement();
-      const el = isViewport ? paneElement : viewportElement;
-      if (!el) throw new Error('Canvas not found');
-      return isViewport ? toImage(el) : withFullCanvasView(() => toImage(viewportElement));
+      if (isViewport) {
+        if (!paneElement) throw new Error('Canvas not found');
+        return toImage(paneElement);
+      }
+      if (isGroups) {
+        if (!viewportElement) throw new Error('Canvas not found');
+        return withGroupsView(options.selectedGroupIds, () =>
+          toImage(viewportElement)
+        );
+      }
+      if (!viewportElement) throw new Error('Canvas not found');
+      return withFullCanvasView(() => toImage(viewportElement));
     },
-    [options.exportRange, getViewportElement, getPaneElement, withFullCanvasView]
+    [options.exportRange, options.selectedGroupIds, getViewportElement, getPaneElement, withFullCanvasView, withGroupsView]
   );
+
+  const canExportGroups =
+    options.exportRange !== 'groups' || options.selectedGroupIds.length > 0;
 
   // Handle export
   const handleExport = useCallback(async () => {
+    if (!canExportGroups) {
+      await alertDialog({
+        message: 'Select at least one group to export, or choose a different export range.',
+        variant: 'warning',
+      });
+      return;
+    }
     setIsExporting(true);
 
     try {
@@ -394,7 +508,12 @@ export default function ExportWizard({
         ? (isDark ? '#111827' : options.backgroundColor)
         : 'transparent';
       const bgJpeg = isDark ? '#111827' : options.backgroundColor;
-      const suffix = options.exportRange === 'viewport' ? '-viewport' : '';
+      const suffix =
+        options.exportRange === 'viewport'
+          ? '-viewport'
+          : options.exportRange === 'groups' && options.selectedGroupIds.length > 0
+            ? '-groups'
+            : '';
 
       switch (selectedFormat) {
         case 'png': {
@@ -472,13 +591,18 @@ export default function ExportWizard({
         case 'plantuml':
         case 'graphml':
         case 'dot': {
-          const text = generateTextExport(selectedFormat);
+          const nodeIdSet =
+            options.exportRange === 'groups' && options.selectedGroupIds.length > 0
+              ? getNodeIdsForGroups(options.selectedGroupIds)
+              : undefined;
+          const text = generateTextExport(selectedFormat, nodeIdSet);
           const extension = selectedFormat === 'json' ? 'json'
             : selectedFormat === 'mermaid' ? 'mmd'
             : selectedFormat === 'plantuml' ? 'puml'
             : selectedFormat === 'graphml' ? 'graphml'
             : 'dot';
-          downloadText(text, `${filename}.${extension}`);
+          const textSuffix = nodeIdSet ? '-groups' : '';
+          downloadText(text, `${filename}${textSuffix}.${extension}`);
           break;
         }
       }
@@ -491,7 +615,7 @@ export default function ExportWizard({
     } finally {
       setIsExporting(false);
     }
-  }, [selectedFormat, options, isDark, getFilenameBase, imageExportFilter, generateTextExport, alertDialog, onClose, captureExportImage]);
+  }, [canExportGroups, selectedFormat, options, isDark, getFilenameBase, imageExportFilter, generateTextExport, getNodeIdsForGroups, alertDialog, onClose, captureExportImage]);
 
   const downloadDataUrl = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -615,42 +739,103 @@ export default function ExportWizard({
                 <div className="grid grid-cols-3 gap-4">
                   {isImageFormat && (
                     <>
-                      {/* Export range: full canvas vs current viewport (#403) */}
+                      {/* Export range: full, viewport, or selected groups (#403, #404) */}
                       <div className="col-span-3">
                         <label className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">
                           Export range
                         </label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => setOptions(prev => ({ ...prev, exportRange: 'full' }))}
-                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                            className={`flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                               options.exportRange === 'full'
                                 ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
                                 : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                             }`}
                           >
-                            <Maximize2 className="w-4 h-4" />
+                            <Maximize2 className="w-4 h-4 shrink-0" />
                             Full canvas
                           </button>
                           <button
                             type="button"
                             onClick={() => setOptions(prev => ({ ...prev, exportRange: 'viewport' }))}
-                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                            className={`flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                               options.exportRange === 'viewport'
                                 ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
                                 : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                             }`}
                           >
-                            <Crop className="w-4 h-4" />
-                            Current viewport
+                            <Crop className="w-4 h-4 shrink-0" />
+                            Viewport
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOptions(prev => ({
+                                ...prev,
+                                exportRange: 'groups',
+                                selectedGroupIds:
+                                  prev.exportRange === 'groups' ? prev.selectedGroupIds : [],
+                              }))
+                            }
+                            className={`flex-1 min-w-0 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                              options.exportRange === 'groups'
+                                ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
+                                : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                            }`}
+                          >
+                            <Layers className="w-4 h-4 shrink-0" />
+                            Selected groups
                           </button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
                           {options.exportRange === 'viewport'
                             ? 'Export only what is visible on screen (current pan and zoom).'
-                            : 'Fit and export the entire canvas.'}
+                            : options.exportRange === 'groups'
+                              ? 'Export only the groups you select below.'
+                              : 'Fit and export the entire canvas.'}
                         </p>
+                        {/* Group selector when export range is "groups" (#404) */}
+                        {options.exportRange === 'groups' && (
+                          <div className="mt-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-40 overflow-y-auto">
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 block mb-2">
+                              Select groups to export
+                            </span>
+                            {groups.length === 0 ? (
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                No groups on the canvas. Create groups first, then export them.
+                              </p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {groups.map((g) => (
+                                  <label
+                                    key={g.id}
+                                    className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={options.selectedGroupIds.includes(g.id)}
+                                      onChange={(e) =>
+                                        setOptions((prev) => ({
+                                          ...prev,
+                                          selectedGroupIds: e.target.checked
+                                            ? [...prev.selectedGroupIds, g.id]
+                                            : prev.selectedGroupIds.filter((id) => id !== g.id),
+                                        }))
+                                      }
+                                      className="rounded border-gray-300 dark:border-gray-600"
+                                    />
+                                    <span className="truncate">{g.name}</span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                                      ({g.nodeIds.length} node{g.nodeIds.length !== 1 ? 's' : ''})
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {/* Scale */}
                       <div>
@@ -763,7 +948,7 @@ export default function ExportWizard({
               </button>
               <button
                 onClick={handleExport}
-                disabled={isExporting}
+                disabled={isExporting || !canExportGroups}
                 className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isExporting ? (
