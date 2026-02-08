@@ -1,12 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 
 interface SchemaMetricsPanelProps {
   metrics: SchemaMetricsResult | null;
+  layoutQuality?: LayoutQualityResult | null;
   onClose?: () => void;
   isMinimized?: boolean;
   onMinimizeToggle?: () => void;
@@ -14,6 +16,7 @@ interface SchemaMetricsPanelProps {
 
 export default function SchemaMetricsPanel({
   metrics,
+  layoutQuality,
   onClose,
   isMinimized = false,
   onMinimizeToggle,
@@ -208,6 +211,91 @@ export default function SchemaMetricsPanel({
               </p>
             )}
           </div>
+
+          {/* Layout Quality (#473) */}
+          {layoutQuality && (
+            <>
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  <Layout className="w-3 h-3" />
+                  Layout quality
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Gauge className="w-5 h-5 text-indigo-500 shrink-0" />
+                  <span className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                    {layoutQuality.overallScore}
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">/ 100</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1.5">
+                        <span className="text-gray-500 dark:text-gray-400">Edge crossings</span>
+                        <div className="font-semibold text-gray-800 dark:text-gray-200">
+                          {layoutQuality.edgeCrossingCount}
+                        </div>
+                        <span className="text-[10px] text-gray-400">lower is better</span>
+                      </div>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg max-w-xs" sideOffset={4}>
+                        Number of pairs of edges that cross. Fewer crossings improve readability.
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1.5">
+                        <span className="text-gray-500 dark:text-gray-400">Spacing</span>
+                        <div className="font-semibold text-gray-800 dark:text-gray-200">
+                          {layoutQuality.nodeSpacingUniformityScore}
+                        </div>
+                        <span className="text-[10px] text-gray-400">uniformity 0–100</span>
+                      </div>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg max-w-xs" sideOffset={4}>
+                        How uniform the spacing between neighboring nodes is.
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1.5">
+                        <span className="text-gray-500 dark:text-gray-400">Symmetry</span>
+                        <div className="font-semibold text-gray-800 dark:text-gray-200">
+                          {layoutQuality.layoutSymmetryScore}
+                        </div>
+                        <span className="text-[10px] text-gray-400">0–100</span>
+                      </div>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg max-w-xs" sideOffset={4}>
+                        How symmetric the layout is around its center.
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger asChild>
+                      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2 py-1.5">
+                        <span className="text-gray-500 dark:text-gray-400">Balance</span>
+                        <div className="font-semibold text-gray-800 dark:text-gray-200">
+                          {layoutQuality.visualBalanceScore}
+                        </div>
+                        <span className="text-[10px] text-gray-400">0–100</span>
+                      </div>
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Content className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg max-w-xs" sideOffset={4}>
+                        How well the node mass is balanced around the center of the layout.
+                      </Tooltip.Content>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Summary line */}
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">

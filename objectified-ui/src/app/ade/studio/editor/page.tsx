@@ -104,6 +104,7 @@ import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
+import { computeLayoutQuality } from '@/app/utils/layout-quality';
 import { computeSchemaMetrics } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
@@ -376,6 +377,13 @@ const StudioContent = () => {
     const classNodes = nodes.filter((n) => n.type !== 'groupNode');
     if (classNodes.length === 0) return null;
     return computeSchemaMetrics(nodes, edges);
+  }, [nodes, edges]);
+
+  // Layout quality (#473): edge crossings, spacing uniformity, symmetry, balance
+  const layoutQuality = useMemo(() => {
+    const classNodes = nodes.filter((n) => n.type !== 'groupNode');
+    if (classNodes.length === 0) return null;
+    return computeLayoutQuality(nodes, edges);
   }, [nodes, edges]);
 
   // Create stable refs for callbacks to prevent unnecessary re-renders
@@ -5647,12 +5655,13 @@ const StudioContent = () => {
               storageKey="schema-metrics-panel"
               defaultPosition={{ left: 20, top: 120 }}
             >
-              <SchemaMetricsPanel
-                metrics={schemaMetrics}
-                onClose={() => setSchemaMetricsOpen(false)}
-                isMinimized={schemaMetricsMinimized}
-                onMinimizeToggle={() => setSchemaMetricsMinimized(!schemaMetricsMinimized)}
-              />
+                <SchemaMetricsPanel
+                  metrics={schemaMetrics}
+                  layoutQuality={layoutQuality}
+                  onClose={() => setSchemaMetricsOpen(false)}
+                  isMinimized={schemaMetricsMinimized}
+                  onMinimizeToggle={() => setSchemaMetricsMinimized(!schemaMetricsMinimized)}
+                />
             </DraggablePanel>
           )}
           {memoryProfilerOpen && (
