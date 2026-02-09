@@ -330,7 +330,8 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     },
     onGroupDeleteAllClasses: async (groupId) => {
       if (isReadOnly) return;
-      await deleteAllClassesInGroupFn?.(groupId);
+      const group = groups.find(g => g.id === groupId);
+      await deleteAllClassesInGroupFn?.(groupId, group?.nodeIds, group?.name);
       triggerCanvasRefresh();
     },
   };

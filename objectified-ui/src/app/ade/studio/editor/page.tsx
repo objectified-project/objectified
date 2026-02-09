@@ -1678,10 +1678,6 @@ const StudioContent = () => {
     const groupName = groupNameFromNode ?? group?.name ?? 'this group';
 
     if (classIds.length === 0) {
-      await alertDialog({
-        message: 'This group has no classes to delete.',
-        variant: 'info',
-      });
       return;
     }
 
