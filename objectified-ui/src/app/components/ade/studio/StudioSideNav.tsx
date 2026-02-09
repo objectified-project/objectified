@@ -1151,6 +1151,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     onDragStart={(e) => {
                       e.dataTransfer.effectAllowed = 'copy';
                       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-group' }));
+                      e.dataTransfer.setData('application/x-objectified-drag-type', 'new-group');
                     }}
                     sx={{
                       display: 'flex',

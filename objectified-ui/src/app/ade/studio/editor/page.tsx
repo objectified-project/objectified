@@ -1884,6 +1884,9 @@ const StudioContent = () => {
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
   const dragOverGroupIdRef = useRef<string | null>(null);
 
+  // #477: Canvas dropzone highlight when dragging new-group from sidebar
+  const [isCanvasDropTarget, setIsCanvasDropTarget] = useState(false);
+
   // Update group highlight state when dragging nodes over groups
   useEffect(() => {
     // Only update if the dragOverGroupId actually changed
@@ -2270,10 +2273,23 @@ const StudioContent = () => {
     }
   }, [isReadOnly, findNodeGroup, findGroupAtPosition, handleAddNodeToGroup, handleRemoveNodeFromGroup, groups, confirmDialog, updateGroup, setNodes, nodes, isNodeCompletelyOutsideGroup]);
 
-  // Handle canvas drag over - allow dropping groups
+  // Handle canvas drag over - allow dropping groups; show dropzone when dragging new-group
   const handleCanvasDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
+    const isNewGroupDrag = event.dataTransfer.types.includes('application/x-objectified-drag-type');
+    setIsCanvasDropTarget(isNewGroupDrag);
+  }, []);
+
+  // Clear canvas dropzone highlight when drag ends (e.g. drop elsewhere or cancel)
+  useEffect(() => {
+    const clearCanvasDropTarget = () => setIsCanvasDropTarget(false);
+    document.addEventListener('dragend', clearCanvasDropTarget);
+    document.addEventListener('drop', clearCanvasDropTarget);
+    return () => {
+      document.removeEventListener('dragend', clearCanvasDropTarget);
+      document.removeEventListener('drop', clearCanvasDropTarget);
+    };
   }, []);
 
   // Create a new group (must be defined after handlers it references)
@@ -2521,6 +2537,7 @@ const StudioContent = () => {
   // Handle canvas drop - create group at drop position
   const handleCanvasDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
+    setIsCanvasDropTarget(false);
 
     if (isReadOnly) return;
 
@@ -4678,7 +4695,7 @@ const StudioContent = () => {
               snapGrid={[gridSize, gridSize]}
               fitView
               attributionPosition="bottom-left"
-              className={isAnimating ? 'layout-animating' : ''}
+              className={`${isAnimating ? 'layout-animating' : ''} ${isCanvasDropTarget ? 'ring-2 ring-blue-400/60 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 border-2 border-dashed border-blue-400 rounded-xl transition-all duration-150' : ''}`}
               nodesDraggable={!layoutPreviewNodes}
               nodesConnectable={!isReadOnly}
               elementsSelectable={true}

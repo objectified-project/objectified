@@ -99,14 +99,13 @@
 | #485   | Quick restore hidden nodes     |
 
 #### Visual Feedback
-- 📋 [TODO] **Dropzone highlighting**: Visual cues for valid drop targets
+- ✅ **Dropzone highlighting**: Visual cues for valid drop targets
 - 📋 [TODO] **Ghost preview**: Show preview while dragging
 - 📋 [TODO] **Invalid drop indicator**: Clear feedback for invalid drops
 - 📋 [TODO] **Snap indicators**: Show snap points during drag
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
-| #477   | Add dropzone highlighting when dragging nodes    |
 | #478   | Show ghost preview of node while dragging        |
 | #479   | Invalid drop indicator                           |
 | #480   | Snap indicators when dragging nodes              |
@@ -130,14 +129,13 @@
   - 📋 [TODO] Expand/collapse all groups with keyboard shortcut
   - 📋 [TODO] Remember collapsed state per user
 - 📋 [TODO] Nested groups for hierarchical organization (max 3 levels)
-- 📋 [TODO] Group-level operations:
+- ✅ Group-level operations:
   - ✅ Move entire group with one drag
   - ✅ Delete all classes in a group
 - ✅ Named groups with descriptions and metadata
 - ✅ Visual styling options:
   - ✅ Rounded rectangle containers with subtle shadows
   - ✅ Dashed or solid borders with custom colors
-  - 📋 [TODO] Group headers with collapse/expand icons
   - ✅ Background color/opacity customization
   - ✅ Optional group icons from icon library
 - ✅ Group object is drag-and-drop to the canvas
@@ -147,8 +145,6 @@
 | #154   | Collapsible groups to reduce canvas clutter                         |
 | #155   | Nested groups for hierarchical organization                         |
 | #156   | Group-level operations: move, delete, export, duplicate, bulk edit  |
-| #285   | Ungroup nodes by deleting the group                                 |
-| #516   | Group headers with collapse/expand icons                            |
 
 ---
 

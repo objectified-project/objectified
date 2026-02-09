@@ -910,6 +910,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
   const textColor = typedData.theme?.textColor || '#1e293b';
   const headerTextColor = typedData.theme?.headerTextColor || 'white';
 
+  const isDropTarget = dragTarget === 'node' || dragTarget === 'property';
+
   return (
     <div
       ref={nodeRef}
@@ -933,8 +935,17 @@ function ClassNode({ id, data, selected }: NodeProps) {
         cursor: 'pointer',
         color: textColor,
         fontSize: '12px',
+        position: 'relative',
       }}
     >
+      {/* #477: Dropzone highlight overlay - visual cue for valid drop target */}
+      {isDropTarget && (
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[10px] border-2 border-dashed border-blue-400 bg-blue-50/30 dark:bg-blue-950/20"
+          style={{ zIndex: 10 }}
+          aria-hidden
+        />
+      )}
       {/* Target handle at the top */}
       <Handle
         type="target"
