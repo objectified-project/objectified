@@ -5,7 +5,8 @@ import { NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
 import {
   Folder, Edit2, Trash2, X, Check, Palette, Settings,
   Box, Layers, Database, Shield, Users, Zap, Globe, Lock,
-  FileText, Tag, Star, Heart, Flag, Bookmark, Archive, Package
+  FileText, Tag, Star, Heart, Flag, Bookmark, Archive, Package,
+  FileX
 } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 
@@ -99,6 +100,7 @@ export interface GroupNodeData {
   isHighlighted?: boolean; // Visual highlight when node is dragged over
   onRename?: (groupId: string, newName: string) => void;
   onDelete?: (groupId: string) => void;
+  onDeleteAllClassesInGroup?: (groupId: string, classIds?: string[], groupName?: string) => void;
   onColorChange?: (groupId: string, newColor: string) => void;
   onStyleChange?: (groupId: string, styleOptions: GroupStyleOptions) => void;
   isReadOnly?: boolean;
@@ -169,6 +171,12 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
     e.stopPropagation();
     if (groupData.isReadOnly) return;
     groupData.onDelete?.(groupData.id);
+  }, [groupData]);
+
+  const handleDeleteAllClassesInGroup = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (groupData.isReadOnly) return;
+    groupData.onDeleteAllClassesInGroup?.(groupData.id, groupData.nodeIds, groupData.name);
   }, [groupData]);
 
   const handleColorChange = useCallback((colorName: string) => {
@@ -436,7 +444,19 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 <Edit2 className="h-3.5 w-3.5" />
               </button>
 
-              {/* Delete button */}
+              {/* Delete all classes in group (only when group has classes) */}
+              {nodeCount > 0 && (
+                <button
+                  onClick={handleDeleteAllClassesInGroup}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-amber-400/40 text-amber-200' : 'hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}
+                  title="Delete all classes in group"
+                >
+                  <FileX className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {/* Delete group button */}
               <button
                 onClick={handleDelete}
                 onMouseDown={(e) => e.stopPropagation()}

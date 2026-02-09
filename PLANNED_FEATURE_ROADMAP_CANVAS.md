@@ -98,18 +98,6 @@
 | #484   | "Ghosts mode" for hidden nodes |
 | #485   | Quick restore hidden nodes     |
 
-#### Focus Mode 📋 PLANNED
-- ✅ Isolate selected classes and immediate relationships
-- ✅ Blur/dim non-focused nodes
-- ✅ Show only 1st-degree connections (or 2nd, 3rd degree)
-- ✅ Expand focus incrementally
-- ✅ Focus on group (show only group members)
-- 📋 [TODO] Exit focus mode with Esc key
-
-| Ticket | Feature Description                        |
-|--------|--------------------------------------------|
-| #491   | Exit focus mode with Esc key               |
-
 #### Visual Feedback
 - 📋 [TODO] **Dropzone highlighting**: Visual cues for valid drop targets
 - 📋 [TODO] **Ghost preview**: Show preview while dragging
@@ -144,7 +132,7 @@
 - 📋 [TODO] Nested groups for hierarchical organization (max 3 levels)
 - 📋 [TODO] Group-level operations:
   - ✅ Move entire group with one drag
-  - 📋 [TODO] Delete all classes in a group
+  - ✅ Delete all classes in a group
 - ✅ Named groups with descriptions and metadata
 - ✅ Visual styling options:
   - ✅ Rounded rectangle containers with subtle shadows
@@ -160,7 +148,6 @@
 | #155   | Nested groups for hierarchical organization                         |
 | #156   | Group-level operations: move, delete, export, duplicate, bulk edit  |
 | #285   | Ungroup nodes by deleting the group                                 |
-| #515   | Delete all classes in a group                                       |
 | #516   | Group headers with collapse/expand icons                            |
 
 ---
@@ -523,6 +510,13 @@
   - ✅ "Class X is isolated - consider adding relationships"
   - ✅ "Large clusters detected - consider splitting into groups"
 
+#### Focus Mode ✅ IMPLEMENTED
+- ✅ Isolate selected classes and immediate relationships
+- ✅ Blur/dim non-focused nodes
+- ✅ Show only 1st-degree connections (or 2nd, 3rd degree)
+- ✅ Expand focus incrementally
+- ✅ Focus on group (show only group members)
+
 ### 4.1 Smart Canvas Features
 
 **Intelligent Layout Suggestions** ✅ PARTIALLY IMPLEMENTED
@@ -537,8 +531,6 @@
 - ✅ Dynamic detail based on zoom level
 - ✅ Fade transitions between LOD levels
 - ✅ Show property references even when nodes are collapsed
-
----
 
 ---
 

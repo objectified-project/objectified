@@ -15,7 +15,7 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Fab from '@mui/material/Fab';
-import { Search, Add, Edit, Delete, Upload, LibraryBooks, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { Search, Add, Edit, Delete, DeleteSweep, Upload, LibraryBooks, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
@@ -81,6 +81,7 @@ export interface StudioSideNavCallbacks {
   onGroupAdd?: () => void;
   onGroupSelect?: (groupId: string) => void;
   onGroupDelete?: (groupId: string) => void;
+  onGroupDeleteAllClasses?: (groupId: string) => void;
 }
 
 export interface GroupItem {
@@ -1213,20 +1214,40 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                         sx={{ mb: 0.5 }}
                         secondaryAction={
                           !isReadOnly && (
-                            <IconButton
-                              edge="end"
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                callbacks.onGroupDelete?.(group.id);
-                              }}
-                              sx={{
-                                color: isDark ? '#94a3b8' : '#64748b',
-                                '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                              }}
-                            >
-                              <Delete fontSize="small" />
-                            </IconButton>
+                            <Box sx={{ display: 'flex', gap: 0, alignItems: 'center' }}>
+                              {(group.nodeIds?.length ?? 0) > 0 && (
+                                <IconButton
+                                  edge="end"
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    callbacks.onGroupDeleteAllClasses?.(group.id);
+                                  }}
+                                  sx={{
+                                    color: isDark ? '#94a3b8' : '#64748b',
+                                    '&:hover': { color: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)' },
+                                  }}
+                                  title="Delete all classes in group"
+                                >
+                                  <DeleteSweep fontSize="small" />
+                                </IconButton>
+                              )}
+                              <IconButton
+                                edge="end"
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  callbacks.onGroupDelete?.(group.id);
+                                }}
+                                sx={{
+                                  color: isDark ? '#94a3b8' : '#64748b',
+                                  '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' },
+                                }}
+                                title="Delete group"
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Box>
                           )
                         }
                       >

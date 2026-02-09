@@ -36,7 +36,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, createGroupFn, clickToFocusEnabled, groups, deleteGroup } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, createGroupFn, clickToFocusEnabled, groups, deleteGroup, deleteAllClassesInGroupFn } = useStudio();
 
   // Check if we're on the code or paths view - hide sidebar for these views
   const isCodeView = pathname?.includes('/code') || pathname?.includes('/paths');
@@ -326,6 +326,11 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       if (!confirmed) return;
 
       deleteGroup(groupId);
+      triggerCanvasRefresh();
+    },
+    onGroupDeleteAllClasses: async (groupId) => {
+      if (isReadOnly) return;
+      await deleteAllClassesInGroupFn?.(groupId);
       triggerCanvasRefresh();
     },
   };

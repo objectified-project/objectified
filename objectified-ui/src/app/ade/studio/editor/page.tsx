@@ -219,6 +219,7 @@ const StudioContent = () => {
     addGroup,
     updateGroup,
     deleteGroup: deleteGroupFromContext,
+    setDeleteAllClassesInGroupFn,
     setSearchHistoryCount,
     setClearSearchHistoryFn
   } = useStudio();
@@ -420,6 +421,7 @@ const StudioContent = () => {
   // Refs for group handlers - initialized here, values set later
   const handleGroupRenameRef = useRef<any>(null);
   const handleGroupDeleteRef = useRef<any>(null);
+  const handleDeleteAllClassesInGroupRef = useRef<any>(null);
   const handleGroupColorChangeRef = useRef<any>(null);
   const handleGroupStyleChangeRef = useRef<any>(null);
   const handleGroupTagsChangeRef = useRef<any>(null);
@@ -1662,6 +1664,56 @@ const StudioContent = () => {
     }
   }, [isReadOnly, groups, confirmDialog, deleteGroupFromContext, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges]);
 
+  // Handle delete all classes in group
+  // Optional classIdsFromNode/groupNameFromNode come from the group node so we don't rely on groups state being in sync
+  const handleDeleteAllClassesInGroup = useCallback(async (
+    groupId: string,
+    classIdsFromNode?: string[],
+    groupNameFromNode?: string
+  ) => {
+    if (isReadOnly) return;
+
+    const group = groups.find(g => g.id === groupId);
+    const classIds = (classIdsFromNode?.length ? classIdsFromNode : group?.nodeIds) || [];
+    const groupName = groupNameFromNode ?? group?.name ?? 'this group';
+
+    if (classIds.length === 0) {
+      await alertDialog({
+        message: 'This group has no classes to delete.',
+        variant: 'info',
+      });
+      return;
+    }
+
+    const confirmed = await confirmDialog({
+      title: 'Delete All Classes in Group',
+      message: `Are you sure you want to delete all ${classIds.length} class${classIds.length === 1 ? '' : 'es'} in "${groupName}"? This action cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: 'Delete All',
+      cancelLabel: 'Cancel',
+    });
+
+    if (!confirmed) return;
+
+    const errors: string[] = [];
+    for (const classId of classIds) {
+      const response = await deleteClassWithSession(classId);
+      if (!response.success) {
+        errors.push(response.error || classId);
+      }
+    }
+
+    if (errors.length > 0) {
+      await alertDialog({
+        message: `Failed to delete ${errors.length} class${errors.length === 1 ? '' : 'es'}: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`,
+        variant: 'error',
+      });
+    }
+
+    await reloadClasses(true);
+    triggerSidebarRefresh();
+  }, [isReadOnly, groups, confirmDialog, alertDialog, deleteClassWithSession, reloadClasses, triggerSidebarRefresh]);
+
   // Handle group color change
   const handleGroupColorChange = useCallback(async (groupId: string, newColor: string) => {
     if (isReadOnly) return;
@@ -1828,6 +1880,7 @@ const StudioContent = () => {
   handleGroupTagsChangeRef.current = handleGroupTagsChange;
   handleGroupRenameRef.current = handleGroupRename;
   handleGroupDeleteRef.current = handleGroupDelete;
+  handleDeleteAllClassesInGroupRef.current = handleDeleteAllClassesInGroup;
   handleGroupColorChangeRef.current = handleGroupColorChange;
   handleGroupStyleChangeRef.current = handleGroupStyleChange;
 
@@ -2296,6 +2349,7 @@ const StudioContent = () => {
         styleOptions: newGroup.styleOptions,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
+        onDeleteAllClassesInGroup: handleDeleteAllClassesInGroup,
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
         isReadOnly: isReadOnly
@@ -2340,13 +2394,19 @@ const StudioContent = () => {
       }
     }
 
-  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleDeleteAllClassesInGroup, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
 
   // Register handleCreateGroup function in context for sidebar access
   useEffect(() => {
     setCreateGroupFn(() => handleCreateGroup);
     return () => setCreateGroupFn(null);
   }, [handleCreateGroup, setCreateGroupFn]);
+
+  // Register handleDeleteAllClassesInGroup in context for sidebar access
+  useEffect(() => {
+    setDeleteAllClassesInGroupFn(() => (groupId: string, classIds?: string[], groupName?: string) => handleDeleteAllClassesInGroupRef.current?.(groupId, classIds, groupName));
+    return () => setDeleteAllClassesInGroupFn(null);
+  }, [setDeleteAllClassesInGroupFn]);
 
   // Create a new group at a specific position (for drag-and-drop)
   const handleCreateGroupAtPosition = useCallback(async (dropPosition: { x: number; y: number }) => {
@@ -2408,6 +2468,7 @@ const StudioContent = () => {
         styleOptions: newGroup.styleOptions,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
+        onDeleteAllClassesInGroup: handleDeleteAllClassesInGroup,
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
         isReadOnly: isReadOnly
@@ -2451,7 +2512,7 @@ const StudioContent = () => {
       }
     }
 
-  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleDeleteAllClassesInGroup, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
 
   // Register handleCreateGroupAtPosition function in context for drag-and-drop access
   useEffect(() => {
@@ -2822,6 +2883,7 @@ const StudioContent = () => {
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
                 onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
+                onDeleteAllClassesInGroup: (groupId: string) => handleDeleteAllClassesInGroupRef.current?.(groupId),
                 onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
                 onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
                 onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
@@ -3655,6 +3717,7 @@ const StudioContent = () => {
                   availableTags,
                   onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
                   onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
+                  onDeleteAllClassesInGroup: (groupId: string) => handleDeleteAllClassesInGroupRef.current?.(groupId),
                   onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
                   onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
                   onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
