@@ -374,7 +374,7 @@ export default function ExportWizard({
             const bg = options.includeBackground
               ? (isDark ? '#111827' : options.backgroundColor)
               : 'transparent';
-            return toPng(viewportElement, {
+            return toPng(captureElement, {
               backgroundColor: bg,
               quality: 0.5, // Lower quality for preview
               pixelRatio: 1,

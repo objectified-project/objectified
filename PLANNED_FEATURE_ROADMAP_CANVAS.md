@@ -305,7 +305,6 @@
   - [TODO] Include/exclude annotations
   - [TODO] Include/exclude hidden nodes
   - ✅ Background color/transparency toggle
-  - 📋 [TODO] Add watermark
   - ✅ Add timestamp and metadata
 - **Batch Export**:
   - [TODO] Export all groups separately
@@ -316,10 +315,6 @@
   - [TODO] Export canvas walkthrough as video (WebM, MP4)
   - [TODO] Adjustable frame rate and duration
   - [TODO] Add narration (audio recording)
-
-| Ticket | Feature Description                        | Status |
-|--------|--------------------------------------------|--------|
-| #408   | Export option to add watermark             | [TODO] |
 
 ---
 
