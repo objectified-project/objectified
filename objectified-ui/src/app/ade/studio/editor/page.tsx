@@ -2404,7 +2404,9 @@ const StudioContent = () => {
 
   // Register handleDeleteAllClassesInGroup in context for sidebar access
   useEffect(() => {
-    setDeleteAllClassesInGroupFn(() => (groupId: string, classIds?: string[], groupName?: string) => handleDeleteAllClassesInGroupRef.current?.(groupId, classIds, groupName));
+    setDeleteAllClassesInGroupFn((groupId: string, classIds?: string[], groupName?: string): Promise<void> =>
+      handleDeleteAllClassesInGroupRef.current?.(groupId, classIds, groupName) ?? Promise.resolve()
+    );
     return () => setDeleteAllClassesInGroupFn(null);
   }, [setDeleteAllClassesInGroupFn]);
 

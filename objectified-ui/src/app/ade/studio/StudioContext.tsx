@@ -137,8 +137,8 @@ interface StudioContextType {
   updateGroup: (groupId: string, updates: Partial<CanvasGroup>) => void;
   deleteGroup: (groupId: string) => void;
   /** Called to delete all classes contained in a group (registered by editor). */
-  deleteAllClassesInGroupFn: ((groupId: string) => Promise<void>) | null;
-  setDeleteAllClassesInGroupFn: (fn: ((groupId: string) => Promise<void>) | null) => void;
+  deleteAllClassesInGroupFn: ((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null;
+  setDeleteAllClassesInGroupFn: (fn: ((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null) => void;
   addNodeToGroup: (groupId: string, nodeId: string) => void;
   removeNodeFromGroup: (groupId: string, nodeId: string) => void;
   // Search history
@@ -392,7 +392,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     setGroups(prev => prev.filter(g => g.id !== groupId));
   };
 
-  const [deleteAllClassesInGroupFn, setDeleteAllClassesInGroupFn] = useState<((groupId: string) => Promise<void>) | null>(null);
+  const [deleteAllClassesInGroupFn, setDeleteAllClassesInGroupFn] = useState<((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null>(null);
 
   const addNodeToGroup = (groupId: string, nodeId: string) => {
     setGroups(prev => prev.map(g => {
