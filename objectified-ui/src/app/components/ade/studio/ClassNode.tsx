@@ -443,6 +443,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
   const [dragTarget, setDragTarget] = useState<'node' | 'property' | null>(null);
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
+  /** #479: Reason string when drop would be invalid (duplicate, read-only, etc.); null when valid or not dragging over */
+  const [invalidDropReason, setInvalidDropReason] = useState<string | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -801,11 +803,38 @@ function ClassNode({ id, data, selected }: NodeProps) {
     return `${typeName}${suffix}`;
   };
 
+  // #479: Validate whether a drop at the given parent would be invalid (duplicate name or read-only)
+  const validateDrop = (parentId: string | null, dragPayload: { type?: string; property?: { name?: string } } | null): string | null => {
+    if (!dragPayload || !dragPayload.type) return null;
+    if (typedData.isReadOnly) return 'This class is read-only';
+    if (dragPayload.type === 'property' && dragPayload.property?.name) {
+      const name = String(dragPayload.property.name).trim();
+      const props = typedData.properties || [];
+      const duplicate = props.some(
+        (p) =>
+          (p.parent_id === parentId || (p.parent_id == null && parentId == null)) &&
+          String(p.name).trim() === name
+      );
+      if (duplicate) return 'A property with this name already exists at this level';
+    }
+    return null;
+  };
+
   // DnD Handlers (top-level)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (dragTarget !== 'property') setDragTarget('node');
+    // #479: Validate drop (getData may be empty in some browsers until drop)
+    try {
+      const raw = e.dataTransfer.getData('application/json');
+      const payload = raw ? (JSON.parse(raw) as { type?: string; property?: { name?: string } }) : null;
+      const reason = validateDrop(null, payload);
+      setInvalidDropReason(reason);
+      if (reason) e.dataTransfer.dropEffect = 'none';
+    } catch {
+      setInvalidDropReason(null);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -813,6 +842,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     e.stopPropagation();
     setDragTarget(null);
     setDragOverPropertyId(null);
+    setInvalidDropReason(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -820,15 +850,17 @@ function ClassNode({ id, data, selected }: NodeProps) {
     e.stopPropagation();
     setDragTarget(null);
     setDragOverPropertyId(null);
+    setInvalidDropReason(null);
     if (typedData.isReadOnly) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
       if (raw) {
         const dropData = JSON.parse(raw);
+        // #479: Re-validate on drop; do not perform invalid drop
+        if (validateDrop(null, dropData)) return;
         if (dropData.type === 'property' && typedData.onPropertyDrop) {
           typedData.onPropertyDrop(typedData.id, dropData.property, null);
         } else if (dropData.type === 'new-reference' && typedData.onCreateReference) {
-          // Create reference at top-level on this class
           typedData.onCreateReference(typedData.id);
         }
       }
@@ -844,9 +876,27 @@ function ClassNode({ id, data, selected }: NodeProps) {
     if (isObject) {
       setDragTarget('property');
       setDragOverPropertyId(propertyId);
+      try {
+        const raw = e.dataTransfer.getData('application/json');
+        const payload = raw ? (JSON.parse(raw) as { type?: string; property?: { name?: string } }) : null;
+        const reason = validateDrop(propertyId, payload);
+        setInvalidDropReason(reason);
+        if (reason) e.dataTransfer.dropEffect = 'none';
+      } catch {
+        setInvalidDropReason(null);
+      }
     } else {
       setDragTarget('node');
       setDragOverPropertyId(null);
+      try {
+        const raw = e.dataTransfer.getData('application/json');
+        const payload = raw ? (JSON.parse(raw) as { type?: string; property?: { name?: string } }) : null;
+        const reason = validateDrop(null, payload);
+        setInvalidDropReason(reason);
+        if (reason) e.dataTransfer.dropEffect = 'none';
+      } catch {
+        setInvalidDropReason(null);
+      }
     }
   };
 
@@ -855,6 +905,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     e.stopPropagation();
     setDragTarget(null);
     setDragOverPropertyId(null);
+    setInvalidDropReason(null);
   };
 
   const handlePropertyDrop = (e: React.DragEvent, parentPropertyId: string) => {
@@ -862,15 +913,17 @@ function ClassNode({ id, data, selected }: NodeProps) {
     e.stopPropagation();
     setDragTarget(null);
     setDragOverPropertyId(null);
+    setInvalidDropReason(null);
     if (typedData.isReadOnly) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
       if (raw) {
         const dropData = JSON.parse(raw);
+        // #479: Re-validate on drop; do not perform invalid drop
+        if (validateDrop(parentPropertyId, dropData)) return;
         if (dropData.type === 'property' && typedData.onPropertyDrop) {
           typedData.onPropertyDrop(typedData.id, dropData.property, parentPropertyId);
         } else if (dropData.type === 'new-reference' && typedData.onCreateReference) {
-          // Create nested reference under the given parent property (object container)
           typedData.onCreateReference(`${typedData.id}|${parentPropertyId}`);
         }
       }
@@ -911,6 +964,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
   const headerTextColor = typedData.theme?.headerTextColor || 'white';
 
   const isDropTarget = dragTarget === 'node' || dragTarget === 'property';
+  const showValidDropOverlay = isDropTarget && !invalidDropReason;
 
   return (
     <div
@@ -927,6 +981,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
         maxWidth: '420px',
         boxShadow: selected
           ? `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(99, 102, 241, 0.35)`
+          : invalidDropReason
+          ? '0 0 0 2px #dc2626, 0 8px 24px -8px rgba(220, 38, 38, 0.3)'
           : dragTarget === 'node'
           ? '0 0 0 2px #10b981, 0 8px 24px -8px rgba(16, 185, 129, 0.25)'
           : '0 2px 12px -2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04)',
@@ -938,8 +994,38 @@ function ClassNode({ id, data, selected }: NodeProps) {
         position: 'relative',
       }}
     >
+      {/* #479: Invalid drop indicator - entire node; shows when drop would be duplicate or read-only */}
+      {invalidDropReason && (
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[10px] border-2 border-dashed border-red-500 bg-red-50/40 dark:bg-red-950/30"
+          style={{ zIndex: 11 }}
+          title={invalidDropReason}
+          aria-hidden
+        >
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(220, 38, 38, 0.95)',
+              color: 'white',
+              fontSize: '11px',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              whiteSpace: 'nowrap',
+              maxWidth: '90%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            {invalidDropReason}
+          </div>
+        </div>
+      )}
       {/* #477: Dropzone highlight overlay - visual cue for valid drop target */}
-      {isDropTarget && (
+      {showValidDropOverlay && (
         <div
           className="pointer-events-none absolute inset-0 rounded-[10px] border-2 border-dashed border-blue-400 bg-blue-50/30 dark:bg-blue-950/20"
           style={{ zIndex: 10 }}
@@ -1452,27 +1538,29 @@ function ClassNode({ id, data, selected }: NodeProps) {
           style={{
             padding: '6px 12px',
             fontSize: '11px',
-            color: dragTarget === 'node' ? '#059669' : '#64748b',
+            color: invalidDropReason ? '#b91c1c' : dragTarget === 'node' ? '#059669' : '#64748b',
             lineHeight: '1.4',
-            background: dragTarget === 'node'
+            background: invalidDropReason
+              ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+              : dragTarget === 'node'
               ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
               : '#f8fafc',
-            borderBottom: `1px solid ${dragTarget === 'node' ? '#a7f3d0' : '#e2e8f0'}`,
-            textAlign: dragTarget === 'node' ? 'center' : 'left',
-            fontWeight: dragTarget === 'node' ? 500 : 400,
+            borderBottom: `1px solid ${invalidDropReason ? '#fecaca' : dragTarget === 'node' ? '#a7f3d0' : '#e2e8f0'}`,
+            textAlign: (dragTarget === 'node' || invalidDropReason) ? 'center' : 'left',
+            fontWeight: (dragTarget === 'node' || invalidDropReason) ? 500 : 400,
             minHeight: '28px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: dragTarget === 'node' ? 'center' : 'flex-start',
+            justifyContent: (dragTarget === 'node' || invalidDropReason) ? 'center' : 'flex-start',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             opacity: descriptionOpacity,
             transition: 'all 0.2s ease',
-            fontStyle: typedData.description ? 'normal' : 'italic',
+            fontStyle: typedData.description && !invalidDropReason ? 'normal' : 'italic',
           }}
         >
-          {dragTarget === 'node' ? '✨ Drop here' : (typedData.description || 'No description')}
+          {invalidDropReason ? `⚠ ${invalidDropReason}` : dragTarget === 'node' ? '✨ Drop here' : (typedData.description || 'No description')}
         </div>
       )}
 
@@ -1557,6 +1645,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
               const draggedOver = dragOverPropertyId === p.id;
               const childOfDragged = isDescendantOfDraggedProperty(p.id, dragOverPropertyId);
               const isInDropZone = draggedOver || childOfDragged;
+              const isInvalidDropZone = isInDropZone && !!invalidDropReason;
               const currentIndex = rowIndex++;
               const isRequired = p.data?.required;
               const isDeprecated = parseData(p)?.deprecated;
@@ -1574,7 +1663,9 @@ function ClassNode({ id, data, selected }: NodeProps) {
                     alignItems: 'center',
                     padding: '5px 10px',
                     paddingLeft: `${10 + depth * 14}px`,
-                    background: isInDropZone
+                    background: isInvalidDropZone
+                      ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+                      : isInDropZone
                       ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
                       : 'transparent',
                     borderBottom: !isLast ? '1px solid #f1f5f9' : 'none',
