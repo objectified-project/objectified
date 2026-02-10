@@ -76,7 +76,7 @@ describe('Database Helper - Deep Coverage Tests', () => {
     expect(result).toBeDefined();
   });
 
-  xit('updateProperty should work', async () => {
+  it('updateProperty should work', async () => {
     // Function not implemented - skipping test
     // const { updateProperty } = await import('../lib/db/helper');
     const db = require('../lib/db/db');

@@ -102,12 +102,11 @@
 - ✅ **Dropzone highlighting**: Visual cues for valid drop targets
 - 📋 [TODO] **Ghost preview**: Show preview while dragging
 - ✅ **Invalid drop indicator**: Clear feedback for invalid drops
-- 📋 [TODO] **Snap indicators**: Show snap points during drag
+- ✅ **Snap indicators**: Show snap points during drag
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
 | #478   | Show ghost preview of node while dragging        |
-| #480   | Snap indicators when dragging nodes              |
 
 ---
 

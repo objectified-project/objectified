@@ -159,5 +159,45 @@ components:
     );
     expect(conversionWarning).toBe(true);
   });
+
+  it('should include unsupportedFeatures in analysis result (#573)', async () => {
+    const content = fs.readFileSync(examplePath, 'utf-8');
+    const analysis = await analyzeSpecification(content, '30-openapi-3.0-petstore.yaml');
+
+    expect(analysis).toHaveProperty('unsupportedFeatures');
+    expect(Array.isArray(analysis.unsupportedFeatures)).toBe(true);
+  });
+
+  it('should identify unsupported features when present (#573)', async () => {
+    const specWithUnsupported = `
+openapi: 3.1.0
+info:
+  title: Spec with unsupported features
+  version: 1.0.0
+components:
+  schemas:
+    VariantOnly:
+      oneOf:
+        - type: string
+        - type: integer
+    WithExternalRef:
+      type: object
+      properties:
+        ref:
+          $ref: 'https://example.com/schema.json#/External'
+`;
+    const analysis = await analyzeSpecification(specWithUnsupported, 'spec.yaml');
+
+    expect(analysis.unsupportedFeatures).toBeDefined();
+    expect(analysis.unsupportedFeatures.length).toBeGreaterThan(0);
+
+    const externalRefs = analysis.unsupportedFeatures.find(f => f.id === 'external-refs');
+    expect(externalRefs).toBeDefined();
+    expect(externalRefs?.count).toBe(1);
+
+    const variantOnly = analysis.unsupportedFeatures.find(f => f.id === 'oneof-anyof-only');
+    expect(variantOnly).toBeDefined();
+    expect(variantOnly?.count).toBe(1);
+  });
 });
 

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, AlertCircle, XCircle, FileCode, AlertTriangle, X, ChevronRight } from 'lucide-react';
+import { CheckCircle2, AlertCircle, XCircle, FileCode, AlertTriangle, X, ChevronRight, Info } from 'lucide-react';
 import * as Progress from '@radix-ui/react-progress';
 import * as Dialog from '@radix-ui/react-dialog';
-import { AnalysisResult, QualityIssue } from '../../../utils/openapi-analyzer';
+import { AnalysisResult, QualityIssue, UnsupportedFeature } from '../../../utils/openapi-analyzer';
 
 interface AnalysisPanelProps {
   fileName: string;
@@ -308,6 +308,55 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
           </div>
         </div>
       </div>
+
+      {/* Feature compatibility – unsupported features (#573) */}
+      {analysis.unsupportedFeatures && analysis.unsupportedFeatures.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-amber-200 dark:border-amber-800 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            Feature compatibility
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            The following features in your specification are not or only partially supported by the import. They will be skipped or simplified during import.
+          </p>
+          <ul className="space-y-3">
+            {analysis.unsupportedFeatures.map((feature: UnsupportedFeature) => (
+              <li
+                key={feature.id}
+                className={`flex items-start gap-3 p-3 rounded-lg border ${
+                  feature.severity === 'warning'
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                    : 'bg-gray-50 dark:bg-gray-900/30 border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                {feature.severity === 'warning' ? (
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                    {feature.label}
+                    {feature.count != null && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        {feature.count} {feature.count === 1 ? 'use' : 'uses'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {feature.description}
+                  </div>
+                  {feature.path && (
+                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 font-mono">
+                      {feature.path}
+                    </div>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Specification Analysis */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

@@ -601,7 +601,7 @@ describe('Database Helper - Property Functions', () => {
     mockQuery.mockClear();
   });
 
-  xit('getPropertiesForProject should return properties', async () => {
+  it('getPropertiesForProject should return properties', async () => {
     // Function not implemented - skipping test
     // const { getPropertiesForProject } = await import('../lib/db/helper');
 
@@ -619,7 +619,7 @@ describe('Database Helper - Property Functions', () => {
     // expect(properties[0].name).toBe('id');
   });
 
-  xit('createProperty should create new property', async () => {
+  it('createProperty should create new property', async () => {
     // Function not implemented - skipping test
     // const { createProperty } = await import('../lib/db/helper');
 
@@ -639,7 +639,7 @@ describe('Database Helper - Property Functions', () => {
     // expect(parsed.property.name).toBe('email');
   });
 
-  xit('updateProperty should update property', async () => {
+  it('updateProperty should update property', async () => {
     // Function not implemented - skipping test
     // const { updateProperty } = await import('../lib/db/helper');
 
@@ -653,7 +653,7 @@ describe('Database Helper - Property Functions', () => {
     // expect(parsed.success).toBe(true);
   });
 
-  xit('deleteProperty should soft delete property', async () => {
+  it('deleteProperty should soft delete property', async () => {
     // Function not implemented - skipping test
     // const { deleteProperty } = await import('../lib/db/helper');
 
@@ -820,7 +820,7 @@ describe('Database Helper - Class Property Functions', () => {
     expect(parsed.success).toBe(true);
   });
 
-  xit('updateClassProperty should update property', async () => {
+  it('updateClassProperty should update property', async () => {
     // Function not implemented - skipping test
     // const { updateClassProperty } = await import('../lib/db/helper');
 
@@ -834,7 +834,7 @@ describe('Database Helper - Class Property Functions', () => {
     // expect(parsed.success).toBe(true);
   });
 
-  xit('removePropertyFromClass should remove property', async () => {
+  it('removePropertyFromClass should remove property', async () => {
     // Function not implemented - skipping test
     // const { removePropertyFromClass } = await import('../lib/db/helper');
 
@@ -1140,7 +1140,7 @@ describe('Database Helper - Property Advanced Functions', () => {
     mockQuery.mockClear();
   });
 
-  xit('getPropertyById should return property by ID', async () => {
+  it('getPropertyById should return property by ID', async () => {
     // Function not implemented - skipping test
     // This function may not be exported or may have a different implementation
     // Test that we can query properties by ID through other means
@@ -2099,7 +2099,7 @@ describe('Database Helper - Performance and Optimization', () => {
     mockQuery.mockClear();
   });
 
-  xit('should handle large result sets efficiently', async () => {
+  it('should handle large result sets efficiently', async () => {
     // Function not implemented - skipping test
     // const { getPropertiesForProject } = await import('../lib/db/helper');
 

@@ -60,7 +60,7 @@ describe('Search Filters', () => {
     filterHasProperties: 'all' | 'with' | 'without'
   ): boolean => {
     if (filterHasProperties === 'all') return true;
-    const hasProps = props && Array.isArray(props) && props.length > 0;
+    const hasProps = !!(props && Array.isArray(props) && props.length > 0);
     return filterHasProperties === 'with' ? hasProps : !hasProps;
   };
 

@@ -50,6 +50,9 @@ export interface AnalysisResult {
   errors: AnalysisIssue[];
   warnings: AnalysisIssue[];
 
+  /** Features in the spec that are not or only partially supported by import (#573) */
+  unsupportedFeatures: UnsupportedFeature[];
+
   // Parsed document
   document: any;
 }
@@ -68,6 +71,19 @@ export interface QualityIssue {
   path: string;
   line?: number;
   severity: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Describes a feature present in the spec that is not (or only partially) supported by the import.
+ * Used for pre-import compatibility check (#573).
+ */
+export interface UnsupportedFeature {
+  id: string;
+  label: string;
+  description: string;
+  path?: string;
+  count?: number;
+  severity: 'warning' | 'info';
 }
 
 /**
@@ -813,6 +829,162 @@ function findWarnings(doc: any): AnalysisIssue[] {
 }
 
 /**
+ * Identify features in the specification that are not or only partially supported by the import.
+ * Used for pre-import compatibility check (#573).
+ */
+function identifyUnsupportedFeatures(doc: any): UnsupportedFeature[] {
+  const features: UnsupportedFeature[] = [];
+  if (!doc || typeof doc !== 'object') return features;
+
+  const schemas = doc.components?.schemas || doc.definitions || {};
+  const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
+
+  // External references: not resolved during import
+  const refs = findReferences(doc);
+  const externalRefs = findExternalReferences(refs);
+  if (externalRefs.length > 0) {
+    features.push({
+      id: 'external-refs',
+      label: 'External references',
+      description: 'References to external URLs are not resolved during import. Only in-document $refs are followed.',
+      count: externalRefs.length,
+      severity: 'warning'
+    });
+  }
+
+  // Schemas that are oneOf/anyOf only (no properties): import yields no properties
+  let variantOnlyCount = 0;
+  const variantSchemaNames: string[] = [];
+  Object.entries(schemas).forEach(([name, schema]: [string, any]) => {
+    if (!schema) return;
+    const hasProps = schema.properties && Object.keys(schema.properties).length > 0;
+    const hasAllOfWithInline = schema.allOf && Array.isArray(schema.allOf) &&
+      schema.allOf.some((item: any) => item && !item.$ref && item.properties);
+    if ((schema.oneOf || schema.anyOf) && !hasProps && !hasAllOfWithInline) {
+      variantOnlyCount++;
+      variantSchemaNames.push(name);
+    }
+  });
+  if (variantOnlyCount > 0) {
+    features.push({
+      id: 'oneof-anyof-only',
+      label: 'Variant-type schemas (oneOf/anyOf only)',
+      description: `Schemas that only use oneOf/anyOf without inline properties will import with no properties. (e.g. ${variantSchemaNames.slice(0, 3).join(', ')}${variantSchemaNames.length > 3 ? '…' : ''})`,
+      path: schemaPath,
+      count: variantOnlyCount,
+      severity: 'warning'
+    });
+  }
+
+  // Conditional schemas (if/then/else): skipped by importer
+  let conditionalCount = 0;
+  function countConditional(obj: any): void {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.if !== undefined) conditionalCount++;
+    Object.values(obj).forEach(countConditional);
+  }
+  Object.values(schemas).forEach(countConditional);
+  if (conditionalCount > 0) {
+    features.push({
+      id: 'conditional-schemas',
+      label: 'Conditional schemas (if/then/else)',
+      description: 'JSON Schema if/then/else rules are not imported; only static property definitions are used.',
+      count: conditionalCount,
+      severity: 'info'
+    });
+  }
+
+  // patternProperties: not mapped by importer
+  let patternPropsCount = 0;
+  function countPatternProps(obj: any): void {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.patternProperties && Object.keys(obj.patternProperties).length > 0) patternPropsCount++;
+    Object.values(obj).forEach(countPatternProps);
+  }
+  Object.values(schemas).forEach(countPatternProps);
+  if (patternPropsCount > 0) {
+    features.push({
+      id: 'pattern-properties',
+      label: 'patternProperties',
+      description: 'JSON Schema patternProperties are not imported; only named properties are supported.',
+      count: patternPropsCount,
+      severity: 'info'
+    });
+  }
+
+  // Discriminator: not mapped to class model
+  let discriminatorCount = 0;
+  Object.values(schemas).forEach((schema: any) => {
+    if (schema?.discriminator) discriminatorCount++;
+  });
+  if (discriminatorCount > 0) {
+    features.push({
+      id: 'discriminator',
+      label: 'Discriminator',
+      description: 'Discriminator mapping is not imported; polymorphism is represented only via schema structure.',
+      path: schemaPath,
+      count: discriminatorCount,
+      severity: 'info'
+    });
+  }
+
+  // Callbacks (OpenAPI 3: operation.callbacks)
+  let callbackCount = 0;
+  if (doc.paths) {
+    Object.values(doc.paths).forEach((pathItem: any) => {
+      if (!pathItem || typeof pathItem !== 'object') return;
+      for (const method of ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace']) {
+        const op = pathItem[method];
+        if (op?.callbacks && Object.keys(op.callbacks).length > 0) callbackCount++;
+      }
+    });
+  }
+  if (callbackCount > 0) {
+    features.push({
+      id: 'callbacks',
+      label: 'Callbacks',
+      description: 'Callback operations in paths are not imported as part of schema import.',
+      path: 'paths',
+      count: callbackCount,
+      severity: 'info'
+    });
+  }
+
+  // Webhooks (OpenAPI 3.1)
+  const webhookCount = doc.webhooks ? Object.keys(doc.webhooks).length : 0;
+  if (webhookCount > 0) {
+    features.push({
+      id: 'webhooks',
+      label: 'Webhooks',
+      description: 'Webhooks section is not imported; only components/schemas are imported.',
+      path: 'webhooks',
+      count: webhookCount,
+      severity: 'info'
+    });
+  }
+
+  // readOnly / writeOnly: may not be preserved in property model
+  let readWriteOnlyCount = 0;
+  function countReadWriteOnly(obj: any): void {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.readOnly === true || obj.writeOnly === true) readWriteOnlyCount++;
+    Object.values(obj).forEach(countReadWriteOnly);
+  }
+  Object.values(schemas).forEach(countReadWriteOnly);
+  if (readWriteOnlyCount > 0) {
+    features.push({
+      id: 'readonly-writeonly',
+      label: 'readOnly / writeOnly',
+      description: 'Property readOnly/writeOnly hints may not be preserved in the imported class model.',
+      count: readWriteOnlyCount,
+      severity: 'info'
+    });
+  }
+
+  return features;
+}
+
+/**
  * Main analysis function
  */
 export async function analyzeSpecification(fileContent: string, fileName: string): Promise<AnalysisResult> {
@@ -861,6 +1033,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
         severity: 'critical'
       }],
       warnings: [],
+      unsupportedFeatures: [],
       document: null
     };
   }
@@ -907,6 +1080,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           severity: 'critical'
         }],
         warnings: [],
+        unsupportedFeatures: [],
         document: null
       };
     }
@@ -961,6 +1135,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           severity: 'critical'
         }],
         warnings: [],
+        unsupportedFeatures: [],
         document: null
       };
     }
@@ -1018,6 +1193,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           severity: 'critical'
         }],
         warnings: [],
+        unsupportedFeatures: [],
         document: null
       };
     }
@@ -1076,6 +1252,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           severity: 'critical'
         }],
         warnings: [],
+        unsupportedFeatures: [],
         document: null
       };
     }
@@ -1133,6 +1310,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           severity: 'critical'
         }],
         warnings: [],
+        unsupportedFeatures: [],
         document: null
       };
     }
@@ -1179,6 +1357,9 @@ export async function analyzeSpecification(fileContent: string, fileName: string
   // Combine conversion warnings with analysis warnings
   const allWarnings = [...conversionWarnings, ...warnings];
 
+  // Identify unsupported features for import compatibility (#573)
+  const unsupportedFeatures = identifyUnsupportedFeatures(doc);
+
   return {
     isValid: validation.valid,
     format: formatDetection.format,
@@ -1192,6 +1373,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     qualityScore,
     errors: validation.errors,
     warnings: allWarnings,
+    unsupportedFeatures,
     document: doc
   };
 }
