@@ -147,6 +147,237 @@ components:
     });
   });
 
+  describe('custom extensions (x-) (#574)', () => {
+    it('lists all x- custom extensions in metrics and reports in unsupportedFeatures', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: With extensions
+  version: 1.0.0
+  x-api-owner: platform
+paths:
+  /users:
+    x-rate-limit: 100
+    get:
+      summary: List users
+      x-internal: true
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    User:
+      type: object
+      x-schema-version: "1"
+      properties:
+        id:
+          type: string
+          x-field-hint: optional
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      expect(analysis.metrics.customExtensions).toBeDefined();
+      expect(Array.isArray(analysis.metrics.customExtensions)).toBe(true);
+      const extSet = new Set(analysis.metrics.customExtensions);
+      expect(extSet.has('x-api-owner')).toBe(true);
+      expect(extSet.has('x-rate-limit')).toBe(true);
+      expect(extSet.has('x-internal')).toBe(true);
+      expect(extSet.has('x-schema-version')).toBe(true);
+      expect(extSet.has('x-field-hint')).toBe(true);
+      expect(analysis.metrics.customExtensions.length).toBe(5);
+
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'custom-extensions');
+      expect(f).toBeDefined();
+      expect(f?.label).toBe('Custom extensions (x-)');
+      expect(f?.severity).toBe('info');
+      expect(f?.count).toBe(5);
+    });
+
+    it('does not report custom-extensions when spec has no x- fields', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: No extensions
+  version: 1.0.0
+components:
+  schemas:
+    Foo:
+      type: object
+      properties:
+        id:
+          type: string
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      expect(analysis.metrics.customExtensions).toEqual([]);
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'custom-extensions');
+      expect(f).toBeUndefined();
+    });
+
+    it('deduplicates extension names when same x- appears in multiple places', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Dupes
+  version: 1.0.0
+  x-tag: info
+paths:
+  /a:
+    x-tag: path
+    get:
+      x-tag: op
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    S:
+      type: object
+      x-tag: schema
+      properties:
+        p:
+          type: string
+          x-tag: prop
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      expect(analysis.metrics.customExtensions).toContain('x-tag');
+      expect(analysis.metrics.customExtensions.filter((e: string) => e === 'x-tag')).toHaveLength(1);
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'custom-extensions');
+      expect(f?.count).toBe(1);
+    });
+
+    it('finds x- extensions in nested structures (responses, requestBody, etc.)', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Nested
+  version: 1.0.0
+paths:
+  /post:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              x-request-schema: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                x-response-schema: true
+components:
+  schemas:
+    Dummy:
+      type: object
+      properties: {}
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const extSet = new Set(analysis.metrics.customExtensions);
+      expect(extSet.has('x-request-schema')).toBe(true);
+      expect(extSet.has('x-response-schema')).toBe(true);
+      expect(analysis.unsupportedFeatures.some((x: UnsupportedFeature) => x.id === 'custom-extensions')).toBe(true);
+    });
+
+    it('detects x- extensions in OpenAPI 3.0 spec after conversion to 3.1', async () => {
+      const spec = `
+openapi: 3.0.3
+info:
+  title: OAS3
+  version: 1.0.0
+  x-oas3-extension: true
+paths:
+  /health:
+    get:
+      summary: Health
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    Empty:
+      type: object
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      expect(analysis.metrics.customExtensions).toContain('x-oas3-extension');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'custom-extensions');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+    });
+
+    it('detects x- extensions in Swagger 2.0 spec after conversion to OpenAPI 3.1', async () => {
+      // Swagger converter preserves x- on definitions (via convertSchema spread); top-level info x- are not copied
+      const spec = `
+swagger: "2.0"
+info:
+  title: Swagger with x-
+  version: 1.0.0
+paths:
+  /ping:
+    get:
+      summary: Ping
+      responses:
+        200:
+          description: OK
+definitions:
+  Empty:
+    type: object
+    x-definition-extension: true
+  Other:
+    type: object
+    x-another-extension: true
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const extSet = new Set(analysis.metrics.customExtensions);
+      expect(extSet.has('x-definition-extension')).toBe(true);
+      expect(extSet.has('x-another-extension')).toBe(true);
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'custom-extensions');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(2);
+    });
+
+    it('custom-extensions feature has expected label and description', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Label check
+  version: 1.0.0
+  x-test: true
+components:
+  schemas:
+    S:
+      type: object
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'custom-extensions');
+      expect(f).toBeDefined();
+      expect(f?.label).toBe('Custom extensions (x-)');
+      expect(f?.description).toContain('x-');
+      expect(f?.description.length).toBeGreaterThan(10);
+    });
+
+    it('metrics.customExtensions contains only x- prefixed names', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Prefix check
+  version: 1.0.0
+  x-valid: true
+  x-another: true
+components:
+  schemas:
+    S:
+      type: object
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      analysis.metrics.customExtensions.forEach((name: string) => {
+        expect(name).toMatch(/^x-/);
+      });
+      expect(analysis.metrics.customExtensions.length).toBe(2);
+    });
+  });
+
   describe('variant-type schemas (oneOf/anyOf only)', () => {
     it('detects oneOf-only schema with no properties', async () => {
       const spec = `

@@ -346,6 +346,18 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {feature.description}
                   </div>
+                  {feature.id === 'custom-extensions' && analysis.metrics.customExtensions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {[...analysis.metrics.customExtensions].sort().map((ext) => (
+                        <span
+                          key={ext}
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200"
+                        >
+                          {ext}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {feature.path && (
                     <div className="text-xs text-gray-500 dark:text-gray-500 mt-1 font-mono">
                       {feature.path}
@@ -429,12 +441,23 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
             </div>
           </div>
           {analysis.metrics.customExtensions.length > 0 && (
-            <div className="flex items-center justify-between py-2">
-              <span className="text-gray-600 dark:text-gray-400">Custom Extensions:</span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                {analysis.metrics.customExtensions.slice(0, 3).join(', ')}
-                {analysis.metrics.customExtensions.length > 3 && ` +${analysis.metrics.customExtensions.length - 3} more`}
-              </span>
+            <div className="py-2 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-gray-600 dark:text-gray-400">Custom Extensions (x-):</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {analysis.metrics.customExtensions.length} total
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {[...analysis.metrics.customExtensions].sort().map((ext) => (
+                  <span
+                    key={ext}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                  >
+                    {ext}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
           {(analysis.metrics.compositionSchemas.allOf > 0 ||

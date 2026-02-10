@@ -839,6 +839,18 @@ function identifyUnsupportedFeatures(doc: any): UnsupportedFeature[] {
   const schemas = doc.components?.schemas || doc.definitions || {};
   const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
 
+  // Custom extensions (x-): listed for pre-import compatibility (#574)
+  const customExtensions = findCustomExtensions(doc);
+  if (customExtensions.length > 0) {
+    features.push({
+      id: 'custom-extensions',
+      label: 'Custom extensions (x-)',
+      description: 'The following x- prefixed vendor extensions were detected. They are not part of the OpenAPI standard and are not imported.',
+      count: customExtensions.length,
+      severity: 'info'
+    });
+  }
+
   // External references: not resolved during import
   const refs = findReferences(doc);
   const externalRefs = findExternalReferences(refs);
