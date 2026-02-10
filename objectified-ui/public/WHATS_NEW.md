@@ -87,6 +87,9 @@ We continue to improve the platform based on your feedback with improvements and
   - Added response header templates to the response properties form
   - Dragging a property to a variable chip in the header will apply that property's primitive settings to the bound variable
   - Dragging a class to a response schema allows the class to be copied or referenced
+- Import Improvements:
+  - Identify unsupported features for compatibility
+  - Detects and lists all x- custom extensions
 - Control Panel:
   - Versions page now has the ability to view the relationship graph for each version
 - OpenAPI Support:
