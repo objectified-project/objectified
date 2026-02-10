@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network } from 'lucide-react';
+import { Package, Search, Check, ChevronRight, ChevronDown, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network, FolderTree } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
+import { buildSchemaTree, extractSchemaReferences, type SchemaTreeNode } from '../../../utils/schema-tree-utils';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
@@ -21,6 +22,7 @@ import {
   BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/Collapsible';
 
 interface PreviewPanelProps {
   analysis: AnalysisResult;
@@ -130,30 +132,8 @@ const previewNodeTypes = {
   previewClass: PreviewClassNode,
 };
 
-// Extract references from a schema
-function extractSchemaReferences(schema: any): string[] {
-  const refs: string[] = [];
-
-  const findRefs = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return;
-
-    if (obj.$ref && typeof obj.$ref === 'string') {
-      const refName = obj.$ref.split('/').pop();
-      if (refName && !refs.includes(refName)) {
-        refs.push(refName);
-      }
-    }
-
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        findRefs(obj[key]);
-      }
-    }
-  };
-
-  findRefs(schema);
-  return refs;
-}
+// Re-export for consumers that import from PreviewPanel
+export type { SchemaTreeNode } from '../../../utils/schema-tree-utils';
 
 // Get composition type if any
 function getCompositionType(schema: any): string | null {
@@ -163,11 +143,116 @@ function getCompositionType(schema: any): string | null {
   return null;
 }
 
+// Single tree node for hierarchical schema view
+function SchemaTreeItem({
+  node,
+  depth,
+  parentKey,
+  expandedSchemaNames,
+  onToggleExpand,
+  getSchemaInfo,
+  onToggleSchema,
+  onSelectSchema,
+  selectedSchemaName,
+}: {
+  node: SchemaTreeNode;
+  depth: number;
+  parentKey: string;
+  expandedSchemaNames: string[];
+  onToggleExpand: (name: string) => void;
+  getSchemaInfo: (name: string) => SchemaInfo | undefined;
+  onToggleSchema: (name: string) => void;
+  onSelectSchema: (name: string | null) => void;
+  selectedSchemaName: string | null;
+}) {
+  const schemaInfo = getSchemaInfo(node.name);
+  const hasChildren = node.children.length > 0;
+  const isExpanded = expandedSchemaNames.includes(node.name);
+  const isSelected = selectedSchemaName === node.name;
+  const paddingLeft = depth * 16 + 12;
+
+  return (
+    <div className="space-y-0.5">
+      <div
+        className={`flex items-center gap-2 rounded-lg cursor-pointer transition-colors ${
+          isSelected
+            ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800'
+            : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+        }`}
+        style={{ paddingLeft: `${paddingLeft}px`, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+        onClick={() => onSelectSchema(node.name)}
+      >
+        <div className="flex items-center gap-1 flex-shrink-0 w-5">
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand(node.name);
+              }}
+              className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400"
+              aria-label={isExpanded ? 'Collapse' : 'Expand'}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+          ) : (
+            <span className="w-4 inline-block" aria-hidden />
+          )}
+        </div>
+        <Checkbox.Root
+          checked={schemaInfo?.selected ?? false}
+          onCheckedChange={() => onToggleSchema(node.name)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center flex-shrink-0"
+        >
+          <Checkbox.Indicator>
+            <Check className="w-4 h-4 text-white" />
+          </Checkbox.Indicator>
+        </Checkbox.Root>
+        <Package className="h-4 w-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-gray-900 dark:text-white truncate text-sm">
+            {node.name}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {schemaInfo != null ? `${schemaInfo.properties} properties` : ''}
+          </div>
+        </div>
+      </div>
+      {hasChildren && (
+        <Collapsible open={isExpanded}>
+          <CollapsibleContent>
+            {node.children.map((child, idx) => (
+              <SchemaTreeItem
+                key={`${parentKey}-${child.name}-${idx}`}
+                node={child}
+                depth={depth + 1}
+                parentKey={`${parentKey}-${node.name}-${idx}`}
+                expandedSchemaNames={expandedSchemaNames}
+                onToggleExpand={onToggleExpand}
+                getSchemaInfo={getSchemaInfo}
+                onToggleSchema={onToggleSchema}
+                onSelectSchema={onSelectSchema}
+                selectedSchemaName={selectedSchemaName}
+              />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
+  );
+}
+
 export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelProps) {
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'json' | 'yaml'>('summary');
-  const [panelView, setPanelView] = useState<'list' | 'chart'>('list');
+  const [panelView, setPanelView] = useState<'list' | 'chart' | 'tree'>('list');
+  const [expandedSchemaNames, setExpandedSchemaNames] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [schemas, setSchemas] = useState<SchemaInfo[]>(() => {
     const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
@@ -215,6 +300,26 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     });
 
   const selectedCount = schemas.filter(s => s.selected).length;
+
+  const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
+
+  // Hierarchical tree for Tree View (#576): filter roots by search, children = $refs
+  const schemaTreeRoots = useMemo(() => {
+    const allSchemaNames = Object.keys(schemaObj);
+    const nameFilter = searchFilter.trim()
+      ? (name: string) => name.toLowerCase().includes(searchFilter.toLowerCase())
+      : undefined;
+    return buildSchemaTree(schemaObj, allSchemaNames, nameFilter);
+  }, [analysis.document, searchFilter]);
+
+  const toggleExpanded = (name: string) => {
+    setExpandedSchemaNames((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
+
+  const getSchemaInfo = (name: string): SchemaInfo | undefined =>
+    schemas.find((s) => s.name === name);
 
   // Generate nodes and edges for the chart view
   const { chartNodes, chartEdges } = useMemo(() => {
@@ -412,10 +517,21 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
               <Network className="h-4 w-4" />
               Chart View
             </button>
+            <button
+              onClick={() => setPanelView('tree')}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                panelView === 'tree'
+                  ? 'bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <FolderTree className="h-4 w-4" />
+              Tree View
+            </button>
           </div>
 
-          {/* Selection Controls - Only show in list view */}
-          {panelView === 'list' && (
+          {/* Selection Controls - show in list and tree view */}
+          {(panelView === 'list' || panelView === 'tree') && (
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSelectAll}
@@ -493,77 +609,100 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
         </div>
       )}
 
-      {/* List View - Schema Selection and Preview */}
-      {panelView === 'list' && (
+      {/* List View and Tree View - Schema Selection and Preview */}
+      {(panelView === 'list' || panelView === 'tree') && (
       <div className="grid grid-cols-3 gap-6">
-        {/* Left: Schema List - 1/3 width */}
+        {/* Left: Schema List or Tree - 1/3 width */}
         <div className="col-span-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
           <div className="border-b border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Schemas to Import
+                {panelView === 'tree' ? 'Schema Tree' : 'Schemas to Import'}
               </h3>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? null : 'asc')}
-                  className={`p-1.5 rounded transition-colors ${
-                    sortOrder === 'asc'
-                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                  title="Sort A → Z"
-                >
-                  <ArrowUpAZ className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setSortOrder(sortOrder === 'desc' ? null : 'desc')}
-                  className={`p-1.5 rounded transition-colors ${
-                    sortOrder === 'desc'
-                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                  title="Sort Z → A"
-                >
-                  <ArrowDownAZ className="h-4 w-4" />
-                </button>
-              </div>
+              {panelView === 'list' && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? null : 'asc')}
+                    className={`p-1.5 rounded transition-colors ${
+                      sortOrder === 'asc'
+                        ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    title="Sort A → Z"
+                  >
+                    <ArrowUpAZ className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'desc' ? null : 'desc')}
+                    className={`p-1.5 rounded transition-colors ${
+                      sortOrder === 'desc'
+                        ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    title="Sort Z → A"
+                  >
+                    <ArrowDownAZ className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
+            {panelView === 'tree' && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Expand schemas to see referenced types ($ref)
+              </p>
+            )}
           </div>
           <div className="p-4 space-y-2 max-h-[400px] overflow-y-auto">
-            {filteredSchemas.map((schema) => (
-              <div
-                key={schema.name}
-                className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                  selectedSchemaName === schema.name
-                    ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                }`}
-                onClick={() => setSelectedSchemaName(schema.name)}
-              >
-                <Checkbox.Root
-                  checked={schema.selected}
-                  onCheckedChange={() => handleToggleSchema(schema.name)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center"
+            {panelView === 'list' &&
+              filteredSchemas.map((schema) => (
+                <div
+                  key={schema.name}
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                    selectedSchemaName === schema.name
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                  onClick={() => setSelectedSchemaName(schema.name)}
                 >
-                  <Checkbox.Indicator>
-                    <Check className="w-4 h-4 text-white" />
-                  </Checkbox.Indicator>
-                </Checkbox.Root>
-                <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-gray-900 dark:text-white truncate">
-                    {schema.name}
+                  <Checkbox.Root
+                    checked={schema.selected}
+                    onCheckedChange={() => handleToggleSchema(schema.name)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 flex items-center justify-center"
+                  >
+                    <Checkbox.Indicator>
+                      <Check className="w-4 h-4 text-white" />
+                    </Checkbox.Indicator>
+                  </Checkbox.Root>
+                  <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">
+                      {schema.name}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {schema.properties} properties
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {schema.properties} properties
-                  </div>
+                  {selectedSchemaName === schema.name && (
+                    <ChevronRight className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  )}
                 </div>
-                {selectedSchemaName === schema.name && (
-                  <ChevronRight className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                )}
-              </div>
-            ))}
+              ))}
+            {panelView === 'tree' &&
+              schemaTreeRoots.map((node, rootIndex) => (
+                <SchemaTreeItem
+                  key={`root-${node.name}-${rootIndex}`}
+                  node={node}
+                  depth={0}
+                  parentKey={`root-${rootIndex}`}
+                  expandedSchemaNames={expandedSchemaNames}
+                  onToggleExpand={toggleExpanded}
+                  getSchemaInfo={getSchemaInfo}
+                  onToggleSchema={handleToggleSchema}
+                  onSelectSchema={setSelectedSchemaName}
+                  selectedSchemaName={selectedSchemaName}
+                />
+              ))}
           </div>
         </div>
 

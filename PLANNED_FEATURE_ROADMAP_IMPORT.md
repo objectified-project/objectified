@@ -99,7 +99,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 #### 4.4 Import Preview & Mapping 📋 PLANNED
 
 ##### Visual Preview
-- 📋 **Schema Tree View**: Hierarchical view of all schemas
+- ✅ **Schema Tree View**: Hierarchical view of all schemas
 - 📋 **Property Listing**: Expandable property details
 - 📋 **Relationship Diagram**: Preview of schema relationships
 - [TODO] **Side-by-Side Comparison**: Compare with existing schemas
@@ -107,7 +107,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description                      |
 |--------|------------------------------------------|
-| #576   | Add visual hierarchical schema tree view |
 | #577   | Expandable property details              |
 | #578   | Preview of schema relationships          |
 
