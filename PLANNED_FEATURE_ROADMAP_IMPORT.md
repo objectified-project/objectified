@@ -113,13 +113,12 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### Schema Selection 📋 PARTIALLY IMPLEMENTED
 - ✅ **Select All / None**: Bulk selection controls
 - ✅ **Individual Selection**: Cherry-pick specific schemas
-- 📋 **Dependency Resolution**: Auto-select required dependencies
+- ✅ **Dependency Resolution**: Auto-select required dependencies
 - 📋 **Search & Filter**: Find schemas by name, type, tags
 - [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
 | Ticket | Feature Description                                       |
 |--------|-----------------------------------------------------------|
-| #579   | Dependency resolution - auto-select required dependencies |
 | #580   | Search & filter schemas by name, type, tags               |
 
 ##### Name Mapping 📋 PLANNED

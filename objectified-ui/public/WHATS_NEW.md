@@ -92,6 +92,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Detects and lists all x- custom extensions
   - Added a deprecated feature warning: Flag any deprecated constructs
   - Added a visual preview of all schemas before import
+  - Auto-select required dependencies when selecting schemas
 - Control Panel:
   - Versions page now has the ability to view the relationship graph for each version
 - OpenAPI Support:

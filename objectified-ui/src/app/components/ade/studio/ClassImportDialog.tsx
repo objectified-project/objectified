@@ -15,6 +15,10 @@ import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/
 import UrlImportPanel from '../dashboard/UrlImportPanel';
 import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 import GitImportPanel from '../dashboard/GitImportPanel';
+import {
+  getTransitiveDependencies,
+  isReferencedBySelectedSchemas,
+} from '../../../utils/schema-tree-utils';
 
 interface ClassImportDialogProps {
   open: boolean;
@@ -284,9 +288,22 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   };
 
   const handleToggleSchema = (name: string) => {
-    setSchemas(prev =>
-      prev.map(s => (s.name === name && !s.exists ? { ...s, selected: !s.selected } : s))
-    );
+    const schemaObj = (analysisResult?.document?.components?.schemas ?? analysisResult?.document?.definitions ?? {}) as Record<string, unknown>;
+    const current = schemas.find((s) => s.name === name);
+    if (!current || current.exists) return;
+
+    if (current.selected) {
+      // Deselecting: only allow if no other selected schema references this one (#579)
+      if (isReferencedBySelectedSchemas(name, schemas, schemaObj)) return;
+      setSchemas((prev) => prev.map((s) => (s.name === name ? { ...s, selected: false } : s)));
+    } else {
+      // Selecting: also select all transitive dependencies (#579)
+      const deps = getTransitiveDependencies(name, schemaObj);
+      const toSelect = new Set([name, ...deps]);
+      setSchemas((prev) =>
+        prev.map((s) => (!s.exists && toSelect.has(s.name) ? { ...s, selected: true } : s))
+      );
+    }
   };
 
   const handleSelectAllNew = () => {
@@ -958,12 +975,20 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                     </div>
                   </div>
                   <div className="p-4 space-y-2 max-h-[400px] overflow-y-auto">
-                    {filteredSchemas.map((schema) => (
+                    {filteredSchemas.map((schema) => {
+                      const schemaObjForDeps = (analysisResult?.document?.components?.schemas ??
+                        analysisResult?.document?.definitions ??
+                        {}) as Record<string, unknown>;
+                      const requiredBySelection =
+                        schema.selected && isReferencedBySelectedSchemas(schema.name, schemas, schemaObjForDeps);
+                      return (
                       <div
                         key={schema.name}
                         className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
                           schema.exists
                             ? 'opacity-60 cursor-not-allowed'
+                            : requiredBySelection
+                            ? 'cursor-not-allowed'
                             : 'cursor-pointer'
                         } ${
                           selectedSchemaName === schema.name
@@ -973,13 +998,15 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                             : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                         }`}
                         onClick={() => setSelectedSchemaName(schema.name)}
+                        title={requiredBySelection ? 'Required by other selected classes' : undefined}
                       >
                         <Checkbox.Root
                           checked={schema.selected}
-                          disabled={schema.exists}
+                          disabled={schema.exists || requiredBySelection}
                           onCheckedChange={() => handleToggleSchema(schema.name)}
                           onClick={(e) => e.stopPropagation()}
                           className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed flex items-center justify-center"
+                          title={requiredBySelection ? 'Required by other selected classes' : undefined}
                         >
                           <Checkbox.Indicator>
                             <Check className="w-4 h-4 text-white" />
@@ -1003,7 +1030,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                           <ChevronRight className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

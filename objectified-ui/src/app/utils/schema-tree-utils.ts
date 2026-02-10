@@ -65,3 +65,57 @@ export function buildSchemaTree(
 
   return roots.map((name) => buildNode(name, new Set()));
 }
+
+/**
+ * Schema selection info for dependency resolution (#579).
+ * Used to determine if a schema can be deselected (not referenced by others).
+ */
+export interface SchemaSelectionInfo {
+  name: string;
+  selected: boolean;
+  exists: boolean;
+}
+
+/**
+ * Get all schema names that the given schema references (transitively),
+ * only from schemaObj. Used for auto-selecting dependencies on import (#579).
+ */
+export function getTransitiveDependencies(
+  schemaName: string,
+  schemaObj: Record<string, unknown>,
+  visited = new Set<string>()
+): string[] {
+  if (visited.has(schemaName)) return [];
+  visited.add(schemaName);
+  const schema = schemaObj[schemaName];
+  if (!schema) return [];
+  const refs = extractSchemaReferences(schema);
+  const result: string[] = [];
+  for (const ref of refs) {
+    if (schemaObj[ref]) {
+      if (!visited.has(ref)) {
+        result.push(ref);
+        result.push(...getTransitiveDependencies(ref, schemaObj, visited));
+      }
+    }
+  }
+  return [...new Set(result)];
+}
+
+/**
+ * True if any other selected (non-existing) schema references schemaName.
+ * Used to prevent deselecting schemas that are required by others (#579).
+ */
+export function isReferencedBySelectedSchemas(
+  schemaName: string,
+  schemas: SchemaSelectionInfo[],
+  schemaObj: Record<string, unknown>
+): boolean {
+  const selectedNames = schemas.filter((s) => s.selected && !s.exists).map((s) => s.name);
+  for (const name of selectedNames) {
+    if (name === schemaName) continue;
+    const refs = extractSchemaReferences(schemaObj[name] ?? {});
+    if (refs.includes(schemaName)) return true;
+  }
+  return false;
+}
