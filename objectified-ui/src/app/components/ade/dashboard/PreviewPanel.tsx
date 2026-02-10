@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Package, Search, Check, ChevronRight, ChevronDown, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network, FolderTree } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
-import { buildSchemaTree, extractSchemaReferences, type SchemaTreeNode } from '../../../utils/schema-tree-utils';
+import { buildSchemaTree, extractSchemaReferences, getSchemaType, getSchemaTags, type SchemaTreeNode, type SchemaDisplayType } from '../../../utils/schema-tree-utils';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
@@ -42,6 +42,8 @@ interface SchemaInfo {
   properties: number;
   selected: boolean;
   required: boolean;
+  schemaType: SchemaDisplayType;
+  tags: string[];
 }
 
 const MAX_ENUM_DISPLAY = 4;
@@ -397,6 +399,8 @@ function SchemaTreeItem({
 
 export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelProps) {
   const [searchFilter, setSearchFilter] = useState('');
+  const [filterType, setFilterType] = useState<SchemaDisplayType | ''>('');
+  const [filterTag, setFilterTag] = useState<string>('');
   const [selectedSchemaName, setSelectedSchemaName] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'json' | 'yaml'>('summary');
   const [panelView, setPanelView] = useState<'list' | 'chart' | 'tree'>('list');
@@ -405,12 +409,17 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [schemas, setSchemas] = useState<SchemaInfo[]>(() => {
     const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
-    return Object.keys(schemaObj).map(name => ({
-      name,
-      properties: countSchemaProperties(schemaObj[name]),
-      selected: true,
-      required: false
-    }));
+    return Object.keys(schemaObj).map((name) => {
+      const raw = schemaObj[name];
+      return {
+        name,
+        properties: countSchemaProperties(raw),
+        selected: true,
+        required: false,
+        schemaType: getSchemaType(raw),
+        tags: getSchemaTags(raw),
+      };
+    });
   });
 
   const [importOptions, setImportOptions] = useState<ImportOptions>(() => {
@@ -440,8 +449,15 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
        analysis.document?.definitions?.[selectedSchemaName])
     : null;
 
+  const allTags = Array.from(new Set(schemas.flatMap((s) => s.tags))).sort();
+
   const filteredSchemas = schemas
-    .filter(schema => schema.name.toLowerCase().includes(searchFilter.toLowerCase()))
+    .filter((schema) => {
+      const matchesName = schema.name.toLowerCase().includes(searchFilter.toLowerCase());
+      const matchesType = !filterType || schema.schemaType === filterType;
+      const matchesTag = !filterTag || schema.tags.includes(filterTag);
+      return matchesName && matchesType && matchesTag;
+    })
     .sort((a, b) => {
       if (sortOrder === 'asc') return a.name.localeCompare(b.name);
       if (sortOrder === 'desc') return b.name.localeCompare(a.name);
@@ -452,14 +468,22 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
 
   const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
 
-  // Hierarchical tree for Tree View (#576): filter roots by search, children = $refs
+  // Hierarchical tree for Tree View (#576): filter roots by name, type, tags (#580)
   const schemaTreeRoots = useMemo(() => {
     const allSchemaNames = Object.keys(schemaObj);
-    const nameFilter = searchFilter.trim()
-      ? (name: string) => name.toLowerCase().includes(searchFilter.toLowerCase())
+    const hasFilter = searchFilter.trim() || filterType || filterTag;
+    const nameFilter = hasFilter
+      ? (name: string) => {
+          const info = schemas.find((s) => s.name === name);
+          if (!info) return true;
+          const matchesName = !searchFilter.trim() || name.toLowerCase().includes(searchFilter.toLowerCase());
+          const matchesType = !filterType || info.schemaType === filterType;
+          const matchesTag = !filterTag || info.tags.includes(filterTag);
+          return matchesName && matchesType && matchesTag;
+        }
       : undefined;
     return buildSchemaTree(schemaObj, allSchemaNames, nameFilter);
-  }, [analysis.document, searchFilter]);
+  }, [analysis.document, searchFilter, filterType, filterTag, schemas]);
 
   const toggleExpanded = (name: string) => {
     setExpandedSchemaNames((prev) =>
@@ -709,16 +733,51 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
             </div>
           )}
 
-          {/* Search filter - always visible */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Filter schemas..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
+          {/* Search and filter by name, type, tags (#580) */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[140px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </div>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType((e.target.value || '') as SchemaDisplayType | '')}
+              className="py-2 pl-3 pr-8 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              title="Filter by type"
+            >
+              <option value="">All types</option>
+              <option value="object">object</option>
+              <option value="array">array</option>
+              <option value="allOf">allOf</option>
+              <option value="oneOf">oneOf</option>
+              <option value="anyOf">anyOf</option>
+              <option value="enum">enum</option>
+              <option value="string">string</option>
+              <option value="number">number</option>
+              <option value="integer">integer</option>
+              <option value="boolean">boolean</option>
+              <option value="null">null</option>
+              <option value="unknown">unknown</option>
+            </select>
+            <select
+              value={filterTag}
+              onChange={(e) => setFilterTag(e.target.value)}
+              className="py-2 pl-3 pr-8 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              title="Filter by tag"
+            >
+              <option value="">All tags</option>
+              {allTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Schema count - always visible */}

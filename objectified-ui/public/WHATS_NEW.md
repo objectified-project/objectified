@@ -93,6 +93,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added a deprecated feature warning: Flag any deprecated constructs
   - Added a visual preview of all schemas before import
   - Auto-select required dependencies when selecting schemas
+  - Added allowing for searching and filtering by name, type, and tags
 - Control Panel:
   - Versions page now has the ability to view the relationship graph for each version
 - OpenAPI Support:

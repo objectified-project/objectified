@@ -119,3 +119,61 @@ export function isReferencedBySelectedSchemas(
   }
   return false;
 }
+
+/** Schema type for filtering (#580). Composition takes precedence over JSON Schema type. */
+export type SchemaDisplayType =
+  | 'object'
+  | 'array'
+  | 'string'
+  | 'number'
+  | 'integer'
+  | 'boolean'
+  | 'allOf'
+  | 'oneOf'
+  | 'anyOf'
+  | 'enum'
+  | 'null'
+  | 'unknown';
+
+/**
+ * Derive a display type from a schema for search/filter (#580).
+ * Composition (allOf/oneOf/anyOf) takes precedence; then enum; then type.
+ */
+export function getSchemaType(schema: unknown): SchemaDisplayType {
+  if (schema == null || typeof schema !== 'object') return 'unknown';
+  const s = schema as Record<string, unknown>;
+  if (Array.isArray(s.allOf) && s.allOf.length > 0) return 'allOf';
+  if (Array.isArray(s.oneOf) && s.oneOf.length > 0) return 'oneOf';
+  if (Array.isArray(s.anyOf) && s.anyOf.length > 0) return 'anyOf';
+  if (Array.isArray(s.enum) && s.enum.length > 0) return 'enum';
+  const t = s.type;
+  if (t === 'object' || t === 'array' || t === 'string' || t === 'number' || t === 'integer' || t === 'boolean' || t === 'null') {
+    return t as SchemaDisplayType;
+  }
+  if (s.properties && typeof s.properties === 'object') return 'object';
+  return 'unknown';
+}
+
+/**
+ * Extract tags from a schema for search/filter (#580).
+ * Supports x-tags (array), x-tag (string), and tags (array).
+ */
+export function getSchemaTags(schema: unknown): string[] {
+  if (schema == null || typeof schema !== 'object') return [];
+  const s = schema as Record<string, unknown>;
+  const out: string[] = [];
+  if (Array.isArray(s['x-tags'])) {
+    s['x-tags'].forEach((v) => {
+      if (typeof v === 'string' && v.trim()) out.push(v.trim());
+    });
+  }
+  if (typeof s['x-tag'] === 'string' && s['x-tag'].trim()) {
+    out.push((s['x-tag'] as string).trim());
+  }
+  if (Array.isArray(s.tags)) {
+    s.tags.forEach((v) => {
+      if (typeof v === 'string' && v.trim()) out.push(v.trim());
+    });
+  }
+  return [...new Set(out)];
+}

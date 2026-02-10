@@ -1,6 +1,7 @@
 /**
  * Unit tests for schema tree utilities (#576)
  * Hierarchical view of schemas for import preview and mapping.
+ * Includes getSchemaType / getSchemaTags for search & filter (#580).
  */
 
 import { describe, test, expect } from '@jest/globals';
@@ -9,6 +10,8 @@ import {
   buildSchemaTree,
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
+  getSchemaType,
+  getSchemaTags,
   type SchemaTreeNode,
   type SchemaSelectionInfo,
 } from '../../src/app/utils/schema-tree-utils';
@@ -411,5 +414,110 @@ describe('isReferencedBySelectedSchemas (#579)', () => {
     ];
     // Order is not referenced by Customer or LineItem
     expect(isReferencedBySelectedSchemas('Order', schemas, schemaObj)).toBe(false);
+  });
+});
+
+describe('getSchemaType (#580)', () => {
+  test('returns unknown for null or undefined', () => {
+    expect(getSchemaType(null)).toBe('unknown');
+    expect(getSchemaType(undefined)).toBe('unknown');
+  });
+
+  test('returns unknown for non-object', () => {
+    expect(getSchemaType(42)).toBe('unknown');
+    expect(getSchemaType('string')).toBe('unknown');
+    expect(getSchemaType(true)).toBe('unknown');
+  });
+
+  test('returns allOf when schema has allOf (non-empty)', () => {
+    expect(getSchemaType({ allOf: [{ $ref: '#/schemas/Base' }] })).toBe('allOf');
+    expect(getSchemaType({ allOf: [{ type: 'object' }], type: 'object' })).toBe('allOf');
+  });
+
+  test('returns oneOf when schema has oneOf (and no allOf)', () => {
+    expect(getSchemaType({ oneOf: [{ type: 'string' }, { type: 'number' }] })).toBe('oneOf');
+  });
+
+  test('returns anyOf when schema has anyOf (and no allOf/oneOf)', () => {
+    expect(getSchemaType({ anyOf: [{ type: 'string' }] })).toBe('anyOf');
+  });
+
+  test('composition precedence: allOf > oneOf > anyOf > enum > type', () => {
+    expect(getSchemaType({ allOf: [{}], oneOf: [{}], type: 'object' })).toBe('allOf');
+    expect(getSchemaType({ oneOf: [{}], anyOf: [{}], type: 'string' })).toBe('oneOf');
+    expect(getSchemaType({ anyOf: [{}], enum: ['a'], type: 'string' })).toBe('anyOf');
+    expect(getSchemaType({ enum: ['x'], type: 'string' })).toBe('enum');
+  });
+
+  test('returns enum when schema has enum (non-empty)', () => {
+    expect(getSchemaType({ enum: ['a', 'b'] })).toBe('enum');
+    expect(getSchemaType({ enum: [] })).toBe('unknown'); // empty enum not treated as enum type
+  });
+
+  test('returns JSON Schema type when present and no composition/enum', () => {
+    expect(getSchemaType({ type: 'object' })).toBe('object');
+    expect(getSchemaType({ type: 'array' })).toBe('array');
+    expect(getSchemaType({ type: 'string' })).toBe('string');
+    expect(getSchemaType({ type: 'number' })).toBe('number');
+    expect(getSchemaType({ type: 'integer' })).toBe('integer');
+    expect(getSchemaType({ type: 'boolean' })).toBe('boolean');
+    expect(getSchemaType({ type: 'null' })).toBe('null');
+  });
+
+  test('returns object when schema has properties and no type', () => {
+    expect(getSchemaType({ properties: { name: { type: 'string' } } })).toBe('object');
+  });
+
+  test('returns unknown when no type, composition, enum, or properties', () => {
+    expect(getSchemaType({})).toBe('unknown');
+    expect(getSchemaType({ description: 'foo' })).toBe('unknown');
+  });
+});
+
+describe('getSchemaTags (#580)', () => {
+  test('returns empty array for null or undefined', () => {
+    expect(getSchemaTags(null)).toEqual([]);
+    expect(getSchemaTags(undefined)).toEqual([]);
+  });
+
+  test('returns empty array for non-object', () => {
+    expect(getSchemaTags(42)).toEqual([]);
+    expect(getSchemaTags('tag')).toEqual([]);
+  });
+
+  test('returns empty array when no tag fields', () => {
+    expect(getSchemaTags({ type: 'object', properties: {} })).toEqual([]);
+  });
+
+  test('extracts x-tags array', () => {
+    expect(getSchemaTags({ 'x-tags': ['api', 'model'] })).toEqual(['api', 'model']);
+    expect(getSchemaTags({ 'x-tags': ['single'] })).toEqual(['single']);
+  });
+
+  test('extracts x-tag string', () => {
+    expect(getSchemaTags({ 'x-tag': 'legacy' })).toEqual(['legacy']);
+  });
+
+  test('extracts tags array', () => {
+    expect(getSchemaTags({ tags: ['v1', 'public'] })).toEqual(['v1', 'public']);
+  });
+
+  test('combines x-tags, x-tag, and tags and deduplicates', () => {
+    const schema = {
+      'x-tags': ['api'],
+      'x-tag': 'model',
+      tags: ['api', 'v2'],
+    };
+    expect(getSchemaTags(schema)).toEqual(['api', 'model', 'v2']);
+  });
+
+  test('trims tag values', () => {
+    expect(getSchemaTags({ 'x-tags': ['  a  ', 'b'] })).toEqual(['a', 'b']);
+    expect(getSchemaTags({ 'x-tag': '  t  ' })).toEqual(['t']);
+  });
+
+  test('ignores empty or non-string tag values', () => {
+    expect(getSchemaTags({ 'x-tags': ['', '  ', 'valid', 1, null] } as any)).toEqual(['valid']);
+    expect(getSchemaTags({ 'x-tag': '' })).toEqual([]);
   });
 });
