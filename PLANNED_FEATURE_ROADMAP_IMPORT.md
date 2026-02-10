@@ -99,22 +99,10 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 #### 4.4 Import Preview & Mapping 📋 PLANNED
 
 ##### Visual Preview
-- ✅ **Schema Tree View**: Hierarchical view of all schemas
-- 📋 **Property Listing**: Expandable property details
-- 📋 **Relationship Diagram**: Preview of schema relationships
 - [TODO] **Side-by-Side Comparison**: Compare with existing schemas
 - [TODO] **Diff Highlighting**: Visual diff for updates
 
-| Ticket | Feature Description                      |
-|--------|------------------------------------------|
-| #577   | Expandable property details              |
-| #578   | Preview of schema relationships          |
-
 ##### Schema Selection 📋 PARTIALLY IMPLEMENTED
-- ✅ **Select All / None**: Bulk selection controls
-- ✅ **Individual Selection**: Cherry-pick specific schemas
-- ✅ **Dependency Resolution**: Auto-select required dependencies
-- ✅ **Search & Filter**: Find schemas by name, type, tags
 - [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
 ##### Name Mapping 📋 PLANNED
@@ -562,6 +550,19 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Feature Compatibility**: Identify unsupported features
 - ✅ **Extension Detection**: List all x- custom extensions
 - ✅ **Deprecated Feature Warning**: Flag deprecated constructs (#575)
+
+##### Schema Selection 📋 PARTIALLY IMPLEMENTED
+- ✅ **Select All / None**: Bulk selection controls
+- ✅ **Individual Selection**: Cherry-pick specific schemas
+- ✅ **Dependency Resolution**: Auto-select required dependencies
+- ✅ **Search & Filter**: Find schemas by name, type, tags
+
+#### 4.4 Import Preview & Mapping 📋 PLANNED
+
+##### Visual Preview
+- ✅ **Schema Tree View**: Hierarchical view of all schemas
+- ✅ **Property Listing**: Expandable property details
+- ✅ **Relationship Diagram**: Preview of schema relationships (#578)
 
 ---
 

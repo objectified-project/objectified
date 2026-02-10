@@ -94,6 +94,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added a visual preview of all schemas before import
   - Auto-select required dependencies when selecting schemas
   - Added allowing for searching and filtering by name, type, and tags
+  - Added preview of schema relationships at import preview and mapping
 - Control Panel:
   - Versions page now has the ability to view the relationship graph for each version
 - OpenAPI Support:

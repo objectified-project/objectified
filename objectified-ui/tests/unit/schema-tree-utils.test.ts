@@ -7,6 +7,8 @@
 import { describe, test, expect } from '@jest/globals';
 import {
   extractSchemaReferences,
+  extractSchemaReferenceEdges,
+  buildRelationshipDiagramEdges,
   buildSchemaTree,
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
@@ -110,6 +112,250 @@ describe('extractSchemaReferences', () => {
   test('ignores invalid $ref (non-string)', () => {
     const schema = { $ref: 123 };
     expect(extractSchemaReferences(schema)).toEqual([]);
+  });
+});
+
+describe('extractSchemaReferenceEdges (#578)', () => {
+  test('returns empty array for null or undefined', () => {
+    expect(extractSchemaReferenceEdges(null)).toEqual([]);
+    expect(extractSchemaReferenceEdges(undefined)).toEqual([]);
+  });
+
+  test('returns property name for $ref under properties', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        owner: { $ref: '#/components/schemas/User' },
+        category: { $ref: '#/components/schemas/Category' },
+      },
+    };
+    expect(extractSchemaReferenceEdges(schema)).toEqual([
+      { refName: 'User', propertyName: 'owner' },
+      { refName: 'Category', propertyName: 'category' },
+    ]);
+  });
+
+  test('returns "items" for $ref under array items', () => {
+    const schema = {
+      type: 'array',
+      items: { $ref: '#/components/schemas/LineItem' },
+    };
+    expect(extractSchemaReferenceEdges(schema)).toEqual([
+      { refName: 'LineItem', propertyName: 'items' },
+    ]);
+  });
+
+  test('returns refName with null propertyName for allOf/oneOf/anyOf', () => {
+    const schema = {
+      allOf: [{ $ref: '#/components/schemas/BaseEntity' }],
+      oneOf: [{ $ref: '#/schemas/A' }],
+    };
+    expect(extractSchemaReferenceEdges(schema)).toEqual([
+      { refName: 'BaseEntity', propertyName: null },
+      { refName: 'A', propertyName: null },
+    ]);
+  });
+
+  test('extracts ref from nested properties with correct property name', () => {
+    const schema = {
+      properties: {
+        address: {
+          type: 'object',
+          properties: {
+            country: { $ref: '#/schemas/Country' },
+          },
+        },
+      },
+    };
+    expect(extractSchemaReferenceEdges(schema)).toEqual([
+      { refName: 'Country', propertyName: 'country' },
+    ]);
+  });
+
+  test('multiple refs from same schema each get correct property name', () => {
+    const schema = {
+      properties: {
+        user: { $ref: '#/schemas/User' },
+        profile: { $ref: '#/schemas/Profile' },
+        role: { $ref: '#/schemas/User' },
+      },
+    };
+    expect(extractSchemaReferenceEdges(schema)).toEqual([
+      { refName: 'User', propertyName: 'user' },
+      { refName: 'Profile', propertyName: 'profile' },
+      { refName: 'User', propertyName: 'role' },
+    ]);
+  });
+});
+
+describe('buildRelationshipDiagramEdges (#578)', () => {
+  test('returns empty array when filtered schema names is empty', () => {
+    const schemaObj = {
+      Pet: {
+        type: 'object',
+        properties: { category: { $ref: '#/components/schemas/Category' } },
+      },
+      Category: { type: 'object', properties: {} },
+    };
+    expect(buildRelationshipDiagramEdges(schemaObj, [])).toEqual([]);
+  });
+
+  test('returns empty array when schema object is empty', () => {
+    expect(buildRelationshipDiagramEdges({}, ['Pet', 'Category'])).toEqual([]);
+  });
+
+  test('builds one edge with property label when one ref between filtered schemas', () => {
+    const schemaObj = {
+      Pet: {
+        type: 'object',
+        properties: { category: { $ref: '#/components/schemas/Category' } },
+      },
+      Category: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Pet', 'Category']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toEqual({
+      source: 'Pet',
+      target: 'Category',
+      label: 'category',
+    });
+  });
+
+  test('excludes edges where target is not in filtered schema names', () => {
+    const schemaObj = {
+      Order: {
+        type: 'object',
+        properties: {
+          customer: { $ref: '#/schemas/Customer' },
+          external: { $ref: '#/schemas/ExternalType' },
+        },
+      },
+      Customer: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Order', 'Customer']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toEqual({
+      source: 'Order',
+      target: 'Customer',
+      label: 'customer',
+    });
+  });
+
+  test('uses "items" label for array items ref', () => {
+    const schemaObj = {
+      Order: {
+        type: 'object',
+        properties: {
+          lines: { type: 'array', items: { $ref: '#/schemas/LineItem' } },
+        },
+      },
+      LineItem: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Order', 'LineItem']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toEqual({
+      source: 'Order',
+      target: 'LineItem',
+      label: 'items',
+    });
+  });
+
+  test('uses "ref" label for allOf/oneOf/anyOf references', () => {
+    const schemaObj = {
+      Extended: {
+        allOf: [{ $ref: '#/schemas/Base' }],
+      },
+      Base: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Extended', 'Base']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].label).toBe('ref');
+  });
+
+  test('merges multiple properties from same source to same target into one edge', () => {
+    const schemaObj = {
+      Pet: {
+        type: 'object',
+        properties: {
+          category: { $ref: '#/schemas/Category' },
+          tags: { type: 'array', items: { $ref: '#/schemas/Tag' } },
+        },
+      },
+      Category: { type: 'object', properties: {} },
+      Tag: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Pet', 'Category', 'Tag']);
+    expect(edges).toHaveLength(2);
+    const petCategory = edges.find((e) => e.source === 'Pet' && e.target === 'Category');
+    const petTag = edges.find((e) => e.source === 'Pet' && e.target === 'Tag');
+    expect(petCategory).toEqual({ source: 'Pet', target: 'Category', label: 'category' });
+    expect(petTag).toEqual({ source: 'Pet', target: 'Tag', label: 'items' });
+  });
+
+  test('combines multiple refs same source→target with comma-separated label', () => {
+    const schemaObj = {
+      User: {
+        type: 'object',
+        properties: {
+          billing: { $ref: '#/schemas/Address' },
+          shipping: { $ref: '#/schemas/Address' },
+        },
+      },
+      Address: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['User', 'Address']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].label).toBe('billing, shipping');
+  });
+
+  test('labels show "first, +N" when more than two refs same source→target', () => {
+    const schemaObj = {
+      Container: {
+        type: 'object',
+        properties: {
+          a: { $ref: '#/schemas/Ref' },
+          b: { $ref: '#/schemas/Ref' },
+          c: { $ref: '#/schemas/Ref' },
+        },
+      },
+      Ref: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Container', 'Ref']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].label).toBe('a, +2');
+  });
+
+  test('only includes schemas in filtered list (filtered view)', () => {
+    const schemaObj = {
+      Pet: {
+        type: 'object',
+        properties: {
+          category: { $ref: '#/schemas/Category' },
+          owner: { $ref: '#/schemas/User' },
+        },
+      },
+      Category: { type: 'object', properties: {} },
+      User: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['Pet', 'Category']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toEqual({ source: 'Pet', target: 'Category', label: 'category' });
+  });
+
+  test('deduplicates same property name when referenced multiple times', () => {
+    const schemaObj = {
+      A: {
+        type: 'object',
+        properties: {
+          ref: { $ref: '#/schemas/B' },
+          other: { $ref: '#/schemas/B' },
+        },
+      },
+      B: { type: 'object', properties: {} },
+    };
+    const edges = buildRelationshipDiagramEdges(schemaObj, ['A', 'B']);
+    expect(edges).toHaveLength(1);
+    expect(edges[0].label).toBe('ref, other');
   });
 });
 

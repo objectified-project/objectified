@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Package, Search, Check, ChevronRight, ChevronDown, ArrowUpAZ, ArrowDownAZ, LayoutGrid, Network, FolderTree } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
-import { buildSchemaTree, extractSchemaReferences, getSchemaType, getSchemaTags, type SchemaTreeNode, type SchemaDisplayType } from '../../../utils/schema-tree-utils';
+import { buildSchemaTree, buildRelationshipDiagramEdges, extractSchemaReferences, getSchemaType, getSchemaTags, type SchemaTreeNode, type SchemaDisplayType } from '../../../utils/schema-tree-utils';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
@@ -494,26 +494,24 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
   const getSchemaInfo = (name: string): SchemaInfo | undefined =>
     schemas.find((s) => s.name === name);
 
-  // Generate nodes and edges for the chart view
+  // Generate nodes and edges for the relationship diagram (#578) – use filtered schemas and edge labels
   const { chartNodes, chartEdges } = useMemo(() => {
     const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
-    const schemaNames = Object.keys(schemaObj);
+    const allSchemaNames = Object.keys(schemaObj);
+    const schemaNames = filteredSchemas.map((s) => s.name);
 
     if (schemaNames.length === 0) {
       return { chartNodes: [], chartEdges: [] };
     }
 
-    // Create a map of schema names to their selection status
-    const selectionMap = new Map(schemas.map(s => [s.name, s.selected]));
+    const selectionMap = new Map(schemas.map((s) => [s.name, s.selected]));
 
-    // Calculate layout - arrange in a grid pattern
     const cols = Math.ceil(Math.sqrt(schemaNames.length));
     const nodeWidth = 160;
     const nodeHeight = 80;
     const gapX = 80;
     const gapY = 60;
 
-    // Create nodes
     const nodes: Node[] = schemaNames.map((name, index) => {
       const row = Math.floor(index / cols);
       const col = index % cols;
@@ -537,35 +535,30 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       };
     });
 
-    // Create edges based on $ref relationships
-    const edges: Edge[] = [];
-    schemaNames.forEach(name => {
-      const schema = schemaObj[name];
-      const refs = extractSchemaReferences(schema);
-
-      refs.forEach(refName => {
-        // Only create edge if the referenced schema exists
-        if (schemaNames.includes(refName)) {
-          edges.push({
-            id: `${name}-${refName}`,
-            source: name,
-            target: refName,
-            type: 'smoothstep',
-            animated: false,
-            style: { stroke: '#6366f1', strokeWidth: 1.5 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              color: '#6366f1',
-              width: 15,
-              height: 15,
-            },
-          });
-        }
-      });
-    });
+    // Build edges from $ref relationships with property labels (#578) via shared util
+    const diagramEdges = buildRelationshipDiagramEdges(schemaObj, schemaNames);
+    const edges: Edge[] = diagramEdges.map(({ source, target, label }) => ({
+      id: `${source}-${target}`,
+      source,
+      target,
+      type: 'smoothstep',
+      animated: false,
+      label,
+      labelStyle: { fill: '#4338ca', fontSize: 10, fontWeight: 500 },
+      labelBgStyle: { fill: 'white', fillOpacity: 0.9 },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 4,
+      style: { stroke: '#6366f1', strokeWidth: 1.5 },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#6366f1',
+        width: 15,
+        height: 15,
+      },
+    }));
 
     return { chartNodes: nodes, chartEdges: edges };
-  }, [analysis.document, schemas]);
+  }, [analysis.document, schemas, filteredSchemas]);
 
   const handleSelectAll = () => {
     const newSchemas = schemas.map(s => ({ ...s, selected: true }));
@@ -697,7 +690,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
               }`}
             >
               <Network className="h-4 w-4" />
-              Chart View
+              Relationship Diagram
             </button>
             <button
               onClick={() => setPanelView('tree')}
@@ -787,15 +780,15 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
         </div>
       </div>
 
-      {/* Chart View */}
+      {/* Relationship Diagram (#578) */}
       {panelView === 'chart' && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="border-b border-gray-200 dark:border-gray-700 p-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Schema Relationships
+              Relationship Diagram
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Visualize how schemas relate to each other through references
+              Preview of schema relationships. Arrows show references; labels show the property or &quot;items&quot;. Filter by search, type, or tag above.
             </p>
           </div>
           <div className="h-[500px]">

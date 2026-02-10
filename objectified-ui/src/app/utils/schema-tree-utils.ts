@@ -42,6 +42,115 @@ export function extractSchemaReferences(schema: unknown): string[] {
 }
 
 /**
+ * Result for one reference from a schema (for relationship diagram edge labels).
+ */
+export interface SchemaRefEdge {
+  refName: string;
+  /** Property name when ref is under schema.properties[prop]; "items" for array items; null for allOf/oneOf/anyOf */
+  propertyName: string | null;
+}
+
+/**
+ * Extract schema reference edges with property context (for relationship diagram #578).
+ * Returns each $ref with the property name that leads to it when under properties, or "items" for array items.
+ */
+export function extractSchemaReferenceEdges(schema: unknown): SchemaRefEdge[] {
+  const result: SchemaRefEdge[] = [];
+
+  const findRefs = (obj: unknown, propertyName: string | null) => {
+    if (obj == null || typeof obj !== 'object') return;
+
+    if (
+      typeof obj === 'object' &&
+      '$ref' in obj &&
+      typeof (obj as { $ref: unknown }).$ref === 'string'
+    ) {
+      const ref = (obj as { $ref: string }).$ref;
+      const refName = ref.split('/').pop();
+      if (refName) {
+        result.push({ refName, propertyName });
+      }
+      return;
+    }
+
+    const rec = obj as Record<string, unknown>;
+    if (rec.properties && typeof rec.properties === 'object') {
+      for (const key of Object.keys(rec.properties)) {
+        findRefs(rec.properties[key], key);
+      }
+    }
+    if (rec.items && typeof rec.items === 'object') {
+      findRefs(rec.items, 'items');
+    }
+    if (Array.isArray(rec.allOf)) {
+      rec.allOf.forEach((item) => findRefs(item, null));
+    }
+    if (Array.isArray(rec.oneOf)) {
+      rec.oneOf.forEach((item) => findRefs(item, null));
+    }
+    if (Array.isArray(rec.anyOf)) {
+      rec.anyOf.forEach((item) => findRefs(item, null));
+    }
+    // Fallback: any other key that might contain $ref (e.g. additionalProperties)
+    for (const key of Object.keys(rec)) {
+      if (key === 'properties' || key === 'items' || key === 'allOf' || key === 'oneOf' || key === 'anyOf') continue;
+      findRefs(rec[key], null);
+    }
+  };
+
+  findRefs(schema, null);
+  return result;
+}
+
+/**
+ * One edge in the relationship diagram (for unit testing #578).
+ */
+export interface RelationshipDiagramEdge {
+  source: string;
+  target: string;
+  label: string;
+}
+
+/**
+ * Build relationship diagram edges from schema object and filtered schema names (#578).
+ * Only includes edges where both source and target are in filteredSchemaNames.
+ * Labels show the property name(s) that reference the target; multiple properties
+ * are combined (e.g. "category, tags" or "first, +2").
+ */
+export function buildRelationshipDiagramEdges(
+  schemaObj: Record<string, unknown>,
+  filteredSchemaNames: string[]
+): RelationshipDiagramEdge[] {
+  if (filteredSchemaNames.length === 0) return [];
+
+  const schemaNameSet = new Set(filteredSchemaNames);
+  const edgeMap = new Map<string, { source: string; target: string; labels: string[] }>();
+
+  filteredSchemaNames.forEach((name) => {
+    const schema = schemaObj[name];
+    const refEdges = extractSchemaReferenceEdges(schema);
+
+    refEdges.forEach(({ refName, propertyName }) => {
+      if (!schemaNameSet.has(refName)) return;
+      const key = `${name}\0${refName}`;
+      const label = propertyName ?? 'ref';
+      const existing = edgeMap.get(key);
+      if (existing) {
+        if (!existing.labels.includes(label)) existing.labels.push(label);
+      } else {
+        edgeMap.set(key, { source: name, target: refName, labels: [label] });
+      }
+    });
+  });
+
+  return Array.from(edgeMap.values()).map(({ source, target, labels }) => ({
+    source,
+    target,
+    label: labels.length <= 2 ? labels.join(', ') : `${labels[0]}, +${labels.length - 1}`,
+  }));
+}
+
+/**
  * Build a forest of schema trees. Each root is a schema name; children are
  * schemas it references via $ref. Cycles are avoided per path.
  */
