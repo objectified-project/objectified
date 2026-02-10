@@ -143,6 +143,154 @@ function getCompositionType(schema: any): string | null {
   return null;
 }
 
+// Expandable property row for import preview (#577)
+function ExpandablePropertyRow({
+  propName,
+  propValue,
+  isRequired,
+  getPropertyType,
+  expandKey,
+  isExpanded,
+  onOpenChange,
+  accentClass = 'text-indigo-600 dark:text-indigo-400',
+}: {
+  propName: string;
+  propValue: any;
+  isRequired: boolean;
+  getPropertyType: (prop: any) => string;
+  expandKey: string;
+  isExpanded: boolean;
+  onOpenChange: (open: boolean) => void;
+  accentClass?: string;
+}) {
+  const hasAny =
+    propValue?.description ||
+    propValue?.format ||
+    propValue?.default !== undefined ||
+    propValue?.example !== undefined ||
+    (Array.isArray(propValue?.enum) && propValue.enum.length > 0) ||
+    propValue?.nullable === true ||
+    propValue?.minimum !== undefined ||
+    propValue?.maximum !== undefined ||
+    propValue?.minLength !== undefined ||
+    propValue?.maxLength !== undefined ||
+    propValue?.pattern;
+
+  return (
+    <Collapsible
+      open={isExpanded}
+      onOpenChange={onOpenChange}
+    >
+      <div className="text-sm group">
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-2 w-full text-left rounded px-1 -mx-1 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+          >
+            {hasAny ? (
+              isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+              )
+            ) : (
+              <span className="w-4 inline-block flex-shrink-0" aria-hidden />
+            )}
+            <span className={`font-mono ${accentClass}`}>{propName}</span>
+            <span className="text-gray-500 dark:text-gray-400">: </span>
+            <span className="text-gray-700 dark:text-gray-300">
+              {getPropertyType(propValue)}
+            </span>
+            {isRequired && (
+              <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                (required)
+              </span>
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          {hasAny && (
+            <div className="ml-6 mt-1 mb-2 pl-3 border-l border-gray-200 dark:border-gray-600 space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
+              {propValue?.description && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Description: </span>
+                  {propValue.description}
+                </div>
+              )}
+              {propValue?.format && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Format: </span>
+                  <span className="font-mono">{propValue.format}</span>
+                </div>
+              )}
+              {propValue?.default !== undefined && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Default: </span>
+                  <span className="font-mono">
+                    {typeof propValue.default === 'object'
+                      ? JSON.stringify(propValue.default)
+                      : String(propValue.default)}
+                  </span>
+                </div>
+              )}
+              {propValue?.example !== undefined && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Example: </span>
+                  <span className="font-mono">
+                    {typeof propValue.example === 'object'
+                      ? JSON.stringify(propValue.example)
+                      : String(propValue.example)}
+                  </span>
+                </div>
+              )}
+              {Array.isArray(propValue?.enum) && propValue.enum.length > 0 && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Enum: </span>
+                  <span className="font-mono">
+                    {propValue.enum.map((v: unknown) => (typeof v === 'string' ? `"${v}"` : String(v))).join(', ')}
+                  </span>
+                </div>
+              )}
+              {propValue?.nullable === true && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Nullable: </span>
+                  true
+                </div>
+              )}
+              {(propValue?.minimum !== undefined || propValue?.maximum !== undefined) && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Range: </span>
+                  {propValue.minimum !== undefined && (
+                    <span className="font-mono">min {propValue.minimum}</span>
+                  )}
+                  {propValue.minimum !== undefined && propValue.maximum !== undefined && ' \u2013 '}
+                  {propValue.maximum !== undefined && (
+                    <span className="font-mono">max {propValue.maximum}</span>
+                  )}
+                </div>
+              )}
+              {(propValue?.minLength !== undefined || propValue?.maxLength !== undefined) && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Length: </span>
+                  <span className="font-mono">
+                    {propValue.minLength ?? 0} \u2013 {propValue.maxLength ?? '\u221E'}
+                  </span>
+                </div>
+              )}
+              {propValue?.pattern && (
+                <div>
+                  <span className="font-medium text-gray-500 dark:text-gray-500">Pattern: </span>
+                  <span className="font-mono break-all">{propValue.pattern}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
 // Single tree node for hierarchical schema view
 function SchemaTreeItem({
   node,
@@ -253,6 +401,7 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
   const [viewMode, setViewMode] = useState<'summary' | 'json' | 'yaml'>('summary');
   const [panelView, setPanelView] = useState<'list' | 'chart' | 'tree'>('list');
   const [expandedSchemaNames, setExpandedSchemaNames] = useState<string[]>([]);
+  const [expandedPropertyKeys, setExpandedPropertyKeys] = useState<Set<string>>(new Set());
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [schemas, setSchemas] = useState<SchemaInfo[]>(() => {
     const schemaObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
@@ -404,6 +553,15 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     const newSchemas = schemas.map(s => ({ ...s, selected: s.required }));
     setSchemas(newSchemas);
     updateSelectedSchemas(newSchemas);
+  };
+
+  const handlePropertyExpand = (expandKey: string, open: boolean) => {
+    setExpandedPropertyKeys((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(expandKey);
+      else next.delete(expandKey);
+      return next;
+    });
   };
 
   const handleToggleSchema = (name: string) => {
@@ -770,23 +928,22 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                         <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Properties:
                         </h5>
-                        <div className="space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                          {Object.entries(selectedSchema.properties).map(([propName, propValue]: [string, any]) => (
-                            <div key={propName} className="text-sm">
-                              <span className="font-mono text-indigo-600 dark:text-indigo-400">
-                                {propName}
-                              </span>
-                              <span className="text-gray-500 dark:text-gray-400">: </span>
-                              <span className="text-gray-700 dark:text-gray-300">
-                                {getPropertyType(propValue)}
-                              </span>
-                              {selectedSchema.required?.includes(propName) && (
-                                <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-medium">
-                                  (required)
-                                </span>
-                              )}
-                            </div>
-                          ))}
+                        <div className="space-y-0.5 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                          {Object.entries(selectedSchema.properties).map(([propName, propValue]: [string, any]) => {
+                            const expandKey = `${selectedSchemaName}|${propName}`;
+                            return (
+                              <ExpandablePropertyRow
+                                key={propName}
+                                propName={propName}
+                                propValue={propValue}
+                                isRequired={selectedSchema.required?.includes(propName) ?? false}
+                                getPropertyType={getPropertyType}
+                                expandKey={expandKey}
+                                isExpanded={expandedPropertyKeys.has(expandKey)}
+                                onOpenChange={(open) => handlePropertyExpand(expandKey, open)}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
                     )}

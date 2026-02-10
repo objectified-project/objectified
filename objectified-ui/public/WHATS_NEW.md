@@ -98,6 +98,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes
   - Added importing from Postman Collections
+  - Added property listing during import: expandable property details in the visual preview
 - Bug fixes:
   - Fixed AI generation bug when creating $ref objects: was referring to properties, not the object itself.
   - Fixed $ref editing in classes - was opening a blank editing panel, now corrected.
