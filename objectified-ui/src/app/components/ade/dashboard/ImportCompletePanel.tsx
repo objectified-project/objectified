@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import {
@@ -41,6 +42,7 @@ interface ImportSummary {
   totalTime?: number;
   sourceName?: string;
   projectName?: string;
+  projectId?: string;
   versionId?: string;
   schemas?: Array<{
     name: string;
@@ -50,6 +52,7 @@ interface ImportSummary {
 }
 
 export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps) {
+  const router = useRouter();
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [state, setState] = useState<'completed' | 'failed' | 'canceled' | string>('completed');
   const [loading, setLoading] = useState(true);
@@ -60,7 +63,8 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
         const status = await getImportStatus(jobId);
         setState(status.state);
 
-        // Extract summary from status
+        // Extract summary from status; use result for projectId/versionId when completed
+        const result = (status as any).result;
         if (status.summary) {
           const rawSummary = status.summary as any;
           setSummary({
@@ -71,7 +75,8 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
             totalTime: rawSummary.totalTime,
             sourceName: rawSummary.sourceName,
             projectName: rawSummary.projectName,
-            versionId: rawSummary.versionId,
+            projectId: result?.projectId ?? rawSummary.projectId,
+            versionId: result?.versionId ?? rawSummary.versionId,
             schemas: rawSummary.classes?.map((c: any) => ({
               name: c.name,
               status: c.status
@@ -93,6 +98,12 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
 
     fetchStatus();
   }, [jobId]);
+
+  const handleViewInCanvas = () => {
+    if (summary?.projectId && summary?.versionId) {
+      router.push(`/ade/studio/editor?projectId=${encodeURIComponent(summary.projectId)}&versionId=${encodeURIComponent(summary.versionId)}`);
+    }
+  };
 
   const formatDuration = (ms?: number) => {
     if (!ms) return 'N/A';
@@ -286,16 +297,27 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Next Actions</h3>
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <div className="flex flex-wrap justify-center gap-4 mb-4 opacity-50">
-            <Button variant="outline" disabled className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
-              View on Canvas
-            </Button>
-            <Button variant="outline" disabled className="flex items-center gap-2">
+          <div className="flex flex-wrap justify-center gap-4 mb-4">
+            {isSuccess && summary?.projectId && summary?.versionId ? (
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={handleViewInCanvas}
+              >
+                <Palette className="h-4 w-4" />
+                View on Canvas
+              </Button>
+            ) : (
+              <Button variant="outline" disabled className="flex items-center gap-2">
+                <Palette className="h-4 w-4" />
+                View on Canvas
+              </Button>
+            )}
+            <Button variant="outline" disabled className="flex items-center gap-2 opacity-50">
               <FileText className="h-4 w-4" />
               Generate Docs
             </Button>
-            <Button variant="outline" disabled className="flex items-center gap-2">
+            <Button variant="outline" disabled className="flex items-center gap-2 opacity-50">
               <Download className="h-4 w-4" />
               Export Report
             </Button>

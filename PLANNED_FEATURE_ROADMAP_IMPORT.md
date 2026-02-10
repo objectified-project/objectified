@@ -236,15 +236,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 #### 4.7 Post-Import Actions 📋 PLANNED
 
 ##### Follow-Up Actions 📋 PLANNED
-- 📋 **Open in Canvas**: Navigate to imported schemas
+- ✅ **Open in Canvas**: Navigate to imported schemas
 - [TODO] **Generate Documentation**: Create docs from import
 - [TODO] **Share Import Report**: Send summary to team
 - [TODO] **Schedule Re-Import**: Set up recurring import
 - [TODO] **Export Transformed**: Export in different format
-
-| Ticket | Feature Description          |
-|--------|------------------------------|
-| #319   | Open in canvas after import  |
 
 #### 4.11 Import Flow UI Design 📋 PLANNED
 

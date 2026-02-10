@@ -95,6 +95,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Auto-select required dependencies when selecting schemas
   - Added allowing for searching and filtering by name, type, and tags
   - Added preview of schema relationships at import preview and mapping
+  - After importing, the user has the ability to switch to the project view to view the imported spec
 - Control Panel:
   - Versions page now has the ability to view the relationship graph for each version
 - OpenAPI Support:

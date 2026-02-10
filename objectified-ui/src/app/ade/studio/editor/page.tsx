@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useStudio } from '../StudioContext';
 import {
@@ -128,6 +129,7 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 
 const StudioContent = () => {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
 
   // Custom dark mode detection - prioritize localStorage, then fall back to system preference
   const [isDark, setIsDark] = useState(false);
@@ -3613,6 +3615,29 @@ const StudioContent = () => {
       setIsReadOnly(false); // Reset read-only flag when no project is selected
     }
   }, [selectedProjectId]);
+
+  // Apply projectId/versionId from URL (e.g. after "View on Canvas" from import complete)
+  const urlVersionIdAppliedRef = useRef(false);
+  useEffect(() => {
+    const projectId = searchParams.get('projectId');
+    const versionId = searchParams.get('versionId');
+    if (!projectId) return;
+    if (selectedProjectId !== projectId) {
+      setSelectedProjectId(projectId);
+    }
+    if (versionId && selectedProjectId === projectId && versions.length > 0) {
+      const versionExists = versions.some((v) => v.id === versionId);
+      if (versionExists && !urlVersionIdAppliedRef.current) {
+        urlVersionIdAppliedRef.current = true;
+        setSelectedVersionId(versionId);
+      }
+    }
+  }, [searchParams, selectedProjectId, versions, setSelectedProjectId, setSelectedVersionId]);
+  useEffect(() => {
+    if (!searchParams.get('projectId') || !searchParams.get('versionId')) {
+      urlVersionIdAppliedRef.current = false;
+    }
+  }, [searchParams]);
 
   // Load classes and render them on canvas when version changes or canvas refresh is triggered
   useEffect(() => {

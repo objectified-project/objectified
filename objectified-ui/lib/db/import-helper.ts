@@ -746,7 +746,8 @@ export async function getImportStatus(jobId: string) {
     events: job.events.slice(-200),
     progress: job.progress,
     summary: job.summary,
-    transactionPending: job.transactionPending
+    transactionPending: job.transactionPending,
+    result: job.result
   };
 }
 
