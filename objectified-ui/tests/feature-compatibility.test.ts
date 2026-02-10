@@ -701,4 +701,400 @@ definitions:
       expect(f).toBeDefined();
     });
   });
+
+  describe('Deprecated constructs (#575)', () => {
+    it('does not report deprecated features when none present', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: No deprecated
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      summary: List users
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      expect(analysis.unsupportedFeatures.filter(f => f.id.startsWith('deprecated-'))).toEqual([]);
+    });
+
+    it('flags deprecated operations with deprecated-operations', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Deprecated ops
+  version: 1.0.0
+paths:
+  /legacy:
+    get:
+      deprecated: true
+      summary: Old endpoint
+      responses:
+        "200":
+          description: OK
+  /new:
+    get:
+      summary: New endpoint
+      responses:
+        "200":
+          description: OK
+  /old:
+    post:
+      deprecated: true
+      summary: Old post
+      responses:
+        "201":
+          description: Created
+components:
+  schemas: {}
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-operations');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(2);
+      expect(f?.severity).toBe('warning');
+    });
+
+    it('flags deprecated parameters with deprecated-parameters', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Deprecated params
+  version: 1.0.0
+paths:
+  /search:
+    get:
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: legacy
+          in: query
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+components:
+  schemas: {}
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-parameters');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+      expect(f?.severity).toBe('warning');
+    });
+
+    it('flags deprecated schemas with deprecated-schemas', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Deprecated schema
+  version: 1.0.0
+components:
+  schemas:
+    OldModel:
+      deprecated: true
+      type: object
+      properties:
+        id:
+          type: string
+    NewModel:
+      type: object
+      properties:
+        id:
+          type: string
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-schemas');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+      expect(f?.severity).toBe('warning');
+    });
+
+    it('flags deprecated schema properties with deprecated-properties', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Deprecated props
+  version: 1.0.0
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        legacyField:
+          type: string
+          deprecated: true
+        name:
+          type: string
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-properties');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+      expect(f?.severity).toBe('warning');
+    });
+
+    it('flags deprecated nullable keyword with deprecated-nullable', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Nullable usage
+  version: 1.0.0
+components:
+  schemas:
+    WithNull:
+      type: object
+      properties:
+        opt:
+          type: string
+          nullable: true
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-nullable');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+      expect(f?.severity).toBe('warning');
+      expect(f?.description).toMatch(/type:.*null/i);
+    });
+
+    it('reports multiple deprecated construct types in one analysis', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Multiple deprecated
+  version: 1.0.0
+paths:
+  /old:
+    get:
+      deprecated: true
+      parameters:
+        - name: legacy
+          in: query
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    DeprecatedSchema:
+      deprecated: true
+      type: object
+      properties:
+        oldProp:
+          type: string
+          deprecated: true
+        opt:
+          type: string
+          nullable: true
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      expect(analysis.unsupportedFeatures.find(x => x.id === 'deprecated-operations')).toBeDefined();
+      expect(analysis.unsupportedFeatures.find(x => x.id === 'deprecated-parameters')).toBeDefined();
+      expect(analysis.unsupportedFeatures.find(x => x.id === 'deprecated-schemas')).toBeDefined();
+      expect(analysis.unsupportedFeatures.find(x => x.id === 'deprecated-properties')).toBeDefined();
+      expect(analysis.unsupportedFeatures.find(x => x.id === 'deprecated-nullable')).toBeDefined();
+    });
+
+    it('counts path-level deprecated parameters', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Path-level params
+  version: 1.0.0
+paths:
+  /items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: legacy
+        in: query
+        deprecated: true
+        schema:
+          type: string
+    get:
+      responses:
+        "200":
+          description: OK
+components:
+  schemas: {}
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-parameters');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+    });
+
+    it('counts deprecated parameters in components.parameters', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Reusable deprecated param
+  version: 1.0.0
+paths:
+  /search:
+    get:
+      parameters:
+        - $ref: '#/components/parameters/LegacyQuery'
+      responses:
+        "200":
+          description: OK
+components:
+  parameters:
+    LegacyQuery:
+      name: legacy
+      in: query
+      deprecated: true
+      schema:
+        type: string
+  schemas: {}
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-parameters');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+    });
+
+    it('counts multiple deprecated properties correctly', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Two deprecated props
+  version: 1.0.0
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        old1:
+          type: string
+          deprecated: true
+        old2:
+          type: integer
+          deprecated: true
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-properties');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(2);
+    });
+
+    it('counts multiple nullable usages correctly', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Multiple nullable
+  version: 1.0.0
+components:
+  schemas:
+    A:
+      type: object
+      properties:
+        a:
+          type: string
+          nullable: true
+        b:
+          type: integer
+          nullable: true
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-nullable');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(2);
+    });
+
+    it('deprecated feature entries have required fields (id, label, description, severity)', async () => {
+      const spec = `
+openapi: 3.1.0
+info:
+  title: Deprecated check shape
+  version: 1.0.0
+paths:
+  /x:
+    get:
+      deprecated: true
+      responses:
+        "200":
+          description: OK
+components:
+  schemas: {}
+`;
+      const analysis = await analyzeSpecification(spec, 'spec.yaml');
+      const deprecatedFeatures = analysis.unsupportedFeatures.filter(f => f.id.startsWith('deprecated-'));
+      expect(deprecatedFeatures.length).toBeGreaterThan(0);
+      deprecatedFeatures.forEach((f: UnsupportedFeature) => {
+        expect(f.id).toBeDefined();
+        expect(typeof f.id).toBe('string');
+        expect(f.label).toBeDefined();
+        expect(typeof f.label).toBe('string');
+        expect(f.description).toBeDefined();
+        expect(typeof f.description).toBe('string');
+        expect(f.severity).toBe('warning');
+      });
+    });
+
+    it('flags deprecated operations in Swagger 2.0 spec after conversion to OpenAPI 3.1', async () => {
+      const swagger = `
+swagger: "2.0"
+info:
+  title: Swagger deprecated op
+  version: 1.0.0
+paths:
+  /legacy:
+    get:
+      deprecated: true
+      responses:
+        200:
+          description: OK
+definitions: {}
+`;
+      const analysis = await analyzeSpecification(swagger, 'swagger.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-operations');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+    });
+
+    it('flags deprecated schema in definitions (Swagger 2 / converted)', async () => {
+      const swagger = `
+swagger: "2.0"
+info:
+  title: Swagger deprecated schema
+  version: 1.0.0
+paths: {}
+definitions:
+  OldDef:
+    deprecated: true
+    type: object
+    properties:
+      id:
+        type: string
+`;
+      const analysis = await analyzeSpecification(swagger, 'swagger.yaml');
+      const f = analysis.unsupportedFeatures.find(x => x.id === 'deprecated-schemas');
+      expect(f).toBeDefined();
+      expect(f?.count).toBe(1);
+    });
+  });
 });

@@ -309,7 +309,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
         </div>
       </div>
 
-      {/* Feature compatibility – unsupported features (#573) */}
+      {/* Feature compatibility – unsupported features (#573), deprecated constructs (#575) */}
       {analysis.unsupportedFeatures && analysis.unsupportedFeatures.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-amber-200 dark:border-amber-800 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
@@ -317,7 +317,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
             Feature compatibility
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            The following features in your specification are not or only partially supported by the import. They will be skipped or simplified during import.
+            The following features in your specification are not or only partially supported by the import, or use deprecated constructs. Deprecated items are flagged; others will be skipped or simplified during import.
           </p>
           <ul className="space-y-3">
             {analysis.unsupportedFeatures.map((feature: UnsupportedFeature) => (
@@ -337,6 +337,11 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
                     {feature.label}
+                    {feature.id.startsWith('deprecated-') && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200">
+                        Deprecated
+                      </span>
+                    )}
                     {feature.count != null && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                         {feature.count} {feature.count === 1 ? 'use' : 'uses'}

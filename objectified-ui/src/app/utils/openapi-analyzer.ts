@@ -829,6 +829,135 @@ function findWarnings(doc: any): AnalysisIssue[] {
 }
 
 /**
+ * Identify deprecated constructs in the specification (#575).
+ * Returns entries suitable for the pre-import compatibility / deprecated feature warning.
+ */
+function identifyDeprecatedConstructs(doc: any): UnsupportedFeature[] {
+  const features: UnsupportedFeature[] = [];
+  if (!doc || typeof doc !== 'object') return features;
+
+  const schemas = doc.components?.schemas || doc.definitions || {};
+  const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
+
+  // Deprecated operations (paths.*.get/post/... .deprecated)
+  let deprecatedOpCount = 0;
+  if (doc.paths) {
+    const methods = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'] as const;
+    Object.values(doc.paths).forEach((pathItem: any) => {
+      if (!pathItem || typeof pathItem !== 'object') return;
+      methods.forEach((method) => {
+        const op = pathItem[method];
+        if (op?.deprecated === true) deprecatedOpCount++;
+      });
+    });
+  }
+  if (deprecatedOpCount > 0) {
+    features.push({
+      id: 'deprecated-operations',
+      label: 'Deprecated operations',
+      description: 'Some path operations are marked deprecated. Consider migrating callers before removing.',
+      path: 'paths',
+      count: deprecatedOpCount,
+      severity: 'warning'
+    });
+  }
+
+  // Deprecated parameters (in path items or operations)
+  let deprecatedParamCount = 0;
+  function countDeprecatedParams(params: any[] | undefined) {
+    if (!Array.isArray(params)) return;
+    params.forEach((p: any) => {
+      if (p && p.deprecated === true) deprecatedParamCount++;
+    });
+  }
+  if (doc.paths) {
+    Object.values(doc.paths).forEach((pathItem: any) => {
+      if (!pathItem || typeof pathItem !== 'object') return;
+      countDeprecatedParams(pathItem.parameters);
+      ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'].forEach((method) => {
+        const op = pathItem[method];
+        if (op?.parameters) countDeprecatedParams(op.parameters);
+      });
+    });
+  }
+  if (doc.components?.parameters) {
+    Object.values(doc.components.parameters).forEach((p: any) => {
+      if (p?.deprecated === true) deprecatedParamCount++;
+    });
+  }
+  if (deprecatedParamCount > 0) {
+    features.push({
+      id: 'deprecated-parameters',
+      label: 'Deprecated parameters',
+      description: 'Some parameters are marked deprecated. Consider migrating to alternatives.',
+      path: 'paths',
+      count: deprecatedParamCount,
+      severity: 'warning'
+    });
+  }
+
+  // Deprecated schemas or schema properties (deprecated: true)
+  let deprecatedSchemaCount = 0;
+  let deprecatedPropertyCount = 0;
+  function countDeprecatedInSchema(obj: any, inProperty: boolean) {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.deprecated === true) {
+      if (inProperty) deprecatedPropertyCount++;
+      else deprecatedSchemaCount++;
+    }
+    if (obj.properties && typeof obj.properties === 'object') {
+      Object.values(obj.properties).forEach((p: any) => countDeprecatedInSchema(p, true));
+    }
+    if (Array.isArray(obj.allOf)) obj.allOf.forEach((s: any) => countDeprecatedInSchema(s, inProperty));
+    if (Array.isArray(obj.oneOf)) obj.oneOf.forEach((s: any) => countDeprecatedInSchema(s, inProperty));
+    if (Array.isArray(obj.anyOf)) obj.anyOf.forEach((s: any) => countDeprecatedInSchema(s, inProperty));
+    if (obj.items) countDeprecatedInSchema(obj.items, inProperty);
+  }
+  Object.values(schemas).forEach((schema: any) => countDeprecatedInSchema(schema, false));
+  if (deprecatedSchemaCount > 0) {
+    features.push({
+      id: 'deprecated-schemas',
+      label: 'Deprecated schemas',
+      description: 'Some schemas are marked deprecated. Consider replacing with a supported schema.',
+      path: schemaPath,
+      count: deprecatedSchemaCount,
+      severity: 'warning'
+    });
+  }
+  if (deprecatedPropertyCount > 0) {
+    features.push({
+      id: 'deprecated-properties',
+      label: 'Deprecated schema properties',
+      description: 'Some schema properties are marked deprecated. Consider migrating to alternative fields.',
+      path: schemaPath,
+      count: deprecatedPropertyCount,
+      severity: 'warning'
+    });
+  }
+
+  // nullable (deprecated in OpenAPI 3.1 in favor of type: [..., "null"])
+  let nullableCount = 0;
+  function countNullable(obj: any): void {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.nullable === true) nullableCount++;
+    Object.values(obj).forEach(countNullable);
+  }
+  Object.values(schemas).forEach(countNullable);
+  if (nullableCount > 0) {
+    features.push({
+      id: 'deprecated-nullable',
+      label: 'Deprecated nullable keyword',
+      description: 'The nullable keyword is deprecated in OpenAPI 3.1. Prefer type: [<type>, "null"] instead.',
+      path: schemaPath,
+      count: nullableCount,
+      severity: 'warning'
+    });
+  }
+
+  return features;
+}
+
+/**
  * Identify features in the specification that are not or only partially supported by the import.
  * Used for pre-import compatibility check (#573).
  */
@@ -838,6 +967,9 @@ function identifyUnsupportedFeatures(doc: any): UnsupportedFeature[] {
 
   const schemas = doc.components?.schemas || doc.definitions || {};
   const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
+
+  // Deprecated constructs (#575): flag deprecated operations, parameters, schemas, nullable
+  features.push(...identifyDeprecatedConstructs(doc));
 
   // Custom extensions (x-): listed for pre-import compatibility (#574)
   const customExtensions = findCustomExtensions(doc);

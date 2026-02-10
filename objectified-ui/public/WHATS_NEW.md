@@ -90,6 +90,7 @@ We continue to improve the platform based on your feedback with improvements and
 - Import Improvements:
   - Identify unsupported features for compatibility
   - Detects and lists all x- custom extensions
+  - Added a deprecated feature warning: Flag any deprecated constructs.
 - Control Panel:
   - Versions page now has the ability to view the relationship graph for each version
 - OpenAPI Support:

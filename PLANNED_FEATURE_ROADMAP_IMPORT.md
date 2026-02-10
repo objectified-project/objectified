@@ -93,16 +93,8 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 #### 4.3 Pre-Import Analysis 📋 PLANNED
 
 ##### Compatibility Check
-- ✅ **Feature Compatibility**: Identify unsupported features
-- ✅ **Extension Detection**: List all x- custom extensions
-- 📋 **Deprecated Feature Warning**: Flag deprecated constructs
 - [TODO] **Security Scheme Analysis**: Identify auth requirements
 - [TODO] **Breaking Change Detection**: Compare with existing version
-
-| Ticket | Feature Description            |
-|--------|--------------------------------|
-| #574   | List all x- custom extensions (implemented)  |
-| #575   | Flag deprecated constructs     |
 
 #### 4.4 Import Preview & Mapping 📋 PLANNED
 
@@ -569,6 +561,13 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Branch/Tag Selection**: Import specific versions from git
 - ✅ **Swagger Hub Integration**: Direct import from SwaggerHub
 - ✅ **Postman Collection Import**: Import from Postman workspace URL
+
+#### 4.3 Pre-Import Analysis 📋 PLANNED
+
+##### Compatibility Check
+- ✅ **Feature Compatibility**: Identify unsupported features
+- ✅ **Extension Detection**: List all x- custom extensions
+- ✅ **Deprecated Feature Warning**: Flag deprecated constructs (#575)
 
 ---
 
