@@ -196,11 +196,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 #### 4.6 Import Execution 📋 PLANNED
 
-##### Execution Options ✅ PARTIALLY IMPLEMENTED
-- ✅ **Dry Run Mode**: Preview changes without committing
-- ✅ **Transaction Mode**: All-or-nothing import
-- ✅ **Incremental Mode**: Import available, skip failures
-
 ##### Real-Time Feedback ✅ PARTIALLY IMPLEMENTED
 - ✅ **Live Log**: Streaming import log
 - ✅ **Success Indicators**: Green checkmarks for completed
@@ -531,6 +526,11 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Swagger Hub Integration**: Direct import from SwaggerHub
 - ✅ **Postman Collection Import**: Import from Postman workspace URL
 
+##### Execution Options ✅ IMPLEMENTED
+- ✅ **Dry Run Mode**: Preview changes without committing
+- ✅ **Transaction Mode**: All-or-nothing import
+- ✅ **Incremental Mode**: Import available, skip failures
+
 #### 4.3 Pre-Import Analysis 📋 PLANNED
 
 ##### Compatibility Check
@@ -538,13 +538,13 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Extension Detection**: List all x- custom extensions
 - ✅ **Deprecated Feature Warning**: Flag deprecated constructs (#575)
 
-##### Schema Selection 📋 PARTIALLY IMPLEMENTED
+##### Schema Selection ✅ IMPLEMENTED
 - ✅ **Select All / None**: Bulk selection controls
 - ✅ **Individual Selection**: Cherry-pick specific schemas
 - ✅ **Dependency Resolution**: Auto-select required dependencies
 - ✅ **Search & Filter**: Find schemas by name, type, tags
 
-#### 4.4 Import Preview & Mapping 📋 PLANNED
+#### 4.4 Import Preview & Mapping ✅ IMPLEMENTED
 
 ##### Visual Preview
 - ✅ **Schema Tree View**: Hierarchical view of all schemas
