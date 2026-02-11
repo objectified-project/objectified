@@ -328,7 +328,7 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
             {events.slice().reverse().map(ev => (
               <div key={ev.id} className={getLiveProgressRowClasses(ev)}>
                 {isSkippedEvent(ev) ? (
-                  <MinusCircle className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" aria-label="Skipped" title="Intentionally skipped" />
+                  <MinusCircle className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" aria-label="Intentionally skipped" />
                 ) : (
                   levelIcon(ev.level)
                 )}
