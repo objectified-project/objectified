@@ -190,6 +190,39 @@ describe('Import Actions - startImport Integration', () => {
       })
     );
   });
+
+  test('should pass dryRun: true to import-helper for preview-only import (#729)', async () => {
+    const { startImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    const mockInput: ImportJobInput = {
+      tenantId: 'tenant-123',
+      userId: 'user-456',
+      sourceKind: 'openapi' as any,
+      document: { openapi: '3.1.0' },
+      project: { name: 'Preview Project', slug: 'preview-project' },
+      version: { versionId: '1.0.0' },
+      options: {
+        selectedSchemas: ['User', 'Order'],
+        dryRun: true
+      }
+    };
+
+    (importHelper.startImport as jest.Mock).mockResolvedValue({ jobId: 'job-dry-run' });
+
+    const result = await startImport(mockInput);
+
+    expect(importHelper.startImport).toHaveBeenCalledWith(mockInput);
+    expect(importHelper.startImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          dryRun: true,
+          selectedSchemas: ['User', 'Order']
+        })
+      })
+    );
+    expect(result).toEqual({ jobId: 'job-dry-run' });
+  });
 });
 
 describe('Import Actions - getImportStatus Integration', () => {

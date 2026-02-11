@@ -345,7 +345,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         description: 'Imported from OpenAPI specification'
       },
       options: {
-        selectedSchemas: importOptions.selectedSchemas
+        selectedSchemas: importOptions.selectedSchemas,
+        dryRun: importOptions.dryRun ?? false
       }
     });
 

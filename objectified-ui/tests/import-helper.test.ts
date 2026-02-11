@@ -315,14 +315,45 @@ describe('Import Helper - ImportStatus Structure', () => {
         projectId: 'proj-123',
         versionId: 'ver-456',
         classesCreated: 5,
-        propertiesCreated: 20
+        propertiesCreated: 20,
+        classes: []
       }
     };
 
     expect(status.state).toBe('completed');
     expect(status.percent).toBe(100);
     expect(status.summary).toBeDefined();
-    expect(status.summary.projectId).toBe('proj-123');
+    expect(status.summary!.projectId).toBe('proj-123');
+  });
+
+  test('should create valid ImportStatus for completed dry run with summary.dryRun (#729)', () => {
+    const status: ImportStatus = {
+      jobId: 'job-dry',
+      state: 'completed',
+      percent: 100,
+      events: [],
+      summary: {
+        classesCreated: 2,
+        propertiesCreated: 4,
+        warnings: 0,
+        failed: 0,
+        dryRun: true,
+        totalTime: 100,
+        sourceName: 'Test',
+        projectName: 'Dry Run Project',
+        versionId: '1.0.0',
+        classes: [
+          { name: 'User', status: 'success' },
+          { name: 'Product', status: 'success' }
+        ]
+      }
+    };
+
+    expect(status.state).toBe('completed');
+    expect(status.summary).toBeDefined();
+    expect((status.summary as any).dryRun).toBe(true);
+    expect((status.summary as any).classesCreated).toBe(2);
+    expect((status.summary as any).classes?.length).toBe(2);
   });
 
   test('should create valid ImportStatus for failed state', () => {

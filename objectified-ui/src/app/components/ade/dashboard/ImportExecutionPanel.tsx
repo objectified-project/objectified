@@ -234,6 +234,21 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
           )}
         </div>
 
+        {/* Dry run complete notice */}
+        {state === 'completed' && summary?.dryRun && (
+          <div className="mt-4 p-3 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
+            <div className="flex items-center gap-2 text-sky-800 dark:text-sky-200">
+              <Info className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                Dry run complete. No changes were saved.
+              </span>
+            </div>
+            <p className="text-xs text-sky-700 dark:text-sky-300 mt-1 ml-6">
+              Review the summary above. Uncheck &quot;Dry run (preview only)&quot; and run again to import for real.
+            </p>
+          </div>
+        )}
+
         {/* Transaction pending notice */}
         {transactionPending && state === 'pending-approval' && (
           <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">

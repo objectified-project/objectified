@@ -46,6 +46,7 @@ interface ImportSummary {
   projectName?: string;
   projectId?: string;
   versionId?: string;
+  dryRun?: boolean;
   schemas?: Array<{
     name: string;
     status: 'success' | 'warning' | 'failed';
@@ -81,6 +82,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
             projectName: rawSummary.projectName,
             projectId: result?.projectId ?? rawSummary.projectId,
             versionId: result?.versionId ?? rawSummary.versionId,
+            dryRun: rawSummary.dryRun === true,
             schemas: rawSummary.classes?.map((c: any) => ({
               name: c.name,
               status: c.status
@@ -160,6 +162,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
   }
 
   const isSuccess = state === 'completed';
+  const isDryRun = isSuccess && summary?.dryRun === true;
   const isFailed = state === 'failed';
   const isRolledBack = state === 'rolled-back';
 
@@ -187,14 +190,19 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
           )}
         </div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {isSuccess ? 'Import Complete!' : isFailed ? 'Import Failed' : isRolledBack ? 'Import Rolled Back' : 'Import Canceled'}
+          {isDryRun ? 'Dry run complete' : isSuccess ? 'Import Complete!' : isFailed ? 'Import Failed' : isRolledBack ? 'Import Rolled Back' : 'Import Canceled'}
         </h2>
+        {isDryRun && (
+          <p className="text-gray-600 dark:text-gray-400 mt-2 text-center max-w-md">
+            No project or data was created. To import for real, go back and run again with &quot;Dry run (preview only)&quot; unchecked.
+          </p>
+        )}
         {isRolledBack && (
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             The completed import was undone. The created project and all imported data have been removed.
           </p>
         )}
-        {!isSuccess && !isRolledBack && (
+        {!isSuccess && !isRolledBack && !isDryRun && (
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             {isFailed
               ? 'There was an error during the import process.'
@@ -205,7 +213,12 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
 
       {/* Import Summary */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Summary</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Import Summary</h3>
+          {isDryRun && (
+            <Badge variant="secondary" className="text-xs">Preview only</Badge>
+          )}
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-4 mb-6">
@@ -355,8 +368,13 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Next Actions</h3>
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          {isDryRun && (
+            <p className="text-sm text-sky-700 dark:text-sky-300 mb-4">
+              This was a preview only. No project was created — View on Canvas and Undo are not available.
+            </p>
+          )}
           <div className="flex flex-wrap justify-center gap-4 mb-4">
-            {isSuccess && summary?.projectId && summary?.versionId && !isRolledBack ? (
+            {isSuccess && !isDryRun && summary?.projectId && summary?.versionId && !isRolledBack ? (
               <Button
                 variant="outline"
                 className="flex items-center gap-2"
@@ -371,7 +389,7 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
                 View on Canvas
               </Button>
             )}
-            {isSuccess && summary?.projectId && !isRolledBack && (
+            {isSuccess && !isDryRun && summary?.projectId && !isRolledBack && (
               <Button
                 variant="outline"
                 className="flex items-center gap-2 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"

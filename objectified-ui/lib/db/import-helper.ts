@@ -91,6 +91,7 @@ interface JobState {
     sourceName?: string;
     projectName?: string;
     versionId?: string;
+    dryRun?: boolean;
     classes: Array<{ name: string; status: 'success' | 'warning' | 'failed' }>;
     verification?: {
       passed: boolean;
@@ -448,11 +449,78 @@ export async function startImport(input: ImportJobInput) {
 
   (async () => {
     let client: PoolClient | null = null;
+    const isDryRun = input.options.dryRun === true;
 
     try {
       job.state = 'running';
-      emit(job, 'info', 'INIT', 'Initializing import job');
+      emit(job, 'info', 'INIT', isDryRun ? 'Initializing dry run (preview only - no changes will be saved)' : 'Initializing import job');
       setProgress(job, 'initializing', 1, 0);
+
+      const importer = getImporter(input.sourceKind);
+      if (!importer) throw new Error(`No importer registered for ${input.sourceKind}`);
+      const norm = importer.normalize({ document: input.document, options: { selectedSchemas: input.options.selectedSchemas } });
+      if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));
+
+      // Log normalized class info for debugging
+      for (const cls of norm.classes) {
+        emit(job, 'info', 'DEBUG_NORMALIZED_CLASS', `Normalized class: ${cls.name}`, {
+          propertyCount: cls.properties?.length || 0,
+          properties: cls.properties?.map(p => p.name).join(', ') || 'none',
+          hasDiscriminator: !!cls.schema?.discriminator
+        });
+      }
+
+      if (job.canceled) throw new Error('Import canceled');
+
+      if (isDryRun) {
+        // Dry run: no DB transaction, just compute what would be created and emit summary
+        setProgress(job, 'creating-project', 1, 0, input.project.name);
+        emit(job, 'info', 'DRY_RUN', 'Dry run mode - simulating import (no database changes)');
+        setProgress(job, 'creating-version', 2, 1, input.version.versionId);
+
+        const propertyMap = new Map<string, { data: any; description?: string; names: Set<string> }>();
+        const collectProperties = (props: any[]) => {
+          for (const p of props || []) {
+            const isReference = p.data?.$ref || (p.data?.type === 'array' && p.data?.items?.$ref);
+            if (!isReference) {
+              const sig = stableStringify(p.data);
+              if (!propertyMap.has(sig)) {
+                propertyMap.set(sig, { data: p.data, description: p.description, names: new Set<string>() });
+              }
+              propertyMap.get(sig)!.names.add(p.name);
+            }
+            if (p.children) collectProperties(p.children);
+          }
+        };
+        for (const cls of norm.classes) {
+          collectProperties(cls.properties || []);
+        }
+
+        emit(job, 'info', 'CREATING_PROPERTIES', `Would create ${propertyMap.size} unique properties in library`);
+        if (job.summary) job.summary.propertiesCreated = propertyMap.size;
+
+        setProgress(job, 'creating-classes', 2 + norm.classes.length, 2);
+        for (let i = 0; i < norm.classes.length; i++) {
+          if (job.canceled) throw new Error('Import canceled');
+          const cls = norm.classes[i];
+          setProgress(job, 'creating-classes', 2 + norm.classes.length, 2 + i, cls.name);
+          emit(job, 'info', 'CLASS_CREATED', `Would import class: ${cls.name}`);
+          if (job.summary) {
+            job.summary.classesCreated++;
+            job.summary.classes.push({ name: cls.name, status: 'success' });
+          }
+        }
+
+        setProgress(job, 'finalizing', 3 + norm.classes.length, 3 + norm.classes.length);
+        job.state = 'completed';
+        if (job.summary) {
+          job.summary.dryRun = true;
+          job.summary.totalTime = Date.now() - startTime;
+        }
+        job.percent = 100;
+        emit(job, 'info', 'DRY_RUN_COMPLETE', 'Dry run complete. No changes were saved. Run without "Dry run" to import for real.');
+        return;
+      }
 
       // Get a transaction client (with retry for transient connection errors)
       client = await withRetry(() => getTransactionClient(), {
@@ -470,20 +538,6 @@ export async function startImport(input: ImportJobInput) {
       });
       job.transactionPending = true;
       emit(job, 'info', 'TRANSACTION_STARTED', 'Database transaction started - changes will be committed only after approval');
-
-      const importer = getImporter(input.sourceKind);
-      if (!importer) throw new Error(`No importer registered for ${input.sourceKind}`);
-      const norm = importer.normalize({ document: input.document, options: { selectedSchemas: input.options.selectedSchemas } });
-      if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));
-
-      // Log normalized class info for debugging
-      for (const cls of norm.classes) {
-        emit(job, 'info', 'DEBUG_NORMALIZED_CLASS', `Normalized class: ${cls.name}`, {
-          propertyCount: cls.properties?.length || 0,
-          properties: cls.properties?.map(p => p.name).join(', ') || 'none',
-          hasDiscriminator: !!cls.schema?.discriminator
-        });
-      }
 
       if (job.canceled) throw new Error('Import canceled');
 

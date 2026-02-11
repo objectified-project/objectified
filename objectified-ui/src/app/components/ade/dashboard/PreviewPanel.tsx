@@ -35,6 +35,8 @@ export interface ImportOptions {
   versionSource: 'spec' | 'manual';
   targetVersion: string;
   selectedSchemas: string[];
+  /** When true, preview changes without committing (dry run). */
+  dryRun?: boolean;
 }
 
 interface SchemaInfo {
@@ -429,7 +431,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       projectSlug: generateSlug(title) || 'new-project',
       versionSource: 'spec',
       targetVersion: analysis.document?.info?.version || '1.0.0',
-      selectedSchemas: schemas.map(s => s.name)
+      selectedSchemas: schemas.map(s => s.name),
+      dryRun: false
     };
   });
 
@@ -1351,6 +1354,24 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                   : 'Allowed: 0-9, A-Z, a-z, . (dot), - (dash)'}
               </div>
             </div>
+          </div>
+
+          {/* Dry run: preview without committing */}
+          <div className="col-span-4 flex items-start gap-3 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={importOptions.dryRun ?? false}
+                onChange={(e) => handleOptionChange('dryRun', e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Dry run (preview only)
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Simulate the import and show what would be created. No project or data is saved.
+            </p>
           </div>
         </div>
       </div>
