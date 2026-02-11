@@ -75,8 +75,9 @@ export function extractSchemaReferenceEdges(schema: unknown): SchemaRefEdge[] {
 
     const rec = obj as Record<string, unknown>;
     if (rec.properties && typeof rec.properties === 'object') {
-      for (const key of Object.keys(rec.properties)) {
-        findRefs(rec.properties[key], key);
+      const props = rec.properties as Record<string, unknown>;
+      for (const key of Object.keys(props)) {
+        findRefs(props[key], key);
       }
     }
     if (rec.items && typeof rec.items === 'object') {
