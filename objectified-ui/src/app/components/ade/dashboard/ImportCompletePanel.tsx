@@ -18,6 +18,7 @@ import {
   Undo2
 } from 'lucide-react';
 import { getImportStatus, rollbackCompletedImport } from '../../../../../lib/db/import-actions';
+import { buildImportErrorReport, getImportErrorReportFilename, type ImportStatusForReport } from '../../../../../lib/db/import-error-report';
 
 interface ImportCompletePanelProps {
   jobId: string;
@@ -124,6 +125,23 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
       setRollbackError(e instanceof Error ? e.message : 'Rollback failed');
     } finally {
       setIsRollingBack(false);
+    }
+  };
+
+  const handleDownloadErrorReport = async () => {
+    try {
+      const status = await getImportStatus(jobId);
+      const exportedAt = new Date().toISOString();
+      const report = buildImportErrorReport(status as ImportStatusForReport, exportedAt);
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getImportErrorReportFilename(status.jobId, exportedAt);
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to download error report:', e);
     }
   };
 
@@ -368,9 +386,13 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
               <FileText className="h-4 w-4" />
               Generate Docs
             </Button>
-            <Button variant="outline" disabled className="flex items-center gap-2 opacity-50">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={handleDownloadErrorReport}
+            >
               <Download className="h-4 w-4" />
-              Export Report
+              Download error report
             </Button>
           </div>
           <div className="flex flex-wrap justify-center gap-4 opacity-50">

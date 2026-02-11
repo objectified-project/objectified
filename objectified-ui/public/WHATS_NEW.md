@@ -100,6 +100,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Versions page now has the ability to view the relationship graph for each version
   - Adds an error recovery strategy to retry failed operations
   - Adds rollback support for partially committed imports
+  - Adds the ability to download import results
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

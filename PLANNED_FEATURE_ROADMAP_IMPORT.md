@@ -222,12 +222,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Graceful Degradation**: Continue on non-critical errors
 - ✅ **Error Recovery**: Retry failed operations
 - ✅ **Rollback Support**: Undo partial imports (post-commit rollback)
-- 📋 **Error Export**: Download detailed error report
+- ✅ **Error Export**: Download detailed error report
 - 📋 **Support Ticket Creation**: One-click issue reporting
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
-| #736   | Download detailed error report       |
 | #737   | One-click support ticket creation    |
 
 #### 4.7 Post-Import Actions 📋 PLANNED
