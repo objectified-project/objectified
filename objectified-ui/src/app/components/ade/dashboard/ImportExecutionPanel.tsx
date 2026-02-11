@@ -6,6 +6,7 @@ import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { AlertCircle, CheckCircle2, Info, XCircle, Pause, RotateCw } from 'lucide-react';
 import { cancelImport, getImportStatus, commitImport, rollbackImport, retryImport } from '../../../../../lib/db/import-actions';
+import { getErrorEvents, formatEventContext, getLiveProgressRowClasses, getImportLogLineClasses } from '../../../../../lib/import-execution-error-indicators';
 
 interface ImportExecutionPanelProps {
   jobId: string;
@@ -152,10 +153,12 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
   };
 
   const levelIcon = (lvl: LogLevel) => {
-    if (lvl === 'error') return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400"/>;
-    if (lvl === 'warn') return <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400"/>;
-    return <Info className="h-4 w-4 text-indigo-600 dark:text-indigo-400"/>;
+    if (lvl === 'error') return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" aria-hidden />;
+    if (lvl === 'warn') return <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" aria-hidden />;
+    return <Info className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />;
   };
+
+  const errorEvents = getErrorEvents(events);
 
   return (
     <div className="space-y-6">
@@ -280,20 +283,57 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
         )}
       </div>
 
+      {/* Error indicators: red for failures with details (#731) */}
+      {errorEvents.length > 0 && (
+        <div
+          className="rounded-xl border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 p-6"
+          role="alert"
+          aria-label="Import failures"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" aria-hidden />
+            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">
+              Failures ({errorEvents.length})
+            </h3>
+          </div>
+          <ul className="space-y-3 max-h-[280px] overflow-y-auto">
+            {errorEvents.map((ev) => (
+              <li
+                key={ev.id}
+                className="rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900/60 p-3"
+              >
+                <div className="flex items-start gap-2">
+                  <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" aria-hidden />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-red-600 dark:text-red-400 font-medium">{ev.code}</div>
+                    <div className="text-sm text-red-900 dark:text-red-100 mt-0.5">{ev.message}</div>
+                    {ev.context != null && (
+                      <pre className="mt-2 text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-32 border border-red-100 dark:border-red-900/50">
+                        {formatEventContext(ev.context)}
+                      </pre>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Live Progress - per event log */}
       <div className="grid grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Live Progress</h3>
           <div className="max-h-[320px] overflow-y-auto space-y-2">
             {events.slice().reverse().map(ev => (
-              <div key={ev.id} className="flex items-start gap-2 p-2 rounded border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+              <div key={ev.id} className={getLiveProgressRowClasses(ev.level)}>
                 {levelIcon(ev.level)}
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(ev.ts).toLocaleTimeString()} • {ev.code}</div>
-                  <div className="text-sm text-gray-900 dark:text-gray-100">{ev.message}</div>
-                  {ev.context && (
+                  <div className={`text-sm ${ev.level === 'error' ? 'text-red-900 dark:text-red-100 font-medium' : 'text-gray-900 dark:text-gray-100'}`}>{ev.message}</div>
+                  {ev.context != null && (
                     <pre className="mt-1 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-24">
-                      {JSON.stringify(ev.context, null, 2)}
+                      {formatEventContext(ev.context)}
                     </pre>
                   )}
                 </div>
@@ -307,10 +347,15 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Log</h3>
           <div className="max-h-[320px] overflow-y-auto space-y-1">
             {events.map(ev => (
-              <div key={ev.id} className="text-xs font-mono">
+              <div key={ev.id} className={getImportLogLineClasses(ev.level)}>
                 <span className="mr-2 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300">{new Date(ev.ts).toLocaleTimeString()}</span>
-                <span className={`mr-2 font-semibold ${ev.level==='error' ? 'text-red-600 dark:text-red-400' : ev.level==='warn' ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>[{ev.level.toUpperCase()}]</span>
-                <span className="text-gray-800 dark:text-gray-200">{ev.message}</span>
+                <span className={`mr-2 font-semibold ${ev.level === 'error' ? 'text-red-600 dark:text-red-400' : ev.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>[{ev.level.toUpperCase()}]</span>
+                <span className={ev.level === 'error' ? 'text-red-900 dark:text-red-100' : 'text-gray-800 dark:text-gray-200'}>{ev.message}</span>
+                {ev.level === 'error' && ev.context != null && (
+                  <pre className="mt-1.5 ml-0 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-20 border border-red-200 dark:border-red-800">
+                    {formatEventContext(ev.context)}
+                  </pre>
+                )}
               </div>
             ))}
           </div>

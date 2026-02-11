@@ -200,12 +200,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Live Log**: Streaming import log
 - ✅ **Success Indicators**: Green checkmarks for completed
 - ✅ **Warning Indicators**: Yellow for non-critical issues
-- 📋 **Error Indicators**: Red for failures with details
+- ✅ **Error Indicators**: Red for failures with details
 - 📋 **Skip Indicators**: Gray for intentionally skipped items
 
 | Ticket | Feature Description            |
 |--------|--------------------------------|
-| #731   | Indicator for failures in red  |
 | #732   | Indicate skipped items in gray |
 
 ##### Error Handling
