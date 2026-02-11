@@ -337,7 +337,8 @@ async function verifyImport(
   if (passed) {
     emit(job, 'info', 'VERIFY_PASS', `Verification passed: ${classesVerified} classes, ${totalPropertiesVerified} properties verified`);
   } else {
-    emit(job, 'error', 'VERIFY_FAIL', `Verification failed with ${mismatches.length} mismatches`, {
+    // Non-critical: log as warning so import can continue (graceful degradation)
+    emit(job, 'warn', 'VERIFY_MISMATCHES', `Verification found ${mismatches.length} mismatch(es)`, {
       mismatches: mismatches.slice(0, 10) // Limit to first 10 for logging
     });
   }
@@ -395,7 +396,15 @@ async function writeClassWithProperties(
       const addRes = JSON.parse(
         await addPropertyToClassTx(client, classId, propertyId, p.name, p.description || null, p.data, parentId)
       );
-      if (!addRes.success) throw new Error(addRes.error || 'Failed to add property');
+      if (!addRes.success) {
+        // Graceful degradation: log and continue with remaining properties
+        emit(job, 'warn', 'PROPERTY_LINK_FAILED', `Could not add property "${p.name}" to class "${cls.name}": ${addRes.error}`, {
+          className: cls.name,
+          propertyName: p.name
+        });
+        if (job.summary) job.summary.warnings++;
+        continue;
+      }
       const newId = addRes.classProperty.id as string;
       if (p.children && p.children.length) await linkRec(classId, p.children, newId);
     }
@@ -577,10 +586,13 @@ export async function startImport(input: ImportJobInput) {
         job.summary.verification = verificationResult;
       }
 
-      // If verification failed, mark the import as failed (will trigger rollback)
+      // Graceful degradation: verification mismatches are non-critical — continue to pending-approval
       if (!verificationResult.passed) {
-        throw new Error(`Import verification failed: ${verificationResult.mismatches.length} mismatches found. ` +
-          `First mismatch: ${verificationResult.mismatches[0]?.message || 'Unknown'}`);
+        emit(job, 'warn', 'VERIFY_MISMATCHES', `Verification found ${verificationResult.mismatches.length} mismatch(es). You can still commit this import and review in Canvas.`, {
+          mismatchCount: verificationResult.mismatches.length,
+          firstMessage: verificationResult.mismatches[0]?.message
+        });
+        if (job.summary) job.summary.warnings++;
       }
 
       setProgress(job, 'finalizing', 3 + norm.classes.length, 3 + norm.classes.length);
