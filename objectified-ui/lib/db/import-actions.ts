@@ -22,5 +22,9 @@ export async function rollbackImport(jobId: string) {
   return importHelper.rollbackImport(jobId);
 }
 
+export async function retryImport(jobId: string) {
+  return importHelper.retryImport(jobId);
+}
+
 export type { ImportJobInput, ImportStatus, ImportEvent, ProgressEvent, ImportJobState, ImportLogLevel } from './import-helper';
 

@@ -98,6 +98,7 @@ We continue to improve the platform based on your feedback with improvements and
   - After importing, the user has the ability to switch to the project view to view the imported spec
   - Handles graceful degradation for import execution: continue on non-critical errors
   - Versions page now has the ability to view the relationship graph for each version
+  - Adds an error recovery strategy to retry failed operations
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

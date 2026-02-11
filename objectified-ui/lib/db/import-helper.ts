@@ -15,6 +15,7 @@ import {
   getClassesWithPropertiesAndTagsTx
 } from './import-transaction';
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
+import { withRetry } from '../retry';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
@@ -452,12 +453,20 @@ export async function startImport(input: ImportJobInput) {
       emit(job, 'info', 'INIT', 'Initializing import job');
       setProgress(job, 'initializing', 1, 0);
 
-      // Get a transaction client
-      client = await getTransactionClient();
+      // Get a transaction client (with retry for transient connection errors)
+      client = await withRetry(() => getTransactionClient(), {
+        maxAttempts: 3,
+        initialDelayMs: 500,
+        label: 'getTransactionClient'
+      });
       job.transactionClient = client;
 
-      // Begin transaction
-      await beginTransaction(client);
+      // Begin transaction (with retry for transient DB errors)
+      await withRetry(() => beginTransaction(client!), {
+        maxAttempts: 3,
+        initialDelayMs: 300,
+        label: 'beginTransaction'
+      });
       job.transactionPending = true;
       emit(job, 'info', 'TRANSACTION_STARTED', 'Database transaction started - changes will be committed only after approval');
 
@@ -478,7 +487,12 @@ export async function startImport(input: ImportJobInput) {
       if (job.canceled) throw new Error('Import canceled');
 
       setProgress(job, 'creating-project', 1, 0, input.project.name);
-      const resProj = JSON.parse(await createProjectTx(client, input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug));
+      const resProj = JSON.parse(
+        await withRetry(
+          () => createProjectTx(client!, input.tenantId, input.userId, input.project.name, input.project.description || '', input.project.slug),
+          { maxAttempts: 3, initialDelayMs: 500, label: 'createProject' }
+        )
+      );
       if (!resProj.success) throw new Error(resProj.error || 'Failed to create project');
       const projectId = resProj.project.id as string;
       emit(job, 'info', 'PROJECT_CREATED', `Created project: ${input.project.name}`, { projectId });
@@ -486,7 +500,12 @@ export async function startImport(input: ImportJobInput) {
       if (job.canceled) throw new Error('Import canceled');
 
       setProgress(job, 'creating-version', 2, 1, input.version.versionId);
-      const resVer = JSON.parse(await createVersionTx(client, projectId, input.userId, input.version.versionId, input.version.description || '', 'Imported from specification'));
+      const resVer = JSON.parse(
+        await withRetry(
+          () => createVersionTx(client!, projectId, input.userId, input.version.versionId, input.version.description || '', 'Imported from specification'),
+          { maxAttempts: 3, initialDelayMs: 500, label: 'createVersion' }
+        )
+      );
       if (!resVer.success) throw new Error(resVer.error || 'Failed to create version');
       const versionId = resVer.version.id as string;
       emit(job, 'info', 'VERSION_CREATED', `Created version: ${input.version.versionId}`, { versionId });
@@ -663,7 +682,11 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
     job.state = 'committing';
     emit(job, 'info', 'COMMITTING', 'Committing import transaction...');
 
-    await commitTransaction(job.transactionClient);
+    await withRetry(() => commitTransaction(job.transactionClient!), {
+      maxAttempts: 3,
+      initialDelayMs: 500,
+      label: 'commitTransaction'
+    });
     job.transactionPending = false;
 
     emit(job, 'info', 'COMMITTED', 'Import transaction committed successfully');
@@ -761,6 +784,26 @@ export async function getImportStatus(jobId: string) {
     transactionPending: job.transactionPending,
     result: job.result
   };
+}
+
+/**
+ * Retry a failed or canceled import by re-running with the same input.
+ * Returns a new job ID so the UI can switch to the new job.
+ */
+export async function retryImport(jobId: string): Promise<{ success: boolean; jobId?: string; error?: string }> {
+  const job = jobs.get(jobId);
+  if (!job) {
+    return { success: false, error: 'Job not found' };
+  }
+  if (job.state !== 'failed' && job.state !== 'canceled') {
+    return { success: false, error: `Import can only be retried when it has failed or was canceled (current state: ${job.state})` };
+  }
+  try {
+    const { jobId: newJobId } = await startImport(job.input);
+    return { success: true, jobId: newJobId };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Failed to start retry' };
+  }
 }
 
 export async function cancelImport(jobId: string) {

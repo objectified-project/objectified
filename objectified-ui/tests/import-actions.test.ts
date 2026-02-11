@@ -14,6 +14,9 @@ jest.mock('../lib/db/import-helper', () => ({
   startImport: jest.fn(),
   getImportStatus: jest.fn(),
   cancelImport: jest.fn(),
+  commitImport: jest.fn(),
+  rollbackImport: jest.fn(),
+  retryImport: jest.fn(),
 }));
 
 describe('Import Actions - Module Exports', () => {
@@ -34,6 +37,12 @@ describe('Import Actions - Module Exports', () => {
     const importActions = await import('../lib/db/import-actions');
 
     expect(typeof importActions.cancelImport).toBe('function');
+  });
+
+  test('should export retryImport function', async () => {
+    const importActions = await import('../lib/db/import-actions');
+
+    expect(typeof importActions.retryImport).toBe('function');
   });
 });
 
@@ -386,6 +395,69 @@ describe('Import Actions - cancelImport Integration', () => {
   });
 });
 
+describe('Import Actions - retryImport (error recovery)', () => {
+  test('should call import-helper retryImport with jobId', async () => {
+    const { retryImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.retryImport as jest.Mock).mockResolvedValue({ success: true, jobId: 'job-new-123' });
+
+    const result = await retryImport('job-failed-456');
+
+    expect(importHelper.retryImport).toHaveBeenCalledWith('job-failed-456');
+    expect(result.success).toBe(true);
+    expect(result.jobId).toBe('job-new-123');
+  });
+
+  test('should return new jobId on successful retry', async () => {
+    const { retryImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.retryImport as jest.Mock).mockResolvedValue({ success: true, jobId: 'job-retry-789' });
+
+    const result = await retryImport('job-failed');
+
+    expect(result).toEqual({ success: true, jobId: 'job-retry-789' });
+  });
+
+  test('should return error when job not found', async () => {
+    const { retryImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.retryImport as jest.Mock).mockResolvedValue({ success: false, error: 'Job not found' });
+
+    const result = await retryImport('job-nonexistent');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Job not found');
+    expect(result.jobId).toBeUndefined();
+  });
+
+  test('should return error when job state does not allow retry', async () => {
+    const { retryImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.retryImport as jest.Mock).mockResolvedValue({
+      success: false,
+      error: 'Import can only be retried when it has failed or was canceled (current state: running)'
+    });
+
+    const result = await retryImport('job-running');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('can only be retried');
+  });
+
+  test('should propagate retryImport errors', async () => {
+    const { retryImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.retryImport as jest.Mock).mockRejectedValue(new Error('Failed to start retry'));
+
+    await expect(retryImport('job-failed')).rejects.toThrow('Failed to start retry');
+  });
+});
+
 describe('Import Actions - Server Action Behavior', () => {
   test('should be marked as server action', async () => {
     const fileContent = `'use server';`;
@@ -597,5 +669,5 @@ describe('Import Actions - Real-World Scenarios', () => {
   });
 });
 
-console.log('✅ Import Actions tests defined - 30 tests total');
+console.log('✅ Import Actions tests defined - 35 tests total');
 

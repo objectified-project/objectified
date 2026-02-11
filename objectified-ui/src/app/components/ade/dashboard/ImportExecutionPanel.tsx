@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import * as Progress from '@radix-ui/react-progress';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
-import { AlertCircle, CheckCircle2, Info, XCircle, Pause } from 'lucide-react';
-import { cancelImport, getImportStatus, commitImport, rollbackImport } from '../../../../../lib/db/import-actions';
+import { AlertCircle, CheckCircle2, Info, XCircle, Pause, RotateCw } from 'lucide-react';
+import { cancelImport, getImportStatus, commitImport, rollbackImport, retryImport } from '../../../../../lib/db/import-actions';
 
 interface ImportExecutionPanelProps {
   jobId: string;
   onComplete?: (succeeded: boolean) => void;
+  /** When user retries a failed/canceled import, called with the new job ID so the dialog can switch to it. */
+  onRetry?: (newJobId: string) => void;
   isReviewing?: boolean; // True when viewing from 'done' step via Back button
 }
 
@@ -33,7 +35,7 @@ interface ProgressInfo {
 
 type JobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
-export default function ImportExecutionPanel({ jobId, onComplete, isReviewing }: ImportExecutionPanelProps) {
+export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isReviewing }: ImportExecutionPanelProps) {
   const [state, setState] = useState<JobState>('queued');
   const [percent, setPercent] = useState(0);
   const [progress, setProgress] = useState<ProgressInfo | undefined>(undefined);
@@ -42,7 +44,13 @@ export default function ImportExecutionPanel({ jobId, onComplete, isReviewing }:
   const [hasNotifiedComplete, setHasNotifiedComplete] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [transactionPending, setTransactionPending] = useState(false);
+
+  // Reset completion notification when jobId changes (e.g. after retry)
+  useEffect(() => {
+    setHasNotifiedComplete(false);
+  }, [jobId]);
 
   useEffect(() => {
     let mounted = true;
@@ -128,6 +136,21 @@ export default function ImportExecutionPanel({ jobId, onComplete, isReviewing }:
     }
   };
 
+  const onRetryClick = async () => {
+    if (!onRetry) return;
+    setIsRetrying(true);
+    try {
+      const result = await retryImport(jobId);
+      if (result.success && result.jobId) {
+        onRetry(result.jobId);
+      }
+    } catch (e) {
+      console.error('Failed to retry:', e);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
   const levelIcon = (lvl: LogLevel) => {
     if (lvl === 'error') return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400"/>;
     if (lvl === 'warn') return <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400"/>;
@@ -167,7 +190,7 @@ export default function ImportExecutionPanel({ jobId, onComplete, isReviewing }:
           <span>{percent}%</span>
           {progress && <span>{progress.completed} of {progress.total}</span>}
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {state === 'pending-approval' ? (
             <>
               <Button
@@ -186,6 +209,22 @@ export default function ImportExecutionPanel({ jobId, onComplete, isReviewing }:
               >
                 <XCircle className="h-4 w-4 mr-1"/>
                 {isRollingBack ? 'Rolling Back...' : 'Reject & Rollback'}
+              </Button>
+            </>
+          ) : state === 'failed' || state === 'canceled' ? (
+            <>
+              {onRetry && (
+                <Button
+                  onClick={onRetryClick}
+                  disabled={isRetrying}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <RotateCw className={`h-4 w-4 mr-1 ${isRetrying ? 'animate-spin' : ''}`}/>
+                  {isRetrying ? 'Starting retry...' : 'Retry Import'}
+                </Button>
+              )}
+              <Button variant="outline" onClick={onCancel} disabled={isRetrying}>
+                <Pause className="h-4 w-4 mr-1"/> Cancel Import
               </Button>
             </>
           ) : (

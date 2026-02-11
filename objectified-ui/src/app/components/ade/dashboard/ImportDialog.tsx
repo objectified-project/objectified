@@ -978,6 +978,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                     setImportComplete(true);
                     setImportSucceeded(succeeded);
                   }}
+                  onRetry={(newJobId) => {
+                    setJobId(newJobId);
+                    setImportComplete(false);
+                  }}
                 />
               );
             } else if (currentStep === 'done') {
