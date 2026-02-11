@@ -14,9 +14,10 @@ import {
   Plus,
   Clock,
   ShieldCheck,
-  ShieldX
+  ShieldX,
+  Undo2
 } from 'lucide-react';
-import { getImportStatus } from '../../../../../lib/db/import-actions';
+import { getImportStatus, rollbackCompletedImport } from '../../../../../lib/db/import-actions';
 
 interface ImportCompletePanelProps {
   jobId: string;
@@ -54,8 +55,10 @@ interface ImportSummary {
 export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps) {
   const router = useRouter();
   const [summary, setSummary] = useState<ImportSummary | null>(null);
-  const [state, setState] = useState<'completed' | 'failed' | 'canceled' | string>('completed');
+  const [state, setState] = useState<'completed' | 'failed' | 'canceled' | 'rolled-back' | string>('completed');
   const [loading, setLoading] = useState(true);
+  const [isRollingBack, setIsRollingBack] = useState(false);
+  const [rollbackError, setRollbackError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -105,6 +108,25 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
     }
   };
 
+  const handleRollbackCompleted = async () => {
+    if (!jobId) return;
+    setIsRollingBack(true);
+    setRollbackError(null);
+    try {
+      const result = await rollbackCompletedImport(jobId);
+      if (result.success) {
+        setState('rolled-back');
+      } else {
+        setRollbackError(result.error ?? 'Rollback failed');
+      }
+    } catch (e) {
+      console.error('Rollback failed:', e);
+      setRollbackError(e instanceof Error ? e.message : 'Rollback failed');
+    } finally {
+      setIsRollingBack(false);
+    }
+  };
+
   const formatDuration = (ms?: number) => {
     if (!ms) return 'N/A';
     if (ms < 1000) return `${ms}ms`;
@@ -121,30 +143,40 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
 
   const isSuccess = state === 'completed';
   const isFailed = state === 'failed';
+  const isRolledBack = state === 'rolled-back';
 
   return (
     <div className="space-y-6">
-      {/* Success/Failure Header */}
+      {/* Success/Failure/Rolled-back Header */}
       <div className="flex flex-col items-center justify-center py-8">
         <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
           isSuccess 
             ? 'bg-green-100 dark:bg-green-900/30' 
             : isFailed 
             ? 'bg-red-100 dark:bg-red-900/30'
+            : isRolledBack
+            ? 'bg-gray-100 dark:bg-gray-800'
             : 'bg-yellow-100 dark:bg-yellow-900/30'
         }`}>
           {isSuccess ? (
             <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
           ) : isFailed ? (
             <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+          ) : isRolledBack ? (
+            <Undo2 className="h-10 w-10 text-gray-600 dark:text-gray-400" />
           ) : (
             <AlertTriangle className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
           )}
         </div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {isSuccess ? 'Import Complete!' : isFailed ? 'Import Failed' : 'Import Canceled'}
+          {isSuccess ? 'Import Complete!' : isFailed ? 'Import Failed' : isRolledBack ? 'Import Rolled Back' : 'Import Canceled'}
         </h2>
-        {!isSuccess && (
+        {isRolledBack && (
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            The completed import was undone. The created project and all imported data have been removed.
+          </p>
+        )}
+        {!isSuccess && !isRolledBack && (
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             {isFailed
               ? 'There was an error during the import process.'
@@ -293,12 +325,20 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
         </div>
       )}
 
+      {/* Rollback error */}
+      {rollbackError && (
+        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4 flex items-center gap-3">
+          <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+          <p className="text-sm text-red-800 dark:text-red-200">{rollbackError}</p>
+        </div>
+      )}
+
       {/* Next Actions */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Next Actions</h3>
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <div className="flex flex-wrap justify-center gap-4 mb-4">
-            {isSuccess && summary?.projectId && summary?.versionId ? (
+            {isSuccess && summary?.projectId && summary?.versionId && !isRolledBack ? (
               <Button
                 variant="outline"
                 className="flex items-center gap-2"
@@ -311,6 +351,17 @@ export default function ImportCompletePanel({ jobId }: ImportCompletePanelProps)
               <Button variant="outline" disabled className="flex items-center gap-2">
                 <Palette className="h-4 w-4" />
                 View on Canvas
+              </Button>
+            )}
+            {isSuccess && summary?.projectId && !isRolledBack && (
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                onClick={handleRollbackCompleted}
+                disabled={isRollingBack}
+              >
+                <Undo2 className={`h-4 w-4 ${isRollingBack ? 'animate-pulse' : ''}`} />
+                {isRollingBack ? 'Rolling back...' : 'Undo import'}
               </Button>
             )}
             <Button variant="outline" disabled className="flex items-center gap-2 opacity-50">

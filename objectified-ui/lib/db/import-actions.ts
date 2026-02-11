@@ -22,6 +22,10 @@ export async function rollbackImport(jobId: string) {
   return importHelper.rollbackImport(jobId);
 }
 
+export async function rollbackCompletedImport(jobId: string) {
+  return importHelper.rollbackCompletedImport(jobId);
+}
+
 export async function retryImport(jobId: string) {
   return importHelper.retryImport(jobId);
 }

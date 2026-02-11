@@ -16,6 +16,7 @@ import {
 } from './import-transaction';
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
 import { withRetry } from '../retry';
+import { permanentDeleteProject } from './helper';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
@@ -768,6 +769,47 @@ export async function rollbackImport(jobId: string): Promise<{ success: boolean;
     }
 
     return { success: false, error: err?.message || 'Failed to rollback transaction' };
+  }
+}
+
+/**
+ * Rollback a completed import (#735): remove the project (and its version, classes, properties)
+ * created by this import. Only allowed when the import has already been committed (state === 'completed').
+ */
+export async function rollbackCompletedImport(jobId: string): Promise<{ success: boolean; error?: string }> {
+  const job = jobs.get(jobId);
+  if (!job) {
+    return { success: false, error: 'Job not found' };
+  }
+
+  if (job.state !== 'completed') {
+    return { success: false, error: `Rollback of completed import is only allowed when the import has been committed (current state: ${job.state})` };
+  }
+
+  const projectId = job.result?.projectId;
+  if (!projectId) {
+    return { success: false, error: 'No project ID associated with this import' };
+  }
+
+  try {
+    emit(job, 'info', 'ROLLBACK_STARTED', 'Rolling back completed import - removing imported project and data...');
+
+    const raw = await permanentDeleteProject(projectId);
+    const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!result.success) {
+      emit(job, 'error', 'ROLLBACK_FAILED', result.error || 'Failed to delete project');
+      return { success: false, error: result.error || 'Failed to delete project' };
+    }
+
+    job.state = 'rolled-back';
+    job.result = undefined;
+    emit(job, 'info', 'ROLLED_BACK', 'Completed import was rolled back - all imported data has been removed.');
+
+    return { success: true };
+  } catch (err: any) {
+    const message = err?.message || 'Failed to rollback completed import';
+    emit(job, 'error', 'ROLLBACK_FAILED', message);
+    return { success: false, error: message };
   }
 }
 

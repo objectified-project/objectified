@@ -16,6 +16,7 @@ jest.mock('../lib/db/import-helper', () => ({
   cancelImport: jest.fn(),
   commitImport: jest.fn(),
   rollbackImport: jest.fn(),
+  rollbackCompletedImport: jest.fn(),
   retryImport: jest.fn(),
 }));
 
@@ -43,6 +44,12 @@ describe('Import Actions - Module Exports', () => {
     const importActions = await import('../lib/db/import-actions');
 
     expect(typeof importActions.retryImport).toBe('function');
+  });
+
+  test('should export rollbackCompletedImport function', async () => {
+    const importActions = await import('../lib/db/import-actions');
+
+    expect(typeof importActions.rollbackCompletedImport).toBe('function');
   });
 });
 
@@ -535,6 +542,50 @@ describe('Import Actions - Error Propagation', () => {
   });
 });
 
+describe('Import Actions - rollbackCompletedImport (#735)', () => {
+  test('should call import-helper rollbackCompletedImport with jobId', async () => {
+    const { rollbackCompletedImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.rollbackCompletedImport as jest.Mock).mockResolvedValue({ success: true });
+
+    const result = await rollbackCompletedImport('job-completed-123');
+
+    expect(importHelper.rollbackCompletedImport).toHaveBeenCalledWith('job-completed-123');
+    expect(result).toEqual({ success: true });
+  });
+
+  test('should return error when rollback fails', async () => {
+    const { rollbackCompletedImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.rollbackCompletedImport as jest.Mock).mockResolvedValue({
+      success: false,
+      error: 'No project ID associated with this import'
+    });
+
+    const result = await rollbackCompletedImport('job-completed');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('No project ID associated with this import');
+  });
+
+  test('should only allow rollback when import is completed', async () => {
+    const { rollbackCompletedImport } = await import('../lib/db/import-actions');
+    const importHelper = await import('../lib/db/import-helper');
+
+    (importHelper.rollbackCompletedImport as jest.Mock).mockResolvedValue({
+      success: false,
+      error: 'Rollback of completed import is only allowed when the import has been committed (current state: pending-approval)'
+    });
+
+    const result = await rollbackCompletedImport('job-pending');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('only allowed when');
+  });
+});
+
 describe('Import Actions - Real-World Scenarios', () => {
   test('should handle complete import workflow', async () => {
     const { startImport, getImportStatus } = await import('../lib/db/import-actions');
@@ -669,5 +720,5 @@ describe('Import Actions - Real-World Scenarios', () => {
   });
 });
 
-console.log('✅ Import Actions tests defined - 35 tests total');
+console.log('✅ Import Actions tests defined - 38 tests total');
 
