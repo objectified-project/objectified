@@ -196,17 +196,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 #### 4.6 Import Execution 📋 PLANNED
 
-##### Real-Time Feedback ✅ PARTIALLY IMPLEMENTED
-- ✅ **Live Log**: Streaming import log
-- ✅ **Success Indicators**: Green checkmarks for completed
-- ✅ **Warning Indicators**: Yellow for non-critical issues
-- ✅ **Error Indicators**: Red for failures with details
-- 📋 **Skip Indicators**: Gray for intentionally skipped items
-
-| Ticket | Feature Description            |
-|--------|--------------------------------|
-| #732   | Indicate skipped items in gray |
-
 ##### Error Handling
 - ✅ **Graceful Degradation**: Continue on non-critical errors
 - ✅ **Error Recovery**: Retry failed operations
@@ -549,6 +538,15 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Schema Tree View**: Hierarchical view of all schemas
 - ✅ **Property Listing**: Expandable property details
 - ✅ **Relationship Diagram**: Preview of schema relationships (#578)
+
+#### 4.6 Import Execution ✅ IMPLEMENTED
+
+##### Real-Time Feedback ✅ IMPLEMENTED
+- ✅ **Live Log**: Streaming import log
+- ✅ **Success Indicators**: Green checkmarks for completed
+- ✅ **Warning Indicators**: Yellow for non-critical issues
+- ✅ **Error Indicators**: Red for failures with details
+- ✅ **Skip Indicators**: Gray for intentionally skipped items
 
 ---
 

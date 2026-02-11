@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import * as Progress from '@radix-ui/react-progress';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
-import { AlertCircle, CheckCircle2, Info, XCircle, Pause, RotateCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, XCircle, Pause, RotateCw, MinusCircle } from 'lucide-react';
 import { cancelImport, getImportStatus, commitImport, rollbackImport, retryImport } from '../../../../../lib/db/import-actions';
-import { getErrorEvents, formatEventContext, getLiveProgressRowClasses, getImportLogLineClasses } from '../../../../../lib/import-execution-error-indicators';
+import { getErrorEvents, formatEventContext, getLiveProgressRowClasses, getImportLogLineClasses, isSkippedEvent } from '../../../../../lib/import-execution-error-indicators';
 
 interface ImportExecutionPanelProps {
   jobId: string;
@@ -326,11 +326,15 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Live Progress</h3>
           <div className="max-h-[320px] overflow-y-auto space-y-2">
             {events.slice().reverse().map(ev => (
-              <div key={ev.id} className={getLiveProgressRowClasses(ev.level)}>
-                {levelIcon(ev.level)}
+              <div key={ev.id} className={getLiveProgressRowClasses(ev)}>
+                {isSkippedEvent(ev) ? (
+                  <MinusCircle className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" aria-label="Skipped" title="Intentionally skipped" />
+                ) : (
+                  levelIcon(ev.level)
+                )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{new Date(ev.ts).toLocaleTimeString()} • {ev.code}</div>
-                  <div className={`text-sm ${ev.level === 'error' ? 'text-red-900 dark:text-red-100 font-medium' : 'text-gray-900 dark:text-gray-100'}`}>{ev.message}</div>
+                  <div className={`text-xs ${isSkippedEvent(ev) ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>{new Date(ev.ts).toLocaleTimeString()} • {ev.code}</div>
+                  <div className={`text-sm ${ev.level === 'error' ? 'text-red-900 dark:text-red-100 font-medium' : isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>{ev.message}</div>
                   {ev.context != null && (
                     <pre className="mt-1 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-24">
                       {formatEventContext(ev.context)}
@@ -347,10 +351,10 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Log</h3>
           <div className="max-h-[320px] overflow-y-auto space-y-1">
             {events.map(ev => (
-              <div key={ev.id} className={getImportLogLineClasses(ev.level)}>
-                <span className="mr-2 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300">{new Date(ev.ts).toLocaleTimeString()}</span>
-                <span className={`mr-2 font-semibold ${ev.level === 'error' ? 'text-red-600 dark:text-red-400' : ev.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>[{ev.level.toUpperCase()}]</span>
-                <span className={ev.level === 'error' ? 'text-red-900 dark:text-red-100' : 'text-gray-800 dark:text-gray-200'}>{ev.message}</span>
+              <div key={ev.id} className={getImportLogLineClasses(ev)}>
+                <span className={`mr-2 px-1.5 py-0.5 rounded ${isSkippedEvent(ev) ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400' : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'}`}>{new Date(ev.ts).toLocaleTimeString()}</span>
+                <span className={`mr-2 font-semibold ${isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : ev.level === 'error' ? 'text-red-600 dark:text-red-400' : ev.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>{isSkippedEvent(ev) ? '[SKIPPED]' : `[${ev.level.toUpperCase()}]`}</span>
+                <span className={isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : ev.level === 'error' ? 'text-red-900 dark:text-red-100' : 'text-gray-800 dark:text-gray-200'}>{ev.message}</span>
                 {ev.level === 'error' && ev.context != null && (
                   <pre className="mt-1.5 ml-0 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-20 border border-red-200 dark:border-red-800">
                     {formatEventContext(ev.context)}
