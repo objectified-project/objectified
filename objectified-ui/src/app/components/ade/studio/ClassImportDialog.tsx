@@ -396,6 +396,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         classPrefix: classPrefix.trim() || undefined,
         classSuffix: classSuffix.trim() || undefined,
         typeMapping: Object.keys(typeMapping).length > 0 ? typeMapping : undefined,
+        requiredOverrides: undefined,
       });
       setImportResult(result);
       setCurrentStep('done');

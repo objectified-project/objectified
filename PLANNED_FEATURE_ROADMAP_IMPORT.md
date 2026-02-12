@@ -102,13 +102,12 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### Property Mapping 📋 PLANNED
 - ✅ **Type Mapping**: Map external types to internal types
 - ✅ **Default Value Assignment**: Set defaults during import
-- 📋 **Required Field Override**: Modify required status
+- ✅ **Required Field Override**: Modify required status
 - 📋 **Description Enhancement**: Add/modify descriptions
 - 📋 **Example Generation**: Auto-generate missing examples
 
 | Ticket | Feature Description                             |
 |--------|-------------------------------------------------|
-| #759   | Required field override for imported properties |
 | #760   | Description enhancement for imported properties |
 | #761   | Example generation for imported properties      |
 

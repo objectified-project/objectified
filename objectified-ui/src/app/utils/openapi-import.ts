@@ -220,9 +220,10 @@ function resolveAllOf(schema: any, schemas: any): any {
 
 /**
  * Extracts only the properties directly defined in this schema (not from $ref)
- * For allOf schemas, returns only properties from inline object definitions
+ * For allOf schemas, returns only properties from inline object definitions.
+ * Exported for import mapping UI (e.g. required override #759).
  */
-function extractDirectProperties(schema: any): { properties: any; required: string[] } {
+export function extractDirectProperties(schema: any): { properties: any; required: string[] } {
   const result = {
     properties: {},
     required: [] as string[]

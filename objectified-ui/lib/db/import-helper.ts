@@ -82,6 +82,8 @@ export interface ImportJobInput {
     typeMapping?: Record<string, any>;
     /** Optional default values per type during import (#758). Key = external type key (e.g. "string", "integer"). */
     defaultValues?: Record<string, any>;
+    /** Optional required field overrides per schema/property during import (#759). schema key -> { property name -> boolean }. */
+    requiredOverrides?: Record<string, Record<string, boolean>>;
     dryRun?: boolean;
     /** When true, commit each class separately and skip failures (no single transaction). */
     incrementalMode?: boolean;
@@ -489,6 +491,7 @@ export async function startImport(input: ImportJobInput) {
           classSuffix: input.options.classSuffix,
           typeMapping: input.options.typeMapping,
           defaultValues: input.options.defaultValues,
+          requiredOverrides: input.options.requiredOverrides,
         },
       });
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));

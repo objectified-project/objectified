@@ -44,6 +44,11 @@ export interface NormalizeOptions {
    * When a property has no `default` in the spec, the value for its type key is applied as the property default.
    */
   defaultValues?: Record<string, any>;
+  /**
+   * Optional required field overrides during import (#759). Key = schema key (e.g. components/schemas key),
+   * value = map of property name -> boolean (true = required, false = optional). Applied before naming convention.
+   */
+  requiredOverrides?: Record<string, Record<string, boolean>>;
 }
 
 export interface NormalizeResult {

@@ -188,15 +188,32 @@ export const openApiImporter: Importer = {
 
     if (classes.length === 0) warnings.push('No selected schemas to import.');
 
+    // Required field override (#759): apply before naming so we key by original schema + property name
+    const requiredOverrides = options.requiredOverrides;
+    let classesAfterRequired = classes;
+    if (requiredOverrides && Object.keys(requiredOverrides).length > 0) {
+      classesAfterRequired = classes.map((cls) => {
+        const schemaKey = cls.originalSchemaKey ?? cls.name;
+        const overrides = requiredOverrides[schemaKey];
+        if (!overrides || typeof overrides !== 'object') return cls;
+        const newProps = (cls.properties ?? []).map((p) => {
+          if (overrides[p.name] === undefined) return p;
+          const data = p.data && typeof p.data === 'object' ? { ...p.data, required: Boolean(overrides[p.name]) } : p.data;
+          return { ...p, data };
+        });
+        return { ...cls, properties: newProps };
+      });
+    }
+
     // Apply naming convention enforcement (#581)
     const applyNaming = options.applyNamingConvention === true;
     let finalClasses = applyNaming
-      ? applyNamingConventionToClasses(classes, {
+      ? applyNamingConventionToClasses(classesAfterRequired, {
           classNamingConvention: options.classNamingConvention ?? 'PascalCase',
           propertyNamingConvention: options.propertyNamingConvention ?? 'camelCase',
           applyNamingConvention: true,
         })
-      : classes;
+      : classesAfterRequired;
 
     // Apply prefix/suffix rules to class names (#755)
     const prefix = (options.classPrefix ?? '').trim();

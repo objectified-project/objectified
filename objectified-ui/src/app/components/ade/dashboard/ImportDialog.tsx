@@ -354,6 +354,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         classSuffix: (importOptions.classSuffix ?? '').trim() || undefined,
         typeMapping: importOptions.typeMapping,
         defaultValues: importOptions.defaultValues,
+        requiredOverrides: importOptions.requiredOverrides,
         dryRun: importOptions.dryRun ?? false,
         incrementalMode: importOptions.incrementalMode ?? false
       }
