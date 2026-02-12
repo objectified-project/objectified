@@ -33,6 +33,12 @@ export interface NormalizeOptions {
   classPrefix?: string;
   /** Optional suffix applied to every class name after naming convention (#755). */
   classSuffix?: string;
+  /**
+   * Optional type mapping: external type key → internal JSON Schema for property data (#757).
+   * Key format: "type" or "type:format" (e.g. "string", "string:date-time", "integer:int32").
+   * When present, properties with that external type are replaced with the internal schema (required preserved).
+   */
+  typeMapping?: Record<string, any>;
 }
 
 export interface NormalizeResult {

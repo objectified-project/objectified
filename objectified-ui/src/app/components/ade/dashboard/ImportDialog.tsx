@@ -352,6 +352,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         classNameMap: importOptions.classNameMap,
         classPrefix: (importOptions.classPrefix ?? '').trim() || undefined,
         classSuffix: (importOptions.classSuffix ?? '').trim() || undefined,
+        typeMapping: importOptions.typeMapping,
         dryRun: importOptions.dryRun ?? false,
         incrementalMode: importOptions.incrementalMode ?? false
       }

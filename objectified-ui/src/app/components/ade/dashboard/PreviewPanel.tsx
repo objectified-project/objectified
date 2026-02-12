@@ -6,6 +6,7 @@ import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
 import { buildSchemaTree, buildRelationshipDiagramEdges, extractSchemaReferences, getSchemaType, getSchemaTags, type SchemaTreeNode, type SchemaDisplayType } from '../../../utils/schema-tree-utils';
 import { getSmartClassName } from '../../../../../lib/schema-context-naming';
+import { collectExternalTypeKeysFromDocument } from '../../../../../lib/importers/openapi';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
@@ -55,6 +56,8 @@ export interface ImportOptions {
   incrementalMode?: boolean;
   /** Optional map: schema key → class name override for import (#754). */
   classNameMap?: Record<string, string>;
+  /** Optional type mapping: external type key → internal JSON Schema (#757). */
+  typeMapping?: Record<string, any>;
 }
 
 interface SchemaInfo {
@@ -67,6 +70,22 @@ interface SchemaInfo {
 }
 
 const MAX_ENUM_DISPLAY = 4;
+
+/** Internal type options for type mapping (#757). Value is schema to apply; null = keep as-is. */
+const INTERNAL_TYPE_OPTIONS: { value: string; label: string; schema: any }[] = [
+  { value: '__keep__', label: 'Keep as-is', schema: null as any },
+  { value: 'string', label: 'string', schema: { type: 'string' } },
+  { value: 'string:date-time', label: 'string (date-time)', schema: { type: 'string', format: 'date-time' } },
+  { value: 'string:date', label: 'string (date)', schema: { type: 'string', format: 'date' } },
+  { value: 'string:uuid', label: 'string (uuid)', schema: { type: 'string', format: 'uuid' } },
+  { value: 'integer', label: 'integer', schema: { type: 'integer' } },
+  { value: 'integer:int32', label: 'integer (int32)', schema: { type: 'integer', format: 'int32' } },
+  { value: 'integer:int64', label: 'integer (int64)', schema: { type: 'integer', format: 'int64' } },
+  { value: 'number', label: 'number', schema: { type: 'number' } },
+  { value: 'number:float', label: 'number (float)', schema: { type: 'number', format: 'float' } },
+  { value: 'number:double', label: 'number (double)', schema: { type: 'number', format: 'double' } },
+  { value: 'boolean', label: 'boolean', schema: { type: 'boolean' } },
+];
 
 // Helper function to count properties including those from allOf/oneOf/anyOf
 function countSchemaProperties(schema: any): number {
@@ -455,7 +474,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       propertyNamingConvention: 'camelCase',
       classPrefix: '',
       classSuffix: '',
-      dryRun: false
+      dryRun: false,
+      typeMapping: undefined
     };
   });
 
@@ -510,6 +530,12 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       : undefined;
     return buildSchemaTree(schemaObj, allSchemaNames, nameFilter);
   }, [analysis.document, searchFilter, filterType, filterTag, schemas]);
+
+  /** External type keys present in selected schemas for type mapping (#757). */
+  const externalTypeKeys = useMemo(
+    () => collectExternalTypeKeysFromDocument(analysis.document, importOptions.selectedSchemas),
+    [analysis.document, importOptions.selectedSchemas]
+  );
 
   const toggleExpanded = (name: string) => {
     setExpandedSchemaNames((prev) =>
@@ -658,6 +684,20 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     // Only allow: 0-9, A-Z, a-z, ., -
     const sanitized = version.replace(/[^0-9A-Za-z.\-]/g, '');
     const newOptions = { ...importOptions, targetVersion: sanitized };
+    setImportOptions(newOptions);
+    onImportOptionsChange?.(newOptions);
+  };
+
+  /** Update type mapping for an external type (#757). null = keep as-is (remove mapping). */
+  const handleTypeMappingChange = (externalKey: string, internalValue: string) => {
+    const nextMap = { ...(importOptions.typeMapping || {}) };
+    if (internalValue === '__keep__') {
+      delete nextMap[externalKey];
+    } else {
+      const option = INTERNAL_TYPE_OPTIONS.find((o) => o.value === internalValue);
+      if (option && option.schema) nextMap[externalKey] = option.schema;
+    }
+    const newOptions = { ...importOptions, typeMapping: Object.keys(nextMap).length > 0 ? nextMap : undefined };
     setImportOptions(newOptions);
     onImportOptionsChange?.(newOptions);
   };
@@ -1486,6 +1526,60 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
               Prefix and suffix are applied to every imported class name (e.g. Api + User + Dto → ApiUserDto).
             </p>
           </div>
+
+          {/* Type mapping: map external types to internal types (#757) */}
+          {externalTypeKeys.length > 0 && (
+            <div className="col-span-4 flex flex-col gap-3 pt-2">
+              <Collapsible defaultOpen={false} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                  <span>Type mapping</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 data-[state=open]:rotate-180 transition-transform" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Map external types from the spec to internal types for imported properties.
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-gray-600">
+                            <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">External type</th>
+                            <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Map to</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {externalTypeKeys.map((externalKey) => {
+                            const currentMapped = importOptions.typeMapping?.[externalKey];
+                            const currentValue = currentMapped
+                              ? INTERNAL_TYPE_OPTIONS.find((o) => o.schema && JSON.stringify(o.schema) === JSON.stringify(currentMapped))?.value ?? '__keep__'
+                              : '__keep__';
+                            return (
+                              <tr key={externalKey} className="border-b border-gray-100 dark:border-gray-700/50">
+                                <td className="py-2 text-gray-900 dark:text-white font-mono text-xs">{externalKey}</td>
+                                <td className="py-2">
+                                  <select
+                                    value={currentValue}
+                                    onChange={(e) => handleTypeMappingChange(externalKey, e.target.value)}
+                                    className="w-full max-w-[220px] px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                  >
+                                    <option value="__keep__">Keep as-is</option>
+                                    {INTERNAL_TYPE_OPTIONS.filter((o) => o.value !== '__keep__').map((o) => (
+                                      <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
 
           {/* Dry run: preview without committing */}
           <div className="col-span-4 flex items-start gap-3 pt-2">

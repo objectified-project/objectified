@@ -100,7 +100,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
 ##### Property Mapping 📋 PLANNED
-- 📋 **Type Mapping**: Map external types to internal types
+- ✅ **Type Mapping**: Map external types to internal types
 - 📋 **Default Value Assignment**: Set defaults during import
 - 📋 **Required Field Override**: Modify required status
 - 📋 **Description Enhancement**: Add/modify descriptions
@@ -108,7 +108,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description                             |
 |--------|-------------------------------------------------|
-| #757   | Type mapping for imported properties            |
 | #758   | Default value assignment during import          |
 | #759   | Required field override for imported properties |
 | #760   | Description enhancement for imported properties |

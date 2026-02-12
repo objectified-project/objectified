@@ -37,6 +37,65 @@ const extractDirectProperties = (schema: any): { properties: Record<string, any>
   return result;
 };
 
+/** Build external type key from property data for type mapping (#757). Returns null for refs or missing type. */
+export function getExternalTypeKey(data: any): string | null {
+  if (!data || typeof data !== 'object' || data.$ref) return null;
+  const t = data.type;
+  if (!t || typeof t !== 'string') return null;
+  const f = data.format;
+  return f && typeof f === 'string' ? `${t}:${f}` : t;
+}
+
+/** Apply type mapping to a single property data object (recurses into items). Refs are not modified. */
+function applyTypeMappingToData(data: any, typeMapping: Record<string, any>): any {
+  if (!data || typeof data !== 'object') return data;
+  if (data.$ref) return data;
+  const next = { ...data };
+  if (next.items && typeof next.items === 'object') {
+    next.items = applyTypeMappingToData(next.items, typeMapping);
+  }
+  const key = getExternalTypeKey(next);
+  if (key && typeMapping[key]) {
+    const internal = typeMapping[key];
+    const merged = typeof internal === 'object' && internal !== null ? { ...internal } : { type: internal };
+    if (next.required !== undefined) merged.required = next.required;
+    return merged;
+  }
+  return next;
+}
+
+/** Apply type mapping to a normalized property and its children. */
+function applyTypeMappingToProperty(p: NormalizedProperty, typeMapping: Record<string, any>): NormalizedProperty {
+  const data = applyTypeMappingToData(p.data, typeMapping);
+  const children = p.children?.map((c) => applyTypeMappingToProperty(c, typeMapping));
+  return { ...p, data, children };
+}
+
+/** Recursively collect external type keys from a property schema. */
+function collectKeysFromProp(prop: any, keys: Set<string>): void {
+  if (!prop || typeof prop !== 'object') return;
+  if (prop.$ref) return;
+  const key = getExternalTypeKey(prop);
+  if (key) keys.add(key);
+  if (prop.type === 'object' && prop.properties) {
+    for (const child of Object.values(prop.properties)) collectKeysFromProp(child as any, keys);
+  }
+  if (prop.type === 'array' && prop.items) collectKeysFromProp(prop.items, keys);
+}
+
+/** Collect all external type keys present in the given document for selected schemas (#757). */
+export function collectExternalTypeKeysFromDocument(document: any, selectedSchemas: string[]): string[] {
+  const schemas = document?.components?.schemas || {};
+  const selected = new Set(selectedSchemas);
+  const keys = new Set<string>();
+  for (const [schemaName, schema] of Object.entries<any>(schemas)) {
+    if (!selected.has(schemaName)) continue;
+    const { properties } = extractDirectProperties(schema);
+    for (const prop of Object.values(properties)) collectKeysFromProp(prop, keys);
+  }
+  return Array.from(keys).sort();
+}
+
 const convertProperty = (propName: string, propSchema: any, required: string[] = []): NormalizedProperty => {
   const data: any = { ...propSchema };
   const description = data.description;
@@ -162,7 +221,17 @@ export const openApiImporter: Importer = {
     // Reserved name detection (#756): warn on class and property names that conflict with keywords
     warnings.push(...collectReservedNameWarnings(finalClasses));
 
-    return { classes: finalClasses, warnings };
+    // Type mapping (#757): map external types to internal types for imported properties
+    const typeMapping = options.typeMapping;
+    const classesWithTypeMapping =
+      typeMapping && Object.keys(typeMapping).length > 0
+        ? finalClasses.map((cls) => ({
+            ...cls,
+            properties: (cls.properties ?? []).map((p) => applyTypeMappingToProperty(p, typeMapping)),
+          }))
+        : finalClasses;
+
+    return { classes: classesWithTypeMapping, warnings };
   }
 };
 

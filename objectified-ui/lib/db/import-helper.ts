@@ -78,6 +78,8 @@ export interface ImportJobInput {
     classPrefix?: string;
     /** Optional suffix applied to every class name after naming convention (#755) */
     classSuffix?: string;
+    /** Optional type mapping: external type key → internal JSON Schema (#757) */
+    typeMapping?: Record<string, any>;
     dryRun?: boolean;
     /** When true, commit each class separately and skip failures (no single transaction). */
     incrementalMode?: boolean;
@@ -483,6 +485,7 @@ export async function startImport(input: ImportJobInput) {
           classNameMap: input.options.classNameMap,
           classPrefix: input.options.classPrefix,
           classSuffix: input.options.classSuffix,
+          typeMapping: input.options.typeMapping,
         },
       });
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));

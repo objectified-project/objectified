@@ -21,6 +21,11 @@ export interface ImportClassesInput {
   classPrefix?: string;
   /** Optional suffix applied to every class name after naming convention (#755). */
   classSuffix?: string;
+  /**
+   * Optional type mapping: external type key → internal JSON Schema (#757).
+   * Key format: "type" or "type:format" (e.g. "string:date-time", "integer:int32").
+   */
+  typeMapping?: Record<string, any>;
 }
 
 export interface ImportClassesResult {
@@ -113,6 +118,7 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
         classNameMap: input.classNameMap,
         classPrefix: input.classPrefix,
         classSuffix: input.classSuffix,
+        typeMapping: input.typeMapping,
       },
     });
     if (norm.warnings.length) {

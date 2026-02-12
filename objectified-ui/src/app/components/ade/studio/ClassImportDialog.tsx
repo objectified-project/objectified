@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, Link2, FileText, Github } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Upload, X, FileCode, AlertTriangle, CheckCircle2, Package, Search, Check, ChevronRight, ArrowUpAZ, ArrowDownAZ, Link2, FileText, Github, ChevronDown } from 'lucide-react';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import {
   Dialog,
@@ -9,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../ui/Dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/Collapsible';
+import { collectExternalTypeKeysFromDocument } from '../../../../../lib/importers/openapi';
 import { Button } from '../../ui/Button';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/db/class-import-actions';
@@ -82,6 +84,22 @@ function countSchemaProperties(schema: any): number {
   return count;
 }
 
+/** Internal type options for type mapping (#757). */
+const INTERNAL_TYPE_OPTIONS: { value: string; label: string; schema: any }[] = [
+  { value: '__keep__', label: 'Keep as-is', schema: null as any },
+  { value: 'string', label: 'string', schema: { type: 'string' } },
+  { value: 'string:date-time', label: 'string (date-time)', schema: { type: 'string', format: 'date-time' } },
+  { value: 'string:date', label: 'string (date)', schema: { type: 'string', format: 'date' } },
+  { value: 'string:uuid', label: 'string (uuid)', schema: { type: 'string', format: 'uuid' } },
+  { value: 'integer', label: 'integer', schema: { type: 'integer' } },
+  { value: 'integer:int32', label: 'integer (int32)', schema: { type: 'integer', format: 'int32' } },
+  { value: 'integer:int64', label: 'integer (int64)', schema: { type: 'integer', format: 'int64' } },
+  { value: 'number', label: 'number', schema: { type: 'number' } },
+  { value: 'number:float', label: 'number (float)', schema: { type: 'number', format: 'float' } },
+  { value: 'number:double', label: 'number (double)', schema: { type: 'number', format: 'double' } },
+  { value: 'boolean', label: 'boolean', schema: { type: 'boolean' } },
+];
+
 const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   open,
   onClose,
@@ -122,6 +140,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   /** Prefix/suffix applied to every class name after naming convention (#755). */
   const [classPrefix, setClassPrefix] = useState('');
   const [classSuffix, setClassSuffix] = useState('');
+  /** Type mapping: external type key → internal JSON Schema (#757). */
+  const [typeMapping, setTypeMapping] = useState<Record<string, any>>({});
 
   const existingNamesSet = new Set(existingClassNames.map(n => n.toLowerCase()));
 
@@ -375,6 +395,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         classNameMap: Object.keys(classNameMap).length > 0 ? classNameMap : undefined,
         classPrefix: classPrefix.trim() || undefined,
         classSuffix: classSuffix.trim() || undefined,
+        typeMapping: Object.keys(typeMapping).length > 0 ? typeMapping : undefined,
       });
       setImportResult(result);
       setCurrentStep('done');
@@ -410,6 +431,26 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const selectedCount = schemas.filter(s => s.selected && !s.exists).length;
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
+
+  const selectedSchemaNames = useMemo(
+    () => schemas.filter(s => s.selected && !s.exists).map(s => s.name),
+    [schemas]
+  );
+  const externalTypeKeys = useMemo(
+    () => (analysisResult?.document ? collectExternalTypeKeysFromDocument(analysisResult.document, selectedSchemaNames) : []),
+    [analysisResult?.document, selectedSchemaNames]
+  );
+
+  const handleTypeMappingChange = (externalKey: string, internalValue: string) => {
+    const next = { ...typeMapping };
+    if (internalValue === '__keep__') {
+      delete next[externalKey];
+    } else {
+      const option = INTERNAL_TYPE_OPTIONS.find((o) => o.value === internalValue);
+      if (option?.schema) next[externalKey] = option.schema;
+    }
+    setTypeMapping(next);
+  };
 
   const getPropertyType = (prop: any): string => {
     if (prop.$ref) {
@@ -1273,6 +1314,58 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 <p className="text-xs text-gray-500 dark:text-gray-400 pl-6 mt-1">
                   Prefix and suffix are applied to every imported class name (e.g. Api + User + Dto → ApiUserDto).
                 </p>
+                {externalTypeKeys.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <Collapsible defaultOpen={false} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <span>Type mapping (#757)</span>
+                        <ChevronDown className="h-4 w-4 shrink-0 data-[state=open]:rotate-180 transition-transform" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            Map external types to internal types for imported properties.
+                          </p>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-gray-200 dark:border-gray-600">
+                                  <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">External type</th>
+                                  <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Map to</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {externalTypeKeys.map((externalKey) => {
+                                  const currentMapped = typeMapping[externalKey];
+                                  const currentValue = currentMapped
+                                    ? INTERNAL_TYPE_OPTIONS.find((o) => o.schema && JSON.stringify(o.schema) === JSON.stringify(currentMapped))?.value ?? '__keep__'
+                                    : '__keep__';
+                                  return (
+                                    <tr key={externalKey} className="border-b border-gray-100 dark:border-gray-700/50">
+                                      <td className="py-2 text-gray-900 dark:text-white font-mono text-xs">{externalKey}</td>
+                                      <td className="py-2">
+                                        <select
+                                          value={currentValue}
+                                          onChange={(e) => handleTypeMappingChange(externalKey, e.target.value)}
+                                          className="w-full max-w-[220px] px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                        >
+                                          <option value="__keep__">Keep as-is</option>
+                                          {INTERNAL_TYPE_OPTIONS.filter((o) => o.value !== '__keep__').map((o) => (
+                                            <option key={o.value} value={o.value}>{o.label}</option>
+                                          ))}
+                                        </select>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )}
               </div>
             </div>
           )}
