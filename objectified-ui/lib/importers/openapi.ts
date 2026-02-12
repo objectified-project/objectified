@@ -71,6 +71,26 @@ function applyTypeMappingToProperty(p: NormalizedProperty, typeMapping: Record<s
   return { ...p, data, children };
 }
 
+/** Apply global default values to a property when it has no default (#758). Recurse into children and items. */
+function applyDefaultValuesToProperty(p: NormalizedProperty, defaultValues: Record<string, any>): NormalizedProperty {
+  if (!defaultValues || Object.keys(defaultValues).length === 0) return p;
+  const data = p.data && typeof p.data === 'object' ? { ...p.data } : p.data;
+  if (data && !data.$ref && data.default === undefined) {
+    const key = getExternalTypeKey(data);
+    if (key && key in defaultValues) {
+      data.default = defaultValues[key];
+    }
+  }
+  if (data?.items && typeof data.items === 'object' && !data.items.$ref && data.items.default === undefined) {
+    const key = getExternalTypeKey(data.items);
+    if (key && key in defaultValues) {
+      data.items = { ...data.items, default: defaultValues[key] };
+    }
+  }
+  const children = p.children?.map((c) => applyDefaultValuesToProperty(c, defaultValues));
+  return { ...p, data, children };
+}
+
 /** Recursively collect external type keys from a property schema. */
 function collectKeysFromProp(prop: any, keys: Set<string>): void {
   if (!prop || typeof prop !== 'object') return;
@@ -223,7 +243,7 @@ export const openApiImporter: Importer = {
 
     // Type mapping (#757): map external types to internal types for imported properties
     const typeMapping = options.typeMapping;
-    const classesWithTypeMapping =
+    let classesOut =
       typeMapping && Object.keys(typeMapping).length > 0
         ? finalClasses.map((cls) => ({
             ...cls,
@@ -231,7 +251,16 @@ export const openApiImporter: Importer = {
           }))
         : finalClasses;
 
-    return { classes: classesWithTypeMapping, warnings };
+    // Default value assignment (#758): set global defaults for properties that have no default
+    const defaultValues = options.defaultValues;
+    if (defaultValues && Object.keys(defaultValues).length > 0) {
+      classesOut = classesOut.map((cls) => ({
+        ...cls,
+        properties: (cls.properties ?? []).map((p) => applyDefaultValuesToProperty(p, defaultValues)),
+      }));
+    }
+
+    return { classes: classesOut, warnings };
   }
 };
 

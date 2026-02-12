@@ -111,6 +111,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Adds support to add prefix and suffix rules to names to apply consistent naming patterns
   - Adds reserved name detection in properties and class names
   - Adds the ability to map external types to internal types using type mapping during imports
+  - Adds default value assignment during imports by setting global defaults during import
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

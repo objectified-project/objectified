@@ -58,6 +58,8 @@ export interface ImportOptions {
   classNameMap?: Record<string, string>;
   /** Optional type mapping: external type key → internal JSON Schema (#757). */
   typeMapping?: Record<string, any>;
+  /** Optional default values per type during import (#758). Key = external type key (e.g. "string", "integer"). */
+  defaultValues?: Record<string, any>;
 }
 
 interface SchemaInfo {
@@ -475,7 +477,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       classPrefix: '',
       classSuffix: '',
       dryRun: false,
-      typeMapping: undefined
+      typeMapping: undefined,
+      defaultValues: undefined
     };
   });
 
@@ -1568,6 +1571,75 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                                       <option key={o.value} value={o.value}>{o.label}</option>
                                     ))}
                                   </select>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Default values: set defaults for properties that have none (#758) */}
+              <Collapsible defaultOpen={false} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                  <span>Default values</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 data-[state=open]:rotate-180 transition-transform" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Set a default value for properties that do not define one. Use JSON (e.g. &quot;&quot;, 0, false, null) or plain text for strings.
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-gray-600">
+                            <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Type</th>
+                            <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Default value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {externalTypeKeys.map((externalKey) => {
+                            const current = importOptions.defaultValues?.[externalKey];
+                            const displayValue =
+                              current === undefined || current === null
+                                ? ''
+                                : typeof current === 'string'
+                                  ? current
+                                  : JSON.stringify(current);
+                            return (
+                              <tr key={externalKey} className="border-b border-gray-100 dark:border-gray-700/50">
+                                <td className="py-2 text-gray-900 dark:text-white font-mono text-xs">{externalKey}</td>
+                                <td className="py-2">
+                                  <input
+                                    type="text"
+                                    value={displayValue}
+                                    onChange={(e) => {
+                                      const raw = e.target.value.trim();
+                                      let value: any = undefined;
+                                      if (raw !== '') {
+                                        try {
+                                          value = JSON.parse(raw);
+                                        } catch {
+                                          value = raw;
+                                        }
+                                      }
+                                      const next = { ...(importOptions.defaultValues || {}) };
+                                      if (value === undefined) delete next[externalKey];
+                                      else next[externalKey] = value;
+                                      const newOptions = {
+                                        ...importOptions,
+                                        defaultValues: Object.keys(next).length > 0 ? next : undefined
+                                      };
+                                      setImportOptions(newOptions);
+                                      onImportOptionsChange?.(newOptions);
+                                    }}
+                                    placeholder="(none)"
+                                    className="w-full max-w-[220px] px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                                  />
                                 </td>
                               </tr>
                             );

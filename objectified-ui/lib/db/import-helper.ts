@@ -80,6 +80,8 @@ export interface ImportJobInput {
     classSuffix?: string;
     /** Optional type mapping: external type key → internal JSON Schema (#757) */
     typeMapping?: Record<string, any>;
+    /** Optional default values per type during import (#758). Key = external type key (e.g. "string", "integer"). */
+    defaultValues?: Record<string, any>;
     dryRun?: boolean;
     /** When true, commit each class separately and skip failures (no single transaction). */
     incrementalMode?: boolean;
@@ -486,6 +488,7 @@ export async function startImport(input: ImportJobInput) {
           classPrefix: input.options.classPrefix,
           classSuffix: input.options.classSuffix,
           typeMapping: input.options.typeMapping,
+          defaultValues: input.options.defaultValues,
         },
       });
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));

@@ -26,6 +26,8 @@ export interface ImportClassesInput {
    * Key format: "type" or "type:format" (e.g. "string:date-time", "integer:int32").
    */
   typeMapping?: Record<string, any>;
+  /** Optional default values per type during import (#758). Key = external type key. */
+  defaultValues?: Record<string, any>;
 }
 
 export interface ImportClassesResult {
@@ -119,6 +121,7 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
         classPrefix: input.classPrefix,
         classSuffix: input.classSuffix,
         typeMapping: input.typeMapping,
+        defaultValues: input.defaultValues,
       },
     });
     if (norm.warnings.length) {

@@ -39,6 +39,11 @@ export interface NormalizeOptions {
    * When present, properties with that external type are replaced with the internal schema (required preserved).
    */
   typeMapping?: Record<string, any>;
+  /**
+   * Optional default values during import (#758). Key = external type key (e.g. "string", "integer").
+   * When a property has no `default` in the spec, the value for its type key is applied as the property default.
+   */
+  defaultValues?: Record<string, any>;
 }
 
 export interface NormalizeResult {
