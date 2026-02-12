@@ -99,17 +99,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### Schema Selection 📋 PARTIALLY IMPLEMENTED
 - [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
-##### Name Mapping 📋 PARTIALLY IMPLEMENTED
-- ✅ **Auto-Generated Names**: Smart naming from schema context
-- ✅ **Custom Name Override**: Manual name assignment
-- ✅ **Naming Convention Enforcement**: camelCase, PascalCase, etc.
-- ✅ **Prefix/Suffix Rules**: Apply consistent naming patterns
-- [TODO] **Reserved Name Detection**: Prevent conflicts with keywords
-
-| Ticket | Feature Description                          |
-|--------|----------------------------------------------|
-| #756   | Reserved name detection to prevent conflicts |
-
 ##### Property Mapping 📋 PLANNED
 - 📋 **Type Mapping**: Map external types to internal types
 - 📋 **Default Value Assignment**: Set defaults during import
@@ -537,6 +526,13 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Warning Indicators**: Yellow for non-critical issues
 - ✅ **Error Indicators**: Red for failures with details
 - ✅ **Skip Indicators**: Gray for intentionally skipped items
+
+##### Name Mapping ✅ IMPLEMENTED
+- ✅ **Auto-Generated Names**: Smart naming from schema context
+- ✅ **Custom Name Override**: Manual name assignment
+- ✅ **Naming Convention Enforcement**: camelCase, PascalCase, etc.
+- ✅ **Prefix/Suffix Rules**: Apply consistent naming patterns
+- ✅ **Reserved Name Detection**: Prevent conflicts with keywords (#756)
 
 ---
 

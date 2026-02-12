@@ -1304,6 +1304,21 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       {importResult.skippedCount} class{importResult.skippedCount !== 1 ? 'es were' : ' was'} skipped (already exist)
                     </p>
                   ) : null}
+                  {importResult.warnings && importResult.warnings.length > 0 ? (
+                    <div className="mt-4 w-full max-w-md rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-left">
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                        Warnings ({importResult.warnings.length})
+                      </p>
+                      <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-1">
+                        {importResult.warnings.slice(0, 10).map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                        {importResult.warnings.length > 10 ? (
+                          <li>+ {importResult.warnings.length - 10} more</li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <>

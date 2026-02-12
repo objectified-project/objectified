@@ -29,6 +29,8 @@ export interface ImportClassesResult {
   skippedCount?: number;
   error?: string;
   importedClasses?: string[];
+  /** Normalization warnings (e.g. reserved name detection #756). */
+  warnings?: string[];
 }
 
 // Stable JSON stringify that sorts object keys to ensure consistent signatures
@@ -204,6 +206,7 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
       importedCount: importedClasses.length,
       skippedCount,
       importedClasses,
+      warnings: norm.warnings.length > 0 ? norm.warnings : undefined,
     };
   } catch (error: any) {
     console.error('Error importing classes:', error);

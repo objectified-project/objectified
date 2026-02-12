@@ -1,6 +1,7 @@
 import { Importer, ImportSourceKind, NormalizeOptions, NormalizeResult, NormalizedClass, NormalizedProperty } from './index';
 import { applyNamingConventionToClasses } from '../../src/app/utils/naming-conventions';
 import { getSmartClassName } from '../schema-context-naming';
+import { collectReservedNameWarnings } from './reserved-names';
 
 // Utility: extract direct properties and nested inline children similar to src/app/utils/openapi-import.ts
 const extractDirectProperties = (schema: any): { properties: Record<string, any>; required: string[] } => {
@@ -157,6 +158,9 @@ export const openApiImporter: Importer = {
         properties: cls.properties?.map(transformProp) ?? cls.properties,
       }));
     }
+
+    // Reserved name detection (#756): warn on class and property names that conflict with keywords
+    warnings.push(...collectReservedNameWarnings(finalClasses));
 
     return { classes: finalClasses, warnings };
   }
