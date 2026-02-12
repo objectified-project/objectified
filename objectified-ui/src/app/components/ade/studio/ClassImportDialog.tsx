@@ -18,6 +18,7 @@ import UrlImportPanel from '../dashboard/UrlImportPanel';
 import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 import GitImportPanel from '../dashboard/GitImportPanel';
 import { ConflictReport, type ImportConflict } from '../dashboard/ConflictReport';
+import { isDuplicateSchema } from '../../../utils/schema-definition-equal';
 import {
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
@@ -34,6 +35,8 @@ interface ClassImportDialogProps {
   versionId: string;
   projectId: string;
   existingClassNames: string[];
+  /** Map of lowercase class name -> schema for duplicate definition detection (#582). When provided, duplicate_schema is only reported when same name has a different definition. */
+  existingClassSchemas?: Record<string, any>;
   userId: string;
 }
 
@@ -108,6 +111,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   versionId,
   projectId,
   existingClassNames,
+  existingClassSchemas,
   userId,
 }) => {
   const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'select' | 'importing' | 'done'>('source');
@@ -143,8 +147,6 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [classSuffix, setClassSuffix] = useState('');
   /** Type mapping: external type key → internal JSON Schema (#757). */
   const [typeMapping, setTypeMapping] = useState<Record<string, any>>({});
-
-  const existingNamesSet = new Set(existingClassNames.map(n => n.toLowerCase()));
 
   const handleSourceClick = (source: 'file' | 'url' | 'clipboard' | 'git') => {
     setSelectedSource(source);
@@ -214,11 +216,11 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       const result = await analyzeSpecification(content, filename);
       setAnalysisResult(result);
 
-      // Initialize schemas list with conflict detection (#580: include type and tags for filtering)
+      // Initialize schemas list with conflict detection (#580, #582: duplicate = same name + different definition)
       const schemaObj = result.document?.components?.schemas || result.document?.definitions || {};
       const schemaList: SchemaInfo[] = Object.keys(schemaObj).map(name => {
         const raw = schemaObj[name];
-        const exists = existingNamesSet.has(name.toLowerCase());
+        const exists = isDuplicateSchema(name, raw, existingClassNames, existingClassSchemas);
         return {
           name,
           properties: countSchemaProperties(raw),
@@ -247,11 +249,11 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       const result = await analyzeSpecification(content, filename);
       setAnalysisResult(result);
 
-      // Initialize schemas list with conflict detection (#580: include type and tags for filtering)
+      // Initialize schemas list with conflict detection (#580, #582: duplicate = same name + different definition)
       const schemaObj = result.document?.components?.schemas || result.document?.definitions || {};
       const schemaList: SchemaInfo[] = Object.keys(schemaObj).map(name => {
         const raw = schemaObj[name];
-        const exists = existingNamesSet.has(name.toLowerCase());
+        const exists = isDuplicateSchema(name, raw, existingClassNames, existingClassSchemas);
         return {
           name,
           properties: countSchemaProperties(raw),
@@ -434,7 +436,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
 
-  /** Conflict report data for #596: overview of all detected conflicts; #597: impact if resolved */
+  /** Conflict report data for #596: overview of all detected conflicts; #582: same name, different definition; #597: impact if resolved */
   const conflictReportItems: ImportConflict[] = useMemo(
     () =>
       schemas
@@ -442,7 +444,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         .map((s) => ({
           kind: 'duplicate_schema' as const,
           schemaName: s.name,
-          message: `A class named "${s.name}" already exists in this version. Importing will overwrite or you can rename.`,
+          message: `A class named "${s.name}" already exists with a different definition. Importing will overwrite or you can rename.`,
           impactIfResolved:
             'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. You cannot import with the same name.',
         })),

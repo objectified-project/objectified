@@ -45,17 +45,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 |--------|------------------------------------|
 | #496   | Adds OpenAPI 3.0 support           |
 
-##### JSON Schema
-- [TODO] **JSON Schema Draft 2020-12**: Latest specification
-- [TODO] **JSON Schema Draft 07**: Common enterprise format
-- [TODO] **JSON Schema Draft 04**: Legacy support
-- [TODO] **Bundled Schemas**: Multi-schema documents
-
-##### Data Formats
-- [TODO] **YAML**: Full YAML 1.2 support with anchors/aliases
-- [TODO] **JSON**: Standard JSON with comments support (JSONC)
-- [TODO] **JSON5**: Extended JSON format support
-
 ##### Schema Import/Export
 
 **Import From** 📋 PLANNED
@@ -84,25 +73,10 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #240   | Import from Thrift          |
 | #299   | Import from Arazzo          |
 
-#### 4.3 Pre-Import Analysis 📋 PLANNED
-
-##### Compatibility Check
-- [TODO] **Security Scheme Analysis**: Identify auth requirements
-- [TODO] **Breaking Change Detection**: Compare with existing version
-
-#### 4.4 Import Preview & Mapping 📋 PLANNED
-
-##### Visual Preview
-- [TODO] **Side-by-Side Comparison**: Compare with existing schemas
-- [TODO] **Diff Highlighting**: Visual diff for updates
-
-##### Schema Selection 📋 PARTIALLY IMPLEMENTED
-- [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
-
 #### 4.5 Conflict Resolution 📋 PLANNED
 
 ##### Conflict Detection
-- 📋 **Duplicate Schema Detection**: Same name, different definition
+- ✅ **Duplicate Schema Detection**: Same name, different definition
 - 📋 **Property Conflicts**: Incompatible property definitions
 - 📋 **Reference Conflicts**: Broken or ambiguous references
 - 📋 **Type Mismatches**: Incompatible type assignments
@@ -110,7 +84,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description                       |
 |--------|-------------------------------------------|
-| #582   | Detect duplicate schemas by name          |
 | #583   | Detect property definition conflicts      |
 | #584   | Detect broken or ambiguous references     |
 | #585   | Detect incompatible type assignments      |
@@ -145,17 +118,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #594   | Deep merge for nested objects                        |
 | #595   | Array merge strategies: append, replace, deduplicate |
 
-##### Conflict Report
-- ✅ **Conflict Summary**: Overview of all detected conflicts
-- ✅ **Impact Analysis**: What will change if resolved
-- [TODO] **Resolution Recommendations**: AI-suggested resolutions
-- [TODO] **Batch Resolution**: Apply same strategy to similar conflicts
-- 📋 **Conflict Export**: Export conflict report for review
-
-| Ticket | Feature Description                     |
-|--------|-----------------------------------------|
-| #598   | Conflict export for review              |
-
 #### 4.6 Import Execution 📋 PLANNED
 
 ##### Error Handling
@@ -168,15 +130,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
 | #737   | One-click support ticket creation    |
-
-#### 4.7 Post-Import Actions 📋 PLANNED
-
-##### Follow-Up Actions 📋 PLANNED
-- ✅ **Open in Canvas**: Navigate to imported schemas
-- [TODO] **Generate Documentation**: Create docs from import
-- [TODO] **Share Import Report**: Send summary to team
-- [TODO] **Schedule Re-Import**: Set up recurring import
-- [TODO] **Export Transformed**: Export in different format
 
 #### 4.11 Import Flow UI Design 📋 PLANNED
 
@@ -524,6 +477,11 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Description Enhancement**: Add/modify property descriptions during import
 - ✅ **Example Generation**: Auto-generate missing examples
 
+##### Conflict Report
+- ✅ **Conflict Summary**: Overview of all detected conflicts
+- ✅ **Impact Analysis**: What will change if resolved
+- ✅ **Conflict Export**: Export conflict report for review
+
 ---
 
 ## Suggested Enterprise Improvements
@@ -865,3 +823,44 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - [TODO] **TypeORM / Sequelize Model Import**: Parse TypeScript/JavaScript ORM model definitions and extract schemas
 - [TODO] **Table Selection**: When importing from a database, show a table browser with search/filter and allow selecting which tables to import
 - [TODO] **Column-to-Property Type Mapping**: Configurable mapping from database column types to JSON Schema types (e.g., `VARCHAR(255)` → `string` with `maxLength: 255`, `TIMESTAMP` → `string` with `format: date-time`)
+
+
+#### 4.3 Pre-Import Analysis 📋 PLANNED
+
+##### Compatibility Check
+- [TODO] **Security Scheme Analysis**: Identify auth requirements
+- [TODO] **Breaking Change Detection**: Compare with existing version
+
+#### 4.4 Import Preview & Mapping 📋 PLANNED
+
+##### Visual Preview
+- [TODO] **Side-by-Side Comparison**: Compare with existing schemas
+- [TODO] **Diff Highlighting**: Visual diff for updates
+
+##### Schema Selection 📋 PARTIALLY IMPLEMENTED
+- [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
+
+#### 4.2 Supported Formats ✅ PARTIALLY IMPLEMENTED
+
+##### JSON Schema
+- [TODO] **JSON Schema Draft 2020-12**: Latest specification
+- [TODO] **JSON Schema Draft 07**: Common enterprise format
+- [TODO] **JSON Schema Draft 04**: Legacy support
+- [TODO] **Bundled Schemas**: Multi-schema documents
+
+##### Data Formats
+- [TODO] **YAML**: Full YAML 1.2 support with anchors/aliases
+- [TODO] **JSON**: Standard JSON with comments support (JSONC)
+- [TODO] **JSON5**: Extended JSON format support
+
+##### Conflict Report
+- [TODO] **Resolution Recommendations**: AI-suggested resolutions
+- [TODO] **Batch Resolution**: Apply same strategy to similar conflicts
+
+#### 4.7 Post-Import Actions 📋 PLANNED
+
+##### Follow-Up Actions 📋 PLANNED
+- [TODO] **Generate Documentation**: Create docs from import
+- [TODO] **Share Import Report**: Send summary to team
+- [TODO] **Schedule Re-Import**: Set up recurring import
+- [TODO] **Export Transformed**: Export in different format

@@ -1,12 +1,12 @@
 'use client';
 
-import { AlertTriangle, FileWarning, Link2Off, Type, Shuffle, Package } from 'lucide-react';
+import { AlertTriangle, FileWarning, Link2Off, Type, Shuffle, Package, Download } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/Collapsible';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
  * Conflict types detected during import (#582–#586, #596).
- * duplicate_schema: schema name already exists in the project (#582)
+ * duplicate_schema: same schema name exists with a different definition (#582)
  * property_conflict: incompatible property definitions (#583)
  * reference_conflict: broken or ambiguous references (#584)
  * type_mismatch: incompatible type assignments (#585)
@@ -32,7 +32,7 @@ export interface ImportConflict {
 }
 
 const CONFLICT_KIND_LABELS: Record<ImportConflictKind, string> = {
-  duplicate_schema: 'Duplicate schema name',
+  duplicate_schema: 'Duplicate schema (same name, different definition)',
   property_conflict: 'Property conflict',
   reference_conflict: 'Reference conflict',
   type_mismatch: 'Type mismatch',
@@ -56,6 +56,77 @@ export const DEFAULT_IMPACT_IF_RESOLVED: Record<ImportConflictKind, string> = {
   semantic_conflict: 'The chosen constraints or semantics will be applied; conflicting rules will be updated.',
 };
 
+/** Options for markdown export (#598). */
+export interface ConflictReportMarkdownOptions {
+  /** Document title (default: "Import Conflict Report") */
+  title?: string;
+  /** Export timestamp for header/filename (default: new Date().toISOString()) */
+  exportedAt?: string;
+}
+
+/**
+ * Build a markdown document from the conflict report for review (#598).
+ * Exported for tests and reuse.
+ */
+export function conflictReportToMarkdown(
+  conflicts: ImportConflict[],
+  options: ConflictReportMarkdownOptions = {}
+): string {
+  const { title = 'Import Conflict Report', exportedAt = new Date().toISOString() } = options;
+
+  const byKind = conflicts.reduce<Record<ImportConflictKind, number>>(
+    (acc, c) => {
+      acc[c.kind] = (acc[c.kind] ?? 0) + 1;
+      return acc;
+    },
+    {
+      duplicate_schema: 0,
+      property_conflict: 0,
+      reference_conflict: 0,
+      type_mismatch: 0,
+      semantic_conflict: 0,
+    }
+  );
+
+  const lines: string[] = [
+    `# ${title}`,
+    '',
+    `**Exported:** ${exportedAt}`,
+    `**Total conflicts:** ${conflicts.length}`,
+    '',
+    '## Summary by type',
+    '',
+    '| Conflict type | Count |',
+    '|---------------|-------|',
+    ...(Object.entries(byKind) as [ImportConflictKind, number][])
+      .filter(([, count]) => count > 0)
+      .map(([kind, count]) => `| ${CONFLICT_KIND_LABELS[kind]} | ${count} |`),
+    '',
+    '## Conflicts',
+    '',
+    '| Schema / Resource | Conflict type | Description | What will change if resolved |',
+    '|-------------------|---------------|--------------|------------------------------|',
+  ];
+
+  for (const c of conflicts) {
+    const impact = c.impactIfResolved ?? DEFAULT_IMPACT_IF_RESOLVED[c.kind];
+    const desc = c.detail ? `${c.message}\n\n_${c.detail}_` : c.message;
+    const descCell = desc.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+    const impactCell = impact.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+    lines.push(`| ${c.schemaName} | ${CONFLICT_KIND_LABELS[c.kind]} | ${descCell} | ${impactCell} |`);
+  }
+
+  lines.push('');
+  return lines.join('\n');
+}
+
+/** Default filename for conflict report markdown export (#598). */
+export function getConflictReportMarkdownFilename(exportedAt?: string): string {
+  const ts = exportedAt ? new Date(exportedAt) : new Date();
+  const iso = ts.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return `conflict-report-${iso}.md`;
+}
+
 interface ConflictReportProps {
   conflicts: ImportConflict[];
   /** When true, the report section is expanded by default */
@@ -69,6 +140,21 @@ interface ConflictReportProps {
  */
 export function ConflictReport({ conflicts, defaultOpen = true, className = '' }: ConflictReportProps) {
   const [open, setOpen] = useState(defaultOpen);
+
+  const handleExportMarkdown = useCallback(() => {
+    const exportedAt = new Date().toISOString();
+    const md = conflictReportToMarkdown(conflicts, { exportedAt });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = getConflictReportMarkdownFilename(exportedAt);
+      a.click();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, [conflicts]);
 
   if (conflicts.length === 0) return null;
 
@@ -132,6 +218,18 @@ export function ConflictReport({ conflicts, defaultOpen = true, className = '' }
                   </span>
                 );
               })}
+            </div>
+
+            {/* Export as Markdown (#598) */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={handleExportMarkdown}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Export as Markdown
+              </button>
             </div>
 
             {/* Impact analysis (#597): what will change if resolved */}

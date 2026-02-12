@@ -148,6 +148,17 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     loadClasses();
   }, [selectedVersionId, refreshKey, sidebarRefreshKey]);
 
+  // Map of lowercase class name -> schema for duplicate definition detection (#582)
+  const existingClassSchemasByLowerName = React.useMemo(() => {
+    const map: Record<string, any> = {};
+    for (const c of classes) {
+      if (!c.name || c.schema == null) continue;
+      const schema = typeof c.schema === 'string' ? (() => { try { return JSON.parse(c.schema); } catch { return null; } })() : c.schema;
+      if (schema && typeof schema === 'object') map[c.name.toLowerCase()] = schema;
+    }
+    return map;
+  }, [classes]);
+
   // Expose handleClassEdit via ref for canvas to trigger
   const handleClassEditRef = React.useRef<((classItem: ClassItem) => Promise<void>) | null>(null);
   React.useEffect(() => {
@@ -422,6 +433,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         versionId={selectedVersionId || ''}
         projectId={selectedProjectId || ''}
         existingClassNames={classes.map(c => c.name)}
+        existingClassSchemas={existingClassSchemasByLowerName}
         userId={currentUserId || ''}
       />
 

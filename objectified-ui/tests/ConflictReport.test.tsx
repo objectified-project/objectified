@@ -1,12 +1,14 @@
 /**
  * Unit tests for Conflict Report (#596): overview of all detected conflicts during import.
  * Impact if resolved (#597): what will change when a conflict is resolved.
+ * Conflict export as markdown (#598): export conflict report for review.
  *
  * Covers:
  * - Types (ImportConflict, ImportConflictKind) and conflict kind labels
  * - Building conflict list from schema list (duplicate_schema from existing names)
  * - Summary-by-kind aggregation contract used by ConflictReport UI
  * - Optional impactIfResolved and default impact text per kind (#597)
+ * - conflictReportToMarkdown and getConflictReportMarkdownFilename (#598)
  *
  * Component rendering is not tested here (React version mismatch in workspace);
  * the UI is validated manually and the data contract is fully covered below.
@@ -15,13 +17,15 @@
 import { describe, test, expect } from '@jest/globals';
 import {
   DEFAULT_IMPACT_IF_RESOLVED,
+  conflictReportToMarkdown,
+  getConflictReportMarkdownFilename,
   type ImportConflict,
   type ImportConflictKind,
 } from '../src/app/components/ade/dashboard/ConflictReport';
 
-/** Conflict kind labels used by ConflictReport - must stay in sync with component */
+/** Conflict kind labels used by ConflictReport - must stay in sync with component (#582) */
 const CONFLICT_KIND_LABELS: Record<ImportConflictKind, string> = {
-  duplicate_schema: 'Duplicate schema name',
+  duplicate_schema: 'Duplicate schema (same name, different definition)',
   property_conflict: 'Property conflict',
   reference_conflict: 'Reference conflict',
   type_mismatch: 'Type mismatch',
@@ -145,6 +149,7 @@ describe('ConflictReport (#596)', () => {
     /**
      * Mirrors the logic in ClassImportDialog: schemas with exists === true
      * become one ImportConflict each with kind 'duplicate_schema' and impactIfResolved (#597).
+     * #582: duplicate = same name, different definition.
      */
     function buildConflictReportFromSchemas(
       schemas: { name: string; exists: boolean }[]
@@ -154,7 +159,7 @@ describe('ConflictReport (#596)', () => {
         .map((s) => ({
           kind: 'duplicate_schema' as const,
           schemaName: s.name,
-          message: `A class named "${s.name}" already exists in this version. Importing will overwrite or you can rename.`,
+          message: `A class named "${s.name}" already exists with a different definition. Importing will overwrite or you can rename.`,
           impactIfResolved:
             'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. You cannot import with the same name.',
         }));
@@ -288,6 +293,154 @@ describe('ConflictReport (#596)', () => {
       );
       expect(kindSummaryEntries).toHaveLength(1);
       expect(kindSummaryEntries[0]).toEqual(['duplicate_schema', 2]);
+    });
+  });
+
+  describe('Conflict export as markdown (#598)', () => {
+    test('conflictReportToMarkdown returns string with title and total', () => {
+      const conflicts: ImportConflict[] = [
+        { kind: 'duplicate_schema', schemaName: 'User', message: 'User exists.' },
+      ];
+      const md = conflictReportToMarkdown(conflicts, {
+        title: 'My Conflict Report',
+        exportedAt: '2025-02-11T12:00:00.000Z',
+      });
+      expect(md).toContain('# My Conflict Report');
+      expect(md).toContain('**Total conflicts:** 1');
+      expect(md).toContain('**Exported:** 2025-02-11T12:00:00.000Z');
+    });
+
+    test('conflictReportToMarkdown includes summary table by kind', () => {
+      const conflicts: ImportConflict[] = [
+        { kind: 'duplicate_schema', schemaName: 'User', message: 'M1' },
+        { kind: 'duplicate_schema', schemaName: 'Product', message: 'M2' },
+      ];
+      const md = conflictReportToMarkdown(conflicts, { exportedAt: '2025-02-11T12:00:00.000Z' });
+      expect(md).toContain('## Summary by type');
+      expect(md).toContain('Duplicate schema (same name, different definition)');
+      expect(md).toContain('| 2 |');
+    });
+
+    test('conflictReportToMarkdown includes conflicts table with schema, type, description, impact', () => {
+      const conflicts: ImportConflict[] = [
+        {
+          kind: 'duplicate_schema',
+          schemaName: 'Order',
+          message: 'Order already exists.',
+          impactIfResolved: 'Custom impact.',
+        },
+      ];
+      const md = conflictReportToMarkdown(conflicts);
+      expect(md).toContain('## Conflicts');
+      expect(md).toContain('| Order |');
+      expect(md).toContain('Duplicate schema (same name, different definition)');
+      expect(md).toContain('Order already exists.');
+      expect(md).toContain('Custom impact.');
+    });
+
+    test('conflictReportToMarkdown uses default impact when impactIfResolved missing', () => {
+      const conflicts: ImportConflict[] = [
+        { kind: 'property_conflict', schemaName: 'Item', message: 'Prop conflict.' },
+      ];
+      const md = conflictReportToMarkdown(conflicts);
+      expect(md).toContain(DEFAULT_IMPACT_IF_RESOLVED.property_conflict);
+    });
+
+    test('conflictReportToMarkdown escapes pipe in cells', () => {
+      const conflicts: ImportConflict[] = [
+        { kind: 'duplicate_schema', schemaName: 'Foo', message: 'Bar | baz' },
+      ];
+      const md = conflictReportToMarkdown(conflicts);
+      expect(md).toContain('Bar \\| baz');
+    });
+
+    test('getConflictReportMarkdownFilename returns .md filename with timestamp', () => {
+      const name = getConflictReportMarkdownFilename('2025-02-11T12:00:00.000Z');
+      expect(name).toMatch(/^conflict-report-.*\.md$/);
+      expect(name).toContain('2025-02-11');
+    });
+
+    test('getConflictReportMarkdownFilename uses current time when no arg', () => {
+      const name = getConflictReportMarkdownFilename();
+      expect(name).toMatch(/^conflict-report-.*\.md$/);
+    });
+
+    test('conflictReportToMarkdown with empty conflicts has title, total 0, and table headers only', () => {
+      const md = conflictReportToMarkdown([], {
+        title: 'Empty Report',
+        exportedAt: '2025-02-11T00:00:00.000Z',
+      });
+      expect(md).toContain('# Empty Report');
+      expect(md).toContain('**Total conflicts:** 0');
+      expect(md).toContain('## Summary by type');
+      expect(md).toContain('## Conflicts');
+      expect(md).toContain('| Schema / Resource |');
+      // No data rows in summary (only header/separator)
+      const summaryTablePart = md.slice(md.indexOf('## Summary by type'), md.indexOf('## Conflicts'));
+      expect(summaryTablePart).toContain('| Conflict type | Count |');
+      expect(summaryTablePart).not.toMatch(/\|\s*Duplicate schema \(same name, different definition\)\s*\|/);
+    });
+
+    test('conflictReportToMarkdown includes optional detail in description cell', () => {
+      const conflicts: ImportConflict[] = [
+        {
+          kind: 'property_conflict',
+          schemaName: 'Order',
+          message: 'Property differs.',
+          detail: 'Order.status',
+        },
+      ];
+      const md = conflictReportToMarkdown(conflicts);
+      expect(md).toContain('Property differs.');
+      expect(md).toContain('Order.status');
+      expect(md).toContain('_Order.status_');
+    });
+
+    test('conflictReportToMarkdown with no options uses default title', () => {
+      const conflicts: ImportConflict[] = [
+        { kind: 'duplicate_schema', schemaName: 'User', message: 'Exists.' },
+      ];
+      const md = conflictReportToMarkdown(conflicts);
+      expect(md).toContain('# Import Conflict Report');
+    });
+
+    test('conflictReportToMarkdown flattens newlines in message and impact to spaces', () => {
+      const conflicts: ImportConflict[] = [
+        {
+          kind: 'duplicate_schema',
+          schemaName: 'User',
+          message: 'Line one\nLine two',
+          impactIfResolved: 'Impact A\nImpact B',
+        },
+      ];
+      const md = conflictReportToMarkdown(conflicts);
+      expect(md).toContain('Line one Line two');
+      expect(md).toContain('Impact A Impact B');
+      const dataRow = md.split('\n').find((line) => line.startsWith('| User |'));
+      expect(dataRow).toBeDefined();
+      expect(dataRow).not.toContain('\n');
+    });
+
+    test('conflictReportToMarkdown with all five conflict kinds includes each in summary', () => {
+      const conflicts: ImportConflict[] = [
+        { kind: 'duplicate_schema', schemaName: 'A', message: 'M' },
+        { kind: 'property_conflict', schemaName: 'B', message: 'M' },
+        { kind: 'reference_conflict', schemaName: 'C', message: 'M' },
+        { kind: 'type_mismatch', schemaName: 'D', message: 'M' },
+        { kind: 'semantic_conflict', schemaName: 'E', message: 'M' },
+      ];
+      const md = conflictReportToMarkdown(conflicts, { exportedAt: '2025-02-11T12:00:00.000Z' });
+      expect(md).toContain('Duplicate schema (same name, different definition)');
+      expect(md).toContain('Property conflict');
+      expect(md).toContain('Reference conflict');
+      expect(md).toContain('Type mismatch');
+      expect(md).toContain('Semantic conflict');
+      expect(md).toContain('**Total conflicts:** 5');
+    });
+
+    test('getConflictReportMarkdownFilename uses ISO date without colons or dots', () => {
+      const name = getConflictReportMarkdownFilename('2025-02-11T14:30:00.123Z');
+      expect(name).toBe('conflict-report-2025-02-11T14-30-00.md');
     });
   });
 });
