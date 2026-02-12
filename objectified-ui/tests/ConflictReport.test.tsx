@@ -1,17 +1,23 @@
 /**
  * Unit tests for Conflict Report (#596): overview of all detected conflicts during import.
+ * Impact if resolved (#597): what will change when a conflict is resolved.
  *
  * Covers:
  * - Types (ImportConflict, ImportConflictKind) and conflict kind labels
  * - Building conflict list from schema list (duplicate_schema from existing names)
  * - Summary-by-kind aggregation contract used by ConflictReport UI
+ * - Optional impactIfResolved and default impact text per kind (#597)
  *
  * Component rendering is not tested here (React version mismatch in workspace);
  * the UI is validated manually and the data contract is fully covered below.
  */
 
 import { describe, test, expect } from '@jest/globals';
-import type { ImportConflict, ImportConflictKind } from '../src/app/components/ade/dashboard/ConflictReport';
+import {
+  DEFAULT_IMPACT_IF_RESOLVED,
+  type ImportConflict,
+  type ImportConflictKind,
+} from '../src/app/components/ade/dashboard/ConflictReport';
 
 /** Conflict kind labels used by ConflictReport - must stay in sync with component */
 const CONFLICT_KIND_LABELS: Record<ImportConflictKind, string> = {
@@ -80,6 +86,16 @@ describe('ConflictReport (#596)', () => {
       };
       expect(c.detail).toBe('Order.status');
     });
+
+    test('ImportConflict may include optional impactIfResolved (#597)', () => {
+      const c: ImportConflict = {
+        kind: 'duplicate_schema',
+        schemaName: 'User',
+        message: 'User exists.',
+        impactIfResolved: 'If renamed: new class created; existing unchanged.',
+      };
+      expect(c.impactIfResolved).toBe('If renamed: new class created; existing unchanged.');
+    });
   });
 
   describe('getConflictSummary', () => {
@@ -128,7 +144,7 @@ describe('ConflictReport (#596)', () => {
   describe('building conflict list from schema list (duplicate_schema)', () => {
     /**
      * Mirrors the logic in ClassImportDialog: schemas with exists === true
-     * become one ImportConflict each with kind 'duplicate_schema'.
+     * become one ImportConflict each with kind 'duplicate_schema' and impactIfResolved (#597).
      */
     function buildConflictReportFromSchemas(
       schemas: { name: string; exists: boolean }[]
@@ -139,6 +155,8 @@ describe('ConflictReport (#596)', () => {
           kind: 'duplicate_schema' as const,
           schemaName: s.name,
           message: `A class named "${s.name}" already exists in this version. Importing will overwrite or you can rename.`,
+          impactIfResolved:
+            'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. You cannot import with the same name.',
         }));
     }
 
@@ -185,6 +203,58 @@ describe('ConflictReport (#596)', () => {
       ];
       const result = buildConflictReportFromSchemas(schemas);
       expect(result.map((c) => c.schemaName)).toEqual(['A', 'C']);
+    });
+
+    test('each duplicate_schema conflict includes impactIfResolved (#597)', () => {
+      const schemas = [{ name: 'User', exists: true }];
+      const result = buildConflictReportFromSchemas(schemas);
+      expect(result).toHaveLength(1);
+      expect(result[0].impactIfResolved).toBeDefined();
+      expect(result[0].impactIfResolved).toContain('class name override');
+      expect(result[0].impactIfResolved).toMatch(/new class|existing.*unchanged|cannot import with the same name/i);
+    });
+  });
+
+  describe('Impact if resolved (#597)', () => {
+    test('DEFAULT_IMPACT_IF_RESOLVED has non-empty text for every conflict kind', () => {
+      const kinds: ImportConflictKind[] = [
+        'duplicate_schema',
+        'property_conflict',
+        'reference_conflict',
+        'type_mismatch',
+        'semantic_conflict',
+      ];
+      kinds.forEach((kind) => {
+        const text = DEFAULT_IMPACT_IF_RESOLVED[kind];
+        expect(text).toBeDefined();
+        expect(typeof text).toBe('string');
+        expect(text.length).toBeGreaterThan(10);
+      });
+    });
+
+    test('default impact for duplicate_schema mentions rename or overwrite', () => {
+      const text = DEFAULT_IMPACT_IF_RESOLVED.duplicate_schema;
+      expect(text).toMatch(/rename|overwrite|replaced|unchanged/i);
+    });
+
+    test('effective impact uses impactIfResolved when provided, else default', () => {
+      const getEffectiveImpact = (c: ImportConflict): string =>
+        c.impactIfResolved ?? DEFAULT_IMPACT_IF_RESOLVED[c.kind];
+
+      const withCustom: ImportConflict = {
+        kind: 'property_conflict',
+        schemaName: 'Order',
+        message: 'Conflict',
+        impactIfResolved: 'Custom impact text.',
+      };
+      expect(getEffectiveImpact(withCustom)).toBe('Custom impact text.');
+
+      const withoutCustom: ImportConflict = {
+        kind: 'property_conflict',
+        schemaName: 'Order',
+        message: 'Conflict',
+      };
+      expect(getEffectiveImpact(withoutCustom)).toBe(DEFAULT_IMPACT_IF_RESOLVED.property_conflict);
     });
   });
 

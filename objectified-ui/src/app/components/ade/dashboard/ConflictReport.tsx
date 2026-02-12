@@ -47,8 +47,8 @@ const CONFLICT_KIND_ICONS: Record<ImportConflictKind, typeof Package> = {
   semantic_conflict: Shuffle,
 };
 
-/** Default impact description when conflict is resolved (#597) */
-const DEFAULT_IMPACT_IF_RESOLVED: Record<ImportConflictKind, string> = {
+/** Default impact description when conflict is resolved (#597). Exported for unit tests. */
+export const DEFAULT_IMPACT_IF_RESOLVED: Record<ImportConflictKind, string> = {
   duplicate_schema: 'If renamed: a new class is created and the existing one is unchanged. If overwritten: the existing class is replaced by the imported definition.',
   property_conflict: 'The chosen property definition will be applied; the other will be discarded or merged per strategy.',
   reference_conflict: 'References will be updated or remapped so they point to valid schemas in the project.',
