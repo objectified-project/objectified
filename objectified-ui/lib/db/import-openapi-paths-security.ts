@@ -87,11 +87,16 @@ export async function importOpenAPIPathsAndSecurity(
       const versionPathId = pathRes.rows[0].id;
 
       const paramIdsByKey = new Map<string, string>();
+      const buildParamData = (p: { schema?: Record<string, unknown>; required?: boolean }) => {
+        const base = p.schema && typeof p.schema === 'object' ? { ...p.schema } : { type: 'string' };
+        if (p.required === true) (base as Record<string, unknown>).required = true;
+        return base;
+      };
       if (pathItem.parameters?.length) {
         for (const p of pathItem.parameters) {
           const inLoc = (p.in || 'query') as 'path' | 'query' | 'header' | 'cookie';
           const key = `${p.name}:${inLoc}`;
-          const data = p.schema ? { ...p.schema } : { type: 'string' };
+          const data = buildParamData(p);
           const pr = await client.query(
             `INSERT INTO odb.shared_path_parameter (version_path_id, name, in_location, summary, description, data)
              VALUES ($1, $2, $3, $4, $5, $6)
@@ -112,16 +117,19 @@ export async function importOpenAPIPathsAndSecurity(
         );
         const pathOperationId = opRes.rows[0].id;
 
+        const descMetadata: Record<string, unknown> = {};
+        if (op.tags?.length) descMetadata.tags = op.tags;
+        if (op.deprecated === true) descMetadata.deprecated = true;
         await client.query(
           `INSERT INTO odb.path_operation_description (path_operation_id, summary, description, operation_id, metadata)
            VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (path_operation_id) DO UPDATE SET summary = EXCLUDED.summary, description = EXCLUDED.description, operation_id = EXCLUDED.operation_id`,
+           ON CONFLICT (path_operation_id) DO UPDATE SET summary = EXCLUDED.summary, description = EXCLUDED.description, operation_id = EXCLUDED.operation_id, metadata = EXCLUDED.metadata`,
           [
             pathOperationId,
             op.summary ?? null,
             op.description ?? null,
             op.operationId ?? null,
-            op.tags?.length ? JSON.stringify({ tags: op.tags }) : null,
+            Object.keys(descMetadata).length > 0 ? JSON.stringify(descMetadata) : null,
           ]
         );
 
@@ -131,7 +139,7 @@ export async function importOpenAPIPathsAndSecurity(
           const key = `${p.name}:${inLoc}`;
           let paramId = paramIdsByKey.get(key);
           if (!paramId) {
-            const data = p.schema ? { ...p.schema } : { type: 'string' };
+            const data = buildParamData(p);
             const pr = await client.query(
               `INSERT INTO odb.shared_path_parameter (version_path_id, name, in_location, summary, description, data)
                VALUES ($1, $2, $3, $4, $5, $6)
@@ -152,13 +160,16 @@ export async function importOpenAPIPathsAndSecurity(
         }
 
         if (op.requestBody?.content && Object.keys(op.requestBody.content).length > 0) {
+          const rbName = op.operationId
+            ? op.operationId
+            : `RequestBody_${op.method}_${(pathItem.path.replace(/^\//, '').replace(/\//g, '_') || 'root')}`;
           const rbRes = await client.query(
             `INSERT INTO odb.shared_path_request_body (version_path_id, name, description, required)
              VALUES ($1, $2, $3, $4)
              RETURNING id`,
             [
               versionPathId,
-              `RequestBody_${op.method}_${pathOperationId}`,
+              rbName,
               op.requestBody.description ?? null,
               op.requestBody.required === true,
             ]
@@ -201,56 +212,86 @@ export async function importOpenAPIPathsAndSecurity(
 
         if (op.responses && Object.keys(op.responses).length > 0) {
           for (const [statusCode, res] of Object.entries(op.responses)) {
-            const content = res.content && Object.keys(res.content).length > 0 ? res.content : { 'application/json': { schema: { type: 'object', properties: [] } } };
-            const firstMedia = Object.entries(content)[0];
-            if (!firstMedia) continue;
-            const [mediaType, mediaObj] = firstMedia;
-            const refName = mediaObj?.$ref ? getRefSchemaName(mediaObj.$ref) : null;
-            const classId = refName ? classNameToId.get(refName) ?? null : null;
-            const inlineSchema = !mediaObj?.$ref && mediaObj?.schema
-              ? (mediaObj.schema.type === 'object' && mediaObj.schema.properties
-                  ? { type: 'object', properties: Object.entries(mediaObj.schema.properties).map(([name, schema]: [string, any]) => ({
+            const hasContent = res.content && typeof res.content === 'object' && Object.keys(res.content).length > 0;
+            const contentEntries = hasContent ? Object.entries(res.content!) : [];
+            const dataObj: Record<string, unknown> = {};
+            if (res.headers && Object.keys(res.headers || {}).length > 0) dataObj.headers = res.headers;
+            if (res.links && Object.keys(res.links || {}).length > 0) dataObj.links = res.links;
+            let classId: string | null = null;
+            let inlineSchema: Record<string, unknown> | null = null;
+            let schemaMode: 'class' | 'object' = 'object';
+            if (contentEntries.length > 0) {
+              const [, firstMediaObj] = contentEntries[0];
+              const refName = firstMediaObj?.$ref ? getRefSchemaName(firstMediaObj.$ref) : null;
+              classId = refName ? classNameToId.get(refName) ?? null : null;
+              if (!firstMediaObj?.$ref && firstMediaObj?.schema) {
+                const s = firstMediaObj.schema as any;
+                inlineSchema = s.type === 'object' && s.properties
+                  ? { type: 'object', properties: Object.entries(s.properties).map(([name, schema]: [string, any]) => ({
                       id: `prop-${name}`,
                       name,
                       data: schema || { type: 'string' },
                       parent_id: null,
                     })) }
-                  : { type: (mediaObj.schema as any).type || 'object', properties: [] })
-              : { type: 'object', properties: [] };
-            const dataObj: Record<string, unknown> = {};
-            if (res.headers && Object.keys(res.headers).length > 0) dataObj.headers = res.headers;
-            if (res.links && Object.keys(res.links).length > 0) dataObj.links = res.links;
+                  : { type: s?.type || 'object', properties: [] };
+              } else {
+                inlineSchema = { type: 'object', properties: [] };
+              }
+              schemaMode = classId ? 'class' : 'object';
+            }
+            const responseData = Object.keys(dataObj).length > 0 ? JSON.stringify(dataObj) : (hasContent ? null : '{}');
+            const responseClassId = classId ?? null;
+            const responseInlineSchema = classId ? null : (inlineSchema ? JSON.stringify(inlineSchema) : null);
             const respRes = await client.query(
               `INSERT INTO odb.shared_path_response (version_path_id, status_code, description, data, class_id, inline_schema, schema_mode)
                VALUES ($1, $2, $3, $4, $5, $6, $7)
-               ON CONFLICT (version_path_id, status_code) DO UPDATE SET description = EXCLUDED.description, data = EXCLUDED.data, class_id = COALESCE(EXCLUDED.class_id, odb.shared_path_response.class_id), inline_schema = COALESCE(EXCLUDED.inline_schema, odb.shared_path_response.inline_schema)
+               ON CONFLICT (version_path_id, status_code) DO UPDATE SET
+                 description = EXCLUDED.description,
+                 data = COALESCE(EXCLUDED.data, odb.shared_path_response.data),
+                 class_id = COALESCE(EXCLUDED.class_id, odb.shared_path_response.class_id),
+                 inline_schema = COALESCE(EXCLUDED.inline_schema, odb.shared_path_response.inline_schema),
+                 schema_mode = COALESCE(EXCLUDED.schema_mode, odb.shared_path_response.schema_mode)
                RETURNING id`,
               [
                 versionPathId,
                 statusCode,
                 res.description ?? null,
-                Object.keys(dataObj).length > 0 ? JSON.stringify(dataObj) : null,
-                classId ?? null,
-                classId ? null : JSON.stringify(inlineSchema),
-                classId ? 'class' : 'object',
+                responseData,
+                responseClassId,
+                responseInlineSchema,
+                schemaMode,
               ]
             );
             const responseId = respRes.rows[0].id;
-            const existingContent = await client.query(
-              'SELECT id FROM odb.shared_path_response_content WHERE shared_path_response_id = $1 AND media_type = $2',
-              [responseId, mediaType]
-            );
-            if (existingContent.rows.length === 0) {
-              await client.query(
-                `INSERT INTO odb.shared_path_response_content (shared_path_response_id, media_type, class_id, inline_schema)
-                 VALUES ($1, $2, $3, $4)`,
-                [
-                  responseId,
-                  mediaType,
-                  classId,
-                  !classId ? JSON.stringify(inlineSchema) : null,
-                ]
+            for (const [mediaType, mediaObj] of contentEntries) {
+              const refName = mediaObj?.$ref ? getRefSchemaName(mediaObj.$ref) : null;
+              const ctClassId = refName ? classNameToId.get(refName) ?? null : null;
+              const ctInlineSchema = !mediaObj?.$ref && mediaObj?.schema
+                ? ((mediaObj.schema as any).type === 'object' && (mediaObj.schema as any).properties
+                    ? { type: 'object', properties: Object.entries((mediaObj.schema as any).properties).map(([name, schema]: [string, any]) => ({
+                        id: `prop-${name}`,
+                        name,
+                        data: schema || { type: 'string' },
+                        parent_id: null,
+                      })) }
+                    : { type: (mediaObj.schema as any)?.type || 'object', properties: [] })
+                : { type: 'object', properties: [] };
+              const existingContent = await client.query(
+                'SELECT id FROM odb.shared_path_response_content WHERE shared_path_response_id = $1 AND media_type = $2',
+                [responseId, mediaType]
               );
+              if (existingContent.rows.length === 0) {
+                await client.query(
+                  `INSERT INTO odb.shared_path_response_content (shared_path_response_id, media_type, class_id, inline_schema)
+                   VALUES ($1, $2, $3, $4)`,
+                  [
+                    responseId,
+                    mediaType,
+                    ctClassId,
+                    ctClassId ? null : JSON.stringify(ctInlineSchema),
+                  ]
+                );
+              }
             }
             await client.query(
               `INSERT INTO odb.path_operation_response_link (path_operation_id, shared_path_response_id, metadata)
