@@ -54,6 +54,10 @@ export interface NormalizeOptions {
    * value = map of property name -> description string. Empty string clears the description. Applied before naming convention.
    */
   descriptionOverrides?: Record<string, Record<string, string>>;
+  /**
+   * When true, auto-generate example values for properties that do not have an example (#761).
+   */
+  generateExamples?: boolean;
 }
 
 export interface NormalizeResult {

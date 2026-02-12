@@ -99,17 +99,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### Schema Selection 📋 PARTIALLY IMPLEMENTED
 - [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
-##### Property Mapping 📋 PARTIALLY IMPLEMENTED
-- ✅ **Type Mapping**: Map external types to internal types
-- ✅ **Default Value Assignment**: Set defaults during import
-- ✅ **Required Field Override**: Modify required status
-- ✅ **Description Enhancement**: Add/modify property descriptions during import
-- 📋 **Example Generation**: Auto-generate missing examples
-
-| Ticket | Feature Description                             |
-|--------|-------------------------------------------------|
-| #761   | Example generation for imported properties      |
-
 #### 4.5 Conflict Resolution 📋 PLANNED
 
 ##### Conflict Detection
@@ -529,6 +518,13 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Naming Convention Enforcement**: camelCase, PascalCase, etc.
 - ✅ **Prefix/Suffix Rules**: Apply consistent naming patterns
 - ✅ **Reserved Name Detection**: Prevent conflicts with keywords (#756)
+
+##### Property Mapping ✅ IMPLEMENTED
+- ✅ **Type Mapping**: Map external types to internal types
+- ✅ **Default Value Assignment**: Set defaults during import
+- ✅ **Required Field Override**: Modify required status
+- ✅ **Description Enhancement**: Add/modify property descriptions during import
+- ✅ **Example Generation**: Auto-generate missing examples
 
 ---
 

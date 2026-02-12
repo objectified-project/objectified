@@ -91,6 +91,66 @@ function applyDefaultValuesToProperty(p: NormalizedProperty, defaultValues: Reco
   return { ...p, data, children };
 }
 
+/**
+ * Generate a single example value for a property schema when it has no example (#761).
+ * Used during import when generateExamples is true. Deterministic and does not resolve $ref.
+ */
+function generateExampleFromPropertyData(data: any): any {
+  if (!data || typeof data !== 'object' || data.example !== undefined) return undefined;
+  if (data.$ref) return undefined;
+
+  if (Array.isArray(data.enum) && data.enum.length > 0) return data.enum[0];
+
+  const t = data.type;
+  if (t === 'string') {
+    const f = data.format;
+    if (f === 'date') return '2025-02-11';
+    if (f === 'date-time') return '2025-02-11T12:00:00Z';
+    if (f === 'time') return '12:00:00';
+    if (f === 'uuid') return '123e4567-e89b-12d3-a456-426614174000';
+    if (f === 'email') return 'user@example.com';
+    if (f === 'uri' || f === 'uri-reference') return 'https://example.com';
+    if (f === 'hostname') return 'example.com';
+    if (data.pattern) return `string matching pattern: ${data.pattern}`;
+    return data.description ? String(data.description).slice(0, 80) : 'example';
+  }
+  if (t === 'integer') {
+    if (data.minimum !== undefined) return Math.ceil(Number(data.minimum));
+    if (data.maximum !== undefined) return Math.floor(Number(data.maximum));
+    return 42;
+  }
+  if (t === 'number') {
+    if (data.minimum !== undefined) return Number(data.minimum) + 0.5;
+    if (data.maximum !== undefined) return Number(data.maximum) - 0.5;
+    return 42.5;
+  }
+  if (t === 'boolean') return true;
+  if (t === 'array') {
+    if (data.items && typeof data.items === 'object' && !data.items.$ref && data.items.example === undefined) {
+      const itemExample = generateExampleFromPropertyData(data.items);
+      if (itemExample !== undefined) return [itemExample];
+    }
+    return [];
+  }
+  if (t === 'object') return {};
+  return undefined;
+}
+
+/** Apply generated example to a property when it has no example (#761). Recurse into children and items. */
+function applyGenerateExamplesToProperty(p: NormalizedProperty): NormalizedProperty {
+  const data = p.data && typeof p.data === 'object' ? { ...p.data } : p.data;
+  if (data && !data.$ref && data.example === undefined) {
+    const example = generateExampleFromPropertyData(data);
+    if (example !== undefined) data.example = example;
+  }
+  if (data?.items && typeof data.items === 'object' && !data.items.$ref && data.items.example === undefined) {
+    const itemExample = generateExampleFromPropertyData(data.items);
+    if (itemExample !== undefined) data.items = { ...data.items, example: itemExample };
+  }
+  const children = p.children?.map((c) => applyGenerateExamplesToProperty(c));
+  return { ...p, data, children };
+}
+
 /** Recursively collect external type keys from a property schema. */
 function collectKeysFromProp(prop: any, keys: Set<string>): void {
   if (!prop || typeof prop !== 'object') return;
@@ -290,6 +350,14 @@ export const openApiImporter: Importer = {
       classesOut = classesOut.map((cls) => ({
         ...cls,
         properties: (cls.properties ?? []).map((p) => applyDefaultValuesToProperty(p, defaultValues)),
+      }));
+    }
+
+    // Example generation (#761): auto-generate example for properties that have no example
+    if (options.generateExamples === true) {
+      classesOut = classesOut.map((cls) => ({
+        ...cls,
+        properties: (cls.properties ?? []).map((p) => applyGenerateExamplesToProperty(p)),
       }));
     }
 

@@ -114,6 +114,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Adds default value assignment during imports by setting global defaults during import
   - Adds the ability to override the required field during property mapping at import
   - Adds/modifies descriptions for property mapping during import
+  - Adds automatic generation of examples during import where examples don't otherwise exist
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

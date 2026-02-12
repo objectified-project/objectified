@@ -32,6 +32,8 @@ export interface ImportClassesInput {
   requiredOverrides?: Record<string, Record<string, boolean>>;
   /** Optional property description overrides per schema/property during import (#760). schema key -> { property name -> description }. */
   descriptionOverrides?: Record<string, Record<string, string>>;
+  /** When true, auto-generate example values for properties that do not have an example (#761). */
+  generateExamples?: boolean;
 }
 
 export interface ImportClassesResult {
@@ -128,6 +130,7 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
         defaultValues: input.defaultValues,
         requiredOverrides: input.requiredOverrides,
         descriptionOverrides: input.descriptionOverrides,
+        generateExamples: input.generateExamples,
       },
     });
     if (norm.warnings.length) {

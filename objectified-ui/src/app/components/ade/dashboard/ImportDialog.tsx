@@ -356,6 +356,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         defaultValues: importOptions.defaultValues,
         requiredOverrides: importOptions.requiredOverrides,
         descriptionOverrides: importOptions.descriptionOverrides,
+        generateExamples: importOptions.generateExamples ?? false,
         dryRun: importOptions.dryRun ?? false,
         incrementalMode: importOptions.incrementalMode ?? false
       }

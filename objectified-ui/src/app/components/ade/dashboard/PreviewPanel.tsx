@@ -65,6 +65,8 @@ export interface ImportOptions {
   requiredOverrides?: Record<string, Record<string, boolean>>;
   /** Optional property description overrides during import (#760). schema key -> { property name -> description }. */
   descriptionOverrides?: Record<string, Record<string, string>>;
+  /** When true, auto-generate example values for properties that do not have an example (#761). */
+  generateExamples?: boolean;
 }
 
 interface SchemaInfo {
@@ -485,7 +487,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       typeMapping: undefined,
       defaultValues: undefined,
       requiredOverrides: undefined,
-      descriptionOverrides: undefined
+      descriptionOverrides: undefined,
+      generateExamples: false
     };
   });
 
@@ -1838,6 +1841,24 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
               )}
             </div>
           )}
+
+          {/* Generate examples for properties without examples (#761) */}
+          <div className="col-span-4 flex items-start gap-3 pt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={importOptions.generateExamples ?? false}
+                onChange={(e) => handleOptionChange('generateExamples', e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Generate examples
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Auto-generate example values for properties that don&apos;t have one (string, number, date, etc.).
+            </p>
+          </div>
 
           {/* Dry run: preview without committing */}
           <div className="col-span-4 flex items-start gap-3 pt-2">
