@@ -349,6 +349,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         applyNamingConvention: importOptions.applyNamingConvention ?? true,
         classNamingConvention: importOptions.classNamingConvention ?? 'PascalCase',
         propertyNamingConvention: importOptions.propertyNamingConvention ?? 'camelCase',
+        classNameMap: importOptions.classNameMap,
         dryRun: importOptions.dryRun ?? false,
         incrementalMode: importOptions.incrementalMode ?? false
       }

@@ -496,6 +496,67 @@ describe('naming-conventions (#581)', () => {
       expect(result.classes[0].originalSchemaKey).toBe('order_item');
     });
 
+    it('applies classNameMap for multiple schemas (partial override) (#754)', () => {
+      const document = {
+        components: {
+          schemas: {
+            user_profile: {
+              type: 'object',
+              title: 'User Profile',
+              properties: { name: { type: 'string' } },
+            },
+            order_item: {
+              type: 'object',
+              title: 'Order Item',
+              properties: { qty: { type: 'integer' } },
+            },
+            api_error: {
+              type: 'object',
+              'x-class-name': 'ApiError',
+              properties: { code: { type: 'integer' } },
+            },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['user_profile', 'order_item', 'api_error'],
+          applyNamingConvention: true,
+          classNamingConvention: 'PascalCase',
+          propertyNamingConvention: 'camelCase',
+          classNameMap: { order_item: 'LineItem' },
+        },
+      });
+      expect(result.classes).toHaveLength(3);
+      expect(result.classes.find((c) => c.originalSchemaKey === 'user_profile')!.name).toBe('UserProfile');
+      expect(result.classes.find((c) => c.originalSchemaKey === 'order_item')!.name).toBe('LineItem');
+      expect(result.classes.find((c) => c.originalSchemaKey === 'api_error')!.name).toBe('ApiError');
+    });
+
+    it('uses smart name when classNameMap omits schema (#754)', () => {
+      const document = {
+        components: {
+          schemas: {
+            pet: { type: 'object', title: 'Pet', properties: {} },
+            category: { type: 'object', title: 'Category', properties: {} },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['pet', 'category'],
+          applyNamingConvention: true,
+          classNamingConvention: 'PascalCase',
+          propertyNamingConvention: 'camelCase',
+          classNameMap: { category: 'Tag' },
+        },
+      });
+      expect(result.classes.find((c) => c.originalSchemaKey === 'pet')!.name).toBe('Pet');
+      expect(result.classes.find((c) => c.originalSchemaKey === 'category')!.name).toBe('Tag');
+    });
+
     it('updates $ref by schema key when class name comes from smart name (originalSchemaKey)', () => {
       const document = {
         components: {

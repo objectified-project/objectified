@@ -5,6 +5,7 @@ import { Package, Search, Check, ChevronRight, ChevronDown, ArrowUpAZ, ArrowDown
 import * as Checkbox from '@radix-ui/react-checkbox';
 import { AnalysisResult } from '../../../utils/openapi-analyzer';
 import { buildSchemaTree, buildRelationshipDiagramEdges, extractSchemaReferences, getSchemaType, getSchemaTags, type SchemaTreeNode, type SchemaDisplayType } from '../../../utils/schema-tree-utils';
+import { getSmartClassName } from '../../../../../lib/schema-context-naming';
 import { generateSlug } from '../../../utils/slug';
 import YAML from 'yaml';
 import Editor from '@monaco-editor/react';
@@ -48,6 +49,8 @@ export interface ImportOptions {
   dryRun?: boolean;
   /** When true, import all available and skip failures (each class committed separately). */
   incrementalMode?: boolean;
+  /** Optional map: schema key → class name override for import (#754). */
+  classNameMap?: Record<string, string>;
 }
 
 interface SchemaInfo {
@@ -653,6 +656,21 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
     onImportOptionsChange?.(newOptions);
   };
 
+  /** Update class name override for a schema (#754). Empty or same as smart name clears the override. */
+  const handleClassNameOverride = (schemaKey: string, schema: any, value: string) => {
+    const trimmed = value.trim();
+    const smart = getSmartClassName(schemaKey, schema);
+    const nextMap = { ...(importOptions.classNameMap || {}) };
+    if (trimmed === '' || trimmed === smart) {
+      delete nextMap[schemaKey];
+    } else {
+      nextMap[schemaKey] = trimmed;
+    }
+    const newOptions = { ...importOptions, classNameMap: Object.keys(nextMap).length > 0 ? nextMap : undefined };
+    setImportOptions(newOptions);
+    onImportOptionsChange?.(newOptions);
+  };
+
   const getPropertyType = (prop: any): string => {
     if (prop.$ref) {
       const refName = prop.$ref.split('/').pop();
@@ -975,6 +993,24 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                 </div>
               )}
             </div>
+            {/* Custom name override for imported class (#754) - visible in all view modes */}
+            {selectedSchema && selectedSchemaName && (
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Import as class name
+                </label>
+                <input
+                  type="text"
+                  value={importOptions.classNameMap?.[selectedSchemaName] ?? getSmartClassName(selectedSchemaName, selectedSchema)}
+                  onChange={(e) => handleClassNameOverride(selectedSchemaName, selectedSchema, e.target.value)}
+                  placeholder={getSmartClassName(selectedSchemaName, selectedSchema)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Override the class name when importing. From schema title / x-class-name when not set.
+                </p>
+              </div>
+            )}
           </div>
           <div className="p-4 max-h-[400px] overflow-y-auto">
             {selectedSchema && selectedSchemaName ? (

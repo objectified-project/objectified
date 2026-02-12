@@ -257,6 +257,35 @@ describe('Import Helper - ImportJobInput Structure', () => {
     expect(typeof options.dryRun).toBe('boolean');
     expect(Array.isArray(options.selectedSchemas)).toBe(true);
   });
+
+  test('should accept classNameMap in options for custom class name override (#754)', () => {
+    const input: ImportJobInput = {
+      tenantId: 't1',
+      userId: 'u1',
+      sourceKind: 'openapi' as any,
+      document: {
+        components: {
+          schemas: {
+            user_profile: { type: 'object', title: 'User Profile', properties: {} },
+            order_item: { type: 'object', title: 'Order Item', properties: {} },
+          },
+        },
+      },
+      project: { name: 'P', slug: 'p' },
+      version: { versionId: '1.0.0' },
+      options: {
+        selectedSchemas: ['user_profile', 'order_item'],
+        applyNamingConvention: true,
+        classNamingConvention: 'PascalCase',
+        propertyNamingConvention: 'camelCase',
+        classNameMap: { order_item: 'LineItem' },
+      },
+    };
+    expect(input.options.classNameMap).toBeDefined();
+    expect(input.options.classNameMap!['order_item']).toBe('LineItem');
+    expect(input.options.selectedSchemas).toContain('user_profile');
+    expect(input.options.selectedSchemas).toContain('order_item');
+  });
 });
 
 describe('Import Helper - ImportStatus Structure', () => {
