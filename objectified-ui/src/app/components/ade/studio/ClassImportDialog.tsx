@@ -19,6 +19,7 @@ import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 import GitImportPanel from '../dashboard/GitImportPanel';
 import { ConflictReport, type ImportConflict } from '../dashboard/ConflictReport';
 import { isDuplicateSchema } from '../../../utils/schema-definition-equal';
+import { detectPropertyConflicts } from '../../../utils/property-conflict-detection';
 import {
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
@@ -436,20 +437,23 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
 
-  /** Conflict report data for #596: overview of all detected conflicts; #582: same name, different definition; #597: impact if resolved */
-  const conflictReportItems: ImportConflict[] = useMemo(
-    () =>
-      schemas
-        .filter((s) => s.exists)
-        .map((s) => ({
-          kind: 'duplicate_schema' as const,
-          schemaName: s.name,
-          message: `A class named "${s.name}" already exists with a different definition. Importing will overwrite or you can rename.`,
-          impactIfResolved:
-            'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. You cannot import with the same name.',
-        })),
-    [schemas]
-  );
+  /** Conflict report data for #596: overview of all detected conflicts; #582: duplicate schema; #583: property definition conflicts; #597: impact if resolved */
+  const conflictReportItems: ImportConflict[] = useMemo(() => {
+    const duplicateConflicts: ImportConflict[] = schemas
+      .filter((s) => s.exists)
+      .map((s) => ({
+        kind: 'duplicate_schema' as const,
+        schemaName: s.name,
+        message: `A class named "${s.name}" already exists with a different definition. Importing will overwrite or you can rename.`,
+        impactIfResolved:
+          'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. You cannot import with the same name.',
+      }));
+    const schemaNames = schemas.map((s) => s.name);
+    const propertyConflicts = analysisResult?.document
+      ? detectPropertyConflicts({ document: analysisResult.document, schemaNames })
+      : [];
+    return [...duplicateConflicts, ...propertyConflicts];
+  }, [schemas, analysisResult?.document]);
 
   const selectedSchemaNames = useMemo(
     () => schemas.filter(s => s.selected && !s.exists).map(s => s.name),
