@@ -22,6 +22,7 @@ import {
   getSchemaTags,
   type SchemaDisplayType,
 } from '../../../utils/schema-tree-utils';
+import { getSmartClassName } from '../../../../../lib/schema-context-naming';
 
 interface ClassImportDialogProps {
   open: boolean;
@@ -116,6 +117,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [applyNamingConvention, setApplyNamingConvention] = useState(true);
   const [classNamingConvention, setClassNamingConvention] = useState<'PascalCase' | 'camelCase' | 'snake_case' | 'kebab-case' | 'none'>('PascalCase');
   const [propertyNamingConvention, setPropertyNamingConvention] = useState<'PascalCase' | 'camelCase' | 'snake_case' | 'kebab-case' | 'none'>('camelCase');
+  /** Per-schema class name overrides for import (#753). When absent, smart name from schema context is used. */
+  const [classNameOverrides, setClassNameOverrides] = useState<Record<string, string>>({});
 
   const existingNamesSet = new Set(existingClassNames.map(n => n.toLowerCase()));
 
@@ -171,6 +174,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setApplyNamingConvention(true);
     setClassNamingConvention('PascalCase');
     setPropertyNamingConvention('camelCase');
+    setClassNameOverrides({});
     onClose();
   };
 
@@ -338,8 +342,17 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const handleImport = async () => {
     if (!analysisResult || !versionId || !projectId) return;
 
-    const selectedSchemas = schemas.filter(s => s.selected && !s.exists).map(s => s.name);
+    const selected = schemas.filter(s => s.selected && !s.exists);
+    const selectedSchemas = selected.map(s => s.name);
     if (selectedSchemas.length === 0) return;
+
+    const schemaObj = analysisResult.document?.components?.schemas ?? analysisResult.document?.definitions ?? {};
+    const classNameMap: Record<string, string> = {};
+    for (const schemaKey of selectedSchemas) {
+      const raw = schemaObj[schemaKey];
+      const name = classNameOverrides[schemaKey]?.trim() || getSmartClassName(schemaKey, raw);
+      if (name) classNameMap[schemaKey] = name;
+    }
 
     setIsImporting(true);
     setCurrentStep('importing');
@@ -354,6 +367,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         applyNamingConvention,
         classNamingConvention,
         propertyNamingConvention,
+        classNameMap: Object.keys(classNameMap).length > 0 ? classNameMap : undefined,
       });
       setImportResult(result);
       setCurrentStep('done');
@@ -1112,6 +1126,34 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                           <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                             {selectedSchemaName}
                           </h4>
+                          {/* Name mapping: smart name from schema context with optional override (#753) */}
+                          <div className="mb-3">
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                              Import as class name
+                            </label>
+                            <input
+                              type="text"
+                              value={classNameOverrides[selectedSchemaName] ?? getSmartClassName(selectedSchemaName, selectedSchema)}
+                              onChange={(e) => {
+                                const v = e.target.value.trim();
+                                const smart = getSmartClassName(selectedSchemaName, selectedSchema);
+                                if (v === '' || v === smart) {
+                                  setClassNameOverrides((prev) => {
+                                    const next = { ...prev };
+                                    delete next[selectedSchemaName];
+                                    return next;
+                                  });
+                                } else {
+                                  setClassNameOverrides((prev) => ({ ...prev, [selectedSchemaName]: e.target.value }));
+                                }
+                              }}
+                              placeholder={getSmartClassName(selectedSchemaName, selectedSchema)}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              From schema title / x-class-name when available
+                            </p>
+                          </div>
                           {schemas.find(s => s.name === selectedSchemaName)?.exists && (
                             <div className="mb-3 p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                               <p className="text-sm text-amber-700 dark:text-amber-300">

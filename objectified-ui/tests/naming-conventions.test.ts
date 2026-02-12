@@ -416,4 +416,170 @@ describe('naming-conventions (#581)', () => {
       expect(categoryProp.data.$ref).toBe('#/components/schemas/Category');
     });
   });
+
+  describe('#753 class name mapping and smart naming', () => {
+    it('uses smart name from schema title when no classNameMap', () => {
+      const document = {
+        components: {
+          schemas: {
+            api_response: {
+              type: 'object',
+              title: 'API Response',
+              properties: { code: { type: 'integer' } },
+            },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['api_response'],
+          applyNamingConvention: true,
+          classNamingConvention: 'PascalCase',
+          propertyNamingConvention: 'camelCase',
+        },
+      });
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe('ApiResponse');
+      expect(result.classes[0].originalSchemaKey).toBe('api_response');
+      expect(result.classes[0].properties[0].name).toBe('code');
+    });
+
+    it('uses smart name from x-class-name when present', () => {
+      const document = {
+        components: {
+          schemas: {
+            user_profile: {
+              type: 'object',
+              'x-class-name': 'UserProfile',
+              properties: { name: { type: 'string' } },
+            },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['user_profile'],
+          applyNamingConvention: true,
+          classNamingConvention: 'PascalCase',
+          propertyNamingConvention: 'camelCase',
+        },
+      });
+      expect(result.classes[0].name).toBe('UserProfile');
+      expect(result.classes[0].originalSchemaKey).toBe('user_profile');
+    });
+
+    it('applies classNameMap override over schema context', () => {
+      const document = {
+        components: {
+          schemas: {
+            order_item: {
+              type: 'object',
+              title: 'Order Item',
+              properties: { qty: { type: 'integer' } },
+            },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['order_item'],
+          applyNamingConvention: true,
+          classNamingConvention: 'PascalCase',
+          propertyNamingConvention: 'camelCase',
+          classNameMap: { order_item: 'LineItem' },
+        },
+      });
+      expect(result.classes[0].name).toBe('LineItem');
+      expect(result.classes[0].originalSchemaKey).toBe('order_item');
+    });
+
+    it('updates $ref by schema key when class name comes from smart name (originalSchemaKey)', () => {
+      const document = {
+        components: {
+          schemas: {
+            pet: {
+              type: 'object',
+              title: 'Pet',
+              properties: {
+                category: { $ref: '#/components/schemas/category' },
+              },
+            },
+            category: {
+              type: 'object',
+              title: 'Category',
+              properties: { name: { type: 'string' } },
+            },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['pet', 'category'],
+          applyNamingConvention: true,
+          classNamingConvention: 'PascalCase',
+          propertyNamingConvention: 'camelCase',
+        },
+      });
+      const petClass = result.classes.find((c) => c.originalSchemaKey === 'pet')!;
+      expect(petClass.name).toBe('Pet');
+      const categoryProp = petClass.properties.find((p) => p.name === 'category')!;
+      expect(categoryProp.data.$ref).toBe('#/components/schemas/Category');
+    });
+
+    it('sets originalSchemaKey on all normalized classes', () => {
+      const document = {
+        components: {
+          schemas: {
+            a: { type: 'object', properties: {} },
+            b: { type: 'object', title: 'BModel', properties: {} },
+          },
+        },
+      };
+      const result = openApiImporter.normalize({
+        document,
+        options: {
+          selectedSchemas: ['a', 'b'],
+          applyNamingConvention: false,
+        },
+      });
+      expect(result.classes.find((c) => c.originalSchemaKey === 'a')).toBeDefined();
+      expect(result.classes.find((c) => c.originalSchemaKey === 'b')).toBeDefined();
+      expect(result.classes.find((c) => c.originalSchemaKey === 'b')!.name).toBe('BModel');
+    });
+  });
+});
+
+describe('applyNamingConventionToClasses with originalSchemaKey (#753)', () => {
+  it('updates $ref by originalSchemaKey when class name differs from key', () => {
+    const classes = [
+      {
+        name: 'Order Item',
+        originalSchemaKey: 'order_item',
+        properties: [
+          {
+            name: 'product',
+            data: { $ref: '#/components/schemas/product_info' },
+            children: [] as any[],
+          },
+        ],
+      },
+      {
+        name: 'Product Info',
+        originalSchemaKey: 'product_info',
+        properties: [] as any[],
+      },
+    ];
+    const result = applyNamingConventionToClasses(classes, {
+      classNamingConvention: 'PascalCase',
+      propertyNamingConvention: 'camelCase',
+      applyNamingConvention: true,
+    });
+    expect(result[0].name).toBe('OrderItem');
+    expect(result[1].name).toBe('ProductInfo');
+    expect(result[0].properties![0].data.$ref).toBe('#/components/schemas/ProductInfo');
+  });
 });

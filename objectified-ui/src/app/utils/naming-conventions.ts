@@ -149,8 +149,9 @@ export function applyNamingConventionToClass<T extends { name: string; propertie
 /**
  * Apply naming conventions to multiple classes.
  * Builds a name map and updates $ref in properties so references point to renamed classes.
+ * When originalSchemaKey is present (e.g. from import #753), the map uses it so $refs by schema key resolve correctly.
  */
-export function applyNamingConventionToClasses<T extends { name: string; properties?: Array<{ name: string; data?: any; children?: unknown[] }> }>(
+export function applyNamingConventionToClasses<T extends { name: string; originalSchemaKey?: string; properties?: Array<{ name: string; data?: any; children?: unknown[] }> }>(
   classes: T[],
   options: {
     classNamingConvention?: NamingConvention;
@@ -164,7 +165,8 @@ export function applyNamingConventionToClasses<T extends { name: string; propert
   const nameMap = new Map<string, string>();
   for (const cls of classes) {
     const newName = classNamingConvention === 'none' ? cls.name : convertToNamingConvention(cls.name, classNamingConvention);
-    nameMap.set(cls.name, newName);
+    const refKey = cls.originalSchemaKey ?? cls.name;
+    nameMap.set(refKey, newName);
   }
 
   return classes.map((cls) =>

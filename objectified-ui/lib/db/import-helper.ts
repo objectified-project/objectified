@@ -72,6 +72,8 @@ export interface ImportJobInput {
     classNamingConvention?: 'PascalCase' | 'camelCase' | 'snake_case' | 'kebab-case' | 'none';
     /** Convention for property names (default: camelCase) */
     propertyNamingConvention?: 'PascalCase' | 'camelCase' | 'snake_case' | 'kebab-case' | 'none';
+    /** Optional map: schema key → class name (#753) */
+    classNameMap?: Record<string, string>;
     dryRun?: boolean;
     /** When true, commit each class separately and skip failures (no single transaction). */
     incrementalMode?: boolean;
@@ -474,6 +476,7 @@ export async function startImport(input: ImportJobInput) {
           applyNamingConvention: input.options.applyNamingConvention,
           classNamingConvention: input.options.classNamingConvention,
           propertyNamingConvention: input.options.propertyNamingConvention,
+          classNameMap: input.options.classNameMap,
         },
       });
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));

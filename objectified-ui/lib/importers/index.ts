@@ -9,6 +9,8 @@ export interface NormalizedProperty {
 
 export interface NormalizedClass {
   name: string;
+  /** Original schema key (e.g. components/schemas key) for $ref resolution when name is mapped (#753) */
+  originalSchemaKey?: string;
   description?: string | null;
   schema?: any;
   properties: NormalizedProperty[];
@@ -25,6 +27,8 @@ export interface NormalizeOptions {
   classNamingConvention?: NamingConvention;
   /** Convention for property names (default: camelCase) */
   propertyNamingConvention?: NamingConvention;
+  /** Optional map: schema key → class name. Applied before naming convention (#753). */
+  classNameMap?: Record<string, string>;
 }
 
 export interface NormalizeResult {

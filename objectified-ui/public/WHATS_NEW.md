@@ -106,6 +106,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Failed import items are listed in red
   - Skipped import items are listed in gray
   - Importing rules are enforced: Enforce naming conventions (camelCase, PascalCase, snake_case)
+  - Added application of smart naming from the schema context
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

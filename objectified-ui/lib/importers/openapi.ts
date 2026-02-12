@@ -1,5 +1,6 @@
 import { Importer, ImportSourceKind, NormalizeOptions, NormalizeResult, NormalizedClass, NormalizedProperty } from './index';
 import { applyNamingConventionToClasses } from '../../src/app/utils/naming-conventions';
+import { getSmartClassName } from '../schema-context-naming';
 
 // Utility: extract direct properties and nested inline children similar to src/app/utils/openapi-import.ts
 const extractDirectProperties = (schema: any): { properties: Record<string, any>; required: string[] } => {
@@ -82,6 +83,8 @@ export const openApiImporter: Importer = {
     const schemas = document?.components?.schemas || {};
     const selected = new Set(options.selectedSchemas || Object.keys(schemas));
 
+    const classNameMap = options.classNameMap;
+
     for (const [schemaName, originalSchema] of Object.entries<any>(schemas)) {
       if (!selected.has(schemaName)) continue;
 
@@ -91,8 +94,12 @@ export const openApiImporter: Importer = {
         props.push(convertProperty(propName, properties[propName], required));
       }
 
+      // Smart naming from schema context (#753): title / x-class-name / then schema key
+      const baseName = classNameMap?.[schemaName] ?? getSmartClassName(schemaName, originalSchema);
+
       classes.push({
-        name: schemaName,
+        name: baseName,
+        originalSchemaKey: schemaName,
         description: originalSchema?.description ?? null,
         schema: originalSchema,
         properties: props

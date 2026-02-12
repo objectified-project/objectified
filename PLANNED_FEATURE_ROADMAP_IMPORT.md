@@ -100,7 +100,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - [TODO] **Category Grouping**: Group by tag, path, or custom criteria (will apply when path functionality is added)
 
 ##### Name Mapping 📋 PLANNED
-- 📋 **Auto-Generated Names**: Smart naming from schema context
+- ✅ **Auto-Generated Names**: Smart naming from schema context
 - 📋 **Custom Name Override**: Manual name assignment
 - ✅ **Naming Convention Enforcement**: camelCase, PascalCase, etc.
 - 📋 **Prefix/Suffix Rules**: Apply consistent naming patterns
@@ -108,7 +108,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #753   | Class type name mapping from schema context  |
 | #754   | Custom name override for imported classes    |
 | #755   | Prefix/suffix rules for imported class names |
 | #756   | Reserved name detection to prevent conflicts |

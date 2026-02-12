@@ -15,6 +15,8 @@ export interface ImportClassesInput {
   classNamingConvention?: 'PascalCase' | 'camelCase' | 'snake_case' | 'kebab-case' | 'none';
   /** Convention for property names (default: camelCase) */
   propertyNamingConvention?: 'PascalCase' | 'camelCase' | 'snake_case' | 'kebab-case' | 'none';
+  /** Optional map: schema key → class name. Applied with smart naming from schema context (#753). */
+  classNameMap?: Record<string, string>;
 }
 
 export interface ImportClassesResult {
@@ -102,6 +104,7 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
         applyNamingConvention: input.applyNamingConvention ?? true,
         classNamingConvention: input.classNamingConvention ?? 'PascalCase',
         propertyNamingConvention: input.propertyNamingConvention ?? 'camelCase',
+        classNameMap: input.classNameMap,
       },
     });
     if (norm.warnings.length) {
