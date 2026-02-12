@@ -21,6 +21,7 @@ import { ConflictReport, type ImportConflict } from '../dashboard/ConflictReport
 import { isDuplicateSchema } from '../../../utils/schema-definition-equal';
 import { detectPropertyConflicts } from '../../../utils/property-conflict-detection';
 import { detectReferenceConflicts } from '../../../utils/reference-conflict-detection';
+import { detectTypeMismatches } from '../../../utils/type-mismatch-detection';
 import {
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
@@ -438,7 +439,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
 
-  /** Conflict report data for #596: overview of all detected conflicts; #582: duplicate; #583: property; #584: reference (broken/ambiguous) */
+  /** Conflict report data for #596: overview of all detected conflicts; #582: duplicate; #583: property; #584: reference; #585: type mismatch */
   const conflictReportItems: ImportConflict[] = useMemo(() => {
     const duplicateConflicts: ImportConflict[] = schemas
       .filter((s) => s.exists)
@@ -461,7 +462,15 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
           selectedSchemaNames,
         })
       : [];
-    return [...duplicateConflicts, ...propertyConflicts, ...referenceConflicts];
+    const typeMismatchConflicts = analysisResult?.document
+      ? detectTypeMismatches({ document: analysisResult.document, schemaNames })
+      : [];
+    return [
+      ...duplicateConflicts,
+      ...propertyConflicts,
+      ...referenceConflicts,
+      ...typeMismatchConflicts,
+    ];
   }, [schemas, analysisResult?.document]);
 
   const selectedSchemaNames = useMemo(
@@ -971,8 +980,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 </div>
               </div>
 
-              {/* Conflict Report (#596): overview of all detected conflicts */}
-              {conflictCount > 0 && (
+              {/* Conflict Report (#596): overview of all detected conflicts (incl. #585 type mismatch) */}
+              {conflictReportItems.length > 0 && (
                 <ConflictReport conflicts={conflictReportItems} defaultOpen={true} className="mb-6" />
               )}
 

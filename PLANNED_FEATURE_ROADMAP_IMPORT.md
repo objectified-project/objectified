@@ -79,12 +79,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Duplicate Schema Detection**: Same name, different definition
 - ✅ **Property Conflicts**: Incompatible property definitions
 - ✅ **Reference Conflicts**: Broken or ambiguous references
-- 📋 **Type Mismatches**: Incompatible type assignments
+- ✅ **Type Mismatches**: Incompatible type assignments
 - 📋 **Semantic Conflicts**: Logically incompatible constraints
 
 | Ticket | Feature Description                       |
 |--------|-------------------------------------------|
-| #585   | Detect incompatible type assignments      |
 | #586   | Detect logically incompatible constraints |
 
 ##### Resolution Strategies

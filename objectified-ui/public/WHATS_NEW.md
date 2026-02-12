@@ -121,6 +121,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds Duplicate Schema Detection
     - Adds detection of property conflicts: incompatible property definitions
     - Adds conflict detection for references: broken or ambiguous references
+    - Detects incompatible type assignments, and list them in the conflict detection section
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes
