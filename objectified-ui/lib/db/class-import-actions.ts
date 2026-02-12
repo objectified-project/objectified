@@ -30,6 +30,8 @@ export interface ImportClassesInput {
   defaultValues?: Record<string, any>;
   /** Optional required field overrides per schema/property during import (#759). schema key -> { property name -> boolean }. */
   requiredOverrides?: Record<string, Record<string, boolean>>;
+  /** Optional property description overrides per schema/property during import (#760). schema key -> { property name -> description }. */
+  descriptionOverrides?: Record<string, Record<string, string>>;
 }
 
 export interface ImportClassesResult {
@@ -125,6 +127,7 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
         typeMapping: input.typeMapping,
         defaultValues: input.defaultValues,
         requiredOverrides: input.requiredOverrides,
+        descriptionOverrides: input.descriptionOverrides,
       },
     });
     if (norm.warnings.length) {

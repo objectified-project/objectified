@@ -205,6 +205,22 @@ export const openApiImporter: Importer = {
       });
     }
 
+    // Description override (#760): add or modify property descriptions during import
+    const descriptionOverrides = options.descriptionOverrides;
+    if (descriptionOverrides && Object.keys(descriptionOverrides).length > 0) {
+      classesAfterRequired = classesAfterRequired.map((cls) => {
+        const schemaKey = cls.originalSchemaKey ?? cls.name;
+        const overrides = descriptionOverrides[schemaKey];
+        if (!overrides || typeof overrides !== 'object') return cls;
+        const newProps = (cls.properties ?? []).map((p) => {
+          if (!(p.name in overrides)) return p;
+          const desc = overrides[p.name];
+          return { ...p, description: desc === '' ? undefined : desc };
+        });
+        return { ...cls, properties: newProps };
+      });
+    }
+
     // Apply naming convention enforcement (#581)
     const applyNaming = options.applyNamingConvention === true;
     let finalClasses = applyNaming

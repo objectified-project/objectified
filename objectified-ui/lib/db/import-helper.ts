@@ -84,6 +84,8 @@ export interface ImportJobInput {
     defaultValues?: Record<string, any>;
     /** Optional required field overrides per schema/property during import (#759). schema key -> { property name -> boolean }. */
     requiredOverrides?: Record<string, Record<string, boolean>>;
+    /** Optional property description overrides per schema/property during import (#760). schema key -> { property name -> description }. */
+    descriptionOverrides?: Record<string, Record<string, string>>;
     dryRun?: boolean;
     /** When true, commit each class separately and skip failures (no single transaction). */
     incrementalMode?: boolean;
@@ -492,6 +494,7 @@ export async function startImport(input: ImportJobInput) {
           typeMapping: input.options.typeMapping,
           defaultValues: input.options.defaultValues,
           requiredOverrides: input.options.requiredOverrides,
+          descriptionOverrides: input.options.descriptionOverrides,
         },
       });
       if (norm.warnings.length) emit(job, 'warn', 'NORMALIZE_WARN', norm.warnings.join('\n'));

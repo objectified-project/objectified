@@ -63,6 +63,8 @@ export interface ImportOptions {
   defaultValues?: Record<string, any>;
   /** Optional required field overrides during import (#759). schema key -> { property name -> boolean }. */
   requiredOverrides?: Record<string, Record<string, boolean>>;
+  /** Optional property description overrides during import (#760). schema key -> { property name -> description }. */
+  descriptionOverrides?: Record<string, Record<string, string>>;
 }
 
 interface SchemaInfo {
@@ -482,7 +484,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
       dryRun: false,
       typeMapping: undefined,
       defaultValues: undefined,
-      requiredOverrides: undefined
+      requiredOverrides: undefined,
+      descriptionOverrides: undefined
     };
   });
 
@@ -560,6 +563,25 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
           propName,
           requiredInSpec: Array.isArray(required) && required.includes(propName),
         });
+      }
+    }
+    return rows;
+  }, [analysis.document, importOptions.selectedSchemas]);
+
+  /** Per-schema property list for description override (#760). Includes description from spec for display. */
+  const descriptionOverrideRows = useMemo(() => {
+    const schemasObj = analysis.document?.components?.schemas || analysis.document?.definitions || {};
+    const selected = new Set(importOptions.selectedSchemas);
+    const rows: { schemaKey: string; propName: string; descriptionInSpec: string }[] = [];
+    for (const schemaKey of importOptions.selectedSchemas) {
+      if (!selected.has(schemaKey)) continue;
+      const schema = schemasObj[schemaKey];
+      if (!schema) continue;
+      const { properties } = extractDirectProperties(schema);
+      for (const propName of Object.keys(properties)) {
+        const propSchema = properties[propName];
+        const descriptionInSpec = typeof propSchema?.description === 'string' ? propSchema.description : '';
+        rows.push({ schemaKey, propName, descriptionInSpec });
       }
     }
     return rows;
@@ -1555,8 +1577,8 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
             </p>
           </div>
 
-          {/* Property mapping: type mapping, default values, required override (#757, #758, #759) */}
-          {(externalTypeKeys.length > 0 || requiredOverrideRows.length > 0) && (
+          {/* Property mapping: type mapping, default values, required override, description override (#757, #758, #759, #760) */}
+          {(externalTypeKeys.length > 0 || requiredOverrideRows.length > 0 || descriptionOverrideRows.length > 0) && (
             <div className="col-span-4 flex flex-col gap-3 pt-2">
               {externalTypeKeys.length > 0 && (
               <Collapsible defaultOpen={false} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1736,6 +1758,73 @@ export function PreviewPanel({ analysis, onImportOptionsChange }: PreviewPanelPr
                                       <option value="required">Required</option>
                                       <option value="optional">Optional</option>
                                     </select>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {/* Property descriptions: add or modify descriptions during import (#760) */}
+              {descriptionOverrideRows.length > 0 && (
+                <Collapsible defaultOpen={false} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <span>Property descriptions</span>
+                    <ChevronDown className="h-4 w-4 shrink-0 data-[state=open]:rotate-180 transition-transform" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-700">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Add or change descriptions for imported properties. Leave empty to keep the specification value.
+                      </p>
+                      <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200 dark:border-gray-600 sticky top-0 bg-gray-50 dark:bg-gray-800/95">
+                              <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Schema</th>
+                              <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Property</th>
+                              <th className="text-left py-2 font-medium text-gray-700 dark:text-gray-300">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {descriptionOverrideRows.map(({ schemaKey, propName, descriptionInSpec }) => {
+                              const override = importOptions.descriptionOverrides?.[schemaKey]?.[propName];
+                              const displayValue = override !== undefined ? override : '';
+                              const placeholder = descriptionInSpec ? `As in spec: ${descriptionInSpec.slice(0, 40)}${descriptionInSpec.length > 40 ? '…' : ''}` : '(no description in spec)';
+                              return (
+                                <tr key={`desc-${schemaKey}.${propName}`} className="border-b border-gray-100 dark:border-gray-700/50">
+                                  <td className="py-1.5 text-gray-900 dark:text-white font-mono text-xs align-top">{schemaKey}</td>
+                                  <td className="py-1.5 text-gray-900 dark:text-white font-mono text-xs align-top">{propName}</td>
+                                  <td className="py-1.5 min-w-[180px]">
+                                    <input
+                                      type="text"
+                                      value={displayValue}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        const nextBySchema = { ...(importOptions.descriptionOverrides || {}) };
+                                        const nextSchema = { ...(nextBySchema[schemaKey] || {}) };
+                                        if (raw === '') {
+                                          delete nextSchema[propName];
+                                        } else {
+                                          nextSchema[propName] = raw;
+                                        }
+                                        if (Object.keys(nextSchema).length === 0) delete nextBySchema[schemaKey];
+                                        else nextBySchema[schemaKey] = nextSchema;
+                                        const newOptions = {
+                                          ...importOptions,
+                                          descriptionOverrides: Object.keys(nextBySchema).length > 0 ? nextBySchema : undefined,
+                                        };
+                                        setImportOptions(newOptions);
+                                        onImportOptionsChange?.(newOptions);
+                                      }}
+                                      placeholder={placeholder}
+                                      className="w-full min-w-[180px] px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                                    />
                                   </td>
                                 </tr>
                               );

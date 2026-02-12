@@ -49,6 +49,11 @@ export interface NormalizeOptions {
    * value = map of property name -> boolean (true = required, false = optional). Applied before naming convention.
    */
   requiredOverrides?: Record<string, Record<string, boolean>>;
+  /**
+   * Optional property description overrides during import (#760). Key = schema key (e.g. components/schemas key),
+   * value = map of property name -> description string. Empty string clears the description. Applied before naming convention.
+   */
+  descriptionOverrides?: Record<string, Record<string, string>>;
 }
 
 export interface NormalizeResult {
