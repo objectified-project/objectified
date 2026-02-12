@@ -22,6 +22,7 @@ import { isDuplicateSchema } from '../../../utils/schema-definition-equal';
 import { detectPropertyConflicts } from '../../../utils/property-conflict-detection';
 import { detectReferenceConflicts } from '../../../utils/reference-conflict-detection';
 import { detectTypeMismatches } from '../../../utils/type-mismatch-detection';
+import { detectSemanticConflicts } from '../../../utils/semantic-conflict-detection';
 import {
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
@@ -439,7 +440,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
 
-  /** Conflict report data for #596: overview of all detected conflicts; #582: duplicate; #583: property; #584: reference; #585: type mismatch */
+  /** Conflict report data for #596: overview of all detected conflicts; #582: duplicate; #583: property; #584: reference; #585: type mismatch; #586: semantic */
   const conflictReportItems: ImportConflict[] = useMemo(() => {
     const duplicateConflicts: ImportConflict[] = schemas
       .filter((s) => s.exists)
@@ -465,11 +466,15 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     const typeMismatchConflicts = analysisResult?.document
       ? detectTypeMismatches({ document: analysisResult.document, schemaNames })
       : [];
+    const semanticConflicts = analysisResult?.document
+      ? detectSemanticConflicts({ document: analysisResult.document, schemaNames })
+      : [];
     return [
       ...duplicateConflicts,
       ...propertyConflicts,
       ...referenceConflicts,
       ...typeMismatchConflicts,
+      ...semanticConflicts,
     ];
   }, [schemas, analysisResult?.document]);
 

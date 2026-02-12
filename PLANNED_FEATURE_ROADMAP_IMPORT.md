@@ -75,17 +75,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 #### 4.5 Conflict Resolution 📋 PLANNED
 
-##### Conflict Detection
-- ✅ **Duplicate Schema Detection**: Same name, different definition
-- ✅ **Property Conflicts**: Incompatible property definitions
-- ✅ **Reference Conflicts**: Broken or ambiguous references
-- ✅ **Type Mismatches**: Incompatible type assignments
-- 📋 **Semantic Conflicts**: Logically incompatible constraints
-
-| Ticket | Feature Description                       |
-|--------|-------------------------------------------|
-| #586   | Detect logically incompatible constraints |
-
 ##### Resolution Strategies
 - [TODO] **Keep Existing**: Preserve current schema, skip import
 - 📋 **Replace**: Overwrite existing with imported schema
@@ -478,6 +467,13 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Conflict Summary**: Overview of all detected conflicts
 - ✅ **Impact Analysis**: What will change if resolved
 - ✅ **Conflict Export**: Export conflict report for review
+
+##### Conflict Detection
+- ✅ **Duplicate Schema Detection**: Same name, different definition
+- ✅ **Property Conflicts**: Incompatible property definitions
+- ✅ **Reference Conflicts**: Broken or ambiguous references
+- ✅ **Type Mismatches**: Incompatible type assignments
+- ✅ **Semantic Conflicts**: Logically incompatible constraints
 
 ---
 
