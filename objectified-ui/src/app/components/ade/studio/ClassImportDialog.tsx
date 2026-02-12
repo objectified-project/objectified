@@ -17,6 +17,7 @@ import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/
 import UrlImportPanel from '../dashboard/UrlImportPanel';
 import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 import GitImportPanel from '../dashboard/GitImportPanel';
+import { ConflictReport, type ImportConflict } from '../dashboard/ConflictReport';
 import {
   getTransitiveDependencies,
   isReferencedBySelectedSchemas,
@@ -432,6 +433,19 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const selectedCount = schemas.filter(s => s.selected && !s.exists).length;
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
+
+  /** Conflict report data for #596: overview of all detected conflicts */
+  const conflictReportItems: ImportConflict[] = useMemo(
+    () =>
+      schemas
+        .filter((s) => s.exists)
+        .map((s) => ({
+          kind: 'duplicate_schema' as const,
+          schemaName: s.name,
+          message: `A class named "${s.name}" already exists in this version. Importing will overwrite or you can rename.`,
+        })),
+    [schemas]
+  );
 
   const selectedSchemaNames = useMemo(
     () => schemas.filter(s => s.selected && !s.exists).map(s => s.name),
@@ -939,6 +953,11 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Conflict Report (#596): overview of all detected conflicts */}
+              {conflictCount > 0 && (
+                <ConflictReport conflicts={conflictReportItems} defaultOpen={true} className="mb-6" />
+              )}
 
               {/* Pre-Import Analysis */}
               {analysisResult.metrics && (

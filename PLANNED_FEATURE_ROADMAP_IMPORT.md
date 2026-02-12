@@ -146,7 +146,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #595   | Array merge strategies: append, replace, deduplicate |
 
 ##### Conflict Report
-- 📋 **Conflict Summary**: Overview of all detected conflicts
+- ✅ **Conflict Summary**: Overview of all detected conflicts
 - 📋 **Impact Analysis**: What will change if resolved
 - [TODO] **Resolution Recommendations**: AI-suggested resolutions
 - [TODO] **Batch Resolution**: Apply same strategy to similar conflicts
@@ -154,7 +154,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description                     |
 |--------|-----------------------------------------|
-| #596   | Overview of all detected conflicts      |
 | #597   | Impact analysis of conflict resolutions |
 | #598   | Conflict export for review              |
 
