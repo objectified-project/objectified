@@ -117,12 +117,19 @@ function mergePropertyLists(
   const seen = new Set<string>();
 
   if (strategy === 'additive') {
-    // Add all existing first
+    // Additive (#591): add new properties, keep existing. At each level: keep existing first,
+    // then add from imported only if name not present. For same name, keep existing property
+    // but recursively merge children additively when both have nested properties.
     for (const p of existingList) {
       seen.add(p.name);
-      result.push(p);
+      const importedProp = byNameImported.get(p.name);
+      if (importedProp?.children?.length && p.children?.length) {
+        const mergedChildren = mergePropertyLists(p.children, importedProp.children, strategy);
+        result.push({ ...p, children: mergedChildren });
+      } else {
+        result.push(p);
+      }
     }
-    // Add imported only if name not present
     for (const p of importedList) {
       if (seen.has(p.name)) continue;
       seen.add(p.name);

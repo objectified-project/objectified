@@ -127,6 +127,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Allows for merging: intelligently merge properties and constraints
     - Adds the ability to import with modified names to avoid conflict
     - Adds ability to create a new version if one conflicts with a current version with a naming strategy
+    - Adds replacement and additive property strategy
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

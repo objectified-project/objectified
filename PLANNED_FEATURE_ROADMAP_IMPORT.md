@@ -73,19 +73,17 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 | #240   | Import from Thrift          |
 | #299   | Import from Arazzo          |
 
-#### 4.5 Conflict Resolution 📋 PLANNED
+#### 4.5 Conflict Resolution ✅ PARTIALLY IMPLEMENTED
 
 ##### Merge Options
-- 📋 **Additive Merge**: Add new properties, keep existing
-- 📋 **Override Merge**: Imported values take precedence
+- ✅ **Additive Merge**: Add new properties, keep existing
+- ✅ **Override Merge**: Imported values take precedence
 - 📋 **Selective Merge**: Choose per-property merge strategy
 - 📋 **Deep Merge**: Recursively merge nested objects
 - 📋 **Array Merge Strategies**: Append, replace, or deduplicate
 
 | Ticket | Feature Description                                  |
 |--------|------------------------------------------------------|
-| #591   | Additive merge strategy                              |
-| #592   | Override merge strategy                              |
 | #593   | Selective per-property merge strategy                |
 | #594   | Deep merge for nested objects                        |
 | #595   | Array merge strategies: append, replace, deduplicate |
@@ -461,7 +459,7 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Type Mismatches**: Incompatible type assignments
 - ✅ **Semantic Conflicts**: Logically incompatible constraints
 
-#### 4.5 Conflict Resolution 📋 PLANNED
+#### 4.5 Conflict Resolution ✅ IMPLEMENTED
 
 ##### Resolution Strategies
 - ✅ **Keep Existing**: Preserve current schema, skip import
