@@ -6,6 +6,8 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## New Features and Improvements
 
+- Import: RAML definition files can now be imported; RAML 0.8/1.0 types are converted to OpenAPI 3.1 schemas for import (#237).
+
 - Canvas Improvements:
   - Preview layout suggestions before applying: try Top-to-Bottom or Left-to-Right from the Layout menu or “Try Auto-organize” in suggestions, then Apply or Cancel (#471)
   - Added top-to-bottom and left-to-right layout options
@@ -133,6 +135,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds array of merge strategies: append, replace, or deduplicate
   - Import formats now supported:
     - AsyncAPI
+    - RAML
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

@@ -183,7 +183,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
   const handleFileSelect = async (selectedFile: File) => {
     const fileName = selectedFile.name.toLowerCase();
-    if (!fileName.endsWith('.json') && !fileName.endsWith('.yaml') && !fileName.endsWith('.yml') && !fileName.endsWith('.graphql') && !fileName.endsWith('.gql')) {
+    if (!fileName.endsWith('.json') && !fileName.endsWith('.yaml') && !fileName.endsWith('.yml') && !fileName.endsWith('.graphql') && !fileName.endsWith('.gql') && !fileName.endsWith('.raml')) {
       setErrorMessage('Please select a JSON, YAML, or GraphQL file');
       return;
     }
@@ -316,13 +316,14 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
       return;
     }
 
-    // Check if it's an OpenAPI file
+    // Check if it's an OpenAPI file (or RAML / other importable spec)
     const isOpenAPIFile =
       file.name.includes('openapi') ||
       file.name.includes('swagger') ||
       file.name.endsWith('.json') ||
       file.name.endsWith('.yaml') ||
-      file.name.endsWith('.yml');
+      file.name.endsWith('.yml') ||
+      file.name.endsWith('.raml');
 
     if (!isOpenAPIFile) {
       setErrorMessage('Please select an OpenAPI specification file (JSON or YAML)');
@@ -551,7 +552,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                 <input
                   id="openapi-file-input"
                   type="file"
-                  accept=".json,.yaml,.yml,.graphql,.gql"
+                  accept=".json,.yaml,.yml,.graphql,.gql,.raml"
                   style={{ display: 'none' }}
                   onChange={handleFileInputChange}
                 />
@@ -864,7 +865,8 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                               file.name.includes('swagger') ||
                               file.name.endsWith('.json') ||
                               file.name.endsWith('.yaml') ||
-                              file.name.endsWith('.yml');
+                              file.name.endsWith('.yml') ||
+                              file.name.endsWith('.raml');
 
                             return (
                               <Box

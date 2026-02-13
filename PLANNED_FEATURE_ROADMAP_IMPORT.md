@@ -53,10 +53,9 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ OpenAPI 3.0.x
 - ✅ OpenAPI 3.1.x
 - ✅ JSON Schema
-- [TODO] Postman Collections
 - ✅ GraphQL SDL
 - ✅ AsyncAPI
-- 📋 RAML
+- ✅ RAML
 - [TODO] API Blueprint
 - 📋 Protobuf
 - 📋 Avro
@@ -66,7 +65,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description         |
 |--------|-----------------------------|
-| #237   | Import from RAML            |
 | #238   | Import from Protobuf        |
 | #239   | Import from Avro            |
 | #240   | Import from Thrift          |

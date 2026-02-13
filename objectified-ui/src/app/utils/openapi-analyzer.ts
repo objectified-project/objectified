@@ -9,6 +9,7 @@ import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
 import { convertAsyncAPIToOpenAPI, isAsyncAPI } from './asyncapi-converter';
+import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -201,15 +202,15 @@ function detectFormat(doc: any): FormatDetectionResult {
     };
   }
 
-  // RAML - detect by version header pattern (typically in YAML content)
-  // RAML files typically start with #%RAML version
-  if (doc['#%RAML'] || (typeof doc === 'object' && doc.title && doc.baseUri && doc.version)) {
+  // RAML - detect by version header pattern (typically in YAML content) — #237
+  // RAML files typically start with #%RAML version; supported via conversion to OpenAPI 3.1
+  if (doc['#%RAML'] || (typeof doc === 'object' && doc.title && (doc.baseUri || doc.version))) {
     const ramlVersion = doc['#%RAML'] || '1.0';
     return {
       format: 'raml',
       version: ramlVersion,
-      supported: false,
-      displayName: `RAML ${ramlVersion}`
+      supported: true,
+      displayName: `RAML ${ramlVersion} (converted to OpenAPI 3.1.x for import)`
     };
   }
 
@@ -1514,6 +1515,62 @@ export async function analyzeSpecification(fileContent: string, fileName: string
         errors: [{
           type: 'error',
           message: conversionResult.error ?? 'AsyncAPI conversion failed',
+          severity: 'critical'
+        }],
+        warnings: [],
+        unsupportedFeatures: [],
+        document: null
+      };
+    }
+
+    doc = conversionResult.document;
+
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
+  }
+
+  // Convert RAML 0.8 / 1.0 to OpenAPI 3.1–like document for import (#237)
+  if (isRAML(doc)) {
+    const conversionResult = convertRAMLToOpenAPI(doc, fileName);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'raml',
+        version: doc['#%RAML'] || '1.0',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: true,
+        formatDisplayName: `RAML ${doc['#%RAML'] || '1.0'} (conversion failed)`,
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0,
+          issues: []
+        },
+        errors: [{
+          type: 'error',
+          message: conversionResult.error ?? 'RAML conversion failed',
           severity: 'critical'
         }],
         warnings: [],

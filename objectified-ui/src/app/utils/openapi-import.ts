@@ -10,6 +10,7 @@ import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
+import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 
 export interface ParsedProperty {
   name: string;
@@ -364,6 +365,28 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
     } catch {
       // If JSON parsing fails, try YAML
       spec = YAML.parse(specContent);
+    }
+
+    // Check for RAML and convert if needed (#237)
+    if (isRAML(spec)) {
+      const conversionResult = convertRAMLToOpenAPI(spec);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `RAML conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      spec = conversionResult.document;
+
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from RAML to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from RAML to OpenAPI 3.1.x'];
+
+      return parseOpenAPISpecInternal(spec, globalWarnings);
     }
 
     // Check for Swagger 2.x and convert if needed
