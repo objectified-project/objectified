@@ -9,6 +9,8 @@ export interface ImportClassesInput {
   versionId: string;
   projectId: string;
   document: any;
+  /** Import format; determines which importer is used (default: openapi). #299 Arazzo */
+  sourceKind?: 'openapi' | 'arazzo';
   selectedSchemas: string[];
   /** When true, apply naming convention to class and property names (#581) */
   applyNamingConvention?: boolean;
@@ -195,10 +197,10 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
       }
     }
 
-    // Use OpenAPI importer to normalize the document
-    const importer = getImporter('openapi');
+    const sourceKind = input.sourceKind ?? 'openapi';
+    const importer = getImporter(sourceKind);
     if (!importer) {
-      return { success: false, error: 'OpenAPI importer not available' };
+      return { success: false, error: `${sourceKind} importer not available` };
     }
 
     const norm = importer.normalize({

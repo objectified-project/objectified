@@ -475,10 +475,12 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       }
 
       const document = analysisResult.document;
+      const sourceKind = analysisResult.format === 'arazzo' ? 'arazzo' : 'openapi';
       const result = await importClassesToVersion({
         versionId: targetVersionId,
         projectId,
         document,
+        sourceKind,
         selectedSchemas,
         applyNamingConvention,
         classNamingConvention,
@@ -929,7 +931,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                               </div>
                               <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                                 The detected format <span className="font-semibold">{fileMetadata.formatDisplayName}</span> is not supported.
-                                Only OpenAPI 3.x and Swagger 2.x specifications are supported.
+                                OpenAPI 3.x, Swagger 2.x, and Arazzo specifications are supported.
                               </div>
                             </div>
                           </div>

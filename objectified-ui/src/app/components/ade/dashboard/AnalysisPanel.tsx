@@ -207,7 +207,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 </div>
                 <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                   The detected format <span className="font-semibold">{analysis.formatDisplayName}</span> is not yet supported for import.
-                  Currently supported formats: OpenAPI 3.x, Swagger 2.x, and JSON Schema.
+                  Currently supported formats: OpenAPI 3.x, Swagger 2.x, JSON Schema, and Arazzo.
                 </div>
               </div>
             </div>

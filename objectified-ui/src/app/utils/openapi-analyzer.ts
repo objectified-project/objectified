@@ -13,6 +13,7 @@ import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
 import { convertAvroToOpenAPI, isAvroSchemaObject } from './avro-converter';
 import { convertThriftToOpenAPI, isThrift } from './thrift-converter';
+import { inferArazzoSchemasFromWorkflows } from '../../../lib/importers/arazzo';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -239,13 +240,15 @@ function detectFormat(doc: any): FormatDetectionResult {
     };
   }
 
-  // Arazzo - not yet supported for import
+  // Arazzo 1.0.x - supported for import (#299)
   if (doc.arazzo) {
+    const version = doc.arazzo;
+    const supported = version.startsWith('1.0');
     return {
       format: 'arazzo',
-      version: doc.arazzo,
-      supported: false,
-      displayName: `Arazzo ${doc.arazzo}`
+      version,
+      supported,
+      displayName: supported ? `Arazzo ${version}` : `Arazzo ${version} (unsupported version)`
     };
   }
 
@@ -1810,6 +1813,14 @@ export async function analyzeSpecification(fileContent: string, fileName: string
 
   // Detect format (will now show OpenAPI 3.1.0 for converted specs)
   const formatDetection = detectFormat(doc);
+
+  // For Arazzo without components.schemas, inject inferred schemas so metrics and preview work (#299)
+  if (formatDetection.format === 'arazzo') {
+    const inferred = inferArazzoSchemasFromWorkflows(doc);
+    if (Object.keys(inferred).length > 0 && !doc.components?.schemas) {
+      doc = { ...doc, components: { ...doc.components, schemas: inferred } };
+    }
+  }
 
   // Validate meta-schema
   const validation = validateMetaSchema(doc, formatDetection.format);

@@ -330,10 +330,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     }
 
     const document = analysisResult.document;
+    const sourceKind = analysisResult.format === 'arazzo' ? 'arazzo' : 'openapi';
     const job = await startImport({
       tenantId,
       userId,
-      sourceKind: 'openapi',
+      sourceKind,
       document,
       project: {
         name: importOptions.projectName || (document?.info?.title || 'New Project'),
@@ -857,7 +858,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                               </div>
                               <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                                 The detected format <span className="font-semibold">{fileMetadata.formatDisplayName}</span> is not yet supported for import.
-                                Currently supported formats: OpenAPI 3.x, Swagger 2.x, and JSON Schema.
+                                Currently supported formats: OpenAPI 3.x, Swagger 2.x, JSON Schema, and Arazzo.
                               </div>
                             </div>
                           </div>

@@ -47,8 +47,8 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 ##### Schema Import/Export
 
-**Import From** 📋 PLANNED
-- 📋 Arazzo
+**Import From** 📋 PARTIALLY IMPLEMENTED
+- ✅ Arazzo
 - ✅ OpenAPI 2.0 (Swagger)
 - ✅ OpenAPI 3.0.x
 - ✅ OpenAPI 3.1.x
@@ -56,16 +56,12 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ GraphQL SDL
 - ✅ AsyncAPI
 - ✅ RAML
-- [TODO] API Blueprint
 - ✅ Protobuf
 - ✅ Avro
 - ✅ Thrift
+- [TODO] API Blueprint
 - [TODO] Excel/CSV (data definitions)
 - [TODO] Database (reverse engineer from DB)
-
-| Ticket | Feature Description         |
-|--------|-----------------------------|
-| #299   | Import from Arazzo          |
 
 #### 4.6 Import Execution 📋 PLANNED
 
@@ -453,6 +449,21 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ **Selective Merge**: Choose per-property merge strategy (#593)
 - ✅ **Deep Merge**: Recursively merge nested objects (#594)
 - ✅ **Array Merge Strategies**: Append, replace, or deduplicate (#595)
+
+##### Schema Import/Export
+
+**Import From** ✅ IMPLEMENTED
+- ✅ Arazzo
+- ✅ OpenAPI 2.0 (Swagger)
+- ✅ OpenAPI 3.0.x
+- ✅ OpenAPI 3.1.x
+- ✅ JSON Schema
+- ✅ GraphQL SDL
+- ✅ AsyncAPI
+- ✅ RAML
+- ✅ Protobuf
+- ✅ Avro
+- ✅ Thrift
 
 ---
 

@@ -139,6 +139,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Protobuf
     - Avro
     - Thrift
+    - Arazzo
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

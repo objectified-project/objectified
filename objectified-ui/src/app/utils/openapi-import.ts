@@ -337,7 +337,29 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
   try {
     let spec: any;
 
-    // Check if this is Protobuf (.proto) content (#238) — before GraphQL so .proto is not misdetected
+    // Check GraphQL first so that schemas with enum/union/type are not misdetected as Protobuf or Thrift
+    if (isGraphQL(specContent)) {
+      const conversionResult = convertGraphQLToOpenAPI(specContent);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `GraphQL conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      spec = conversionResult.document;
+
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from GraphQL Schema to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from GraphQL Schema to OpenAPI 3.1.x'];
+
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
+    // Check if this is Protobuf (.proto) content (#238)
     if (isProtobuf(specContent)) {
       const conversionResult = convertProtobufToOpenAPI(specContent);
 
@@ -359,7 +381,7 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       return parseOpenAPISpecInternal(spec, globalWarnings);
     }
 
-    // Check if this is Thrift IDL (.thrift) content (#240) — before GraphQL so "enum X" is not misdetected as GraphQL
+    // Thrift IDL (.thrift) — after GraphQL so enum/union-heavy GraphQL is not misdetected
     if (isThrift(specContent)) {
       const conversionResult = convertThriftToOpenAPI(specContent);
 
@@ -377,28 +399,6 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       const globalWarnings = conversionResult.warnings.length > 0
         ? [`Converted from Apache Thrift to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
         : ['Successfully converted from Apache Thrift to OpenAPI 3.1.x'];
-
-      return parseOpenAPISpecInternal(spec, globalWarnings);
-    }
-
-    // Check if this is GraphQL SDL content
-    if (isGraphQL(specContent)) {
-      const conversionResult = convertGraphQLToOpenAPI(specContent);
-
-      if (!conversionResult.success) {
-        return {
-          success: false,
-          classes: [],
-          warnings: conversionResult.warnings,
-          error: `GraphQL conversion failed: ${conversionResult.error}`
-        };
-      }
-
-      spec = conversionResult.document;
-
-      const globalWarnings = conversionResult.warnings.length > 0
-        ? [`Converted from GraphQL Schema to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
-        : ['Successfully converted from GraphQL Schema to OpenAPI 3.1.x'];
 
       return parseOpenAPISpecInternal(spec, globalWarnings);
     }
