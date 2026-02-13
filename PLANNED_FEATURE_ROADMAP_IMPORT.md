@@ -55,7 +55,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ JSON Schema
 - [TODO] Postman Collections
 - ✅ GraphQL SDL
-- 📋 AsyncAPI
+- ✅ AsyncAPI
 - 📋 RAML
 - [TODO] API Blueprint
 - 📋 Protobuf
@@ -66,7 +66,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description         |
 |--------|-----------------------------|
-| #236   | Import from AsyncAPI        |
 | #237   | Import from RAML            |
 | #238   | Import from Protobuf        |
 | #239   | Import from Avro            |

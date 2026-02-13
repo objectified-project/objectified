@@ -8,6 +8,7 @@ import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
+import { convertAsyncAPIToOpenAPI, isAsyncAPI } from './asyncapi-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -212,13 +213,17 @@ function detectFormat(doc: any): FormatDetectionResult {
     };
   }
 
-  // AsyncAPI
+  // AsyncAPI (2.x and 3.x supported for import via conversion to OpenAPI 3.1–like doc)
   if (doc.asyncapi) {
+    const version = doc.asyncapi;
+    const isSupported = version.startsWith('2.') || version.startsWith('3.');
     return {
       format: 'asyncapi',
-      version: doc.asyncapi,
-      supported: false,
-      displayName: `AsyncAPI ${doc.asyncapi}`
+      version,
+      supported: isSupported,
+      displayName: isSupported
+        ? `AsyncAPI ${version} (schemas imported as OpenAPI 3.1.x)`
+        : `AsyncAPI ${version} (unsupported version)`
     };
   }
 
@@ -1463,6 +1468,62 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     doc = conversionResult.document;
 
     // Add conversion warnings
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
+  }
+
+  // Convert AsyncAPI 2.x / 3.x to OpenAPI 3.1–like document for import (#236)
+  if (isAsyncAPI(doc)) {
+    const conversionResult = convertAsyncAPIToOpenAPI(doc, fileName);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'asyncapi',
+        version: doc.asyncapi || 'unknown',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: false,
+        formatDisplayName: `AsyncAPI ${doc.asyncapi || 'unknown'} (conversion failed)`,
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0,
+          issues: []
+        },
+        errors: [{
+          type: 'error',
+          message: conversionResult.error ?? 'AsyncAPI conversion failed',
+          severity: 'critical'
+        }],
+        warnings: [],
+        unsupportedFeatures: [],
+        document: null
+      };
+    }
+
+    doc = conversionResult.document;
+
     conversionWarnings = [
       ...conversionWarnings,
       ...conversionResult.warnings.map(warning => ({

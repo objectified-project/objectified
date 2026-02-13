@@ -131,6 +131,8 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds selective merge is the ability to choose per-property merge strategy
     - Adds deep merge to recursively merge nested objects
     - Adds array of merge strategies: append, replace, or deduplicate
+  - Import formats now supported:
+    - AsyncAPI
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes
