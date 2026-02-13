@@ -1,6 +1,6 @@
 'use server';
 
-import { createClass, addPropertyToClass } from './helper';
+import { createClass, addPropertyToClass, updateClass, getClassesForVersion, deleteClassPropertiesForClass } from './helper';
 import { getImporter, NormalizedClass } from '../importers';
 import { cookies } from 'next/headers';
 
@@ -34,6 +34,8 @@ export interface ImportClassesInput {
   descriptionOverrides?: Record<string, Record<string, string>>;
   /** When true, auto-generate example values for properties that do not have an example (#761). */
   generateExamples?: boolean;
+  /** When true, replace existing classes with the same name using the imported schema (#587). */
+  overwriteExisting?: boolean;
 }
 
 export interface ImportClassesResult {
@@ -98,9 +100,47 @@ async function writeClassWithProperties(
   return classId;
 }
 
+async function overwriteClassWithProperties(
+  classId: string,
+  cls: NormalizedClass,
+  propertyIdMap: Map<string, string>
+) {
+  await deleteClassPropertiesForClass(classId);
+  const updateRes = JSON.parse(
+    await updateClass(classId, cls.name, cls.description || null, cls.schema || { type: 'object' })
+  );
+  if (!updateRes.success) throw new Error(updateRes.error || 'Failed to update class');
+
+  const linkRec = async (cid: string, props: any[], parentId: string | null = null) => {
+    for (const p of props || []) {
+      let propertyId: string | null = null;
+      const isReference = p.data.$ref || (p.data.type === 'array' && p.data.items?.$ref);
+      if (!isReference) {
+        const sig = stableStringify(p.data);
+        propertyId = propertyIdMap.get(sig) || null;
+        if (propertyId === null) {
+          console.warn(`Skipping property "${p.name}" in class "${cls.name}" - no library entry found`);
+          if (p.children && p.children.length) {
+            console.warn(`Also skipping ${p.children.length} child properties of "${p.name}"`);
+          }
+          continue;
+        }
+      }
+      const addRes = JSON.parse(
+        await addPropertyToClass(cid, propertyId, p.name, p.description || null, p.data, parentId)
+      );
+      if (!addRes.success) throw new Error(addRes.error || 'Failed to add property');
+      const newId = addRes.classProperty.id as string;
+      if (p.children && p.children.length) await linkRec(cid, p.children, newId);
+    }
+  };
+
+  await linkRec(classId, cls.properties || [], null);
+}
+
 export async function importClassesToVersion(input: ImportClassesInput): Promise<ImportClassesResult> {
   try {
-    const { versionId, projectId, document, selectedSchemas } = input;
+    const { versionId, projectId, document, selectedSchemas, overwriteExisting } = input;
 
     if (!versionId || !projectId) {
       return { success: false, error: 'Version ID and Project ID are required' };
@@ -108,6 +148,15 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
 
     if (!selectedSchemas || selectedSchemas.length === 0) {
       return { success: false, error: 'No schemas selected for import' };
+    }
+
+    const existingNameToId = new Map<string, string>();
+    if (overwriteExisting) {
+      const classesJson = await getClassesForVersion(versionId);
+      const classes = JSON.parse(classesJson) as Array<{ id: string; name: string }>;
+      for (const c of classes) {
+        existingNameToId.set(c.name, c.id);
+      }
     }
 
     // Use OpenAPI importer to normalize the document
@@ -205,12 +254,18 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
     let skippedCount = 0;
 
     for (const cls of norm.classes) {
+      const existingClassId = overwriteExisting ? existingNameToId.get(cls.name) : undefined;
       try {
-        await writeClassWithProperties(projectId, versionId, cls, propertyIdMap);
-        importedClasses.push(cls.name);
+        if (existingClassId) {
+          await overwriteClassWithProperties(existingClassId, cls, propertyIdMap);
+          importedClasses.push(cls.name);
+        } else {
+          await writeClassWithProperties(projectId, versionId, cls, propertyIdMap);
+          importedClasses.push(cls.name);
+        }
       } catch (error: any) {
-        // If class already exists, skip it
-        if (error.message?.includes('already exists')) {
+        // If class already exists and we weren't overwriting, skip it
+        if (!existingClassId && error.message?.includes('already exists')) {
           console.log(`Class "${cls.name}" already exists, skipping`);
           skippedCount++;
         } else {

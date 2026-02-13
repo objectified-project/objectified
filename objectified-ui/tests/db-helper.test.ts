@@ -820,6 +820,20 @@ describe('Database Helper - Class Property Functions', () => {
     expect(parsed.success).toBe(true);
   });
 
+  test('deleteClassPropertiesForClass should delete all properties for class (#587)', async () => {
+    const { deleteClassPropertiesForClass } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({ rowCount: 3 });
+
+    await deleteClassPropertiesForClass('class-1');
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery).toHaveBeenCalledWith(
+      'DELETE FROM odb.class_properties WHERE class_id = $1',
+      ['class-1']
+    );
+  });
+
   it('updateClassProperty should update property', async () => {
     // Function not implemented - skipping test
     // const { updateClassProperty } = await import('../lib/db/helper');

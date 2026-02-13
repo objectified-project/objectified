@@ -151,6 +151,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [classSuffix, setClassSuffix] = useState('');
   /** Type mapping: external type key → internal JSON Schema (#757). */
   const [typeMapping, setTypeMapping] = useState<Record<string, any>>({});
+  /** When true, allow selecting existing classes to replace with imported schema (#587). */
+  const [overwriteExisting, setOverwriteExisting] = useState(false);
 
   const handleSourceClick = (source: 'file' | 'url' | 'clipboard' | 'git') => {
     setSelectedSource(source);
@@ -207,6 +209,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setClassNameOverrides({});
     setClassPrefix('');
     setClassSuffix('');
+    setOverwriteExisting(false);
     onClose();
   };
 
@@ -347,24 +350,25 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const handleToggleSchema = (name: string) => {
     const schemaObj = (analysisResult?.document?.components?.schemas ?? analysisResult?.document?.definitions ?? {}) as Record<string, unknown>;
     const current = schemas.find((s) => s.name === name);
-    if (!current || current.exists) return;
+    if (!current) return;
+    if (current.exists && !overwriteExisting) return;
 
     if (current.selected) {
       // Deselecting: only allow if no other selected schema references this one (#579)
       if (isReferencedBySelectedSchemas(name, schemas, schemaObj)) return;
       setSchemas((prev) => prev.map((s) => (s.name === name ? { ...s, selected: false } : s)));
     } else {
-      // Selecting: also select all transitive dependencies (#579)
+      // Selecting: also select all transitive dependencies (#579). When overwriteExisting, allow selecting existing too.
       const deps = getTransitiveDependencies(name, schemaObj);
       const toSelect = new Set([name, ...deps]);
       setSchemas((prev) =>
-        prev.map((s) => (!s.exists && toSelect.has(s.name) ? { ...s, selected: true } : s))
+        prev.map((s) => (toSelect.has(s.name) && (overwriteExisting || !s.exists) ? { ...s, selected: true } : s))
       );
     }
   };
 
   const handleSelectAllNew = () => {
-    setSchemas(prev => prev.map(s => (s.exists ? s : { ...s, selected: true })));
+    setSchemas(prev => prev.map(s => (overwriteExisting || !s.exists ? { ...s, selected: true } : s)));
   };
 
   const handleSelectNone = () => {
@@ -374,7 +378,9 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const handleImport = async () => {
     if (!analysisResult || !versionId || !projectId) return;
 
-    const selected = schemas.filter(s => s.selected && !s.exists);
+    const selected = overwriteExisting
+      ? schemas.filter(s => s.selected)
+      : schemas.filter(s => s.selected && !s.exists);
     const selectedSchemas = selected.map(s => s.name);
     if (selectedSchemas.length === 0) return;
 
@@ -404,6 +410,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         classSuffix: classSuffix.trim() || undefined,
         typeMapping: Object.keys(typeMapping).length > 0 ? typeMapping : undefined,
         requiredOverrides: undefined,
+        overwriteExisting: overwriteExisting || undefined,
       });
       setImportResult(result);
       setCurrentStep('done');
@@ -436,7 +443,9 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       return 0;
     });
 
-  const selectedCount = schemas.filter(s => s.selected && !s.exists).length;
+  const selectedCount = overwriteExisting
+    ? schemas.filter(s => s.selected).length
+    : schemas.filter(s => s.selected && !s.exists).length;
   const newCount = schemas.filter(s => !s.exists).length;
   const conflictCount = schemas.filter(s => s.exists).length;
 
@@ -448,11 +457,14 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         kind: 'duplicate_schema' as const,
         schemaName: s.name,
         message: `A class named "${s.name}" already exists with a different definition. Importing will overwrite or you can rename.`,
-        impactIfResolved:
-          'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. You cannot import with the same name.',
+        impactIfResolved: overwriteExisting
+          ? 'With "Replace existing" enabled, the selected class will replace the existing one with the imported schema.'
+          : 'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. Or enable "Replace existing" to overwrite with the imported schema.',
       }));
     const schemaNames = schemas.map((s) => s.name);
-    const selectedSchemaNames = schemas.filter((s) => s.selected && !s.exists).map((s) => s.name);
+    const selectedSchemaNamesForConflicts = overwriteExisting
+      ? schemas.filter((s) => s.selected).map((s) => s.name)
+      : schemas.filter((s) => s.selected && !s.exists).map((s) => s.name);
     const propertyConflicts = analysisResult?.document
       ? detectPropertyConflicts({ document: analysisResult.document, schemaNames })
       : [];
@@ -460,7 +472,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       ? detectReferenceConflicts({
           document: analysisResult.document,
           schemaNames,
-          selectedSchemaNames,
+          selectedSchemaNames: selectedSchemaNamesForConflicts,
         })
       : [];
     const typeMismatchConflicts = analysisResult?.document
@@ -476,11 +488,14 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       ...typeMismatchConflicts,
       ...semanticConflicts,
     ];
-  }, [schemas, analysisResult?.document]);
+  }, [schemas, analysisResult?.document, overwriteExisting]);
 
   const selectedSchemaNames = useMemo(
-    () => schemas.filter(s => s.selected && !s.exists).map(s => s.name),
-    [schemas]
+    () =>
+      overwriteExisting
+        ? schemas.filter((s) => s.selected).map((s) => s.name)
+        : schemas.filter((s) => s.selected && !s.exists).map((s) => s.name),
+    [schemas, overwriteExisting]
   );
   const externalTypeKeys = useMemo(
     () => (analysisResult?.document ? collectExternalTypeKeysFromDocument(analysisResult.document, selectedSchemaNames) : []),
@@ -1163,7 +1178,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       <div
                         key={schema.name}
                         className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                          schema.exists
+                          schema.exists && !overwriteExisting
                             ? 'opacity-60 cursor-not-allowed'
                             : requiredBySelection
                             ? 'cursor-not-allowed'
@@ -1180,7 +1195,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       >
                         <Checkbox.Root
                           checked={schema.selected}
-                          disabled={schema.exists || requiredBySelection}
+                          disabled={(schema.exists && !overwriteExisting) || requiredBySelection}
                           onCheckedChange={() => handleToggleSchema(schema.name)}
                           onClick={(e) => e.stopPropagation()}
                           className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed flex items-center justify-center"
@@ -1192,11 +1207,11 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                         </Checkbox.Root>
                         <Package className={`h-5 w-5 flex-shrink-0 ${schema.exists ? 'text-amber-500' : 'text-indigo-600 dark:text-indigo-400'}`} />
                         <div className="flex-1 min-w-0">
-                          <div className={`font-medium ${schema.exists ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'} truncate`}>
+                          <div className={`font-medium ${schema.exists && !overwriteExisting ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'} truncate`}>
                             {schema.name}
                             {schema.exists && (
                               <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400 no-underline">
-                                (exists)
+                                {overwriteExisting ? '(exists – will replace)' : '(exists)'}
                               </span>
                             )}
                           </div>
@@ -1256,7 +1271,9 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                           {schemas.find(s => s.name === selectedSchemaName)?.exists && (
                             <div className="mb-3 p-2 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                               <p className="text-sm text-amber-700 dark:text-amber-300">
-                                ⚠️ A class with this name already exists in this version and cannot be imported.
+                                {overwriteExisting
+                                  ? 'Will replace the existing class with the imported schema.'
+                                  : '⚠️ A class with this name already exists in this version and cannot be imported.'}
                               </p>
                             </div>
                           )}
@@ -1294,9 +1311,23 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                 </div>
               </div>
 
-              {/* Import Options: Naming Convention (#581) */}
+              {/* Import Options: Naming Convention (#581), Overwrite existing (#587) */}
               <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Import Options</h4>
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={overwriteExisting}
+                    onChange={(e) => setOverwriteExisting(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
+                  />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Replace existing classes with imported schema
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 pl-6">
+                  When enabled, you can select classes that already exist; the imported schema will replace the current definition.
+                </p>
                 <label className="flex items-center gap-2 cursor-pointer mb-3">
                   <input
                     type="checkbox"

@@ -1400,6 +1400,17 @@ export async function addPropertyToClass(classId: string, propertyId: string | n
   }
 }
 
+/**
+ * Delete all class_properties for a class (#587 overwrite existing).
+ * Used when replacing an existing class with an imported schema.
+ */
+export async function deleteClassPropertiesForClass(classId: string) {
+  await connectionPool.query(
+    `DELETE FROM odb.class_properties WHERE class_id = $1`,
+    [classId]
+  );
+}
+
 // Class Property Management Functions
 // NOTE: Class property CRUD operations have been moved to REST API endpoints.
 // Use /api/classes/[classId]/properties for POST operations (add property).
