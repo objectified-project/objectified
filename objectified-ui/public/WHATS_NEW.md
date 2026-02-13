@@ -125,6 +125,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds conflict detection for semantic conflicts: logically incompatible constraints
     - Allows for an overwrite of existing with imported schema
     - Allows for merging: intelligently merge properties and constraints
+    - Adds the ability to import with modified names to avoid conflict
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

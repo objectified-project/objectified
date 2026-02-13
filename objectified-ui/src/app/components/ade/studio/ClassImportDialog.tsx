@@ -151,12 +151,16 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [classSuffix, setClassSuffix] = useState('');
   /** Type mapping: external type key → internal JSON Schema (#757). */
   const [typeMapping, setTypeMapping] = useState<Record<string, any>>({});
-  /** How to resolve duplicate class names: keep (skip), replace (#587), or merge (#588). */
-  const [conflictResolution, setConflictResolution] = useState<'keep' | 'replace' | 'merge'>('keep');
+  /** How to resolve duplicate class names: keep (skip), replace (#587), merge (#588), or rename (#589). */
+  const [conflictResolution, setConflictResolution] = useState<'keep' | 'replace' | 'merge' | 'rename'>('keep');
+  /** When conflictResolution is 'rename', suffix applied to conflicting class names (e.g. "Imported" → Pet → PetImported). */
+  const [renameSuffix, setRenameSuffix] = useState('Imported');
   /** When conflictResolution is 'merge', strategy: additive (add new, keep existing) or override (imported wins, constraints merged). */
   const [mergeStrategy, setMergeStrategy] = useState<'additive' | 'override'>('additive');
   /** When true, existing classes can be selected and will be replaced or merged. */
   const overwriteExisting = conflictResolution === 'replace' || conflictResolution === 'merge';
+  /** When true, existing (conflicting) classes can be selected—either to overwrite or to import under a new name. */
+  const canSelectExisting = overwriteExisting || conflictResolution === 'rename';
 
   const handleSourceClick = (source: 'file' | 'url' | 'clipboard' | 'git') => {
     setSelectedSource(source);
@@ -214,6 +218,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setClassPrefix('');
     setClassSuffix('');
     setConflictResolution('keep');
+    setRenameSuffix('Imported');
     setMergeStrategy('additive');
     onClose();
   };
@@ -356,7 +361,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     const schemaObj = (analysisResult?.document?.components?.schemas ?? analysisResult?.document?.definitions ?? {}) as Record<string, unknown>;
     const current = schemas.find((s) => s.name === name);
     if (!current) return;
-    if (current.exists && !overwriteExisting) return;
+    if (current.exists && !canSelectExisting) return;
 
     if (current.selected) {
       // Deselecting: only allow if no other selected schema references this one (#579)
@@ -367,13 +372,13 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       const deps = getTransitiveDependencies(name, schemaObj);
       const toSelect = new Set([name, ...deps]);
       setSchemas((prev) =>
-        prev.map((s) => (toSelect.has(s.name) && (overwriteExisting || !s.exists) ? { ...s, selected: true } : s))
+        prev.map((s) => (toSelect.has(s.name) && (canSelectExisting || !s.exists) ? { ...s, selected: true } : s))
       );
     }
   };
 
   const handleSelectAllNew = () => {
-    setSchemas(prev => prev.map(s => (overwriteExisting || !s.exists ? { ...s, selected: true } : s)));
+    setSchemas(prev => prev.map(s => (canSelectExisting || !s.exists ? { ...s, selected: true } : s)));
   };
 
   const handleSelectNone = () => {
@@ -383,18 +388,26 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const handleImport = async () => {
     if (!analysisResult || !versionId || !projectId) return;
 
-    const selected = overwriteExisting
+    const selected = canSelectExisting
       ? schemas.filter(s => s.selected)
       : schemas.filter(s => s.selected && !s.exists);
     const selectedSchemas = selected.map(s => s.name);
     if (selectedSchemas.length === 0) return;
 
     const schemaObj = analysisResult.document?.components?.schemas ?? analysisResult.document?.definitions ?? {};
+    const schemaExists = new Set(schemas.filter(s => s.exists).map(s => s.name));
     const classNameMap: Record<string, string> = {};
     for (const schemaKey of selectedSchemas) {
       const raw = schemaObj[schemaKey];
-      const name = classNameOverrides[schemaKey]?.trim() || getSmartClassName(schemaKey, raw);
-      if (name) classNameMap[schemaKey] = name;
+      const baseName = classNameOverrides[schemaKey]?.trim() || getSmartClassName(schemaKey, raw);
+      if (!baseName) continue;
+      // #589: When conflict resolution is "rename" and this schema conflicts, import under a new name (base + suffix).
+      const isConflicting = schemaExists.has(schemaKey);
+      const name =
+        conflictResolution === 'rename' && isConflicting
+          ? baseName + (renameSuffix.trim() || 'Imported')
+          : baseName;
+      classNameMap[schemaKey] = name;
     }
 
     setIsImporting(true);
@@ -449,7 +462,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       return 0;
     });
 
-  const selectedCount = overwriteExisting
+  const selectedCount = canSelectExisting
     ? schemas.filter(s => s.selected).length
     : schemas.filter(s => s.selected && !s.exists).length;
   const newCount = schemas.filter(s => !s.exists).length;
@@ -465,10 +478,12 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         message: `A class named "${s.name}" already exists with a different definition. Importing will overwrite or you can rename.`,
         impactIfResolved: overwriteExisting
           ? 'With "Replace existing" enabled, the selected class will replace the existing one with the imported schema.'
-          : 'Use the class name override (when you select a different schema) to import under a new name: a new class will be created and the existing one will be unchanged. Or enable "Replace existing" to overwrite with the imported schema.',
+          : conflictResolution === 'rename'
+            ? 'With "Import with new name (rename)" you can import this class under a new name (e.g. ' + s.name + (renameSuffix.trim() || 'Imported') + '); the existing class is unchanged.'
+            : 'Use "Import with new name (rename)" to import under a new name, or the class name override to import under a custom name. Or enable "Replace existing" to overwrite with the imported schema.',
       }));
     const schemaNames = schemas.map((s) => s.name);
-    const selectedSchemaNamesForConflicts = overwriteExisting
+    const selectedSchemaNamesForConflicts = canSelectExisting
       ? schemas.filter((s) => s.selected).map((s) => s.name)
       : schemas.filter((s) => s.selected && !s.exists).map((s) => s.name);
     const propertyConflicts = analysisResult?.document
@@ -494,14 +509,14 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       ...typeMismatchConflicts,
       ...semanticConflicts,
     ];
-  }, [schemas, analysisResult?.document, overwriteExisting]);
+  }, [schemas, analysisResult?.document, overwriteExisting, conflictResolution, renameSuffix]);
 
   const selectedSchemaNames = useMemo(
     () =>
-      overwriteExisting
+      canSelectExisting
         ? schemas.filter((s) => s.selected).map((s) => s.name)
         : schemas.filter((s) => s.selected && !s.exists).map((s) => s.name),
-    [schemas, overwriteExisting]
+    [schemas, canSelectExisting]
   );
   const externalTypeKeys = useMemo(
     () => (analysisResult?.document ? collectExternalTypeKeysFromDocument(analysisResult.document, selectedSchemaNames) : []),
@@ -1184,7 +1199,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       <div
                         key={schema.name}
                         className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                          schema.exists && !overwriteExisting
+                          schema.exists && !canSelectExisting
                             ? 'opacity-60 cursor-not-allowed'
                             : requiredBySelection
                             ? 'cursor-not-allowed'
@@ -1201,7 +1216,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       >
                         <Checkbox.Root
                           checked={schema.selected}
-                          disabled={(schema.exists && !overwriteExisting) || requiredBySelection}
+                          disabled={(schema.exists && !canSelectExisting) || requiredBySelection}
                           onCheckedChange={() => handleToggleSchema(schema.name)}
                           onClick={(e) => e.stopPropagation()}
                           className="w-5 h-5 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed flex items-center justify-center"
@@ -1213,12 +1228,13 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                         </Checkbox.Root>
                         <Package className={`h-5 w-5 flex-shrink-0 ${schema.exists ? 'text-amber-500' : 'text-indigo-600 dark:text-indigo-400'}`} />
                         <div className="flex-1 min-w-0">
-                          <div className={`font-medium ${schema.exists && !overwriteExisting ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'} truncate`}>
+                          <div className={`font-medium ${schema.exists && !canSelectExisting ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'} truncate`}>
                             {schema.name}
                             {schema.exists && (
                               <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400 no-underline">
                                 {conflictResolution === 'replace' && '(exists – will replace)'}
                                 {conflictResolution === 'merge' && `(exists – will merge ${mergeStrategy})`}
+                                {conflictResolution === 'rename' && `(will import as ${schema.name}${renameSuffix.trim() || 'Imported'})`}
                                 {conflictResolution === 'keep' && '(exists)'}
                               </span>
                             )}
@@ -1355,7 +1371,32 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       />
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Merge</span>
                     </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="conflictResolution"
+                        checked={conflictResolution === 'rename'}
+                        onChange={() => setConflictResolution('rename')}
+                        className="w-4 h-4 border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Import with new name (rename)</span>
+                    </label>
                   </div>
+                  {conflictResolution === 'rename' && (
+                    <div className="mt-2 pl-6">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Suffix for conflicting classes (#589)</label>
+                      <input
+                        type="text"
+                        value={renameSuffix}
+                        onChange={(e) => setRenameSuffix(e.target.value)}
+                        placeholder="e.g. Imported or V2"
+                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-full max-w-[200px]"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Conflicting classes will be imported with this suffix (e.g. Pet → Pet{renameSuffix.trim() || 'Imported'}).
+                      </p>
+                    </div>
+                  )}
                   {conflictResolution === 'merge' && (
                     <div className="mt-2 pl-6">
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Merge strategy (#588)</label>

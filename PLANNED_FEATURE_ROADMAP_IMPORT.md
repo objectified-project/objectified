@@ -79,12 +79,11 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ **Keep Existing**: Preserve current schema, skip import
 - 📋 **Replace**: Overwrite existing with imported schema
 - ✅ **Merge**: Intelligently merge properties and constraints
-- 📋 **Rename**: Import with modified name to avoid conflict
+- ✅ **Rename**: Import with modified name to avoid conflict
 - 📋 **Create Version**: Import as new version of existing schema
 
 | Ticket | Feature Description                          |
 |--------|----------------------------------------------|
-| #589   | Rename imported schema to avoid conflict     |
 | #590   | Import as new version of existing schema     |
 
 ##### Merge Options
