@@ -358,7 +358,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   };
 
   const handleFileSelect = async (file: File) => {
-    const validExtensions = ['.yaml', '.yml', '.json', '.graphql', '.gql', '.raml'];
+    const validExtensions = ['.yaml', '.yml', '.json', '.graphql', '.gql', '.raml', '.proto'];
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
     if (validExtensions.includes(fileExtension)) {
@@ -887,7 +887,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                           <input
                             type="file"
                             className="hidden"
-                            accept=".yaml,.yml,.json,.graphql,.gql,.raml"
+                            accept=".yaml,.yml,.json,.graphql,.gql,.raml,.proto"
                             onChange={handleFileInputChange}
                           />
                           <span className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors shadow-sm">
@@ -896,7 +896,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                           </span>
                         </label>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Supports: .yaml, .yml, .json, .graphql, .gql
+                          Supports: .yaml, .yml, .json, .graphql, .gql, .raml, .proto
                         </p>
                       </>
                     )}

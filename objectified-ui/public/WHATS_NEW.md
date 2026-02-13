@@ -136,6 +136,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Import formats now supported:
     - AsyncAPI
     - RAML
+    - Protobuf
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

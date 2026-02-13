@@ -6,6 +6,8 @@
  * with support for authentication and various options.
  */
 
+import { isProtobuf } from './protobuf-converter';
+
 export interface UrlImportOptions {
   /** The URL to fetch the specification from */
   url: string;
@@ -101,7 +103,7 @@ function extractFilename(url: string, headers?: Headers): string {
 /**
  * Detects file type from content type header or content
  */
-function detectFileType(contentType: string | null, content: string): 'yaml' | 'json' | 'graphql' | 'unknown' {
+function detectFileType(contentType: string | null, content: string): 'yaml' | 'json' | 'graphql' | 'protobuf' | 'unknown' {
   // Check content type header
   if (contentType) {
     const lowerType = contentType.toLowerCase();
@@ -114,6 +116,9 @@ function detectFileType(contentType: string | null, content: string): 'yaml' | '
     if (lowerType.includes('graphql')) {
       return 'graphql';
     }
+    if (lowerType.includes('protobuf') || lowerType.includes('x-protobuf')) {
+      return 'protobuf';
+    }
   }
 
   // Detect from content
@@ -122,6 +127,11 @@ function detectFileType(contentType: string | null, content: string): 'yaml' | '
   // JSON starts with { or [
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     return 'json';
+  }
+
+  // Protobuf (.proto) — #238
+  if (isProtobuf(trimmed)) {
+    return 'protobuf';
   }
 
   // GraphQL SDL patterns

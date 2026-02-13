@@ -57,7 +57,7 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ AsyncAPI
 - ✅ RAML
 - [TODO] API Blueprint
-- 📋 Protobuf
+- ✅ Protobuf
 - 📋 Avro
 - 📋 Thrift
 - [TODO] Excel/CSV (data definitions)
@@ -65,7 +65,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 
 | Ticket | Feature Description         |
 |--------|-----------------------------|
-| #238   | Import from Protobuf        |
 | #239   | Import from Avro            |
 | #240   | Import from Thrift          |
 | #299   | Import from Arazzo          |

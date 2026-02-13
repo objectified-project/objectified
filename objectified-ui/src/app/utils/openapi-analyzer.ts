@@ -10,10 +10,11 @@ import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGrap
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
 import { convertAsyncAPIToOpenAPI, isAsyncAPI } from './asyncapi-converter';
 import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
+import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'unknown';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'unknown';
   version: string;
   syntax: 'json' | 'yaml' | 'graphql';
   syntaxValid: boolean;
@@ -89,12 +90,16 @@ export interface UnsupportedFeature {
 }
 
 /**
- * Detect file format (JSON, YAML, or GraphQL)
+ * Detect file format (JSON, YAML, GraphQL, or Protobuf)
  */
-function detectSyntax(content: string): 'json' | 'yaml' | 'graphql' {
+function detectSyntax(content: string): 'json' | 'yaml' | 'graphql' | 'protobuf' {
   const trimmed = content.trim();
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     return 'json';
+  }
+  // Check for Protobuf (.proto) before GraphQL
+  if (isProtobuf(trimmed)) {
+    return 'protobuf';
   }
   // Check for GraphQL SDL patterns
   if (isGraphQL(trimmed)) {
@@ -106,7 +111,7 @@ function detectSyntax(content: string): 'json' | 'yaml' | 'graphql' {
 /**
  * Parse content based on detected format
  */
-function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql'): { valid: boolean; data: any; error?: string; isGraphQL?: boolean } {
+function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql' | 'protobuf'): { valid: boolean; data: any; error?: string; isGraphQL?: boolean } {
   try {
     if (syntax === 'json') {
       const data = JSON.parse(content);
@@ -114,6 +119,9 @@ function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql'): { v
     } else if (syntax === 'graphql') {
       // For GraphQL, we return a marker object - actual parsing happens in conversion
       return { valid: true, data: { __graphql_sdl: content }, isGraphQL: true };
+    } else if (syntax === 'protobuf') {
+      // For Protobuf, we return a marker object - actual parsing happens in conversion
+      return { valid: true, data: { __protobuf_content: content } };
     } else {
       const data = YAML.parse(content);
       return { valid: true, data };
@@ -131,7 +139,7 @@ function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql'): { v
  * Format detection result with support status
  */
 interface FormatDetectionResult {
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'unknown';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'unknown';
   version: string;
   supported: boolean;
   displayName: string;
@@ -148,6 +156,16 @@ function detectFormat(doc: any): FormatDetectionResult {
       version: 'SDL',
       supported: true,
       displayName: 'GraphQL Schema'
+    };
+  }
+
+  // Protobuf (.proto) — #238
+  if (doc.__protobuf_content) {
+    return {
+      format: 'protobuf',
+      version: 'proto2/3',
+      supported: true,
+      displayName: 'Protocol Buffers (converted to OpenAPI 3.1.x for import)'
     };
   }
 
@@ -1591,6 +1609,63 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     ];
   }
 
+  // Convert Protobuf (.proto) to OpenAPI 3.1–like document for import (#238)
+  if (doc.__protobuf_content) {
+    const protobufContent = doc.__protobuf_content;
+    const conversionResult = convertProtobufToOpenAPI(protobufContent, fileName);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'protobuf',
+        version: 'proto2/3',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: true,
+        formatDisplayName: 'Protocol Buffers (conversion failed)',
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0,
+          issues: []
+        },
+        errors: [{
+          type: 'error',
+          message: conversionResult.error ?? 'Protobuf conversion failed',
+          severity: 'critical'
+        }],
+        warnings: [],
+        unsupportedFeatures: [],
+        document: null
+      };
+    }
+
+    doc = conversionResult.document;
+
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
+  }
+
   // Detect format (will now show OpenAPI 3.1.0 for converted specs)
   const formatDetection = detectFormat(doc);
 
@@ -1645,8 +1720,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
  */
 export interface FileMetadataPreview {
   syntaxValid: boolean;
-  syntax: 'json' | 'yaml' | 'graphql';
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'unknown';
+  syntax: 'json' | 'yaml' | 'graphql' | 'protobuf';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'unknown';
   version: string;
   formatDisplayName: string;
   formatSupported: boolean;
