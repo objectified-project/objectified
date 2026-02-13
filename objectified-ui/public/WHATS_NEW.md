@@ -137,6 +137,8 @@ We continue to improve the platform based on your feedback with improvements and
     - AsyncAPI
     - RAML
     - Protobuf
+    - Avro
+    - Thrift
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

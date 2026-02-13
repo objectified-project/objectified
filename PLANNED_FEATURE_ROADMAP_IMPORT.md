@@ -58,15 +58,13 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 - ✅ RAML
 - [TODO] API Blueprint
 - ✅ Protobuf
-- 📋 Avro
-- 📋 Thrift
+- ✅ Avro
+- ✅ Thrift
 - [TODO] Excel/CSV (data definitions)
 - [TODO] Database (reverse engineer from DB)
 
 | Ticket | Feature Description         |
 |--------|-----------------------------|
-| #239   | Import from Avro            |
-| #240   | Import from Thrift          |
 | #299   | Import from Arazzo          |
 
 #### 4.6 Import Execution 📋 PLANNED

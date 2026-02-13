@@ -11,10 +11,12 @@ import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter'
 import { convertAsyncAPIToOpenAPI, isAsyncAPI } from './asyncapi-converter';
 import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
+import { convertAvroToOpenAPI, isAvroSchemaObject } from './avro-converter';
+import { convertThriftToOpenAPI, isThrift } from './thrift-converter';
 
 export interface AnalysisResult {
   isValid: boolean;
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'unknown';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'avro' | 'thrift' | 'unknown';
   version: string;
   syntax: 'json' | 'yaml' | 'graphql';
   syntaxValid: boolean;
@@ -92,14 +94,18 @@ export interface UnsupportedFeature {
 /**
  * Detect file format (JSON, YAML, GraphQL, or Protobuf)
  */
-function detectSyntax(content: string): 'json' | 'yaml' | 'graphql' | 'protobuf' {
+function detectSyntax(content: string): 'json' | 'yaml' | 'graphql' | 'protobuf' | 'thrift' {
   const trimmed = content.trim();
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     return 'json';
   }
-  // Check for Protobuf (.proto) before GraphQL
+  // Check for Protobuf (.proto) before Thrift/GraphQL
   if (isProtobuf(trimmed)) {
     return 'protobuf';
+  }
+  // Check for Thrift IDL (.thrift) — #240
+  if (isThrift(trimmed)) {
+    return 'thrift';
   }
   // Check for GraphQL SDL patterns
   if (isGraphQL(trimmed)) {
@@ -111,7 +117,7 @@ function detectSyntax(content: string): 'json' | 'yaml' | 'graphql' | 'protobuf'
 /**
  * Parse content based on detected format
  */
-function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql' | 'protobuf'): { valid: boolean; data: any; error?: string; isGraphQL?: boolean } {
+function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql' | 'protobuf' | 'thrift'): { valid: boolean; data: any; error?: string; isGraphQL?: boolean } {
   try {
     if (syntax === 'json') {
       const data = JSON.parse(content);
@@ -122,6 +128,9 @@ function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql' | 'pr
     } else if (syntax === 'protobuf') {
       // For Protobuf, we return a marker object - actual parsing happens in conversion
       return { valid: true, data: { __protobuf_content: content } };
+    } else if (syntax === 'thrift') {
+      // For Thrift IDL, we return a marker object - actual parsing happens in conversion (#240)
+      return { valid: true, data: { __thrift_content: content } };
     } else {
       const data = YAML.parse(content);
       return { valid: true, data };
@@ -139,7 +148,7 @@ function parseContent(content: string, syntax: 'json' | 'yaml' | 'graphql' | 'pr
  * Format detection result with support status
  */
 interface FormatDetectionResult {
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'unknown';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'avro' | 'thrift' | 'unknown';
   version: string;
   supported: boolean;
   displayName: string;
@@ -166,6 +175,26 @@ function detectFormat(doc: any): FormatDetectionResult {
       version: 'proto2/3',
       supported: true,
       displayName: 'Protocol Buffers (converted to OpenAPI 3.1.x for import)'
+    };
+  }
+
+  // Thrift IDL (.thrift) — #240
+  if (doc.__thrift_content) {
+    return {
+      format: 'thrift',
+      version: 'IDL',
+      supported: true,
+      displayName: 'Apache Thrift (converted to OpenAPI 3.1.x for import)'
+    };
+  }
+
+  // Apache Avro (.avsc JSON schema) — #239
+  if (isAvroSchemaObject(doc)) {
+    return {
+      format: 'avro',
+      version: '1.x',
+      supported: true,
+      displayName: 'Apache Avro (converted to OpenAPI 3.1.x for import)'
     };
   }
 
@@ -1322,6 +1351,62 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     ];
   }
 
+  // Convert Apache Avro (.avsc) to OpenAPI 3.1–like document for import (#239) — before JSON Schema so Avro records are not mistaken for JSON Schema
+  if (isAvroSchemaObject(doc)) {
+    const conversionResult = convertAvroToOpenAPI(doc, fileName);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'avro',
+        version: '1.x',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: true,
+        formatDisplayName: 'Apache Avro (conversion failed)',
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0,
+          issues: []
+        },
+        errors: [{
+          type: 'error',
+          message: conversionResult.error ?? 'Avro conversion failed',
+          severity: 'critical'
+        }],
+        warnings: [],
+        unsupportedFeatures: [],
+        document: null
+      };
+    }
+
+    doc = conversionResult.document;
+
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
+  }
+
   // Convert JSON Schema to OpenAPI 3.1.x if needed
   if (isJsonSchema(doc)) {
     const conversionResult = convertJsonSchemaToOpenAPI(doc, fileName);
@@ -1666,6 +1751,63 @@ export async function analyzeSpecification(fileContent: string, fileName: string
     ];
   }
 
+  // Convert Thrift IDL (.thrift) to OpenAPI 3.1–like document for import (#240)
+  if (doc.__thrift_content) {
+    const thriftContent = doc.__thrift_content;
+    const conversionResult = convertThriftToOpenAPI(thriftContent, fileName);
+
+    if (!conversionResult.success) {
+      return {
+        isValid: false,
+        format: 'thrift',
+        version: 'IDL',
+        syntax,
+        syntaxValid: true,
+        schemaValid: false,
+        formatSupported: true,
+        formatDisplayName: 'Apache Thrift (conversion failed)',
+        metrics: {
+          schemaCount: 0,
+          propertyCount: 0,
+          referenceCount: 0,
+          pathCount: 0,
+          externalReferences: [],
+          circularReferences: [],
+          customExtensions: [],
+          compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
+        },
+        qualityScore: {
+          overall: 0,
+          grade: 'F',
+          completeness: 0,
+          consistency: 0,
+          bestPractices: 0,
+          security: 0,
+          issues: []
+        },
+        errors: [{
+          type: 'error',
+          message: conversionResult.error ?? 'Thrift conversion failed',
+          severity: 'critical'
+        }],
+        warnings: [],
+        unsupportedFeatures: [],
+        document: null
+      };
+    }
+
+    doc = conversionResult.document;
+
+    conversionWarnings = [
+      ...conversionWarnings,
+      ...conversionResult.warnings.map(warning => ({
+        type: 'warning' as const,
+        message: warning,
+        severity: 'low' as const
+      }))
+    ];
+  }
+
   // Detect format (will now show OpenAPI 3.1.0 for converted specs)
   const formatDetection = detectFormat(doc);
 
@@ -1720,8 +1862,8 @@ export async function analyzeSpecification(fileContent: string, fileName: string
  */
 export interface FileMetadataPreview {
   syntaxValid: boolean;
-  syntax: 'json' | 'yaml' | 'graphql' | 'protobuf';
-  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'unknown';
+  syntax: 'json' | 'yaml' | 'graphql' | 'protobuf' | 'thrift';
+  format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'avro' | 'thrift' | 'unknown';
   version: string;
   formatDisplayName: string;
   formatSupported: boolean;

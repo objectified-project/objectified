@@ -183,8 +183,8 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
 
   const handleFileSelect = async (selectedFile: File) => {
     const fileName = selectedFile.name.toLowerCase();
-    if (!fileName.endsWith('.json') && !fileName.endsWith('.yaml') && !fileName.endsWith('.yml') && !fileName.endsWith('.graphql') && !fileName.endsWith('.gql') && !fileName.endsWith('.raml') && !fileName.endsWith('.proto')) {
-      setErrorMessage('Please select a JSON, YAML, GraphQL, RAML, or Protobuf file');
+    if (!fileName.endsWith('.json') && !fileName.endsWith('.yaml') && !fileName.endsWith('.yml') && !fileName.endsWith('.graphql') && !fileName.endsWith('.gql') && !fileName.endsWith('.raml') && !fileName.endsWith('.proto') && !fileName.endsWith('.avsc') && !fileName.endsWith('.thrift')) {
+      setErrorMessage('Please select a JSON, YAML, GraphQL, RAML, Protobuf, Avro (.avsc), or Thrift (.thrift) file');
       return;
     }
 
@@ -324,10 +324,12 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
       file.name.endsWith('.yaml') ||
       file.name.endsWith('.yml') ||
       file.name.endsWith('.raml') ||
-      file.name.endsWith('.proto');
+      file.name.endsWith('.proto') ||
+      file.name.endsWith('.avsc') ||
+      file.name.endsWith('.thrift');
 
     if (!isOpenAPIFile) {
-      setErrorMessage('Please select an OpenAPI specification file (JSON, YAML, RAML, or Protobuf)');
+      setErrorMessage('Please select an OpenAPI specification file (JSON, YAML, RAML, Protobuf, Avro .avsc, or Thrift .thrift)');
       return;
     }
 
@@ -553,7 +555,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                 <input
                   id="openapi-file-input"
                   type="file"
-                  accept=".json,.yaml,.yml,.graphql,.gql,.raml,.proto"
+                  accept=".json,.yaml,.yml,.graphql,.gql,.raml,.proto,.avsc,.thrift"
                   style={{ display: 'none' }}
                   onChange={handleFileInputChange}
                 />
@@ -868,7 +870,9 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                               file.name.endsWith('.yaml') ||
                               file.name.endsWith('.yml') ||
                               file.name.endsWith('.raml') ||
-                              file.name.endsWith('.proto');
+                              file.name.endsWith('.proto') ||
+                              file.name.endsWith('.avsc') ||
+                              file.name.endsWith('.thrift');
 
                             return (
                               <Box

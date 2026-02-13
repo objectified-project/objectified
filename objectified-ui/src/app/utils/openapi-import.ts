@@ -12,6 +12,8 @@ import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGrap
 import { convertOpenAPI30ToOpenAPI31, isOpenAPI30 } from './openapi30-converter';
 import { convertRAMLToOpenAPI, isRAML } from './raml-converter';
 import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
+import { convertAvroToOpenAPI, isAvroSchemaObject } from './avro-converter';
+import { convertThriftToOpenAPI, isThrift } from './thrift-converter';
 
 export interface ParsedProperty {
   name: string;
@@ -335,32 +337,7 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
   try {
     let spec: any;
 
-    // Check if this is GraphQL SDL content first
-    if (isGraphQL(specContent)) {
-      const conversionResult = convertGraphQLToOpenAPI(specContent);
-
-      if (!conversionResult.success) {
-        return {
-          success: false,
-          classes: [],
-          warnings: conversionResult.warnings,
-          error: `GraphQL conversion failed: ${conversionResult.error}`
-        };
-      }
-
-      // Use the converted spec
-      spec = conversionResult.document;
-
-      // Add conversion warnings to global warnings
-      const globalWarnings = conversionResult.warnings.length > 0
-        ? [`Converted from GraphQL Schema to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
-        : ['Successfully converted from GraphQL Schema to OpenAPI 3.1.x'];
-
-      // Continue with the converted spec
-      return parseOpenAPISpecInternal(spec, globalWarnings);
-    }
-
-    // Check if this is Protobuf (.proto) content (#238)
+    // Check if this is Protobuf (.proto) content (#238) — before GraphQL so .proto is not misdetected
     if (isProtobuf(specContent)) {
       const conversionResult = convertProtobufToOpenAPI(specContent);
 
@@ -382,12 +359,78 @@ export function parseOpenAPISpec(specContent: string): OpenAPIParseResult {
       return parseOpenAPISpecInternal(spec, globalWarnings);
     }
 
+    // Check if this is Thrift IDL (.thrift) content (#240) — before GraphQL so "enum X" is not misdetected as GraphQL
+    if (isThrift(specContent)) {
+      const conversionResult = convertThriftToOpenAPI(specContent);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `Thrift conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      spec = conversionResult.document;
+
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from Apache Thrift to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from Apache Thrift to OpenAPI 3.1.x'];
+
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
+    // Check if this is GraphQL SDL content
+    if (isGraphQL(specContent)) {
+      const conversionResult = convertGraphQLToOpenAPI(specContent);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `GraphQL conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      spec = conversionResult.document;
+
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from GraphQL Schema to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from GraphQL Schema to OpenAPI 3.1.x'];
+
+      return parseOpenAPISpecInternal(spec, globalWarnings);
+    }
+
     // Try to parse as JSON first, then YAML
     try {
       spec = JSON.parse(specContent);
     } catch {
       // If JSON parsing fails, try YAML
       spec = YAML.parse(specContent);
+    }
+
+    // Check for Apache Avro (.avsc) and convert if needed (#239)
+    if (isAvroSchemaObject(spec)) {
+      const conversionResult = convertAvroToOpenAPI(spec);
+
+      if (!conversionResult.success) {
+        return {
+          success: false,
+          classes: [],
+          warnings: conversionResult.warnings,
+          error: `Avro conversion failed: ${conversionResult.error}`
+        };
+      }
+
+      spec = conversionResult.document;
+
+      const globalWarnings = conversionResult.warnings.length > 0
+        ? [`Converted from Apache Avro to OpenAPI 3.1.x with ${conversionResult.warnings.length} conversion notes`]
+        : ['Successfully converted from Apache Avro to OpenAPI 3.1.x'];
+
+      return parseOpenAPISpecInternal(spec, globalWarnings);
     }
 
     // Check for RAML and convert if needed (#237)

@@ -7,6 +7,8 @@
  */
 
 import { isProtobuf } from './protobuf-converter';
+import { isAvroSchemaObject } from './avro-converter';
+import { isThrift } from './thrift-converter';
 
 export interface UrlImportOptions {
   /** The URL to fetch the specification from */
@@ -103,7 +105,7 @@ function extractFilename(url: string, headers?: Headers): string {
 /**
  * Detects file type from content type header or content
  */
-function detectFileType(contentType: string | null, content: string): 'yaml' | 'json' | 'graphql' | 'protobuf' | 'unknown' {
+function detectFileType(contentType: string | null, content: string): 'yaml' | 'json' | 'graphql' | 'protobuf' | 'avro' | 'thrift' | 'unknown' {
   // Check content type header
   if (contentType) {
     const lowerType = contentType.toLowerCase();
@@ -113,25 +115,42 @@ function detectFileType(contentType: string | null, content: string): 'yaml' | '
     if (lowerType.includes('json')) {
       return 'json';
     }
+    if (lowerType.includes('avro') || lowerType.includes('x-avro')) {
+      return 'avro';
+    }
     if (lowerType.includes('graphql')) {
       return 'graphql';
     }
     if (lowerType.includes('protobuf') || lowerType.includes('x-protobuf')) {
       return 'protobuf';
     }
+    if (lowerType.includes('thrift') || lowerType.includes('x-thrift')) {
+      return 'thrift';
+    }
   }
 
   // Detect from content
   const trimmed = content.trim();
 
-  // JSON starts with { or [
+  // JSON starts with { or [ — detect Avro schema (#239)
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const data = JSON.parse(trimmed);
+      if (isAvroSchemaObject(data)) return 'avro';
+    } catch {
+      // not valid JSON, fall through
+    }
     return 'json';
   }
 
   // Protobuf (.proto) — #238
   if (isProtobuf(trimmed)) {
     return 'protobuf';
+  }
+
+  // Thrift IDL (.thrift) — #240
+  if (isThrift(trimmed)) {
+    return 'thrift';
   }
 
   // GraphQL SDL patterns
