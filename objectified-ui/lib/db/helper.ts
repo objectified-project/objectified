@@ -411,10 +411,56 @@ export async function getLatestVersionForProject(projectId: string) {
   }
 }
 
+/**
+ * Get a version by its record id (UUID). Returns id and version_id string for use in sub-version creation (#590).
+ */
+export async function getVersionById(versionRecordId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id, version_id FROM odb.versions WHERE id = $1 AND deleted_at IS NULL`,
+      [versionRecordId]
+    );
+    if (result.rowCount === 0) {
+      return JSON.stringify({ success: false, error: 'Version not found' });
+    }
+    const row = result.rows[0];
+    return JSON.stringify({ success: true, id: row.id, version_id: row.version_id });
+  } catch (error: any) {
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 const parseSemanticVersion = (version: string) => {
   const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
   return match ? { major: parseInt(match[1], 10), minor: parseInt(match[2], 10), patch: parseInt(match[3], 10) } : null;
 };
+
+/** Accept X.Y.Z or X.Y.Z with prerelease (e.g. 1.0.0b, 1.0.0-beta). Used for createVersion when allowing sub-versions (#590). */
+const parseSemanticVersionWithPrerelease = (version: string) => {
+  const strict = parseSemanticVersion(version);
+  if (strict) return true;
+  const withPrerelease = version.match(/^(\d+)\.(\d+)\.(\d+)([-a-zA-Z0-9.]*)$/);
+  return withPrerelease != null && withPrerelease[4].length > 0;
+};
+
+/**
+ * Derive base numeric version (X.Y.Z) from a version string that may include prerelease (e.g. 1.0.0b -> 1.0.0).
+ */
+const getBaseVersion = (version: string): string => {
+  const parsed = parseSemanticVersion(version);
+  if (parsed) return `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+  return match ? `${match[1]}.${match[2]}.${match[3]}` : '0.1.0';
+};
+
+/**
+ * Create a sub-version identifier from a base version (e.g. 1.0.0 + "b" -> 1.0.0b). Used for "import as new version" (#590).
+ */
+export function bumpPrereleaseVersion(baseVersionId: string, suffix: string): string {
+  const base = getBaseVersion(baseVersionId);
+  const s = (suffix || 'b').trim().replace(/^[-.]/, '');
+  return s ? `${base}${s}` : `${base}b`;
+}
 
 const bumpMinorVersion = (version: string) => {
   const parsed = parseSemanticVersion(version);
@@ -528,9 +574,9 @@ export async function createVersion(projectId: string, creatorId: string, versio
       }
     }
 
-    // Validate semantic versioning format
-    if (!parseSemanticVersion(finalVersionId)) {
-      return JSON.stringify({ success: false, error: 'Version ID must follow semantic versioning format (e.g., 1.0.0)' });
+    // Validate semantic versioning format (X.Y.Z or X.Y.Z with prerelease, e.g. 1.0.0b)
+    if (!parseSemanticVersion(finalVersionId) && !parseSemanticVersionWithPrerelease(finalVersionId)) {
+      return JSON.stringify({ success: false, error: 'Version ID must follow semantic versioning format (e.g., 1.0.0 or 1.0.0b)' });
     }
 
     const result = await connectionPool.query(

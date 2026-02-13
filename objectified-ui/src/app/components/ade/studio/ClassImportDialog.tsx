@@ -14,6 +14,7 @@ import { collectExternalTypeKeysFromDocument } from '../../../../../lib/importer
 import { Button } from '../../ui/Button';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import { importClassesToVersion, ImportClassesResult } from '../../../../../lib/db/class-import-actions';
+import { getVersionById, createVersion, bumpPrereleaseVersion } from '../../../../../lib/db/helper';
 import UrlImportPanel from '../dashboard/UrlImportPanel';
 import ClipboardImportPanel from '../dashboard/ClipboardImportPanel';
 import GitImportPanel from '../dashboard/GitImportPanel';
@@ -151,16 +152,20 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   const [classSuffix, setClassSuffix] = useState('');
   /** Type mapping: external type key → internal JSON Schema (#757). */
   const [typeMapping, setTypeMapping] = useState<Record<string, any>>({});
-  /** How to resolve duplicate class names: keep (skip), replace (#587), merge (#588), or rename (#589). */
-  const [conflictResolution, setConflictResolution] = useState<'keep' | 'replace' | 'merge' | 'rename'>('keep');
+  /** How to resolve duplicate class names: keep (skip), replace (#587), merge (#588), rename (#589), or createVersion (#590). */
+  const [conflictResolution, setConflictResolution] = useState<'keep' | 'replace' | 'merge' | 'rename' | 'createVersion'>('keep');
   /** When conflictResolution is 'rename', suffix applied to conflicting class names (e.g. "Imported" → Pet → PetImported). */
   const [renameSuffix, setRenameSuffix] = useState('Imported');
+  /** When conflictResolution is 'createVersion', prerelease suffix for new version (e.g. "b" → 1.0.0b). */
+  const [prereleaseSuffix, setPrereleaseSuffix] = useState('b');
   /** When conflictResolution is 'merge', strategy: additive (add new, keep existing) or override (imported wins, constraints merged). */
   const [mergeStrategy, setMergeStrategy] = useState<'additive' | 'override'>('additive');
   /** When true, existing classes can be selected and will be replaced or merged. */
   const overwriteExisting = conflictResolution === 'replace' || conflictResolution === 'merge';
-  /** When true, existing (conflicting) classes can be selected—either to overwrite or to import under a new name. */
-  const canSelectExisting = overwriteExisting || conflictResolution === 'rename';
+  /** When true, existing (conflicting) classes can be selected—either to overwrite, import under a new name, or import into a new version. */
+  const canSelectExisting = overwriteExisting || conflictResolution === 'rename' || conflictResolution === 'createVersion';
+  /** When import used "Create new version", the created version_id string (e.g. 1.0.0b) for success message. */
+  const [createdVersionLabel, setCreatedVersionLabel] = useState<string | null>(null);
 
   const handleSourceClick = (source: 'file' | 'url' | 'clipboard' | 'git') => {
     setSelectedSource(source);
@@ -219,6 +224,8 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setClassSuffix('');
     setConflictResolution('keep');
     setRenameSuffix('Imported');
+    setPrereleaseSuffix('b');
+    setCreatedVersionLabel(null);
     setMergeStrategy('additive');
     onClose();
   };
@@ -386,7 +393,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
   };
 
   const handleImport = async () => {
-    if (!analysisResult || !versionId || !projectId) return;
+    if (!analysisResult || !versionId || !projectId || !userId) return;
 
     const selected = canSelectExisting
       ? schemas.filter(s => s.selected)
@@ -413,10 +420,41 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
     setIsImporting(true);
     setCurrentStep('importing');
 
+    let targetVersionId = versionId;
+
     try {
+      // #590: When "Import as new version" is selected, create a sub-version (e.g. 1.0.0b) and import there
+      if (conflictResolution === 'createVersion') {
+        const getRes = JSON.parse(await getVersionById(versionId));
+        if (!getRes.success || !getRes.version_id) {
+          setImportResult({ success: false, error: getRes.error || 'Could not load current version' });
+          setCurrentStep('done');
+          return;
+        }
+        const newVersionIdStr = bumpPrereleaseVersion(getRes.version_id, prereleaseSuffix.trim() || 'b');
+        const createRes = JSON.parse(
+          await createVersion(
+            projectId,
+            userId,
+            newVersionIdStr,
+            'Imported as new version',
+            'Import as new version to avoid conflicts'
+          )
+        );
+        if (!createRes.success || !createRes.version?.id) {
+          setImportResult({ success: false, error: createRes.error || 'Could not create new version' });
+          setCurrentStep('done');
+          return;
+        }
+        targetVersionId = createRes.version.id;
+        setCreatedVersionLabel(newVersionIdStr);
+      } else {
+        setCreatedVersionLabel(null);
+      }
+
       const document = analysisResult.document;
       const result = await importClassesToVersion({
-        versionId,
+        versionId: targetVersionId,
         projectId,
         document,
         selectedSchemas,
@@ -428,7 +466,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
         classSuffix: classSuffix.trim() || undefined,
         typeMapping: Object.keys(typeMapping).length > 0 ? typeMapping : undefined,
         requiredOverrides: undefined,
-        overwriteExisting: overwriteExisting || undefined,
+        overwriteExisting: conflictResolution === 'createVersion' ? false : (overwriteExisting || undefined),
         mergeStrategy: conflictResolution === 'merge' ? mergeStrategy : undefined,
       });
       setImportResult(result);
@@ -480,7 +518,9 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
           ? 'With "Replace existing" enabled, the selected class will replace the existing one with the imported schema.'
           : conflictResolution === 'rename'
             ? 'With "Import with new name (rename)" you can import this class under a new name (e.g. ' + s.name + (renameSuffix.trim() || 'Imported') + '); the existing class is unchanged.'
-            : 'Use "Import with new name (rename)" to import under a new name, or the class name override to import under a custom name. Or enable "Replace existing" to overwrite with the imported schema.',
+            : conflictResolution === 'createVersion'
+              ? 'With "Import as new version" a new sub-version (e.g. 1.0.0' + (prereleaseSuffix.trim() || 'b') + ') will be created and the import will go there; the current version is unchanged.'
+              : 'Use "Import with new name (rename)" to import under a new name, or "Import as new version" to create a sub-version. Or enable "Replace existing" to overwrite with the imported schema.',
       }));
     const schemaNames = schemas.map((s) => s.name);
     const selectedSchemaNamesForConflicts = canSelectExisting
@@ -509,7 +549,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
       ...typeMismatchConflicts,
       ...semanticConflicts,
     ];
-  }, [schemas, analysisResult?.document, overwriteExisting, conflictResolution, renameSuffix]);
+  }, [schemas, analysisResult?.document, overwriteExisting, conflictResolution, renameSuffix, prereleaseSuffix]);
 
   const selectedSchemaNames = useMemo(
     () =>
@@ -1381,7 +1421,32 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                       />
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Import with new name (rename)</span>
                     </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="conflictResolution"
+                        checked={conflictResolution === 'createVersion'}
+                        onChange={() => setConflictResolution('createVersion')}
+                        className="w-4 h-4 border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Import as new version (e.g. 1.0.0b)</span>
+                    </label>
                   </div>
+                  {conflictResolution === 'createVersion' && (
+                    <div className="mt-2 pl-6">
+                      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sub-version suffix (#590)</label>
+                      <input
+                        type="text"
+                        value={prereleaseSuffix}
+                        onChange={(e) => setPrereleaseSuffix(e.target.value)}
+                        placeholder="e.g. b or import"
+                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 w-full max-w-[200px]"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        A new version will be created (e.g. 1.0.0 → 1.0.0{prereleaseSuffix.trim() || 'b'}) and the import will go there, avoiding conflicts with the current version.
+                      </p>
+                    </div>
+                  )}
                   {conflictResolution === 'rename' && (
                     <div className="mt-2 pl-6">
                       <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Suffix for conflicting classes (#589)</label>
@@ -1556,6 +1621,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Import Complete!</h3>
                   <p className="text-gray-500 dark:text-gray-400 mb-4">
                     Successfully imported {importResult.importedCount} class{importResult.importedCount !== 1 ? 'es' : ''}
+                    {createdVersionLabel ? ` into new version ${createdVersionLabel}` : ''}.
                   </p>
                   {importResult.skippedCount != null && importResult.skippedCount > 0 ? (
                     <p className="text-amber-600 dark:text-amber-400 text-sm">

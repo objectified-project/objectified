@@ -1632,6 +1632,59 @@ describe('Database Helper - Version Copy and Creation Edge Cases', () => {
 
     expect(parsed).toBeDefined();
   });
+
+  test('createVersion accepts prerelease version_id (e.g. 1.0.0b) (#590)', async () => {
+    const { createVersion } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({
+      rows: [{
+        id: 'ver-1.0.0b',
+        version_id: '1.0.0b'
+      }]
+    });
+
+    const result = await createVersion('proj-1', 'user-1', '1.0.0b', 'Imported as new version', 'Import as new version to avoid conflicts');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.version?.version_id).toBe('1.0.0b');
+  });
+});
+
+describe('Database Helper - bumpPrereleaseVersion and getVersionById (#590)', () => {
+  test('bumpPrereleaseVersion appends suffix to base version', async () => {
+    const { bumpPrereleaseVersion } = await import('../lib/db/helper');
+    expect(bumpPrereleaseVersion('1.0.0', 'b')).toBe('1.0.0b');
+    expect(bumpPrereleaseVersion('1.2.3', 'import')).toBe('1.2.3import');
+    expect(bumpPrereleaseVersion('1.0.0-beta', 'b')).toBe('1.0.0b');
+    expect(bumpPrereleaseVersion('2.1.0', '')).toBe('2.1.0b');
+  });
+
+  test('getVersionById returns version_id for record id', async () => {
+    const { getVersionById } = await import('../lib/db/helper');
+    const db = require('../lib/db/db');
+    const mockQuery = db.query as jest.Mock;
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id: 'ver-uuid', version_id: '1.0.0' }]
+    });
+
+    const result = JSON.parse(await getVersionById('ver-uuid'));
+    expect(result.success).toBe(true);
+    expect(result.id).toBe('ver-uuid');
+    expect(result.version_id).toBe('1.0.0');
+  });
+
+  test('getVersionById returns error when version not found', async () => {
+    const { getVersionById } = await import('../lib/db/helper');
+    const db = require('../lib/db/db');
+    const mockQuery = db.query as jest.Mock;
+    mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    const result = JSON.parse(await getVersionById('nonexistent'));
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Version not found');
+  });
 });
 
 describe('Database Helper - Class Update with Schema Validation', () => {
