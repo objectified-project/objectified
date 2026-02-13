@@ -48,17 +48,6 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 ##### Schema Import/Export
 
 **Import From** 📋 PARTIALLY IMPLEMENTED
-- ✅ Arazzo
-- ✅ OpenAPI 2.0 (Swagger)
-- ✅ OpenAPI 3.0.x
-- ✅ OpenAPI 3.1.x
-- ✅ JSON Schema
-- ✅ GraphQL SDL
-- ✅ AsyncAPI
-- ✅ RAML
-- ✅ Protobuf
-- ✅ Avro
-- ✅ Thrift
 - [TODO] API Blueprint
 - [TODO] Excel/CSV (data definitions)
 - [TODO] Database (reverse engineer from DB)
