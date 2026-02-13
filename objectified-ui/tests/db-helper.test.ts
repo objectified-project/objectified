@@ -1654,10 +1654,10 @@ describe('Database Helper - Version Copy and Creation Edge Cases', () => {
 describe('Database Helper - bumpPrereleaseVersion and getVersionById (#590)', () => {
   test('bumpPrereleaseVersion appends suffix to base version', async () => {
     const { bumpPrereleaseVersion } = await import('../lib/db/helper');
-    expect(bumpPrereleaseVersion('1.0.0', 'b')).toBe('1.0.0b');
-    expect(bumpPrereleaseVersion('1.2.3', 'import')).toBe('1.2.3import');
-    expect(bumpPrereleaseVersion('1.0.0-beta', 'b')).toBe('1.0.0b');
-    expect(bumpPrereleaseVersion('2.1.0', '')).toBe('2.1.0b');
+    expect(await bumpPrereleaseVersion('1.0.0', 'b')).toBe('1.0.0b');
+    expect(await bumpPrereleaseVersion('1.2.3', 'import')).toBe('1.2.3import');
+    expect(await bumpPrereleaseVersion('1.0.0-beta', 'b')).toBe('1.0.0b');
+    expect(await bumpPrereleaseVersion('2.1.0', '')).toBe('2.1.0b');
   });
 
   test('getVersionById returns version_id for record id', async () => {

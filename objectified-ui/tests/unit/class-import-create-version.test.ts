@@ -64,7 +64,7 @@ async function runCreateVersionThenImportFlow(params: {
     return { success: false, error: getRes.error || 'Could not load current version' };
   }
 
-  const newVersionIdStr = bumpPrereleaseVersion(getRes.version_id, prereleaseSuffix.trim() || 'b');
+  const newVersionIdStr = await bumpPrereleaseVersion(getRes.version_id, prereleaseSuffix.trim() || 'b');
   const createRes = JSON.parse(
     await createVersion(
       projectId,
@@ -114,20 +114,20 @@ describe('#590 Import as new version of existing schema', () => {
   });
 
   describe('bumpPrereleaseVersion (used by flow)', () => {
-    it('produces 1.0.0b from 1.0.0 and suffix "b"', () => {
-      expect(bumpPrereleaseVersion('1.0.0', 'b')).toBe('1.0.0b');
+    it('produces 1.0.0b from 1.0.0 and suffix "b"', async () => {
+      expect(await bumpPrereleaseVersion('1.0.0', 'b')).toBe('1.0.0b');
     });
 
-    it('strips existing prerelease from base (e.g. 1.0.0-beta -> 1.0.0)', () => {
-      expect(bumpPrereleaseVersion('1.0.0-beta', 'b')).toBe('1.0.0b');
+    it('strips existing prerelease from base (e.g. 1.0.0-beta -> 1.0.0)', async () => {
+      expect(await bumpPrereleaseVersion('1.0.0-beta', 'b')).toBe('1.0.0b');
     });
 
-    it('uses default "b" when suffix is empty string', () => {
-      expect(bumpPrereleaseVersion('2.1.0', '')).toBe('2.1.0b');
+    it('uses default "b" when suffix is empty string', async () => {
+      expect(await bumpPrereleaseVersion('2.1.0', '')).toBe('2.1.0b');
     });
 
-    it('allows custom suffix (e.g. import)', () => {
-      expect(bumpPrereleaseVersion('1.0.0', 'import')).toBe('1.0.0import');
+    it('allows custom suffix (e.g. import)', async () => {
+      expect(await bumpPrereleaseVersion('1.0.0', 'import')).toBe('1.0.0import');
     });
   });
 

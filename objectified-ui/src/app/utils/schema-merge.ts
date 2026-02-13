@@ -213,9 +213,10 @@ function mergePropertyLists(
     if (importedProp) {
       if (existingProp) {
         const mergedData = mergeConstraints(existingProp.data, importedProp.data);
-        const mergedChildren =
-          (existingProp.children?.length || importedProp.children?.length) &&
-          mergePropertyLists(existingProp.children || [], importedProp.children || [], strategy, options, path);
+        const hasChildren = (existingProp.children?.length ?? 0) > 0 || (importedProp.children?.length ?? 0) > 0;
+        const mergedChildren: NormalizedProperty[] | undefined = hasChildren
+          ? mergePropertyLists(existingProp.children || [], importedProp.children || [], strategy, options, path)
+          : undefined;
         result.push({
           name: importedProp.name,
           data: mergedData,

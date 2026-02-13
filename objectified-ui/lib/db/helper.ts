@@ -455,8 +455,9 @@ const getBaseVersion = (version: string): string => {
 
 /**
  * Create a sub-version identifier from a base version (e.g. 1.0.0 + "b" -> 1.0.0b). Used for "import as new version" (#590).
+ * Async to satisfy Server Actions (file has 'use server').
  */
-export function bumpPrereleaseVersion(baseVersionId: string, suffix: string): string {
+export async function bumpPrereleaseVersion(baseVersionId: string, suffix: string): Promise<string> {
   const base = getBaseVersion(baseVersionId);
   const s = (suffix || 'b').trim().replace(/^[-.]/, '');
   return s ? `${base}${s}` : `${base}b`;

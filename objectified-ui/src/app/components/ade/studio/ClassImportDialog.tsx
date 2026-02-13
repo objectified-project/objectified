@@ -450,7 +450,7 @@ const ClassImportDialog: React.FC<ClassImportDialogProps> = ({
           setCurrentStep('done');
           return;
         }
-        const newVersionIdStr = bumpPrereleaseVersion(getRes.version_id, prereleaseSuffix.trim() || 'b');
+        const newVersionIdStr = await bumpPrereleaseVersion(getRes.version_id, prereleaseSuffix.trim() || 'b');
         const createRes = JSON.parse(
           await createVersion(
             projectId,
