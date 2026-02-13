@@ -189,7 +189,7 @@ describe('schema-merge #591 additive merge', () => {
       expect(merged.properties[0].children![0].name).toBe('street');
     });
 
-    it('adds nested property when only imported has children for same name (additive)', () => {
+    it('adds nested property when only imported has children for same name (#594 deep merge)', () => {
       const existing = cls('User', [prop('address', { type: 'object' })]);
       const imported = cls('User', [
         prop('address', { type: 'object' }, {
@@ -200,7 +200,9 @@ describe('schema-merge #591 additive merge', () => {
       const merged = mergeClasses(existing, imported, 'additive');
 
       expect(merged.properties).toHaveLength(1);
-      expect(merged.properties[0].children).toBeUndefined();
+      expect(merged.properties[0].children).toHaveLength(1);
+      expect(merged.properties[0].children![0].name).toBe('country');
+      expect(merged.properties[0].children![0].data.type).toBe('string');
     });
 
     it('additive merge at three levels: adds new at each level', () => {
@@ -337,6 +339,244 @@ describe('schema-merge override strategy (#592)', () => {
     const street = address?.children!.find((c) => c.name === 'street');
     expect(street?.data.maxLength).toBe(100);
     expect(address?.children!.map((c) => c.name)).toEqual(expect.arrayContaining(['street', 'city', 'country']));
+  });
+});
+
+describe('schema-merge deep merge (#594)', () => {
+  it('recursively merges nested constraint objects (properties, additionalProperties)', () => {
+    const existing = cls('X', [
+      prop('config', {
+        type: 'object',
+        properties: {
+          a: { type: 'string', minLength: 5 },
+          b: { type: 'integer' },
+        },
+        additionalProperties: { type: 'string', maxLength: 10 },
+      }),
+    ]);
+    const imported = cls('X', [
+      prop('config', {
+        type: 'object',
+        properties: {
+          a: { type: 'string', maxLength: 100 },
+          c: { type: 'boolean' },
+        },
+        additionalProperties: { type: 'string', minLength: 1 },
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'override');
+
+    const config = merged.properties.find((p) => p.name === 'config');
+    expect(config?.data.properties).toBeDefined();
+    expect(config?.data.properties.a).toEqual({ type: 'string', minLength: 5, maxLength: 100 });
+    expect(config?.data.properties.b).toEqual({ type: 'integer' });
+    expect(config?.data.properties.c).toEqual({ type: 'boolean' });
+    expect(config?.data.additionalProperties).toEqual({ type: 'string', maxLength: 10, minLength: 1 });
+  });
+
+  it('deep merges patternProperties in constraint objects (override)', () => {
+    const existing = cls('X', [
+      prop('extra', {
+        type: 'object',
+        patternProperties: {
+          '^x': { type: 'string', maxLength: 50 },
+          '^y': { type: 'integer' },
+        },
+      }),
+    ]);
+    const imported = cls('X', [
+      prop('extra', {
+        type: 'object',
+        patternProperties: {
+          '^x': { type: 'string', minLength: 1 },
+          '^z': { type: 'boolean' },
+        },
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'override');
+
+    const extra = merged.properties.find((p) => p.name === 'extra');
+    expect(extra?.data.patternProperties).toBeDefined();
+    expect(extra?.data.patternProperties['^x']).toEqual({ type: 'string', maxLength: 50, minLength: 1 });
+    expect(extra?.data.patternProperties['^y']).toEqual({ type: 'integer' });
+    expect(extra?.data.patternProperties['^z']).toEqual({ type: 'boolean' });
+  });
+
+  it('deep merges items when both are object schemas with nested properties (override)', () => {
+    const existing = cls('X', [
+      prop('list', {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', minLength: 1 },
+            name: { type: 'string' },
+          },
+        },
+      }),
+    ]);
+    const imported = cls('X', [
+      prop('list', {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', maxLength: 100 },
+            tag: { type: 'string' },
+          },
+        },
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'override');
+
+    const list = merged.properties.find((p) => p.name === 'list');
+    expect(list?.data.items).toBeDefined();
+    expect(list?.data.items.properties).toEqual({
+      id: { type: 'string', minLength: 1, maxLength: 100 },
+      name: { type: 'string' },
+      tag: { type: 'string' },
+    });
+  });
+
+  it('additive: adds nested children when only imported has children (single level)', () => {
+    const existing = cls('User', [prop('profile', { type: 'object' })]);
+    const imported = cls('User', [
+      prop('profile', { type: 'object' }, {
+        children: [
+          prop('displayName', { type: 'string' }),
+          prop('avatar', { type: 'string', format: 'uri' }),
+        ],
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'additive');
+
+    expect(merged.properties).toHaveLength(1);
+    const profile = merged.properties[0];
+    expect(profile.children).toHaveLength(2);
+    expect(profile.children!.map((c) => c.name)).toEqual(expect.arrayContaining(['displayName', 'avatar']));
+    expect(profile.children!.find((c) => c.name === 'avatar')?.data.format).toBe('uri');
+  });
+
+  it('additive: deep merge when only imported has children at multiple levels', () => {
+    const existing = cls('Doc', [
+      prop('meta', { type: 'object' }),
+    ]);
+    const imported = cls('Doc', [
+      prop('meta', { type: 'object' }, {
+        children: [
+          prop('author', { type: 'object' }, {
+            children: [
+              prop('name', { type: 'string' }),
+              prop('email', { type: 'string', format: 'email' }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'additive');
+
+    const meta = merged.properties.find((p) => p.name === 'meta');
+    expect(meta?.children).toHaveLength(1);
+    const author = meta?.children!.find((c) => c.name === 'author');
+    expect(author?.children).toHaveLength(2);
+    expect(author?.children!.map((c) => c.name)).toEqual(expect.arrayContaining(['name', 'email']));
+  });
+
+  it('additive: merges nested when both have children and imported adds more at same level', () => {
+    const existing = cls('User', [
+      prop('address', { type: 'object' }, {
+        children: [prop('city', { type: 'string' })],
+      }),
+    ]);
+    const imported = cls('User', [
+      prop('address', { type: 'object' }, {
+        children: [
+          prop('city', { type: 'string' }),
+          prop('postalCode', { type: 'string' }),
+        ],
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'additive');
+
+    const address = merged.properties[0];
+    expect(address.children).toHaveLength(2);
+    expect(address.children!.map((c) => c.name)).toEqual(expect.arrayContaining(['city', 'postalCode']));
+  });
+
+  it('override: uses imported nested properties when existing has none', () => {
+    const existing = cls('X', [prop('obj', { type: 'object' })]);
+    const imported = cls('X', [
+      prop('obj', {
+        type: 'object',
+        properties: {
+          k: { type: 'number', minimum: 0 },
+        },
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'override');
+
+    const obj = merged.properties.find((p) => p.name === 'obj');
+    expect(obj?.data.properties).toEqual({ k: { type: 'number', minimum: 0 } });
+  });
+
+  it('override: keeps existing nested properties when imported has none', () => {
+    const existing = cls('X', [
+      prop('obj', {
+        type: 'object',
+        properties: { a: { type: 'string' } },
+      }),
+    ]);
+    const imported = cls('X', [prop('obj', { type: 'object' })]);
+
+    const merged = mergeClasses(existing, imported, 'override');
+
+    const obj = merged.properties.find((p) => p.name === 'obj');
+    expect(obj?.data.properties).toEqual({ a: { type: 'string' } });
+  });
+
+  it('override: merges multiple levels of nested constraint properties', () => {
+    const existing = cls('X', [
+      prop('root', {
+        type: 'object',
+        properties: {
+          level1: {
+            type: 'object',
+            properties: {
+              a: { type: 'string', minLength: 1 },
+              b: { type: 'integer' },
+            },
+          },
+        },
+      }),
+    ]);
+    const imported = cls('X', [
+      prop('root', {
+        type: 'object',
+        properties: {
+          level1: {
+            type: 'object',
+            properties: {
+              a: { type: 'string', maxLength: 100 },
+              c: { type: 'boolean' },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const merged = mergeClasses(existing, imported, 'override');
+
+    const root = merged.properties.find((p) => p.name === 'root');
+    expect(root?.data.properties?.level1?.properties?.a).toEqual({ type: 'string', minLength: 1, maxLength: 100 });
+    expect(root?.data.properties?.level1?.properties?.b).toEqual({ type: 'integer' });
+    expect(root?.data.properties?.level1?.properties?.c).toEqual({ type: 'boolean' });
   });
 });
 

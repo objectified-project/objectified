@@ -129,6 +129,7 @@ We continue to improve the platform based on your feedback with improvements and
     - Adds ability to create a new version if one conflicts with a current version with a naming strategy
     - Adds replacement and additive property strategy
     - Adds selective merge is the ability to choose per-property merge strategy
+    - Adds deep merge to recursively merge nested objects
 - OpenAPI Support:
   - Now at 100% support for class and properties definitions
   - Improved import support for paths and securitySchemes

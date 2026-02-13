@@ -94,6 +94,42 @@ function mergeConstraints(existing: any, imported: any): any {
   } else if (imported.items !== undefined) result.items = imported.items;
   else if (existing.items !== undefined) result.items = existing.items;
 
+  // #594 Deep merge: recursively merge nested object schema fields
+  if (existing.properties && imported.properties && typeof existing.properties === 'object' && typeof imported.properties === 'object' && !Array.isArray(existing.properties) && !Array.isArray(imported.properties)) {
+    const existingKeys = Object.keys(existing.properties);
+    const importedKeys = Object.keys(imported.properties);
+    const allKeys = new Set([...existingKeys, ...importedKeys]);
+    result.properties = {} as any;
+    for (const k of allKeys) {
+      const e = existing.properties[k];
+      const i = imported.properties[k];
+      if (e != null && i != null && typeof e === 'object' && typeof i === 'object' && !Array.isArray(e) && !Array.isArray(i)) {
+        result.properties[k] = mergeConstraints(e, i);
+      } else if (i !== undefined) result.properties[k] = i;
+      else result.properties[k] = e;
+    }
+  } else if (imported.properties !== undefined) result.properties = imported.properties;
+  else if (existing.properties !== undefined) result.properties = existing.properties;
+
+  if (existing.additionalProperties != null && imported.additionalProperties != null && typeof existing.additionalProperties === 'object' && typeof imported.additionalProperties === 'object' && !Array.isArray(existing.additionalProperties) && !Array.isArray(imported.additionalProperties)) {
+    result.additionalProperties = mergeConstraints(existing.additionalProperties, imported.additionalProperties);
+  } else if (imported.additionalProperties !== undefined) result.additionalProperties = imported.additionalProperties;
+  else if (existing.additionalProperties !== undefined) result.additionalProperties = existing.additionalProperties;
+
+  if (existing.patternProperties && imported.patternProperties && typeof existing.patternProperties === 'object' && typeof imported.patternProperties === 'object' && !Array.isArray(existing.patternProperties) && !Array.isArray(imported.patternProperties)) {
+    const patternKeys = new Set([...Object.keys(existing.patternProperties), ...Object.keys(imported.patternProperties)]);
+    result.patternProperties = {} as any;
+    for (const k of patternKeys) {
+      const e = (existing.patternProperties as any)[k];
+      const i = (imported.patternProperties as any)[k];
+      if (e != null && i != null && typeof e === 'object' && typeof i === 'object' && !Array.isArray(e) && !Array.isArray(i)) {
+        result.patternProperties[k] = mergeConstraints(e, i);
+      } else if (i !== undefined) result.patternProperties[k] = i;
+      else result.patternProperties[k] = e;
+    }
+  } else if (imported.patternProperties !== undefined) result.patternProperties = imported.patternProperties;
+  else if (existing.patternProperties !== undefined) result.patternProperties = existing.patternProperties;
+
   // required: for override use imported; merged schema typically keeps both required sets
   if (imported.required !== undefined) result.required = imported.required;
   else if (existing.required !== undefined) result.required = existing.required;
@@ -157,12 +193,16 @@ function mergePropertyLists(
 
     if (effectiveStrategy === 'additive') {
       if (existingProp) {
+        // #594 Deep merge: recursively merge children when either side has them (treat missing as empty).
+        let mergedChildren: NormalizedProperty[] | undefined;
         if (importedProp?.children?.length && existingProp.children?.length) {
-          const mergedChildren = mergePropertyLists(existingProp.children, importedProp.children, strategy, options, path);
-          result.push({ ...existingProp, children: mergedChildren });
-        } else {
-          result.push(existingProp);
+          mergedChildren = mergePropertyLists(existingProp.children, importedProp.children, strategy, options, path);
+        } else if (importedProp?.children?.length) {
+          mergedChildren = mergePropertyLists([], importedProp.children, strategy, options, path);
+        } else if (existingProp.children?.length) {
+          mergedChildren = existingProp.children;
         }
+        result.push(mergedChildren !== undefined ? { ...existingProp, children: mergedChildren } : existingProp);
       } else if (importedProp) {
         result.push(importedProp);
       }
