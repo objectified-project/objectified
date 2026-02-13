@@ -19,7 +19,7 @@ export interface AnalysisResult {
   isValid: boolean;
   format: 'openapi' | 'swagger' | 'jsonschema' | 'graphql' | 'arazzo' | 'raml' | 'asyncapi' | 'protobuf' | 'avro' | 'thrift' | 'unknown';
   version: string;
-  syntax: 'json' | 'yaml' | 'graphql';
+  syntax: 'json' | 'yaml' | 'graphql' | 'protobuf' | 'thrift';
   syntaxValid: boolean;
   schemaValid: boolean;
   formatSupported: boolean;

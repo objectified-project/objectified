@@ -81,19 +81,20 @@ function collectNamedTypes(
   if (!schema || typeof schema !== 'object') return;
   const t = schema.type;
   const ns = schema.namespace ?? namespace;
-  if (t === 'record' && schema.name) {
-    const name = fullName(schema);
+  const named = schema as unknown as { name: string; namespace?: string };
+  if (t === 'record' && named.name) {
+    const name = fullName(named);
     if (!into.has(name)) {
       into.set(name, { type: 'record', schema });
       (schema.fields || []).forEach((f: any) => {
         if (f && f.type) collectNamedTypes(f.type, into, ns);
       });
     }
-  } else if (t === 'enum' && schema.name) {
-    const name = fullName(schema);
+  } else if (t === 'enum' && named.name) {
+    const name = fullName(named);
     if (!into.has(name)) into.set(name, { type: 'enum', schema });
-  } else if (t === 'fixed' && schema.name) {
-    const name = fullName(schema);
+  } else if (t === 'fixed' && named.name) {
+    const name = fullName(named);
     if (!into.has(name)) into.set(name, { type: 'fixed', schema });
   } else if (t === 'array' && schema.items) {
     collectNamedTypes(schema.items, into, ns);
@@ -163,8 +164,9 @@ function avroTypeToOpenAPI(
     case 'string':
       return { type: 'string' };
     case 'record': {
-      const name = fullName(schema);
-      if (schema.name && named.has(name)) {
+      const recordNamed = schema as unknown as { name: string; namespace?: string };
+      const name = fullName(recordNamed);
+      if (recordNamed.name && named.has(name)) {
         const ref = schemaNameToRef(name);
         if (ref) return { $ref: ref };
       }
@@ -183,8 +185,9 @@ function avroTypeToOpenAPI(
       };
     }
     case 'enum': {
-      const enumName = fullName(schema);
-      if (schema.name && named.has(enumName)) {
+      const enumNamed = schema as unknown as { name: string; namespace?: string };
+      const enumName = fullName(enumNamed);
+      if (enumNamed.name && named.has(enumName)) {
         const ref = schemaNameToRef(enumName);
         if (ref) return { $ref: ref };
       }
