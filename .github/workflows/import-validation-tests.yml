@@ -43,7 +43,7 @@ jobs:
       - name: Install Objectified UI dependencies
         run: |
           cd objectified-ui
-          yarn install --frozen-lockfile
+          yarn install
 
       # - name: Run import validation tests
       #   run: |
