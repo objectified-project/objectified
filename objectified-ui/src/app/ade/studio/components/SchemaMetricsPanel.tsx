@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../../../../lib/utils';
@@ -65,6 +65,7 @@ export default function SchemaMetricsPanel({
     documentationCompletionPercentage,
     classesMissingDocumentation,
     propertiesMissingDocumentation,
+    namingCompliance,
   } = metrics;
 
   const hasHubs = hubNames.length > 0;
@@ -79,7 +80,7 @@ export default function SchemaMetricsPanel({
           className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
         >
           <BarChart3 className="w-4 h-4 shrink-0" />
-          <span className="tabular-nums">{classCount} classes · {totalProperties} props · {relationshipCount} rels · complexity {complexityScore} · docs {documentationCompletionPercentage}%</span>
+          <span className="tabular-nums">{classCount} classes · {totalProperties} props · {relationshipCount} rels · complexity {complexityScore} · docs {documentationCompletionPercentage}% · naming {namingCompliance.compliancePercentage}%</span>
           <ChevronUp className="w-3 h-3 shrink-0" />
         </button>
       </div>
@@ -191,12 +192,13 @@ export default function SchemaMetricsPanel({
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Click for breakdown</p>
               </button>
             </Popover.Trigger>
-            {/* Documentation completion (#557); click to see where coverage is missing */}
+            {/* Documentation and Naming side-by-side */}
+            <div className="flex gap-2 mt-2">
             <Popover.Root>
               <Popover.Trigger asChild>
                 <button
                   type="button"
-                  className="mt-2 w-full rounded-lg bg-gray-50 dark:bg-gray-700/50 dark:border dark:border-gray-600/50 px-3 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                  className="flex-1 min-w-0 rounded-lg bg-gray-50 dark:bg-gray-700/50 dark:border dark:border-gray-600/50 px-2.5 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
                   aria-label="Documentation coverage; click to see where coverage is missing"
                   title="Click to see where coverage needs to be completed"
                 >
@@ -204,7 +206,7 @@ export default function SchemaMetricsPanel({
                     <div className="flex items-center gap-1.5">
                       <FileText className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
                       <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Documentation
+                        Docs
                       </span>
                     </div>
                     <span className="text-lg font-bold text-gray-800 dark:text-gray-200 tabular-nums">
@@ -222,7 +224,7 @@ export default function SchemaMetricsPanel({
                       style={{ width: `${documentationCompletionPercentage}%` }}
                     />
                   </div>
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Click for gaps</p>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 truncate">Click for gaps</p>
                 </button>
               </Popover.Trigger>
               <Popover.Portal>
@@ -283,6 +285,119 @@ export default function SchemaMetricsPanel({
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  className="flex-1 min-w-0 rounded-lg bg-gray-50 dark:bg-gray-700/50 dark:border dark:border-gray-600/50 px-2.5 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                  aria-label="Naming convention compliance; click to see breakdown"
+                  title="Click to see PascalCase / camelCase / snake_case breakdown"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Type className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Naming
+                      </span>
+                    </div>
+                    <span className="text-lg font-bold text-gray-800 dark:text-gray-200 tabular-nums">
+                      {namingCompliance.compliancePercentage}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-300',
+                        namingCompliance.compliancePercentage >= 80 && 'bg-emerald-500',
+                        namingCompliance.compliancePercentage >= 50 && namingCompliance.compliancePercentage < 80 && 'bg-amber-500',
+                        namingCompliance.compliancePercentage < 50 && 'bg-rose-500'
+                      )}
+                      style={{ width: `${namingCompliance.compliancePercentage}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 truncate" title="Classes PascalCase, properties camelCase">Pascal / camel</p>
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-[10000] w-80 max-h-[min(60vh,400px)] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 focus:outline-none flex flex-col"
+                  sideOffset={6}
+                  align="start"
+                >
+                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2 shrink-0">
+                    Naming convention compliance
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3 shrink-0">
+                    Recommended: class names PascalCase, property names camelCase.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] mb-3">
+                    <div className="rounded bg-gray-50 dark:bg-gray-700/50 px-2 py-1.5">
+                      <span className="text-gray-500 dark:text-gray-400">Classes (PascalCase)</span>
+                      <div className="font-semibold text-gray-800 dark:text-gray-200">
+                        {namingCompliance.classes.pascal}/{namingCompliance.classes.total}
+                      </div>
+                    </div>
+                    <div className="rounded bg-gray-50 dark:bg-gray-700/50 px-2 py-1.5">
+                      <span className="text-gray-500 dark:text-gray-400">Properties (camelCase)</span>
+                      <div className="font-semibold text-gray-800 dark:text-gray-200">
+                        {namingCompliance.properties.camel}/{namingCompliance.properties.total}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                    Property naming breakdown
+                  </div>
+                  <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mb-3">
+                    <li>camelCase: {namingCompliance.properties.camel}</li>
+                    <li>snake_case: {namingCompliance.properties.snake}</li>
+                    <li>PascalCase: {namingCompliance.properties.pascal}</li>
+                    {namingCompliance.properties.other > 0 && <li>other: {namingCompliance.properties.other}</li>}
+                  </ul>
+                  <div className="min-h-0 overflow-y-auto space-y-3">
+                    {namingCompliance.classesNonPascal.length > 0 && (
+                      <div>
+                        <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                          Classes not PascalCase ({namingCompliance.classesNonPascal.length})
+                        </div>
+                        <ul className="space-y-0.5 text-[11px] text-gray-700 dark:text-gray-300">
+                          {namingCompliance.classesNonPascal.slice(0, 30).map((name, i) => (
+                            <li key={i} className="truncate font-medium" title={name}>{name}</li>
+                          ))}
+                          {namingCompliance.classesNonPascal.length > 30 && (
+                            <li className="text-gray-500 dark:text-gray-400">+{namingCompliance.classesNonPascal.length - 30} more</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    {namingCompliance.propertiesNonCamel.length > 0 && (
+                      <div>
+                        <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                          Properties not camelCase ({namingCompliance.propertiesNonCamel.length})
+                        </div>
+                        <ul className="space-y-0.5 text-[11px] text-gray-700 dark:text-gray-300">
+                          {namingCompliance.propertiesNonCamel.slice(0, 30).map((item, i) => (
+                            <li key={i} className="truncate" title={`${item.className} › ${item.propertyName}`}>
+                              <span className="text-gray-500 dark:text-gray-400">{item.className}</span>
+                              <span className="mx-1 text-gray-400 dark:text-gray-500">›</span>
+                              <span className="font-medium">{item.propertyName}</span>
+                            </li>
+                          ))}
+                          {namingCompliance.propertiesNonCamel.length > 30 && (
+                            <li className="text-gray-500 dark:text-gray-400">+{namingCompliance.propertiesNonCamel.length - 30} more</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    {namingCompliance.classesNonPascal.length === 0 && namingCompliance.propertiesNonCamel.length === 0 && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        All class names are PascalCase and all property names are camelCase.
+                      </p>
+                    )}
+                  </div>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+            </div>
             <Popover.Portal>
               <Popover.Content
                 className="z-[10000] w-72 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 focus:outline-none"

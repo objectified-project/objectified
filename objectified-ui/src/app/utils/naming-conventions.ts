@@ -74,6 +74,22 @@ function matchesConvention(str: string, convention: NamingConvention): boolean {
   return str === converted;
 }
 
+/** Result of detecting which convention a name follows (#558) */
+export type DetectedConvention = 'PascalCase' | 'camelCase' | 'snake_case' | 'other';
+
+/**
+ * Detect which naming convention a string follows.
+ * Order: PascalCase (starts upper), snake_case (contains _), camelCase (starts lower), else other.
+ */
+export function detectNamingConvention(name: string): DetectedConvention {
+  if (!name || typeof name !== 'string' || name.trim() === '') return 'other';
+  const trimmed = name.trim();
+  if (/^[A-Z]/.test(trimmed) && matchesConvention(trimmed, 'PascalCase')) return 'PascalCase';
+  if (trimmed.includes('_') && matchesConvention(trimmed, 'snake_case')) return 'snake_case';
+  if (/^[a-z]/.test(trimmed) && matchesConvention(trimmed, 'camelCase')) return 'camelCase';
+  return 'other';
+}
+
 /**
  * Validate that a name matches the target naming convention.
  * Returns validation result with optional suggested conversion.

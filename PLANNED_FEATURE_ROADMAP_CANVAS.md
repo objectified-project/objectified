@@ -351,7 +351,7 @@
   - ✅ Total classes, properties, relationships count
   - ✅ Schema complexity score
   - ✅ Documentation coverage percentage
-  - 📋 [TODO] Naming convention compliance
+  - ✅ Naming convention compliance
 - 📋 [TODO] Per-node metrics badges (property count, relationship count)
 - 📋 [TODO] Heatmap visualization:
   - 📋 [TODO] By complexity (more complex = warmer color)
@@ -362,7 +362,6 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #558   | Naming convention compliance                   |
 | #559   | Per-node metrics badges                        |
 | #560   | Heatmap visualization to version dashboard     |
 | #561   | Trend indicators (improving/declining metrics) |

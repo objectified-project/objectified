@@ -4,6 +4,7 @@
  */
 
 import type { Node, Edge } from '@xyflow/react';
+import { detectNamingConvention } from './naming-conventions';
 
 export interface SchemaMetricsResult {
   /** Total number of class nodes (excludes group nodes) */
@@ -40,6 +41,22 @@ export interface SchemaMetricsResult {
   classesMissingDocumentation: string[];
   /** Properties missing description: className + propertyName for display */
   propertiesMissingDocumentation: { className: string; propertyName: string }[];
+  /** Naming convention compliance (#558): camelCase, snake_case, PascalCase breakdown */
+  namingCompliance: NamingComplianceResult;
+}
+
+/** Naming convention counts and compliance percentage (#558) */
+export interface NamingComplianceResult {
+  /** Class names: count per convention (recommended: PascalCase) */
+  classes: { pascal: number; camel: number; snake: number; other: number; total: number };
+  /** Property names: count per convention (recommended: camelCase) */
+  properties: { pascal: number; camel: number; snake: number; other: number; total: number };
+  /** Compliance 0–100: classes PascalCase + properties camelCase over total names */
+  compliancePercentage: number;
+  /** Class names that are not PascalCase (for "click to see" list) */
+  classesNonPascal: string[];
+  /** Properties not camelCase: className + propertyName (for "click to see" list) */
+  propertiesNonCamel: { className: string; propertyName: string }[];
 }
 
 export interface ComplexityBreakdownItem {
@@ -236,6 +253,58 @@ function getNodeName(node: Node): string {
 }
 
 /**
+ * Compute naming convention compliance for classes (PascalCase) and properties (camelCase) (#558).
+ */
+function computeNamingCompliance(classNodes: Node[]): NamingComplianceResult {
+  const classes = { pascal: 0, camel: 0, snake: 0, other: 0, total: 0 };
+  const properties = { pascal: 0, camel: 0, snake: 0, other: 0, total: 0 };
+  const classesNonPascal: string[] = [];
+  const propertiesNonCamel: { className: string; propertyName: string }[] = [];
+
+  for (const node of classNodes) {
+    const data = node.data as {
+      name?: string;
+      properties?: Array<{ name?: string }>;
+    };
+    const className = typeof data?.name === 'string' ? data.name : node.id;
+
+    const classConv = detectNamingConvention(className);
+    classes.total += 1;
+    if (classConv === 'PascalCase') classes.pascal += 1;
+    else if (classConv === 'camelCase') classes.camel += 1;
+    else if (classConv === 'snake_case') classes.snake += 1;
+    else classes.other += 1;
+    if (classConv !== 'PascalCase') classesNonPascal.push(className);
+
+    const props = data?.properties;
+    if (Array.isArray(props)) {
+      for (const p of props) {
+        const propName = typeof p?.name === 'string' ? p.name : 'property';
+        const propConv = detectNamingConvention(propName);
+        properties.total += 1;
+        if (propConv === 'PascalCase') properties.pascal += 1;
+        else if (propConv === 'camelCase') properties.camel += 1;
+        else if (propConv === 'snake_case') properties.snake += 1;
+        else properties.other += 1;
+        if (propConv !== 'camelCase') propertiesNonCamel.push({ className, propertyName: propName });
+      }
+    }
+  }
+
+  const compliant = classes.pascal + properties.camel;
+  const totalNames = classes.total + properties.total;
+  const compliancePercentage = totalNames === 0 ? 100 : Math.round((compliant / totalNames) * 100);
+
+  return {
+    classes,
+    properties,
+    compliancePercentage,
+    classesNonPascal,
+    propertiesNonCamel,
+  };
+}
+
+/**
  * Compute all schema metrics from current canvas nodes and edges.
  */
 export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetricsResult {
@@ -276,6 +345,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
   });
 
   const docResult = computeDocumentationCompletion(classNodes);
+  const namingCompliance = computeNamingCompliance(classNodes);
 
   return {
     classCount,
@@ -295,6 +365,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     documentationCompletionPercentage: docResult.percentage,
     classesMissingDocumentation: docResult.classesMissing,
     propertiesMissingDocumentation: docResult.propertiesMissing,
+    namingCompliance,
   };
 }
 

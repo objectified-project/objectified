@@ -9,6 +9,7 @@
 import {
   convertToNamingConvention,
   validateNamingConvention,
+  detectNamingConvention,
   applyNamingConventionToClass,
   applyNamingConventionToClasses,
 } from '../src/app/utils/naming-conventions';
@@ -86,6 +87,26 @@ describe('naming-conventions (#581)', () => {
 
     it('returns valid for convention none', () => {
       expect(validateNamingConvention('anything_here', 'none')).toEqual({ valid: true });
+    });
+  });
+
+  describe('detectNamingConvention (#558)', () => {
+    it('detects PascalCase', () => {
+      expect(detectNamingConvention('UserProfile')).toBe('PascalCase');
+      expect(detectNamingConvention('OrderItem')).toBe('PascalCase');
+      expect(detectNamingConvention('User')).toBe('PascalCase');
+    });
+    it('detects snake_case', () => {
+      expect(detectNamingConvention('user_profile')).toBe('snake_case');
+      expect(detectNamingConvention('user_id_v2')).toBe('snake_case');
+    });
+    it('detects camelCase', () => {
+      expect(detectNamingConvention('userProfile')).toBe('camelCase');
+      expect(detectNamingConvention('userId')).toBe('camelCase');
+    });
+    it('returns other for kebab-case or invalid', () => {
+      expect(detectNamingConvention('user-profile')).toBe('other');
+      expect(detectNamingConvention('')).toBe('other');
     });
   });
 
