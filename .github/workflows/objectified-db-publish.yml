@@ -1,0 +1,41 @@
+name: Objectified DB publish
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'objectified-db/**'
+  workflow_dispatch:
+
+env:
+  REGISTRY: registry.objectified.dev
+  IMAGE_NAME: objectified-db
+
+jobs:
+  build-and-push:
+    name: Build and push objectified-db image
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry
+        run: echo "${{ env.DOCKER_PASSWORD }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
+
+      - name: Extract metadata and build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./objectified-db
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
