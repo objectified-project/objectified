@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: Run Import Validation Tests
+    name: Run Objectified UI Test and Build
     runs-on: ubuntu-latest
 
     services:
