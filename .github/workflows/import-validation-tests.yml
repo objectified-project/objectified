@@ -45,10 +45,11 @@ jobs:
           cd objectified-ui
           yarn install
 
-      - name: Run import validation tests
+      - name: Run validation tests
         run: |
           cd objectified-ui
-          yarn test:import --ci
+          # yarn test:import --ci
+          yarn test --ci
         env:
           TEST_POSTGRES_DB: objectified_test
           POSTGRES_HOST: localhost
