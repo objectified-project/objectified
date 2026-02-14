@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "./components/ui/Button";
 
 export default function Home() {
@@ -281,41 +282,15 @@ export default function Home() {
                 </Button>
               </a>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-              <div className="space-y-4">
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Public API</span>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Pet Store API v2.0</p>
-                  <div className="mt-3 flex gap-2">
-                    <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">REST</span>
-                    <span className="rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-950 dark:text-purple-300">15 endpoints</span>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Public API</span>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">E-Commerce Platform API</p>
-                  <div className="mt-3 flex gap-2">
-                    <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">REST</span>
-                    <span className="rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-950 dark:text-purple-300">42 endpoints</span>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Public API</span>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">Social Media Integration API</p>
-                  <div className="mt-3 flex gap-2">
-                    <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">REST</span>
-                    <span className="rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 dark:bg-purple-950 dark:text-purple-300">28 endpoints</span>
-                  </div>
-                </div>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-8 dark:border-zinc-800 dark:bg-zinc-900">
+              <div className="relative aspect-video overflow-hidden rounded-lg border-2 border-black dark:border-black">
+                <Image
+                  src="/browser-01.png"
+                  alt="Public API Browser — explore OpenAPI specifications"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
               </div>
             </div>
           </div>
