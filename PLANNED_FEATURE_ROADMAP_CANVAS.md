@@ -272,7 +272,7 @@
   - ✅ Categories: Images, Documents, Diagram Code
 - **High-Resolution Export**:
   - ✅ 1x (default), 2x, 4x resolution options
-  - 📋 [TODO] Customizable DPI (72, 150, 300, 600)
+  - ✅ Customizable DPI (72, 150, 300, 600)
   - 📋 [TODO] Export dimensions in pixels or cm/inches
 - **Selective Export**:
   - [TODO] Export only selected nodes
@@ -347,22 +347,7 @@
 | #553   | Dependency metrics per class (in-degree, out-degree, betweenness)   |
 
 #### Schema Metrics Dashboard 📋 PLANNED
-- ✅[Real-time metrics overlay on canvas:
-  - ✅ Total classes, properties, relationships count
-  - ✅ Schema complexity score
-  - ✅ Documentation coverage percentage
-  - ✅ Naming convention compliance
-- ✅ Per-node metrics badges (property count, relationship count)
-- ✅ Heatmap visualization (#560):
-  - ✅ By complexity (more complex = warmer color)
-  - ✅ By change frequency (recently modified = highlighted)
-  - ✅ By usage/reference count
-  - ✅ By documentation completeness
 - 📋 [TODO] Trend indicators (improving/declining metrics)
-
-| Ticket | Feature                                        |
-|--------|------------------------------------------------|
-| #561   | Trend indicators (improving/declining metrics) |
 
 ---
 
@@ -518,6 +503,19 @@
 - ✅ Dynamic detail based on zoom level
 - ✅ Fade transitions between LOD levels
 - ✅ Show property references even when nodes are collapsed
+
+#### Schema Metrics Dashboard 📋 PLANNED
+- ✅[Real-time metrics overlay on canvas:
+  - ✅ Total classes, properties, relationships count
+  - ✅ Schema complexity score
+  - ✅ Documentation coverage percentage
+  - ✅ Naming convention compliance
+- ✅ Per-node metrics badges (property count, relationship count)
+- ✅ Heatmap visualization (#560):
+  - ✅ By complexity (more complex = warmer color)
+  - ✅ By change frequency (recently modified = highlighted)
+  - ✅ By usage/reference count
+  - ✅ By documentation completeness
 
 ---
 
