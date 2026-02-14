@@ -434,6 +434,8 @@ type ClassNodeData = {
   zoomLevel?: number; // Current zoom level for level-of-detail rendering
   lodEnabled?: boolean; // Whether LOD is enabled (defaults to true)
   theme?: ClassNodeTheme; // Custom theme from canvas_metadata
+  /** #559: Number of edges connected to this node (source or target) for badge display */
+  relationshipCount?: number;
 };
 
 function ClassNode({ id, data, selected }: NodeProps) {
@@ -1156,6 +1158,39 @@ function ClassNode({ id, data, selected }: NodeProps) {
             )}
           </div>
         </div>
+
+        {/* #559: Per-node metrics badges (property count, relationship count) */}
+        {(() => {
+          const propCount = (typedData.properties || []).length;
+          const relCount = typedData.relationshipCount ?? 0;
+          const badgeStyle: React.CSSProperties = {
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: 'rgba(255, 255, 255, 0.2)',
+            color: headerTextColor,
+            fontSize: '10px',
+            fontWeight: 600,
+            lineHeight: 1.2,
+            flexShrink: 0,
+          };
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative', zIndex: 1 }}>
+              <span style={badgeStyle} title={`${propCount} propert${propCount === 1 ? 'y' : 'ies'}`}>
+                <List size={10} strokeWidth={2.5} />
+                {propCount}
+              </span>
+              {relCount > 0 && (
+                <span style={badgeStyle} title={`${relCount} relationship${relCount === 1 ? '' : 's'}`}>
+                  <Link2 size={10} strokeWidth={2.5} />
+                  {relCount}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         {!typedData.isReadOnly && (
           <div style={{ display: 'flex', gap: '3px', alignItems: 'center', position: 'relative', zIndex: 1 }}>

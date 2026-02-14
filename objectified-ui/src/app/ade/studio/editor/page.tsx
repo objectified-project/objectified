@@ -410,6 +410,24 @@ const StudioContent = () => {
     });
   }, [nodes, edges, schemaMetrics, layoutQuality, groupMemberIds]);
 
+  // #559: Sync per-node relationship count from edges into class node data (for badges)
+  useEffect(() => {
+    const countByNodeId = new Map<string, number>();
+    edges.forEach((e) => {
+      countByNodeId.set(e.source, (countByNodeId.get(e.source) ?? 0) + 1);
+      countByNodeId.set(e.target, (countByNodeId.get(e.target) ?? 0) + 1);
+    });
+    setNodes((current) =>
+      current.map((n) => {
+        if (n.type !== 'classNode') return n;
+        const relationshipCount = countByNodeId.get(n.id) ?? 0;
+        const existing = (n.data as any)?.relationshipCount;
+        if (existing === relationshipCount) return n;
+        return { ...n, data: { ...(n.data as any), relationshipCount } };
+      })
+    );
+  }, [edges, setNodes]);
+
   // Create stable refs for callbacks to prevent unnecessary re-renders
   const handlePropertyDropRef = useRef<any>(null);
   const handlePropertyEditRef = useRef<any>(null);
