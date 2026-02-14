@@ -108,7 +108,7 @@ import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeSchemaMetrics, computeHeatmapValues } from '@/app/utils/schema-metrics';
+import { computeSchemaMetrics, computeHeatmapValues, type HeatmapValues } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -914,7 +914,8 @@ const StudioContent = () => {
 
     // #560: Apply heatmap visualization (complexity, change frequency, usage, documentation)
     if (heatmapMode !== 'off') {
-      const key = heatmapMode === 'changeFrequency' ? 'changeRecency' : heatmapMode === 'usage' ? 'usage' : heatmapMode;
+      const key: keyof HeatmapValues =
+        heatmapMode === 'changeFrequency' ? 'changeRecency' : heatmapMode === 'usage' ? 'usage' : heatmapMode;
       const labelByMode: Record<string, string> = {
         complexity: 'Complexity',
         changeRecency: 'Recently modified',
@@ -925,7 +926,7 @@ const StudioContent = () => {
       result = result.map(node => {
         if (node.type === 'groupNode') return node;
         const values = heatmapValues.get(node.id);
-        const value = values ? (values as Record<string, number>)[key] ?? 0.5 : 0.5;
+        const value = values ? values[key] ?? 0.5 : 0.5;
         const valuePct = Math.round(value * 100);
         return {
           ...node,
