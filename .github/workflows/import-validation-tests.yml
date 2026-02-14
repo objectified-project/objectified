@@ -45,17 +45,17 @@ jobs:
           cd objectified-ui
           yarn install
 
-      # - name: Run import validation tests
-      #   run: |
-      #     cd objectified-ui
-      #     yarn test:import --ci
-      #   env:
-      #     TEST_POSTGRES_DB: objectified_test
-      #     POSTGRES_HOST: localhost
-      #     POSTGRES_PORT: 5432
-      #     POSTGRES_USER: postgres
-      #     POSTGRES_PASSWORD: postgres
-      #     NODE_ENV: test
+      - name: Run import validation tests
+        run: |
+          cd objectified-ui
+          yarn test:import --ci
+        env:
+          TEST_POSTGRES_DB: objectified_test
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          NODE_ENV: test
 
       # - name: Upload coverage reports
       #   uses: codecov/codecov-action@v4
