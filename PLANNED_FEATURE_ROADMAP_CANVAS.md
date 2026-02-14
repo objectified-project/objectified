@@ -347,8 +347,8 @@
 | #553   | Dependency metrics per class (in-degree, out-degree, betweenness)   |
 
 #### Schema Metrics Dashboard 📋 PLANNED
-- 📋 [TODO] Real-time metrics overlay on canvas:
-  - 📋 [TODO] Total classes, properties, relationships count
+- ✅[Real-time metrics overlay on canvas:
+  - ✅ Total classes, properties, relationships count
   - 📋 [TODO] Schema complexity score
   - 📋 [TODO] Documentation coverage percentage
   - 📋 [TODO] Naming convention compliance
@@ -362,8 +362,6 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #554   | Real-time metrics overlay on canvas            |
-| #555   | Total classes, properties, relationships count |
 | #556   | Schema complexity score                        |
 | #557   | Documentation coverage percentage              |
 | #558   | Naming convention compliance                   |

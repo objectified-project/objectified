@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
@@ -70,9 +70,9 @@ export default function SchemaMetricsPanel({
           onClick={onMinimizeToggle}
           className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
         >
-          <BarChart3 className="w-4 h-4" />
-          <span>{classCount} classes</span>
-          <ChevronUp className="w-3 h-3" />
+          <BarChart3 className="w-4 h-4 shrink-0" />
+          <span className="tabular-nums">{classCount} classes · {totalProperties} properties · {relationshipCount} relationships</span>
+          <ChevronUp className="w-3 h-3 shrink-0" />
         </button>
       </div>
     );
@@ -108,7 +108,41 @@ export default function SchemaMetricsPanel({
           </div>
         </div>
 
-        <div className="p-3 space-y-4 overflow-y-auto">
+        {/* Totals: static at top (#555) */}
+        <div className="shrink-0 px-3 pt-3 pb-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 px-2.5 py-2 text-center">
+              <Box className="w-4 h-4 mx-auto mb-1 text-indigo-500" aria-hidden />
+              <div className="text-lg font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                {classCount}
+              </div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Classes
+              </div>
+            </div>
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 px-2.5 py-2 text-center">
+              <Layers className="w-4 h-4 mx-auto mb-1 text-indigo-500" aria-hidden />
+              <div className="text-lg font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                {totalProperties}
+              </div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Properties
+              </div>
+            </div>
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 px-2.5 py-2 text-center">
+              <Link2 className="w-4 h-4 mx-auto mb-1 text-indigo-500" aria-hidden />
+              <div className="text-lg font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                {relationshipCount}
+              </div>
+              <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Relationships
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-4">
           {/* Average properties per class */}
           <div>
             <div className="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
@@ -343,11 +377,6 @@ export default function SchemaMetricsPanel({
               </ul>
             </div>
           )}
-
-          {/* Summary line */}
-          <div className="pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-            {classCount} classes · {relationshipCount} relationships
-          </div>
         </div>
       </div>
     </Tooltip.Provider>
