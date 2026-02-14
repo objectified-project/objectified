@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../../../../lib/utils';
@@ -62,6 +62,9 @@ export default function SchemaMetricsPanel({
     complexityScore,
     complexityLabel,
     complexityBreakdown,
+    documentationCompletionPercentage,
+    classesMissingDocumentation,
+    propertiesMissingDocumentation,
   } = metrics;
 
   const hasHubs = hubNames.length > 0;
@@ -76,7 +79,7 @@ export default function SchemaMetricsPanel({
           className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
         >
           <BarChart3 className="w-4 h-4 shrink-0" />
-          <span className="tabular-nums">{classCount} classes · {totalProperties} props · {relationshipCount} rels · complexity {complexityScore}</span>
+          <span className="tabular-nums">{classCount} classes · {totalProperties} props · {relationshipCount} rels · complexity {complexityScore} · docs {documentationCompletionPercentage}%</span>
           <ChevronUp className="w-3 h-3 shrink-0" />
         </button>
       </div>
@@ -188,6 +191,98 @@ export default function SchemaMetricsPanel({
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Click for breakdown</p>
               </button>
             </Popover.Trigger>
+            {/* Documentation completion (#557); click to see where coverage is missing */}
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-lg bg-gray-50 dark:bg-gray-700/50 dark:border dark:border-gray-600/50 px-3 py-2 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800"
+                  aria-label="Documentation coverage; click to see where coverage is missing"
+                  title="Click to see where coverage needs to be completed"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden />
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Documentation
+                      </span>
+                    </div>
+                    <span className="text-lg font-bold text-gray-800 dark:text-gray-200 tabular-nums">
+                      {documentationCompletionPercentage}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-300',
+                        documentationCompletionPercentage >= 80 && 'bg-emerald-500',
+                        documentationCompletionPercentage >= 50 && documentationCompletionPercentage < 80 && 'bg-amber-500',
+                        documentationCompletionPercentage < 50 && 'bg-rose-500'
+                      )}
+                      style={{ width: `${documentationCompletionPercentage}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Click for gaps</p>
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-[10000] w-80 max-h-[min(60vh,400px)] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 focus:outline-none flex flex-col"
+                  sideOffset={6}
+                  align="start"
+                >
+                  <div className="text-xs font-semibold text-gray-800 dark:text-gray-200 mb-2 shrink-0">
+                    Where coverage needs to be completed
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3 shrink-0">
+                    Classes and properties below are missing a non-empty description.
+                  </p>
+                  <div className="min-h-0 overflow-y-auto space-y-3">
+                    {classesMissingDocumentation.length > 0 && (
+                      <div>
+                        <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                          Classes missing description ({classesMissingDocumentation.length})
+                        </div>
+                        <ul className="space-y-0.5 text-[11px] text-gray-700 dark:text-gray-300">
+                          {classesMissingDocumentation.slice(0, 50).map((name, i) => (
+                            <li key={i} className="truncate font-medium" title={name}>
+                              {name}
+                            </li>
+                          ))}
+                          {classesMissingDocumentation.length > 50 && (
+                            <li className="text-gray-500 dark:text-gray-400">+{classesMissingDocumentation.length - 50} more</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    {propertiesMissingDocumentation.length > 0 && (
+                      <div>
+                        <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                          Properties missing description ({propertiesMissingDocumentation.length})
+                        </div>
+                        <ul className="space-y-0.5 text-[11px] text-gray-700 dark:text-gray-300">
+                          {propertiesMissingDocumentation.slice(0, 50).map((item, i) => (
+                            <li key={i} className="truncate" title={`${item.className} › ${item.propertyName}`}>
+                              <span className="text-gray-500 dark:text-gray-400">{item.className}</span>
+                              <span className="mx-1 text-gray-400 dark:text-gray-500">›</span>
+                              <span className="font-medium">{item.propertyName}</span>
+                            </li>
+                          ))}
+                          {propertiesMissingDocumentation.length > 50 && (
+                            <li className="text-gray-500 dark:text-gray-400">+{propertiesMissingDocumentation.length - 50} more</li>
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    {classesMissingDocumentation.length === 0 && propertiesMissingDocumentation.length === 0 && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        All classes and properties have descriptions.
+                      </p>
+                    )}
+                  </div>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
             <Popover.Portal>
               <Popover.Content
                 className="z-[10000] w-72 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg p-3 focus:outline-none"

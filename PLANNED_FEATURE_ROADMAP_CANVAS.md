@@ -349,8 +349,8 @@
 #### Schema Metrics Dashboard 📋 PLANNED
 - ✅[Real-time metrics overlay on canvas:
   - ✅ Total classes, properties, relationships count
-  - 📋 [TODO] Schema complexity score
-  - 📋 [TODO] Documentation coverage percentage
+  - ✅ Schema complexity score
+  - ✅ Documentation coverage percentage
   - 📋 [TODO] Naming convention compliance
 - 📋 [TODO] Per-node metrics badges (property count, relationship count)
 - 📋 [TODO] Heatmap visualization:
@@ -362,8 +362,6 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #556   | Schema complexity score                        |
-| #557   | Documentation coverage percentage              |
 | #558   | Naming convention compliance                   |
 | #559   | Per-node metrics badges                        |
 | #560   | Heatmap visualization to version dashboard     |

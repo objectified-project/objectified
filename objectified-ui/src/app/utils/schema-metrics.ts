@@ -34,6 +34,12 @@ export interface SchemaMetricsResult {
   complexityLabel: 'Low' | 'Medium' | 'High';
   /** Per-factor contribution for "why is this score" breakdown */
   complexityBreakdown: ComplexityBreakdownItem[];
+  /** Documentation completion 0–100: % of classes and properties with non-empty description (#557) */
+  documentationCompletionPercentage: number;
+  /** Class names that have no description (for "click to see where coverage is missing") */
+  classesMissingDocumentation: string[];
+  /** Properties missing description: className + propertyName for display */
+  propertiesMissingDocumentation: { className: string; propertyName: string }[];
 }
 
 export interface ComplexityBreakdownItem {
@@ -50,6 +56,58 @@ function getClassNodes(nodes: Node[]): Node[] {
 function getPropertyCount(node: Node): number {
   const props = (node.data as { properties?: unknown[] })?.properties;
   return Array.isArray(props) ? props.length : 0;
+}
+
+function hasDocumentation(value: unknown): boolean {
+  if (value == null) return false;
+  const s = typeof value === 'string' ? value : String(value);
+  return s.trim().length > 0;
+}
+
+type DocGapResult = {
+  percentage: number;
+  classesMissing: string[];
+  propertiesMissing: { className: string; propertyName: string }[];
+};
+
+/**
+ * Compute documentation completion and list classes/properties missing description (#557).
+ */
+function computeDocumentationCompletion(classNodes: Node[]): DocGapResult {
+  let documented = 0;
+  let total = 0;
+  const classesMissing: string[] = [];
+  const propertiesMissing: { className: string; propertyName: string }[] = [];
+
+  for (const node of classNodes) {
+    const data = node.data as {
+      name?: string;
+      description?: string;
+      properties?: Array<{ name?: string; description?: string }>;
+    };
+    const className = typeof data?.name === 'string' ? data.name : node.id;
+    total += 1;
+    if (hasDocumentation(data?.description)) {
+      documented += 1;
+    } else {
+      classesMissing.push(className);
+    }
+    const props = data?.properties;
+    if (Array.isArray(props)) {
+      for (const p of props) {
+        total += 1;
+        const propName = typeof p?.name === 'string' ? p.name : 'property';
+        if (hasDocumentation(p?.description)) {
+          documented += 1;
+        } else {
+          propertiesMissing.push({ className, propertyName: propName });
+        }
+      }
+    }
+  }
+
+  const percentage = total === 0 ? 100 : Math.round((documented / total) * 100);
+  return { percentage, classesMissing, propertiesMissing };
 }
 
 /**
@@ -217,6 +275,8 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     circularDependencyCount,
   });
 
+  const docResult = computeDocumentationCompletion(classNodes);
+
   return {
     classCount,
     totalProperties,
@@ -232,6 +292,9 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     complexityScore,
     complexityLabel,
     complexityBreakdown,
+    documentationCompletionPercentage: docResult.percentage,
+    classesMissingDocumentation: docResult.classesMissing,
+    propertiesMissingDocumentation: docResult.propertiesMissing,
   };
 }
 
