@@ -34,16 +34,8 @@ The import system provides comprehensive, enterprise-level capabilities for impo
 #### 4.2 Supported Formats ✅ PARTIALLY IMPLEMENTED
 
 ##### OpenAPI Specifications
-- ✅ **OpenAPI 3.1.x**: Full JSON Schema Draft 2020-12 support
-- ✅ Warn on older versions of OpenAPI Specification
-- ✅ **OpenAPI 3.0.x**: Automatically converted to OpenAPI 3.1.x
-- ✅ **OpenAPI 2.0 (Swagger)**
 - [TODO] **Multi-File Specs**: Support for $ref across multiple files
 - [TODO] **External References**: Resolve external $ref URLs
-
-| Ticket | Feature Description                |
-|--------|------------------------------------|
-| #496   | Adds OpenAPI 3.0 support           |
 
 ##### Schema Import/Export
 
@@ -453,6 +445,12 @@ The import flow is designed as a multi-step wizard with clear visual progression
 - ✅ Protobuf
 - ✅ Avro
 - ✅ Thrift
+
+##### OpenAPI Specifications
+- ✅ **OpenAPI 3.1.x**: Full JSON Schema Draft 2020-12 support
+- ✅ Warn on older versions of OpenAPI Specification
+- ✅ **OpenAPI 3.0.x**: Automatically converted to OpenAPI 3.1.x
+- ✅ **OpenAPI 2.0 (Swagger)**
 
 ---
 
