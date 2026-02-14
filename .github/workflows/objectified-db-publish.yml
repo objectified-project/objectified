@@ -1,4 +1,4 @@
-name: Objectified DB publish
+name: Objectified DB
 
 on:
   push:
