@@ -123,23 +123,11 @@ export default function LLMImportDialog({
         throw new Error('Failed to get response from LLM');
       }
 
-      // Process SSE stream with optimized updates
+      // Process SSE stream: update UI on every chunk for real-time streaming (Cursor-like).
+      // Each chunk triggers a state update so text appears as it arrives, not in bursts.
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulatedContent = '';
-      let animationFrameId: number | null = null;
-      let pendingUpdate = false;
-
-      // Function to update UI using requestAnimationFrame for smoother rendering
-      const scheduleUpdate = (content: string) => {
-        if (pendingUpdate) return;
-
-        pendingUpdate = true;
-        animationFrameId = requestAnimationFrame(() => {
-          setStreamingContent(content);
-          pendingUpdate = false;
-        });
-      };
 
       if (reader) {
         let buffer = '';
@@ -149,11 +137,9 @@ export default function LLMImportDialog({
 
           if (done) break;
 
-          // Decode chunk
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
 
-          // Process complete lines
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
 
@@ -164,12 +150,8 @@ export default function LLMImportDialog({
               const data = line.slice(6);
 
               if (data === '[DONE]') {
-                // Cancel any pending animation frame
-                if (animationFrameId !== null) {
-                  cancelAnimationFrame(animationFrameId);
-                }
+                setStreamingContent(accumulatedContent);
 
-                // Streaming complete - add final message
                 const assistantMessage: Message = {
                   role: 'assistant',
                   content: accumulatedContent,
@@ -183,19 +165,13 @@ export default function LLMImportDialog({
                 const event = JSON.parse(data);
                 if (event.content) {
                   accumulatedContent += event.content;
-                  // Schedule UI update without blocking stream processing
-                  scheduleUpdate(accumulatedContent);
+                  setStreamingContent(accumulatedContent);
                 }
               } catch (e) {
                 // Ignore parse errors
               }
             }
           }
-        }
-
-        // Cancel any pending animation frame on completion
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId);
         }
       }
     } catch (error: any) {
