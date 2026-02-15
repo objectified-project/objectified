@@ -89,7 +89,7 @@ commentary, or thinking output.`,
       throw new Error(`Ollama API error: ${ollamaResponse.statusText}`);
     }
 
-    // Create a TransformStream to process the streaming response
+    // Create a ReadableStream to process the streaming response
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
@@ -101,6 +101,36 @@ commentary, or thinking output.`,
           return;
         }
 
+        let closed = false;
+
+        function safeEnqueue(data: Uint8Array): boolean {
+          if (closed) return false;
+          try {
+            controller.enqueue(data);
+            return true;
+          } catch (e) {
+            if (e instanceof TypeError && String(e.message).includes('already closed')) {
+              closed = true;
+              return false;
+            }
+            throw e;
+          }
+        }
+
+        function safeClose(): void {
+          if (closed) return;
+          try {
+            controller.close();
+            closed = true;
+          } catch (e) {
+            if (e instanceof TypeError && String(e.message).includes('already closed')) {
+              closed = true;
+            } else {
+              throw e;
+            }
+          }
+        }
+
         let buffer = '';
 
         try {
@@ -109,7 +139,7 @@ commentary, or thinking output.`,
 
             if (done) {
               // Process any remaining buffer
-              if (buffer.trim()) {
+              if (buffer.trim() && !closed) {
                 try {
                   const data = JSON.parse(buffer);
                   if (data.message?.content) {
@@ -117,16 +147,17 @@ commentary, or thinking output.`,
                       content: data.message.content,
                       done: data.done || false,
                     };
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                    safeEnqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
                   }
                 } catch (e) {
                   // Ignore parse errors on final buffer
                 }
               }
 
-              // Send final event to signal completion
-              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-              controller.close();
+              if (!closed) {
+                safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+                safeClose();
+              }
               break;
             }
 
@@ -142,7 +173,7 @@ commentary, or thinking output.`,
 
             // Process each complete line immediately
             for (const line of lines) {
-              if (!line.trim()) continue;
+              if (!line.trim() || closed) continue;
 
               try {
                 const data = JSON.parse(line);
@@ -154,24 +185,34 @@ commentary, or thinking output.`,
                     done: data.done || false,
                   };
 
-                  // Enqueue immediately for real-time streaming
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                  if (!safeEnqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))) {
+                    break;
+                  }
                 }
 
                 // If this is the last message, signal completion
                 if (data.done) {
-                  controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-                  controller.close();
+                  safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+                  safeClose();
                   return;
                 }
               } catch (parseError) {
-                console.error('Error parsing Ollama response line:', parseError, 'Line:', line);
+                // Only log actual JSON parse errors, not controller-closed from client disconnect
+                if (parseError instanceof SyntaxError || (parseError instanceof TypeError && !String(parseError.message).includes('already closed'))) {
+                  console.error('Error parsing Ollama response line:', parseError, 'Line:', line);
+                }
               }
             }
           }
         } catch (error) {
-          console.error('Error reading stream:', error);
-          controller.error(error);
+          if (!closed) {
+            console.error('Error reading stream:', error);
+            try {
+              controller.error(error);
+            } catch {
+              // Controller may already be closed (e.g. client disconnected)
+            }
+          }
         }
       },
     });
