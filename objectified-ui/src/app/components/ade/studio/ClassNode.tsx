@@ -446,6 +446,10 @@ type ClassNodeData = {
   dependencyDepth?: number;
   /** #549: Human-readable label e.g. "1st", "2nd", "3rd", "3+", "Leaf" */
   dependencyDepthLabel?: string;
+  /** #550: Impact Analysis – this node is the selected (changed) class */
+  impactSource?: boolean;
+  /** #550: Impact Analysis – this node is affected by the selected class */
+  impactAffected?: boolean;
 };
 
 function ClassNode({ id, data, selected }: NodeProps) {
@@ -1241,6 +1245,30 @@ function ClassNode({ id, data, selected }: NodeProps) {
                 >
                   <Layers size={10} strokeWidth={2.5} />
                   {typedData.dependencyDepthLabel}
+                </span>
+              )}
+              {typedData.impactSource && (
+                <span
+                  style={{
+                    ...badgeStyle,
+                    background: 'rgba(245, 158, 11, 0.9)',
+                    color: '#fff',
+                  }}
+                  title="Selected for impact analysis (changing this class affects others)"
+                >
+                  Changed
+                </span>
+              )}
+              {typedData.impactAffected && (
+                <span
+                  style={{
+                    ...badgeStyle,
+                    background: 'rgba(59, 130, 246, 0.85)',
+                    color: '#fff',
+                  }}
+                  title="Affected by the selected class change"
+                >
+                  Affected
                 </span>
               )}
               <span style={badgeStyle} title={`${propCount} propert${propCount === 1 ? 'y' : 'ies'}`}>
@@ -2107,6 +2135,11 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
 
   // #549: Dependency depth badge
   if (prevData?.dependencyDepth !== nextData?.dependencyDepth || prevData?.dependencyDepthLabel !== nextData?.dependencyDepthLabel) {
+    return false;
+  }
+
+  // #550: Impact Analysis badges
+  if (prevData?.impactSource !== nextData?.impactSource || prevData?.impactAffected !== nextData?.impactAffected) {
     return false;
   }
 

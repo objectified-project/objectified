@@ -59,6 +59,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Added interactive dependency graph overlay on canvas via the layout options
   - Added highlighting circular dependencies with warning indicators
   - Shows dependency depth levels (1st, 2nd, 3rd degree)
+  - "Impact Analysis" mode: Show all affected classes when changing one
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)
   - Added inline variable editor that can click parameters in the header of the path studio

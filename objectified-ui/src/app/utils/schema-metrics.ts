@@ -375,6 +375,46 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
 }
 
 /**
+ * #550: Compute all class IDs that would be affected when the given class is changed.
+ * "Affected" = classes that (directly or transitively) reference the selected class
+ * via dependency edges ($ref, allOf/anyOf/oneOf). Uses reverse dependency graph and BFS.
+ */
+export function getAffectedClassIds(
+  selectedNodeId: string,
+  nodes: Node[],
+  dependencyEdges: Edge[]
+): Set<string> {
+  const classNodes = getClassNodes(nodes);
+  const nodeIds = new Set(classNodes.map((n) => n.id));
+  if (!nodeIds.has(selectedNodeId)) return new Set();
+
+  // Reverse adjacency: for edge source -> target, "target" is the changed class, "source" is affected
+  const reverseAdj = new Map<string, string[]>();
+  for (const e of dependencyEdges) {
+    const src = e.source;
+    const tgt = e.target;
+    if (!nodeIds.has(src) || !nodeIds.has(tgt)) continue;
+    if (!reverseAdj.has(tgt)) reverseAdj.set(tgt, []);
+    reverseAdj.get(tgt)!.push(src);
+  }
+
+  const affected = new Set<string>();
+  const queue: string[] = [selectedNodeId];
+  const visited = new Set<string>([selectedNodeId]);
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const next of reverseAdj.get(cur) ?? []) {
+      if (visited.has(next)) continue;
+      visited.add(next);
+      affected.add(next);
+      queue.push(next);
+    }
+  }
+  return affected;
+}
+
+/**
  * Returns the set of edge IDs that are part of a circular dependency (#548).
  * Used by the canvas to highlight circular dependency edges with warning styling.
  */

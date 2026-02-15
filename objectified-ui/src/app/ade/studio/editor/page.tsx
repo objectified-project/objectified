@@ -108,7 +108,7 @@ import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, type HeatmapValues } from '@/app/utils/schema-metrics';
+import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, type HeatmapValues } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -410,6 +410,18 @@ const StudioContent = () => {
     if (typeof window !== 'undefined') localStorage.setItem('showDependencyOverlay', String(showDependencyOverlay));
   }, [showDependencyOverlay]);
 
+  // #550: Impact Analysis mode – show all affected classes when one is changed
+  const [impactAnalysisMode, setImpactAnalysisMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('impactAnalysisMode');
+      return saved === 'true';
+    }
+    return false;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('impactAnalysisMode', String(impactAnalysisMode));
+  }, [impactAnalysisMode]);
+
   // Classify dependency edges (property $ref and schema/property allOf/anyOf/oneOf)
   const isDependencyEdge = useCallback((edge: Edge) => {
     const id = edge.id || '';
@@ -453,6 +465,13 @@ const StudioContent = () => {
     () => getDependencyDepthMap(nodes, dependencyEdges),
     [nodes, dependencyEdges]
   );
+
+  // #550: Affected class IDs when one class is selected in Impact Analysis mode
+  const impactAnalysisSourceId = impactAnalysisMode && selectedNodeIds.length === 1 ? selectedNodeIds[0]! : null;
+  const affectedClassIds = useMemo(() => {
+    if (!impactAnalysisSourceId) return null;
+    return getAffectedClassIds(impactAnalysisSourceId, nodes, dependencyEdges);
+  }, [impactAnalysisSourceId, nodes, dependencyEdges]);
 
   // Layout quality (#473): edge crossings, spacing uniformity, symmetry, balance
   const layoutQuality = useMemo(() => {
@@ -1049,8 +1068,50 @@ const StudioContent = () => {
       };
     });
 
+    // #550: Impact Analysis mode – dim nodes not in {source} ∪ affected, pass impactSource/impactAffected
+    if (impactAnalysisMode && impactAnalysisSourceId && affectedClassIds) {
+      const highlightSet = new Set([impactAnalysisSourceId, ...affectedClassIds]);
+      result = result.map(node => {
+        if (node.type === 'groupNode') return node;
+        const inHighlight = highlightSet.has(node.id);
+        const existingClassName = node.className || '';
+        const impactClass = inHighlight ? '' : 'impact-dimmed';
+        const impactSource = node.id === impactAnalysisSourceId;
+        const impactAffected = affectedClassIds.has(node.id);
+        return {
+          ...node,
+          className: `${existingClassName} ${impactClass}`.trim(),
+          data: {
+            ...(node.data as object),
+            ...(impactSource ? { impactSource: true } : {}),
+            ...(impactAffected ? { impactAffected: true } : {}),
+          },
+        };
+      });
+    } else if (impactAnalysisMode) {
+      result = result.map(node => {
+        if (node.type !== 'classNode') return node;
+        const d = node.data as Record<string, unknown>;
+        if (d.impactSource != null || d.impactAffected != null) {
+          const { impactSource: _s, impactAffected: _a, ...rest } = d;
+          return { ...node, data: rest };
+        }
+        return node;
+      });
+    } else {
+      result = result.map(node => {
+        if (node.type !== 'classNode') return node;
+        const d = node.data as Record<string, unknown>;
+        if (d.impactSource != null || d.impactAffected != null) {
+          const { impactSource: _s, impactAffected: _a, ...rest } = d;
+          return { ...node, data: rest };
+        }
+        return node;
+      });
+    }
+
     return result;
-  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1121,8 +1182,23 @@ const StudioContent = () => {
       return { ...edge, className };
     });
 
+    // #550: Impact Analysis – dim edges not connected to source or affected nodes
+    if (impactAnalysisMode && impactAnalysisSourceId && affectedClassIds) {
+      const highlightSet = new Set([impactAnalysisSourceId, ...affectedClassIds]);
+      result = result.map(edge => {
+        const sourceIn = highlightSet.has(edge.source);
+        const targetIn = highlightSet.has(edge.target);
+        if (sourceIn || targetIn) return edge;
+        const existingClassName = edge.className || '';
+        return {
+          ...edge,
+          className: `${existingClassName} impact-dimmed`.trim()
+        };
+      });
+    }
+
     return result;
-  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyEdgeIds, circularEdgeIds]);
+  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -4638,6 +4714,17 @@ const StudioContent = () => {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.75; }
           }
+
+          /* #550 Impact Analysis – dim nodes/edges not in source or affected set */
+          .react-flow__node.impact-dimmed {
+            opacity: 0.25 !important;
+            filter: grayscale(80%) !important;
+            transition: opacity 0.2s ease, filter 0.2s ease !important;
+          }
+          .react-flow__edge.impact-dimmed path {
+            opacity: 0.15 !important;
+            transition: opacity 0.2s ease !important;
+          }
         `}</style>
 
       {/* Header with Project and Version Selectors - spans full width including over sidebar */}
@@ -4908,6 +4995,30 @@ const StudioContent = () => {
                     className="p-1 rounded-md text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200/50 dark:hover:bg-indigo-800/50"
                     title="Turn off dependency overlay"
                     aria-label="Turn off dependency overlay"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </Panel>
+            )}
+            {/* #550: Impact Analysis indicator (stack below dependency overlay when both on) */}
+            {impactAnalysisMode && !layoutPreviewNodes && (
+              <Panel position="top-center" className={showDependencyOverlay ? '!mt-14 z-[1001]' : '!mt-4 z-[1001]'}>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-md border border-amber-200/80 dark:border-amber-700/50 bg-amber-50/95 dark:bg-amber-900/30 backdrop-blur-sm">
+                  <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  {impactAnalysisSourceId && affectedClassIds ? (
+                    <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      Impact: {String((nodes.find(n => n.id === impactAnalysisSourceId)?.data as { name?: string } | undefined)?.name ?? impactAnalysisSourceId)} ({affectedClassIds.size} affected)
+                    </span>
+                  ) : (
+                    <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Impact Analysis — select a class to see affected</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setImpactAnalysisMode(false)}
+                    className="p-1 rounded-md text-amber-600 dark:text-amber-400 hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
+                    title="Turn off Impact Analysis"
+                    aria-label="Turn off Impact Analysis"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -6077,6 +6188,20 @@ const StudioContent = () => {
                         </label>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">
                           Highlight $ref and allOf/anyOf/oneOf edges, dim the rest
+                        </p>
+                        {/* #550 Impact Analysis mode */}
+                        <label className="flex items-center gap-3 px-1 py-2 mt-2 text-sm text-gray-700 dark:text-gray-300 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={impactAnalysisMode}
+                            onChange={(e) => setImpactAnalysisMode(e.target.checked)}
+                            className="rounded border-gray-300 dark:border-gray-600 text-amber-600 focus:ring-amber-500"
+                          />
+                          <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+                          <span>Impact Analysis</span>
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">
+                          Select a class to see all affected (dependent) classes
                         </p>
                       </div>
                     </div>
