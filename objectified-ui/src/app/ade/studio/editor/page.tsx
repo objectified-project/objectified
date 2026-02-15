@@ -398,6 +398,35 @@ const StudioContent = () => {
     if (typeof window !== 'undefined') localStorage.setItem('heatmapMode', heatmapMode);
   }, [heatmapMode]);
 
+  // #547: Interactive dependency graph overlay – highlight $ref / allOf/anyOf/oneOf edges, dim the rest
+  const [showDependencyOverlay, setShowDependencyOverlay] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('showDependencyOverlay');
+      return saved === 'true';
+    }
+    return false;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('showDependencyOverlay', String(showDependencyOverlay));
+  }, [showDependencyOverlay]);
+
+  // Classify dependency edges (property $ref and schema/property allOf/anyOf/oneOf)
+  const isDependencyEdge = useCallback((edge: Edge) => {
+    const id = edge.id || '';
+    return /^(prop-|allOf-|anyOf-|oneOf-)/.test(id);
+  }, []);
+  const dependencyEdgeIds = useMemo(() => new Set(edges.filter(isDependencyEdge).map(e => e.id)), [edges, isDependencyEdge]);
+  const nodesWithDependencyIds = useMemo(() => {
+    const set = new Set<string>();
+    edges.forEach(e => {
+      if (isDependencyEdge(e)) {
+        set.add(e.source);
+        set.add(e.target);
+      }
+    });
+    return set;
+  }, [edges, isDependencyEdge]);
+
   // Schema metrics (for Schema Metrics panel #472)
   const schemaMetrics = useMemo(() => {
     const classNodes = nodes.filter((n) => n.type !== 'groupNode');
@@ -950,8 +979,22 @@ const StudioContent = () => {
       });
     }
 
+    // #547: Dependency graph overlay – dim nodes that have no dependency edges
+    if (showDependencyOverlay) {
+      result = result.map(node => {
+        if (node.type === 'groupNode') return node;
+        const hasDependency = nodesWithDependencyIds.has(node.id);
+        const existingClassName = node.className || '';
+        const depClass = hasDependency ? '' : 'dependency-dimmed';
+        return {
+          ...node,
+          className: `${existingClassName} ${depClass}`.trim()
+        };
+      });
+    }
+
     return result;
-  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -996,8 +1039,21 @@ const StudioContent = () => {
       });
     }
 
+    // #547: Dependency graph overlay – highlight dependency edges, dim others
+    if (showDependencyOverlay) {
+      result = result.map(edge => {
+        const isDep = dependencyEdgeIds.has(edge.id);
+        const existingClassName = edge.className || '';
+        const depClass = isDep ? 'dependency-highlight' : 'dependency-dimmed';
+        return {
+          ...edge,
+          className: `${existingClassName} ${depClass}`.trim()
+        };
+      });
+    }
+
     return result;
-  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet]);
+  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyEdgeIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -4485,6 +4541,22 @@ const StudioContent = () => {
             stroke-dasharray: 4 4 !important;
             transition: opacity 0.2s ease !important;
           }
+
+          /* #547 Dependency graph overlay */
+          .react-flow__node.dependency-dimmed {
+            opacity: 0.2 !important;
+            filter: grayscale(70%) !important;
+            transition: opacity 0.2s ease, filter 0.2s ease !important;
+          }
+          .react-flow__edge.dependency-dimmed path {
+            opacity: 0.12 !important;
+            transition: opacity 0.2s ease !important;
+          }
+          .react-flow__edge.dependency-highlight path {
+            stroke-width: 3 !important;
+            filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.5)) !important;
+            transition: stroke-width 0.2s ease, filter 0.2s ease !important;
+          }
         `}</style>
 
       {/* Header with Project and Version Selectors - spans full width including over sidebar */}
@@ -4743,6 +4815,24 @@ const StudioContent = () => {
               </div>
             )}
 
+            {/* #547: Dependency graph overlay indicator */}
+            {showDependencyOverlay && !layoutPreviewNodes && (
+              <Panel position="top-center" className="!mt-4 z-[1001]">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-md border border-indigo-200/80 dark:border-indigo-700/50 bg-indigo-50/95 dark:bg-indigo-900/30 backdrop-blur-sm">
+                  <Network className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Dependency graph</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowDependencyOverlay(false)}
+                    className="p-1 rounded-md text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200/50 dark:hover:bg-indigo-800/50"
+                    title="Turn off dependency overlay"
+                    aria-label="Turn off dependency overlay"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </Panel>
+            )}
             {/* #471: Layout preview bar — Apply or Cancel suggested layout */}
             {layoutPreviewNodes && (
               <Panel position="top-center" className="!mt-4 z-[1001]">
@@ -5791,7 +5881,11 @@ const StudioContent = () => {
               <div className="relative" ref={layoutDropdownRef}>
                 <button
                   onClick={() => setLayoutDropdownOpen(!layoutDropdownOpen)}
-                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className={`p-2 text-sm font-medium rounded-lg border transition-all duration-200 shadow-sm hover:shadow-md ${
+                    showDependencyOverlay
+                      ? 'border-indigo-300 dark:border-indigo-600 bg-indigo-50/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50'
+                  }`}
                   title="Layout options"
                 >
                   <Layout className="w-5 h-5" />
@@ -5880,6 +5974,28 @@ const StudioContent = () => {
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Automatically arrange classes hierarchically based on relationships
+                        </p>
+                      </div>
+
+                      <div className="border-t border-gray-200 dark:border-gray-700 mx-4" />
+
+                      {/* #547 Dependency graph overlay */}
+                      <div className="px-4 py-3">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                          Visualization
+                        </h4>
+                        <label className="flex items-center gap-3 px-1 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={showDependencyOverlay}
+                            onChange={(e) => setShowDependencyOverlay(e.target.checked)}
+                            className="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <Network className="h-4 w-4 shrink-0 text-indigo-500" />
+                          <span>Dependency graph</span>
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">
+                          Highlight $ref and allOf/anyOf/oneOf edges, dim the rest
                         </p>
                       </div>
                     </div>

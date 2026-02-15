@@ -327,8 +327,8 @@
 
 ### 10. Schema Visualization & Analytics
 
-#### Dependency Visualization 📋 PLANNED
-- 📋 [TODO] Interactive dependency graph overlay on canvas
+#### Dependency Visualization 🚧 PARTIAL
+- ✅ Interactive dependency graph overlay on canvas
 - 📋 [TODO] Highlight circular dependencies with warning indicators
 - 📋 [TODO] Show dependency depth levels (1st, 2nd, 3rd degree)
 - 📋 [TODO] "Impact Analysis" mode: Show all affected classes when changing one
@@ -338,7 +338,6 @@
 
 | Ticket | Feature                                                             |
 |--------|---------------------------------------------------------------------|
-| #547   | Interactive dependency graph overlay on canvas                      |
 | #548   | Highlight circular dependencies with warning indicators             |
 | #549   | Show dependency depth levels (1st, 2nd, 3rd degree)                 |
 | #550   | "Impact Analysis" mode: Show all affected classes when changing one |
