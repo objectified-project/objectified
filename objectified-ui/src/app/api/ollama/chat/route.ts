@@ -64,6 +64,9 @@ export async function POST(request: NextRequest) {
 
 - Schema must contain "version: 3.1.0" at the root level
 - All properties must include summaries and descriptions
+- All classes must include summaries and descriptions
+- All properties of type "object" must include examples
+- All classes must include examples
 
 Make adjustments to the schema as needed based on user feedback and requests for changes.  Provide no additional feedback,
 commentary, or thinking output.`,
