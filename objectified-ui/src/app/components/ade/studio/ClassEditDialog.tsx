@@ -18,7 +18,8 @@ import { Badge } from '../../ui/Badge';
 import { Checkbox } from '../../ui/Checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/Select';
-import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link, ListChecks, X, ChevronDown, GitBranch, ArrowRight } from 'lucide-react';
+import { Copy, Download, RefreshCw, Check, Tag as TagIcon, ExternalLink, Settings, Layers, FileText, AlertTriangle, Code, Plus, Trash2, Regex, Link, ListChecks, X, ChevronDown, GitBranch, ArrowRight, Sparkles, Bot, User, Send, Loader2, ArrowLeft } from 'lucide-react';
+import * as SelectRadix from '@radix-ui/react-select';
 import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
@@ -183,6 +184,20 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [openApiDoc, setOpenApiDoc] = useState<any>(null);
   const [loadingOpenApiDoc, setLoadingOpenApiDoc] = useState(false);
 
+  // AI Assistant (Create Class) chat mode
+  const [showAIChatMode, setShowAIChatMode] = useState(false);
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStreamingContent, setAiStreamingContent] = useState('');
+  const [aiSelectedModel, setAiSelectedModel] = useState('');
+  const [aiModels, setAiModels] = useState<Array<{ name: string; model: string; modified_at: string; size: number }>>([]);
+  const [aiLoadingModels, setAiLoadingModels] = useState(true);
+  const [aiCreateError, setAiCreateError] = useState('');
+  const [aiProjectProperties, setAiProjectProperties] = useState<Array<{ id: string; name: string; description?: string | null; data: any }>>([]);
+  const aiMessagesEndRef = useRef<HTMLDivElement>(null);
+  const aiAbortControllerRef = useRef<AbortController | null>(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -231,6 +246,10 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     if (open) {
       setActiveTab('edit');
       setExampleRefreshKey(0);
+      setShowAIChatMode(false);
+      setAiMessages([]);
+      setAiInput('');
+      setAiCreateError('');
 
       if (editingClassData) {
         // Edit mode - populate form with existing class data
@@ -562,6 +581,210 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       }
     }
   }, [open, editingClassData]);
+
+  // Load Ollama models and project properties when AI chat mode is shown
+  useEffect(() => {
+    if (open && showAIChatMode) {
+      let cancelled = false;
+      (async () => {
+        setAiLoadingModels(true);
+        try {
+          const [modelsRes, propsRes] = await Promise.all([
+            fetch('/api/ollama/models'),
+            projectId ? fetch(`/api/properties/${projectId}`) : Promise.resolve(null),
+          ]);
+          if (cancelled) return;
+          const modelsData = await modelsRes.json();
+          if (modelsData.success && modelsData.models?.length) {
+            setAiModels(modelsData.models);
+            if (!aiSelectedModel) setAiSelectedModel(modelsData.models[0].name);
+          }
+          if (propsRes?.ok) {
+            const propsData = await propsRes.json();
+            if (propsData.success && Array.isArray(propsData.properties)) {
+              setAiProjectProperties(propsData.properties);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load Ollama models or properties', e);
+        } finally {
+          if (!cancelled) setAiLoadingModels(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+  }, [open, showAIChatMode, projectId]);
+
+  useEffect(() => {
+    aiMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [aiMessages, aiStreamingContent]);
+
+  // Extract class definition JSON from assistant message (```json ... ```)
+  const extractClassDefinition = (content: string): { name: string; description: string | null; schema: any } | null => {
+    const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/;
+    const match = content.match(jsonBlockRegex);
+    if (!match) return null;
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (!parsed || typeof parsed.name !== 'string' || !parsed.schema) return null;
+      const name = parsed.name.replace(/[^A-Za-z0-9_]/g, '') || null;
+      if (!name) return null;
+      return {
+        name,
+        description: typeof parsed.description === 'string' ? parsed.description : null,
+        schema: parsed.schema,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const handleAiSendMessage = async () => {
+    if (!aiInput.trim() || !aiSelectedModel || aiLoading) return;
+    const userMessage = { role: 'user' as const, content: aiInput.trim() };
+    setAiMessages(prev => [...prev, userMessage]);
+    setAiInput('');
+    setAiLoading(true);
+    setAiStreamingContent('');
+    setAiCreateError('');
+    aiAbortControllerRef.current = new AbortController();
+    try {
+      const existingClassNames = nodes.map((n: any) => n.data?.name).filter(Boolean);
+      const existingProperties = aiProjectProperties.map((p) => ({
+        name: p.name,
+        description: p.description ?? null,
+        data: p.data,
+      }));
+
+      const response = await fetch('/api/ollama/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: aiSelectedModel,
+          messages: [...aiMessages, userMessage],
+          task: 'class_skeleton',
+          existingClassNames,
+          existingProperties,
+        }),
+        signal: aiAbortControllerRef.current.signal,
+      });
+      if (!response.ok) throw new Error('Failed to get response from LLM');
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let messageAdded = false;
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim() || !line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              setAiMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
+              setAiStreamingContent('');
+              messageAdded = true;
+              break;
+            }
+            try {
+              const event = JSON.parse(data);
+              if (event.content) {
+                accumulated += event.content;
+                setAiStreamingContent(accumulated);
+              }
+            } catch (_) {}
+          }
+        }
+        if (accumulated && !messageAdded && !aiAbortControllerRef.current?.signal.aborted) {
+          setAiMessages(prev => [...prev, { role: 'assistant', content: accumulated }]);
+        }
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('AI chat error', err);
+        setAiMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+      }
+    } finally {
+      setAiLoading(false);
+      setAiStreamingContent('');
+      aiAbortControllerRef.current = null;
+    }
+  };
+
+  const handleAiCreateClass = async (content: string) => {
+    const def = extractClassDefinition(content);
+    if (!def || !versionId) {
+      setAiCreateError(def ? 'No version selected.' : 'No valid class definition in this message.');
+      return;
+    }
+    if (!/^[A-Za-z0-9_]+$/.test(def.name)) {
+      setAiCreateError('Class name can only contain letters, numbers, and underscores.');
+      return;
+    }
+    setAiCreateError('');
+    const schema = { ...def.schema };
+    if (schema.type !== 'object') schema.type = 'object';
+    if (typeof schema.properties !== 'object') schema.properties = {};
+    try {
+      const response = await createClassWithSession(versionId, def.name, def.description, schema);
+      if (!response.success || !response.class) {
+        setAiCreateError(response.error || 'Failed to create class');
+        return;
+      }
+      const classId = response.class.id as string;
+      const props = schema.properties as Record<string, any>;
+      const propNames = Object.keys(props || {});
+      for (const propName of propNames) {
+        const propSchema = props[propName];
+        if (!propSchema || typeof propSchema !== 'object') continue;
+        const description = typeof propSchema.description === 'string' ? propSchema.description : null;
+        const hasRef = !!(propSchema.$ref || (propSchema.type === 'array' && propSchema.items?.$ref));
+        let propertyId: string | null = null;
+        if (!hasRef && projectId) {
+          const existing = aiProjectProperties.find((p) => p.name === propName);
+          if (existing) {
+            propertyId = existing.id;
+          } else {
+            const createRes = await fetch(`/api/properties/${projectId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: propName, description, data: propSchema }),
+            });
+            const createData = await createRes.json();
+            if (createData.success && createData.property?.id) {
+              propertyId = createData.property.id;
+            } else {
+              console.warn(`Could not create library property "${propName}": ${createData.error}`);
+              continue;
+            }
+          }
+        }
+        if (!hasRef && !propertyId) continue;
+        const addRes = await fetch(`/api/classes/${classId}/properties`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            property_id: propertyId,
+            name: propName,
+            description,
+            data: propSchema,
+          }),
+        });
+        const addData = await addRes.json();
+        if (!addData.success) {
+          console.warn(`Could not add property "${propName}" to class: ${addData.error}`);
+        }
+      }
+      onSave?.();
+      onClose();
+    } catch (e: any) {
+      setAiCreateError(e?.message || 'Failed to create class');
+    }
+  };
 
   // Helper function to build schema from form data
   const buildSchemaFromFormData = () => {
@@ -1171,10 +1394,42 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         <DialogHeader className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <DialogTitle className="text-lg font-semibold">
-                {!editingClassData ? 'Add Class' : isReadOnly ? `View Class: ${formData.name || editingClassData.name}` : `Edit Class: ${formData.name || editingClassData.name}`}
-              </DialogTitle>
-              {isReadOnly && (
+              {showAIChatMode ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAIChatMode(false)}
+                    className="flex items-center gap-1 text-gray-600 dark:text-gray-400"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to form
+                  </Button>
+                  <DialogTitle className="text-lg font-semibold">
+                    Create Class with AI
+                  </DialogTitle>
+                </>
+              ) : (
+                <>
+                  <DialogTitle className="text-lg font-semibold">
+                    {!editingClassData ? 'Add Class' : isReadOnly ? `View Class: ${formData.name || editingClassData.name}` : `Edit Class: ${formData.name || editingClassData.name}`}
+                  </DialogTitle>
+                  {!editingClassData && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAIChatMode(true)}
+                      className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Use AI Assistant
+                    </Button>
+                  )}
+                </>
+              )}
+              {isReadOnly && !showAIChatMode && (
                 <span className="px-2 py-0.5 bg-amber-400 text-black text-xs font-semibold rounded">
                   Read Only
                 </span>
@@ -1183,6 +1438,152 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
           </div>
         </DialogHeader>
 
+        {showAIChatMode ? (
+          <>
+            <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Model:</label>
+              <SelectRadix.Root value={aiSelectedModel} onValueChange={setAiSelectedModel} disabled={aiLoadingModels || aiLoading}>
+                <SelectRadix.Trigger className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
+                  <SelectRadix.Value placeholder={aiLoadingModels ? 'Loading models...' : 'Select a model'} />
+                  <SelectRadix.Icon>
+                    <ChevronDown className="h-4 w-4" />
+                  </SelectRadix.Icon>
+                </SelectRadix.Trigger>
+                <SelectRadix.Portal>
+                  <SelectRadix.Content className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-[10000]">
+                    <SelectRadix.Viewport>
+                      {aiModels.map(m => (
+                        <SelectRadix.Item key={m.name} value={m.name} className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                          <SelectRadix.ItemText>{m.name}</SelectRadix.ItemText>
+                        </SelectRadix.Item>
+                      ))}
+                    </SelectRadix.Viewport>
+                  </SelectRadix.Content>
+                </SelectRadix.Portal>
+              </SelectRadix.Root>
+              {aiMessages.length > 0 && (
+                <button type="button" onClick={() => { setAiMessages([]); setAiInput(''); setAiCreateError(''); }} className="ml-auto px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                  Reset conversation
+                </button>
+              )}
+            </div>
+            {aiCreateError && <Alert variant="error" className="m-4 mb-0">{aiCreateError}</Alert>}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+              {aiMessages.length === 0 && !aiStreamingContent && (
+                <div className="flex flex-col items-center justify-center text-center py-8">
+                  <div className="w-16 h-16 mb-4 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center">
+                    <Bot className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Describe the class you want</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">
+                    Tell me what the class should represent and which properties it should have. I'll generate a JSON Schema class definition you can create in one click.
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 w-full max-w-lg">
+                    <button type="button" onClick={() => setAiInput('Create a User class with email, displayName, and createdAt')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
+                      👤 User with email, displayName, and createdAt
+                    </button>
+                    <button type="button" onClick={() => setAiInput('Create an Order class with orderId, items array, totalAmount, and status')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
+                      🛒 Order with items, totalAmount, and status
+                    </button>
+                    <button type="button" onClick={() => setAiInput('Create a Product class with name, sku, price, and optional description')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
+                      📦 Product with name, sku, price, description
+                    </button>
+                    <button type="button" onClick={() => setAiInput('Create an Address class with street, city, postalCode, and country')} className="px-4 py-3 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700">
+                      📍 Address with street, city, postalCode, country
+                    </button>
+                  </div>
+                </div>
+              )}
+              {aiMessages.map((message, index) => {
+                const classDef = message.role === 'assistant' ? extractClassDefinition(message.content) : null;
+                const hasClassDef = classDef !== null;
+                return (
+                  <div key={index} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {message.role === 'assistant' && (
+                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                        <Bot className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                    <div className={`flex flex-col max-w-[80%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div className={`px-4 py-3 rounded-lg ${message.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'}`}>
+                        {message.role === 'assistant' && hasClassDef && classDef ? (
+                          <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                            <div className="bg-gray-800 dark:bg-gray-900 px-3 py-1.5 border-b border-gray-700">
+                              <span className="text-xs font-mono text-gray-300">JSON</span>
+                            </div>
+                            <pre className="bg-gray-900 dark:bg-black p-4 overflow-x-auto m-0 text-left">
+                              <code className="text-sm font-mono text-green-400 dark:text-green-300 whitespace-pre">
+                                {JSON.stringify({ name: classDef.name, description: classDef.description, schema: classDef.schema }, null, 2)}
+                              </code>
+                            </pre>
+                          </div>
+                        ) : (
+                          <pre className="text-sm whitespace-pre-wrap font-sans">{message.content}</pre>
+                        )}
+                      </div>
+                      {message.role === 'assistant' && hasClassDef && (
+                        <Button type="button" variant="outline" size="sm" className="mt-2 gap-2 text-indigo-600 dark:text-indigo-400" onClick={() => handleAiCreateClass(message.content)}>
+                          <Plus className="h-4 w-4" />
+                          Create this class
+                        </Button>
+                      )}
+                    </div>
+                    {message.role === 'user' && (
+                      <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {aiLoading && !aiStreamingContent && (
+                <div className="flex gap-3 justify-start">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                    <Bot className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-gray-500 dark:bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Thinking...</span>
+                  </div>
+                </div>
+              )}
+              {aiStreamingContent && (
+                <div className="flex gap-3 justify-start">
+                  <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                    <Bot className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white">
+                    <pre className="text-sm whitespace-pre-wrap font-sans">{aiStreamingContent}<span className="inline-block w-2 h-4 ml-1 bg-gray-900 dark:bg-white animate-pulse align-middle" /></pre>
+                  </div>
+                </div>
+              )}
+              <div ref={aiMessagesEndRef} />
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={aiInput}
+                  onChange={e => setAiInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAiSendMessage()}
+                  placeholder="Describe the class you want to create..."
+                  disabled={aiLoading || !aiSelectedModel}
+                  className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+                />
+                <Button onClick={handleAiSendMessage} disabled={aiLoading || !aiInput.trim() || !aiSelectedModel} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2">
+                  {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Send
+                </Button>
+              </div>
+              <p className="mt-2 mb-0 text-xs text-gray-500 dark:text-gray-400 text-center">AI can make mistakes — review the generated schema before creating.</p>
+            </div>
+          </>
+        ) : (
+        <>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="px-6 border-b border-gray-200 dark:border-gray-700 rounded-none justify-start bg-transparent shrink-0">
             <TabsTrigger value="edit">Edit</TabsTrigger>
@@ -2433,6 +2834,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             <Button onClick={onClose}>Close</Button>
           )}
         </DialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

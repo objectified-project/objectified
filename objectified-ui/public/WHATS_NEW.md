@@ -63,6 +63,7 @@ We continue to improve the platform based on your feedback with improvements and
   - Adds upstream/downstream dependency toggles in dependency graph mode
   - Adds dependency path highlighting
   - Shows dependency metrics per class
+  - AI can now assist with creating a class
 - Paths Improvements:
   - Added API Key security schemes: define header, query, or cookie-based API keys in the Security tab and use them on operations (#410)
   - Added inline variable editor that can click parameters in the header of the path studio

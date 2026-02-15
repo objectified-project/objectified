@@ -6759,6 +6759,7 @@ const StudioContent = () => {
           triggerSidebarRefresh();
         }}
         projectId={selectedProjectId}
+        versionId={selectedVersionId || ''}
         projectTags={projectTags}
         projectMetadata={(projects.find(p => p.id === selectedProjectId) as any)?.metadata}
       />

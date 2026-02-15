@@ -9,9 +9,54 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const CLASS_SKELETON_SYSTEM = `You are an expert at defining JSON Schema (OpenAPI 3.1) class/schema definitions. The user will describe a class they want to create. Your only job is to output a single JSON code block that defines that class.
+
+# Output format
+
+Respond with exactly one JSON code block in this shape:
+\`\`\`json
+{
+  "name": "ClassName",
+  "description": "Optional short description of the class",
+  "schema": {
+    "type": "object",
+    "properties": { ... },
+    "required": [ ... ]
+  }
+}
+\`\`\`
+
+# Rules
+
+- "name" must be PascalCase and contain only letters, numbers, and underscores (A-Za-z0-9_).
+- "schema" must be a valid JSON Schema object. It must include "type": "object" and a "properties" object (can be empty {} for a placeholder).
+- You may use any JSON Schema / OpenAPI 3.1 schema features in "schema": properties, required, allOf, anyOf, oneOf, discriminator, additionalProperties, unevaluatedProperties, patternProperties, dependentSchemas, dependentRequired, deprecated, deprecationMessage, minProperties, maxProperties, examples, xml, $id, $anchor, $comment, externalDocs, if/then/else, and x-* extensions.
+- For $ref inside the schema, use format "#/components/schemas/ClassName" when referencing other classes.
+- Property names in "properties" should be camelCase. Include "description" (and optionally "summary") on the schema and on properties where helpful.
+- Keep the class a clear skeleton: include the structure the user asked for, but you do not need to exhaust every option. Prefer properties and required; add allOf/anyOf/oneOf/discriminator/additionalProperties etc. only when they fit the user's description.
+- Do not output any text outside the single JSON code block. No commentary before or after.`;
+
+function buildClassSkeletonSystem(options: {
+  existingClassNames?: string[];
+  existingProperties?: Array<{ name: string; description?: string | null; data?: any }>;
+}): string {
+  let extra = '';
+  if (options.existingClassNames?.length) {
+    extra += `\n\n# Existing classes in this version (reference with $ref: "#/components/schemas/ClassName")\n${options.existingClassNames.join(', ')}`;
+  }
+  if (options.existingProperties?.length) {
+    extra += `\n\n# Existing project properties (reuse by using the exact "name" in your schema.properties; these are shared across classes)\n`;
+    options.existingProperties.forEach((p) => {
+      const typeStr = p.data?.type ?? (p.data?.$ref ? `$ref` : 'object');
+      extra += `- ${p.name}: ${typeStr}${p.description ? ` — ${String(p.description).slice(0, 60)}` : ''}\n`;
+    });
+  }
+  return CLASS_SKELETON_SYSTEM + extra;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { model, messages } = await request.json();
+    const { model, messages, task, existingClassNames, existingProperties } = await request.json();
 
     if (!model || !messages || !Array.isArray(messages)) {
       return new Response(
@@ -20,10 +65,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isClassSkeleton = task === 'class_skeleton';
+
     // Create a system message to guide the LLM
-    const systemMessage = {
-      role: 'system',
-      content: `You are an expert API designer and OpenAPI specification generator. Your task is to help users create OpenAPI 3.1.0 specifications based on their natural language descriptions.
+    const systemContent = isClassSkeleton
+      ? buildClassSkeletonSystem({
+          existingClassNames: Array.isArray(existingClassNames) ? existingClassNames : undefined,
+          existingProperties: Array.isArray(existingProperties) ? existingProperties : undefined,
+        })
+      : `You are an expert API designer and OpenAPI specification generator. Your task is to help users create OpenAPI 3.1.0 specifications based on their natural language descriptions.
 
 # Rules
 
@@ -68,7 +118,11 @@ export async function POST(request: NextRequest) {
 - Examples must be provided in an "examples" array
 
 Make adjustments to the schema as needed based on user feedback and requests for changes.  Provide no additional feedback,
-commentary, or thinking output.`,
+commentary, or thinking output.`;
+
+    const systemMessage = {
+      role: 'system',
+      content: systemContent,
     };
 
     // Prepare messages with system prompt
