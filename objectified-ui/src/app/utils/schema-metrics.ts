@@ -392,6 +392,44 @@ export function getCircularDependencyEdgeIds(nodes: Node[], edges: Edge[]): Set<
 }
 
 /**
+ * Compute dependency depth for each class node (#549).
+ * Uses only the provided dependency edges (e.g. prop-/allOf-/anyOf-/oneOf-).
+ * Depth = distance from "leaves" (nodes with no outgoing dependency edges):
+ * - 0 = leaf (does not depend on any other class)
+ * - 1 = 1st degree (depends only on leaves)
+ * - 2 = 2nd degree, 3 = 3rd degree, etc.
+ * Returns a map nodeId -> depth (0, 1, 2, 3, 4, ...).
+ */
+export function getDependencyDepthMap(
+  nodes: Node[],
+  dependencyEdges: Edge[]
+): Map<string, number> {
+  const classNodes = getClassNodes(nodes);
+  const nodeIds = new Set(classNodes.map((n) => n.id));
+  const adj = buildDirectedAdjacency(dependencyEdges);
+  const depth = new Map<string, number>();
+  for (const id of nodeIds) depth.set(id, 0);
+
+  let changed = true;
+  for (let iter = 0; changed && iter < (nodeIds.size + 2); iter++) {
+    changed = false;
+    for (const id of nodeIds) {
+      const refs = adj.get(id);
+      if (!refs || refs.length === 0) continue;
+      const maxRefDepth = Math.max(
+        ...refs.filter((t) => nodeIds.has(t)).map((t) => depth.get(t) ?? 0)
+      );
+      const newDepth = 1 + maxRefDepth;
+      if (newDepth !== depth.get(id)) {
+        depth.set(id, newDepth);
+        changed = true;
+      }
+    }
+  }
+  return depth;
+}
+
+/**
  * Compute a 0–100 schema complexity score, label, and per-factor breakdown (#556).
  * Based on class count, property count, relationships, depth, and cycles.
  */

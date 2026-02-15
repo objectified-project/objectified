@@ -108,7 +108,7 @@ import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, type HeatmapValues } from '@/app/utils/schema-metrics';
+import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, type HeatmapValues } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -443,6 +443,16 @@ const StudioContent = () => {
     [schemaMetrics?.circularDependencyNodeIds]
   );
   const circularEdgeIds = useMemo(() => getCircularDependencyEdgeIds(nodes, edges), [nodes, edges]);
+
+  // #549: Dependency depth (1st, 2nd, 3rd degree from leaves) for overlay badge
+  const dependencyEdges = useMemo(
+    () => edges.filter(isDependencyEdge),
+    [edges, isDependencyEdge]
+  );
+  const dependencyDepthMap = useMemo(
+    () => getDependencyDepthMap(nodes, dependencyEdges),
+    [nodes, dependencyEdges]
+  );
 
   // Layout quality (#473): edge crossings, spacing uniformity, symmetry, balance
   const layoutQuality = useMemo(() => {
@@ -987,16 +997,42 @@ const StudioContent = () => {
     }
 
     // #547: Dependency graph overlay – dim nodes that have no dependency edges
+    // #549: Show dependency depth level (1st, 2nd, 3rd degree) on class nodes
     if (showDependencyOverlay) {
       result = result.map(node => {
         if (node.type === 'groupNode') return node;
         const hasDependency = nodesWithDependencyIds.has(node.id);
         const existingClassName = node.className || '';
         const depClass = hasDependency ? '' : 'dependency-dimmed';
+        const rawDepth = dependencyDepthMap.get(node.id) ?? 0;
+        const depthLabel =
+          rawDepth === 0
+            ? 'Leaf'
+            : rawDepth === 1
+              ? '1st'
+              : rawDepth === 2
+                ? '2nd'
+                : rawDepth === 3
+                  ? '3rd'
+                  : '3+';
         return {
           ...node,
-          className: `${existingClassName} ${depClass}`.trim()
+          className: `${existingClassName} ${depClass}`.trim(),
+          data: {
+            ...(node.data as object),
+            ...(hasDependency ? { dependencyDepth: rawDepth, dependencyDepthLabel: depthLabel } : {}),
+          },
         };
+      });
+    } else {
+      result = result.map(node => {
+        if (node.type === 'groupNode') return node;
+        const d = node.data as Record<string, unknown>;
+        if (d.dependencyDepth != null || d.dependencyDepthLabel != null) {
+          const { dependencyDepth: _dd, dependencyDepthLabel: _dl, ...rest } = d;
+          return { ...node, data: rest };
+        }
+        return node;
       });
     }
 
@@ -1014,7 +1050,7 @@ const StudioContent = () => {
     });
 
     return result;
-  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds, circularNodeIdsSet]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {

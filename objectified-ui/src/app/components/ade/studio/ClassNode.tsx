@@ -442,6 +442,10 @@ type ClassNodeData = {
   heatmapLabel?: string;
   /** #548: Part of a circular dependency – show warning indicator */
   inCircularDependency?: boolean;
+  /** #549: Dependency depth (0=leaf, 1=1st, 2=2nd, 3=3rd, 4+=3+) when overlay is on */
+  dependencyDepth?: number;
+  /** #549: Human-readable label e.g. "1st", "2nd", "3rd", "3+", "Leaf" */
+  dependencyDepthLabel?: string;
 };
 
 function ClassNode({ id, data, selected }: NodeProps) {
@@ -1224,6 +1228,19 @@ function ClassNode({ id, data, selected }: NodeProps) {
                   title="Part of a circular dependency"
                 >
                   <AlertTriangle size={10} strokeWidth={2.5} />
+                </span>
+              )}
+              {typedData.dependencyDepthLabel != null && (
+                <span
+                  style={{
+                    ...badgeStyle,
+                    background: 'rgba(99, 102, 241, 0.85)',
+                    color: '#fff',
+                  }}
+                  title={`Dependency depth: ${typedData.dependencyDepthLabel} degree`}
+                >
+                  <Layers size={10} strokeWidth={2.5} />
+                  {typedData.dependencyDepthLabel}
                 </span>
               )}
               <span style={badgeStyle} title={`${propCount} propert${propCount === 1 ? 'y' : 'ies'}`}>
@@ -2085,6 +2102,11 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
 
   // #548: Circular dependency indicator
   if (prevData?.inCircularDependency !== nextData?.inCircularDependency) {
+    return false;
+  }
+
+  // #549: Dependency depth badge
+  if (prevData?.dependencyDepth !== nextData?.dependencyDepth || prevData?.dependencyDepthLabel !== nextData?.dependencyDepthLabel) {
     return false;
   }
 

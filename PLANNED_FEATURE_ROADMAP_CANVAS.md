@@ -330,7 +330,7 @@
 #### Dependency Visualization 🚧 PARTIAL
 - ✅ Interactive dependency graph overlay on canvas
 - ✅ Highlight circular dependencies with warning indicators
-- 📋 [TODO] Show dependency depth levels (1st, 2nd, 3rd degree)
+- ✅ Show dependency depth levels (1st, 2nd, 3rd degree)
 - 📋 [TODO] "Impact Analysis" mode: Show all affected classes when changing one
 - 📋 [TODO] Upstream/downstream dependency toggles
 - 📋 [TODO] Dependency path highlighting (click to trace full chain)
@@ -338,7 +338,6 @@
 
 | Ticket | Feature                                                             |
 |--------|---------------------------------------------------------------------|
-| #549   | Show dependency depth levels (1st, 2nd, 3rd degree)                 |
 | #550   | "Impact Analysis" mode: Show all affected classes when changing one |
 | #551   | Upstream/downstream dependency toggles                              |
 | #552   | Dependency path highlighting (click to trace full chain)            |
