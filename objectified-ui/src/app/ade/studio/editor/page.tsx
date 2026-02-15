@@ -49,7 +49,9 @@ import {
   Trash2,
   Filter,
   SlidersHorizontal,
-  Flame
+  Flame,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -108,7 +110,7 @@ import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, type HeatmapValues } from '@/app/utils/schema-metrics';
+import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, type HeatmapValues } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -422,6 +424,18 @@ const StudioContent = () => {
     if (typeof window !== 'undefined') localStorage.setItem('impactAnalysisMode', String(impactAnalysisMode));
   }, [impactAnalysisMode]);
 
+  // #551: Upstream/downstream dependency view – 'all' | 'upstream' | 'downstream'
+  const [dependencyView, setDependencyView] = useState<'all' | 'upstream' | 'downstream'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dependencyView');
+      if (saved === 'upstream' || saved === 'downstream') return saved;
+    }
+    return 'all';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('dependencyView', dependencyView);
+  }, [dependencyView]);
+
   // Classify dependency edges (property $ref and schema/property allOf/anyOf/oneOf)
   const isDependencyEdge = useCallback((edge: Edge) => {
     const id = edge.id || '';
@@ -472,6 +486,17 @@ const StudioContent = () => {
     if (!impactAnalysisSourceId) return null;
     return getAffectedClassIds(impactAnalysisSourceId, nodes, dependencyEdges);
   }, [impactAnalysisSourceId, nodes, dependencyEdges]);
+
+  // #551: Focal node for upstream/downstream view (single selected when overlay + view is upstream/downstream)
+  const dependencyFocalNodeId = showDependencyOverlay && (dependencyView === 'upstream' || dependencyView === 'downstream') && selectedNodeIds.length === 1 ? selectedNodeIds[0]! : null;
+  const dependencyUpstreamIds = useMemo(() => {
+    if (!dependencyFocalNodeId || dependencyView !== 'upstream') return null;
+    return getUpstreamClassIds(dependencyFocalNodeId, nodes, dependencyEdges);
+  }, [dependencyFocalNodeId, dependencyView, nodes, dependencyEdges]);
+  const dependencyDownstreamIds = useMemo(() => {
+    if (!dependencyFocalNodeId || dependencyView !== 'downstream') return null;
+    return getAffectedClassIds(dependencyFocalNodeId, nodes, dependencyEdges);
+  }, [dependencyFocalNodeId, dependencyView, nodes, dependencyEdges]);
 
   // Layout quality (#473): edge crossings, spacing uniformity, symmetry, balance
   const layoutQuality = useMemo(() => {
@@ -1017,12 +1042,20 @@ const StudioContent = () => {
 
     // #547: Dependency graph overlay – dim nodes that have no dependency edges
     // #549: Show dependency depth level (1st, 2nd, 3rd degree) on class nodes
+    // #551: Upstream/downstream view – dim nodes not in focal + upstream/downstream set
     if (showDependencyOverlay) {
+      const upstreamDownstreamHighlightSet =
+        dependencyFocalNodeId && (dependencyView === 'upstream' ? dependencyUpstreamIds : dependencyDownstreamIds)
+          ? new Set([dependencyFocalNodeId, ...(dependencyView === 'upstream' ? dependencyUpstreamIds! : dependencyDownstreamIds!)])
+          : null;
+
       result = result.map(node => {
         if (node.type === 'groupNode') return node;
         const hasDependency = nodesWithDependencyIds.has(node.id);
-        const existingClassName = node.className || '';
-        const depClass = hasDependency ? '' : 'dependency-dimmed';
+        const inUpstreamDownstreamHighlight = upstreamDownstreamHighlightSet?.has(node.id) ?? false;
+        const useHighlightSet = upstreamDownstreamHighlightSet != null;
+        const depClass = useHighlightSet ? (inUpstreamDownstreamHighlight ? '' : 'dependency-dimmed') : (hasDependency ? '' : 'dependency-dimmed');
+        const showDepth = useHighlightSet ? inUpstreamDownstreamHighlight : hasDependency;
         const rawDepth = dependencyDepthMap.get(node.id) ?? 0;
         const depthLabel =
           rawDepth === 0
@@ -1034,12 +1067,13 @@ const StudioContent = () => {
                 : rawDepth === 3
                   ? '3rd'
                   : '3+';
+        const existingClassName = node.className || '';
         return {
           ...node,
           className: `${existingClassName} ${depClass}`.trim(),
           data: {
             ...(node.data as object),
-            ...(hasDependency ? { dependencyDepth: rawDepth, dependencyDepthLabel: depthLabel } : {}),
+            ...(showDepth ? { dependencyDepth: rawDepth, dependencyDepthLabel: depthLabel } : {}),
           },
         };
       });
@@ -1111,7 +1145,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1157,11 +1191,19 @@ const StudioContent = () => {
     }
 
     // #547: Dependency graph overlay – highlight dependency edges, dim others
+    // #551: Upstream/downstream view – highlight only dependency edges inside focal subgraph
     if (showDependencyOverlay) {
+      const upstreamDownstreamEdgeHighlightSet =
+        dependencyFocalNodeId && (dependencyView === 'upstream' ? dependencyUpstreamIds : dependencyDownstreamIds)
+          ? new Set([dependencyFocalNodeId, ...(dependencyView === 'upstream' ? dependencyUpstreamIds! : dependencyDownstreamIds!)])
+          : null;
+
       result = result.map(edge => {
         const isDep = dependencyEdgeIds.has(edge.id);
+        const inSubgraph = upstreamDownstreamEdgeHighlightSet != null && upstreamDownstreamEdgeHighlightSet.has(edge.source) && upstreamDownstreamEdgeHighlightSet.has(edge.target);
+        const highlightDep = upstreamDownstreamEdgeHighlightSet != null ? (isDep && inSubgraph) : isDep;
         const existingClassName = edge.className || '';
-        const depClass = isDep ? 'dependency-highlight' : 'dependency-dimmed';
+        const depClass = highlightDep ? 'dependency-highlight' : 'dependency-dimmed';
         return {
           ...edge,
           className: `${existingClassName} ${depClass}`.trim()
@@ -1198,7 +1240,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -4983,16 +5025,56 @@ const StudioContent = () => {
               </div>
             )}
 
-            {/* #547: Dependency graph overlay indicator */}
+            {/* #547: Dependency graph overlay indicator; #551: Upstream/downstream toggles */}
             {showDependencyOverlay && !layoutPreviewNodes && (
               <Panel position="top-center" className="!mt-4 z-[1001]">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-md border border-indigo-200/80 dark:border-indigo-700/50 bg-indigo-50/95 dark:bg-indigo-900/30 backdrop-blur-sm">
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg shadow-md border border-indigo-200/80 dark:border-indigo-700/50 bg-indigo-50/95 dark:bg-indigo-900/30 backdrop-blur-sm">
                   <Network className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Dependency graph</span>
+                  <span className="text-sm font-medium text-indigo-800 dark:text-indigo-200 shrink-0">Dependency graph</span>
+                  <ToggleGroup.Root
+                    type="single"
+                    value={dependencyView}
+                    onValueChange={(v) => v && (v === 'all' || v === 'upstream' || v === 'downstream') && setDependencyView(v)}
+                    className="flex rounded-md overflow-hidden border border-indigo-200 dark:border-indigo-600 bg-white/60 dark:bg-indigo-950/50"
+                    aria-label="Dependency view"
+                  >
+                    <ToggleGroup.Item
+                      value="all"
+                      className="px-2.5 py-1 text-xs font-medium data-[state=on]:bg-indigo-200/80 dark:data-[state=on]:bg-indigo-700/50 data-[state=on]:text-indigo-900 dark:data-[state=on]:text-indigo-100 hover:bg-indigo-100/80 dark:hover:bg-indigo-800/30 text-indigo-700 dark:text-indigo-300"
+                      title="Show all dependencies"
+                    >
+                      All
+                    </ToggleGroup.Item>
+                    <ToggleGroup.Item
+                      value="upstream"
+                      className="px-2.5 py-1 text-xs font-medium flex items-center gap-1 data-[state=on]:bg-indigo-200/80 dark:data-[state=on]:bg-indigo-700/50 data-[state=on]:text-indigo-900 dark:data-[state=on]:text-indigo-100 hover:bg-indigo-100/80 dark:hover:bg-indigo-800/30 text-indigo-700 dark:text-indigo-300"
+                      title="Show only what this class depends on (select a class)"
+                    >
+                      <ArrowUp className="h-3 w-3" />
+                      Upstream
+                    </ToggleGroup.Item>
+                    <ToggleGroup.Item
+                      value="downstream"
+                      className="px-2.5 py-1 text-xs font-medium flex items-center gap-1 data-[state=on]:bg-indigo-200/80 dark:data-[state=on]:bg-indigo-700/50 data-[state=on]:text-indigo-900 dark:data-[state=on]:text-indigo-100 hover:bg-indigo-100/80 dark:hover:bg-indigo-800/30 text-indigo-700 dark:text-indigo-300"
+                      title="Show only what depends on this class (select a class)"
+                    >
+                      <ArrowDown className="h-3 w-3" />
+                      Downstream
+                    </ToggleGroup.Item>
+                  </ToggleGroup.Root>
+                  {(dependencyView === 'upstream' || dependencyView === 'downstream') && !dependencyFocalNodeId && (
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400 italic">Select a class</span>
+                  )}
+                  {(dependencyView === 'upstream' && dependencyFocalNodeId && dependencyUpstreamIds) && (
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400">{dependencyUpstreamIds.size} upstream</span>
+                  )}
+                  {(dependencyView === 'downstream' && dependencyFocalNodeId && dependencyDownstreamIds) && (
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400">{dependencyDownstreamIds.size} downstream</span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowDependencyOverlay(false)}
-                    className="p-1 rounded-md text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200/50 dark:hover:bg-indigo-800/50"
+                    className="p-1 rounded-md text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200/50 dark:hover:bg-indigo-800/50 shrink-0"
                     title="Turn off dependency overlay"
                     aria-label="Turn off dependency overlay"
                   >
@@ -6189,6 +6271,45 @@ const StudioContent = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 px-1">
                           Highlight $ref and allOf/anyOf/oneOf edges, dim the rest
                         </p>
+                        {/* #551: Upstream/downstream dependency view toggles */}
+                        {showDependencyOverlay && (
+                          <div className="mt-2 px-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1.5">View</span>
+                            <ToggleGroup.Root
+                              type="single"
+                              value={dependencyView}
+                              onValueChange={(v) => v && (v === 'all' || v === 'upstream' || v === 'downstream') && setDependencyView(v)}
+                              className="flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
+                              aria-label="Dependency view"
+                            >
+                              <ToggleGroup.Item
+                                value="all"
+                                className="px-2.5 py-1.5 text-xs font-medium data-[state=on]:bg-indigo-100 dark:data-[state=on]:bg-indigo-900/50 data-[state=on]:text-indigo-800 dark:data-[state=on]:text-indigo-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                              >
+                                All
+                              </ToggleGroup.Item>
+                              <ToggleGroup.Item
+                                value="upstream"
+                                className="px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 data-[state=on]:bg-indigo-100 dark:data-[state=on]:bg-indigo-900/50 data-[state=on]:text-indigo-800 dark:data-[state=on]:text-indigo-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                title="What this class depends on (select a class on canvas)"
+                              >
+                                <ArrowUp className="h-3 w-3" />
+                                Upstream
+                              </ToggleGroup.Item>
+                              <ToggleGroup.Item
+                                value="downstream"
+                                className="px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 data-[state=on]:bg-indigo-100 dark:data-[state=on]:bg-indigo-900/50 data-[state=on]:text-indigo-800 dark:data-[state=on]:text-indigo-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                title="What depends on this class (select a class on canvas)"
+                              >
+                                <ArrowDown className="h-3 w-3" />
+                                Downstream
+                              </ToggleGroup.Item>
+                            </ToggleGroup.Root>
+                            {(dependencyView === 'upstream' || dependencyView === 'downstream') && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Select a class on the canvas to filter</p>
+                            )}
+                          </div>
+                        )}
                         {/* #550 Impact Analysis mode */}
                         <label className="flex items-center gap-3 px-1 py-2 mt-2 text-sm text-gray-700 dark:text-gray-300 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                           <input

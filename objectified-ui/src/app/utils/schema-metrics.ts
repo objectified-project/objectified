@@ -415,6 +415,45 @@ export function getAffectedClassIds(
 }
 
 /**
+ * #551: Compute all class IDs that the given class depends on (upstream dependencies).
+ * "Upstream" = classes that the selected class (directly or transitively) references
+ * via dependency edges ($ref, allOf/anyOf/oneOf). Forward BFS from selected node.
+ */
+export function getUpstreamClassIds(
+  selectedNodeId: string,
+  nodes: Node[],
+  dependencyEdges: Edge[]
+): Set<string> {
+  const classNodes = getClassNodes(nodes);
+  const nodeIds = new Set(classNodes.map((n) => n.id));
+  if (!nodeIds.has(selectedNodeId)) return new Set();
+
+  const adj = new Map<string, string[]>();
+  for (const e of dependencyEdges) {
+    const src = e.source;
+    const tgt = e.target;
+    if (!nodeIds.has(src) || !nodeIds.has(tgt)) continue;
+    if (!adj.has(src)) adj.set(src, []);
+    adj.get(src)!.push(tgt);
+  }
+
+  const upstream = new Set<string>();
+  const queue: string[] = [selectedNodeId];
+  const visited = new Set<string>([selectedNodeId]);
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const next of adj.get(cur) ?? []) {
+      if (visited.has(next)) continue;
+      visited.add(next);
+      upstream.add(next);
+      queue.push(next);
+    }
+  }
+  return upstream;
+}
+
+/**
  * Returns the set of edge IDs that are part of a circular dependency (#548).
  * Used by the canvas to highlight circular dependency edges with warning styling.
  */
