@@ -454,6 +454,27 @@ export function getUpstreamClassIds(
 }
 
 /**
+ * #552: Compute the full dependency chain for a focal node: all nodes and dependency edges
+ * that are on any path through the focal (upstream ∪ downstream ∪ focal, and edges between them).
+ * Used for "Trace full chain" path highlighting on the canvas.
+ */
+export function getDependencyChainNodeAndEdgeIds(
+  focalNodeId: string,
+  nodes: Node[],
+  dependencyEdges: Edge[]
+): { nodeIds: Set<string>; edgeIds: Set<string> } {
+  const upstream = getUpstreamClassIds(focalNodeId, nodes, dependencyEdges);
+  const downstream = getAffectedClassIds(focalNodeId, nodes, dependencyEdges);
+  const nodeIds = new Set<string>([focalNodeId, ...upstream, ...downstream]);
+
+  const edgeIds = new Set<string>();
+  for (const e of dependencyEdges) {
+    if (nodeIds.has(e.source) && nodeIds.has(e.target)) edgeIds.add(e.id);
+  }
+  return { nodeIds, edgeIds };
+}
+
+/**
  * Returns the set of edge IDs that are part of a circular dependency (#548).
  * Used by the canvas to highlight circular dependency edges with warning styling.
  */

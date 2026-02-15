@@ -51,7 +51,8 @@ import {
   SlidersHorizontal,
   Flame,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Route
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -110,7 +111,7 @@ import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, type HeatmapValues } from '@/app/utils/schema-metrics';
+import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds, type HeatmapValues } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -424,11 +425,11 @@ const StudioContent = () => {
     if (typeof window !== 'undefined') localStorage.setItem('impactAnalysisMode', String(impactAnalysisMode));
   }, [impactAnalysisMode]);
 
-  // #551: Upstream/downstream dependency view – 'all' | 'upstream' | 'downstream'
-  const [dependencyView, setDependencyView] = useState<'all' | 'upstream' | 'downstream'>(() => {
+  // #551: Upstream/downstream dependency view; #552: 'path' = trace full chain
+  const [dependencyView, setDependencyView] = useState<'all' | 'upstream' | 'downstream' | 'path'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dependencyView');
-      if (saved === 'upstream' || saved === 'downstream') return saved;
+      if (saved === 'upstream' || saved === 'downstream' || saved === 'path') return saved;
     }
     return 'all';
   });
@@ -487,8 +488,8 @@ const StudioContent = () => {
     return getAffectedClassIds(impactAnalysisSourceId, nodes, dependencyEdges);
   }, [impactAnalysisSourceId, nodes, dependencyEdges]);
 
-  // #551: Focal node for upstream/downstream view (single selected when overlay + view is upstream/downstream)
-  const dependencyFocalNodeId = showDependencyOverlay && (dependencyView === 'upstream' || dependencyView === 'downstream') && selectedNodeIds.length === 1 ? selectedNodeIds[0]! : null;
+  // #551: Focal node for upstream/downstream view; #552: also for path (trace full chain)
+  const dependencyFocalNodeId = showDependencyOverlay && (dependencyView === 'upstream' || dependencyView === 'downstream' || dependencyView === 'path') && selectedNodeIds.length === 1 ? selectedNodeIds[0]! : null;
   const dependencyUpstreamIds = useMemo(() => {
     if (!dependencyFocalNodeId || dependencyView !== 'upstream') return null;
     return getUpstreamClassIds(dependencyFocalNodeId, nodes, dependencyEdges);
@@ -496,6 +497,11 @@ const StudioContent = () => {
   const dependencyDownstreamIds = useMemo(() => {
     if (!dependencyFocalNodeId || dependencyView !== 'downstream') return null;
     return getAffectedClassIds(dependencyFocalNodeId, nodes, dependencyEdges);
+  }, [dependencyFocalNodeId, dependencyView, nodes, dependencyEdges]);
+  // #552: Full chain (path) node and edge sets when view is 'path'
+  const dependencyPathChain = useMemo(() => {
+    if (!dependencyFocalNodeId || dependencyView !== 'path') return null;
+    return getDependencyChainNodeAndEdgeIds(dependencyFocalNodeId, nodes, dependencyEdges);
   }, [dependencyFocalNodeId, dependencyView, nodes, dependencyEdges]);
 
   // Layout quality (#473): edge crossings, spacing uniformity, symmetry, balance
@@ -1043,17 +1049,20 @@ const StudioContent = () => {
     // #547: Dependency graph overlay – dim nodes that have no dependency edges
     // #549: Show dependency depth level (1st, 2nd, 3rd degree) on class nodes
     // #551: Upstream/downstream view – dim nodes not in focal + upstream/downstream set
+    // #552: Path view – dim nodes not in full chain (upstream ∪ downstream ∪ focal)
     if (showDependencyOverlay) {
+      const pathChainNodeSet = dependencyView === 'path' && dependencyPathChain ? dependencyPathChain.nodeIds : null;
       const upstreamDownstreamHighlightSet =
-        dependencyFocalNodeId && (dependencyView === 'upstream' ? dependencyUpstreamIds : dependencyDownstreamIds)
+        !pathChainNodeSet && dependencyFocalNodeId && (dependencyView === 'upstream' ? dependencyUpstreamIds : dependencyDownstreamIds)
           ? new Set([dependencyFocalNodeId, ...(dependencyView === 'upstream' ? dependencyUpstreamIds! : dependencyDownstreamIds!)])
           : null;
+      const highlightSet = pathChainNodeSet ?? upstreamDownstreamHighlightSet;
 
       result = result.map(node => {
         if (node.type === 'groupNode') return node;
         const hasDependency = nodesWithDependencyIds.has(node.id);
-        const inUpstreamDownstreamHighlight = upstreamDownstreamHighlightSet?.has(node.id) ?? false;
-        const useHighlightSet = upstreamDownstreamHighlightSet != null;
+        const inUpstreamDownstreamHighlight = highlightSet?.has(node.id) ?? false;
+        const useHighlightSet = highlightSet != null;
         const depClass = useHighlightSet ? (inUpstreamDownstreamHighlight ? '' : 'dependency-dimmed') : (hasDependency ? '' : 'dependency-dimmed');
         const showDepth = useHighlightSet ? inUpstreamDownstreamHighlight : hasDependency;
         const rawDepth = dependencyDepthMap.get(node.id) ?? 0;
@@ -1145,7 +1154,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1192,16 +1201,19 @@ const StudioContent = () => {
 
     // #547: Dependency graph overlay – highlight dependency edges, dim others
     // #551: Upstream/downstream view – highlight only dependency edges inside focal subgraph
+    // #552: Path view – highlight only dependency edges in full chain
     if (showDependencyOverlay) {
+      const pathChainEdgeSet = dependencyView === 'path' && dependencyPathChain ? dependencyPathChain.edgeIds : null;
       const upstreamDownstreamEdgeHighlightSet =
-        dependencyFocalNodeId && (dependencyView === 'upstream' ? dependencyUpstreamIds : dependencyDownstreamIds)
+        !pathChainEdgeSet && dependencyFocalNodeId && (dependencyView === 'upstream' ? dependencyUpstreamIds : dependencyDownstreamIds)
           ? new Set([dependencyFocalNodeId, ...(dependencyView === 'upstream' ? dependencyUpstreamIds! : dependencyDownstreamIds!)])
           : null;
 
       result = result.map(edge => {
         const isDep = dependencyEdgeIds.has(edge.id);
-        const inSubgraph = upstreamDownstreamEdgeHighlightSet != null && upstreamDownstreamEdgeHighlightSet.has(edge.source) && upstreamDownstreamEdgeHighlightSet.has(edge.target);
-        const highlightDep = upstreamDownstreamEdgeHighlightSet != null ? (isDep && inSubgraph) : isDep;
+        const inPathChain = pathChainEdgeSet != null && pathChainEdgeSet.has(edge.id);
+        const inSubgraph = pathChainEdgeSet != null ? inPathChain : (upstreamDownstreamEdgeHighlightSet != null && upstreamDownstreamEdgeHighlightSet.has(edge.source) && upstreamDownstreamEdgeHighlightSet.has(edge.target));
+        const highlightDep = (pathChainEdgeSet != null ? (isDep && inPathChain) : upstreamDownstreamEdgeHighlightSet != null ? (isDep && inSubgraph) : isDep);
         const existingClassName = edge.className || '';
         const depClass = highlightDep ? 'dependency-highlight' : 'dependency-dimmed';
         return {
@@ -1240,7 +1252,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -5034,7 +5046,7 @@ const StudioContent = () => {
                   <ToggleGroup.Root
                     type="single"
                     value={dependencyView}
-                    onValueChange={(v) => v && (v === 'all' || v === 'upstream' || v === 'downstream') && setDependencyView(v)}
+                    onValueChange={(v) => v && (v === 'all' || v === 'upstream' || v === 'downstream' || v === 'path') && setDependencyView(v)}
                     className="flex rounded-md overflow-hidden border border-indigo-200 dark:border-indigo-600 bg-white/60 dark:bg-indigo-950/50"
                     aria-label="Dependency view"
                   >
@@ -5061,8 +5073,16 @@ const StudioContent = () => {
                       <ArrowDown className="h-3 w-3" />
                       Downstream
                     </ToggleGroup.Item>
+                    <ToggleGroup.Item
+                      value="path"
+                      className="px-2.5 py-1 text-xs font-medium flex items-center gap-1 data-[state=on]:bg-indigo-200/80 dark:data-[state=on]:bg-indigo-700/50 data-[state=on]:text-indigo-900 dark:data-[state=on]:text-indigo-100 hover:bg-indigo-100/80 dark:hover:bg-indigo-800/30 text-indigo-700 dark:text-indigo-300"
+                      title="Trace full chain: click a class to highlight upstream + downstream path"
+                    >
+                      <Route className="h-3 w-3" />
+                      Path
+                    </ToggleGroup.Item>
                   </ToggleGroup.Root>
-                  {(dependencyView === 'upstream' || dependencyView === 'downstream') && !dependencyFocalNodeId && (
+                  {(dependencyView === 'upstream' || dependencyView === 'downstream' || dependencyView === 'path') && !dependencyFocalNodeId && (
                     <span className="text-xs text-indigo-600 dark:text-indigo-400 italic">Select a class</span>
                   )}
                   {(dependencyView === 'upstream' && dependencyFocalNodeId && dependencyUpstreamIds) && (
@@ -5070,6 +5090,9 @@ const StudioContent = () => {
                   )}
                   {(dependencyView === 'downstream' && dependencyFocalNodeId && dependencyDownstreamIds) && (
                     <span className="text-xs text-indigo-600 dark:text-indigo-400">{dependencyDownstreamIds.size} downstream</span>
+                  )}
+                  {(dependencyView === 'path' && dependencyFocalNodeId && dependencyPathChain) && (
+                    <span className="text-xs text-indigo-600 dark:text-indigo-400">{dependencyPathChain.nodeIds.size} in chain</span>
                   )}
                   <button
                     type="button"
@@ -6278,7 +6301,7 @@ const StudioContent = () => {
                             <ToggleGroup.Root
                               type="single"
                               value={dependencyView}
-                              onValueChange={(v) => v && (v === 'all' || v === 'upstream' || v === 'downstream') && setDependencyView(v)}
+                              onValueChange={(v) => v && (v === 'all' || v === 'upstream' || v === 'downstream' || v === 'path') && setDependencyView(v)}
                               className="flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
                               aria-label="Dependency view"
                             >
@@ -6304,9 +6327,17 @@ const StudioContent = () => {
                                 <ArrowDown className="h-3 w-3" />
                                 Downstream
                               </ToggleGroup.Item>
+                              <ToggleGroup.Item
+                                value="path"
+                                className="px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 data-[state=on]:bg-indigo-100 dark:data-[state=on]:bg-indigo-900/50 data-[state=on]:text-indigo-800 dark:data-[state=on]:text-indigo-200 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                title="Trace full chain: click a class to highlight upstream + downstream path"
+                              >
+                                <Route className="h-3 w-3" />
+                                Path
+                              </ToggleGroup.Item>
                             </ToggleGroup.Root>
-                            {(dependencyView === 'upstream' || dependencyView === 'downstream') && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Select a class on the canvas to filter</p>
+                            {(dependencyView === 'upstream' || dependencyView === 'downstream' || dependencyView === 'path') && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Select a class on the canvas to trace</p>
                             )}
                           </div>
                         )}

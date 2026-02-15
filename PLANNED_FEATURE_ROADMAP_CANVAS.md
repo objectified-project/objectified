@@ -333,12 +333,11 @@
 - ✅ Show dependency depth levels (1st, 2nd, 3rd degree)
 - ✅ "Impact Analysis" mode: Show all affected classes when changing one
 - ✅ Upstream/downstream dependency toggles
-- 📋 [TODO] Dependency path highlighting (click to trace full chain)
+- ✅ Dependency path highlighting (click to trace full chain) — #552
 - 📋 [TODO] Dependency metrics per class (in-degree, out-degree, betweenness)
 
 | Ticket | Feature                                                             |
 |--------|---------------------------------------------------------------------|
-| #552   | Dependency path highlighting (click to trace full chain)            |
 | #553   | Dependency metrics per class (in-degree, out-degree, betweenness)   |
 
 #### Schema Metrics Dashboard 📋 PLANNED
