@@ -108,7 +108,7 @@ import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
-import { computeSchemaMetrics, computeHeatmapValues, type HeatmapValues } from '@/app/utils/schema-metrics';
+import { computeSchemaMetrics, computeHeatmapValues, getCircularDependencyEdgeIds, type HeatmapValues } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -436,6 +436,13 @@ const StudioContent = () => {
 
   // Per-node heatmap values (#560) for complexity, change frequency, usage, documentation
   const heatmapValues = useMemo(() => computeHeatmapValues(nodes, edges), [nodes, edges]);
+
+  // #548: Circular dependency node/edge sets for canvas warning indicators
+  const circularNodeIdsSet = useMemo(
+    () => new Set(schemaMetrics?.circularDependencyNodeIds ?? []),
+    [schemaMetrics?.circularDependencyNodeIds]
+  );
+  const circularEdgeIds = useMemo(() => getCircularDependencyEdgeIds(nodes, edges), [nodes, edges]);
 
   // Layout quality (#473): edge crossings, spacing uniformity, symmetry, balance
   const layoutQuality = useMemo(() => {
@@ -993,8 +1000,21 @@ const StudioContent = () => {
       });
     }
 
+    // #548: Circular dependency warning – pass flag to class nodes for badge/border
+    result = result.map(node => {
+      if (node.type === 'groupNode') return node;
+      const inCircular = circularNodeIdsSet.has(node.id);
+      const d = node.data as Record<string, unknown>;
+      if (inCircular === !!d.inCircularDependency) return node;
+      const { inCircularDependency: _rem, ...rest } = d;
+      return {
+        ...node,
+        data: { ...rest, ...(inCircular ? { inCircularDependency: true } : {}) },
+      };
+    });
+
     return result;
-  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds]);
+  }, [nodes, layoutPreviewNodes, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, heatmapMode, heatmapValues, showDependencyOverlay, nodesWithDependencyIds, circularNodeIdsSet]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1052,8 +1072,21 @@ const StudioContent = () => {
       });
     }
 
+    // #548: Circular dependency – warning style for edges that are part of a cycle
+    result = result.map(edge => {
+      const inCycle = circularEdgeIds.has(edge.id);
+      const existingClassName = edge.className || '';
+      const circularClass = 'circular-warning';
+      const hasClass = existingClassName.includes(circularClass);
+      if (inCycle === hasClass) return edge;
+      const className = inCycle
+        ? `${existingClassName} ${circularClass}`.trim()
+        : existingClassName.replace(circularClass, '').trim();
+      return { ...edge, className };
+    });
+
     return result;
-  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyEdgeIds]);
+  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyEdgeIds, circularEdgeIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -4556,6 +4589,18 @@ const StudioContent = () => {
             stroke-width: 3 !important;
             filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.5)) !important;
             transition: stroke-width 0.2s ease, filter 0.2s ease !important;
+          }
+
+          /* #548 Circular dependency warning */
+          .react-flow__edge.circular-warning path {
+            stroke: #f59e0b !important;
+            stroke-width: 2.5 !important;
+            stroke-dasharray: 6 4 !important;
+            animation: circular-warning-pulse 2s ease-in-out infinite;
+          }
+          @keyframes circular-warning-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.75; }
           }
         `}</style>
 

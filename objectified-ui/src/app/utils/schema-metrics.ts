@@ -29,6 +29,8 @@ export interface SchemaMetricsResult {
   circularDependencyCount: number;
   /** Optional: class names involved in cycles (sample) for tooltip */
   circularSampleNames: string[];
+  /** All node IDs that participate in a circular dependency (for canvas warning indicators #548) */
+  circularDependencyNodeIds: string[];
   /** Realtime schema complexity score 0–100 (#556) */
   complexityScore: number;
   /** Human-readable complexity band for display */
@@ -196,11 +198,12 @@ function computeDeepestChain(adj: Map<string, string[]>, nodeIds: Set<string>): 
 
 /**
  * Find strongly connected components (Tarjan) to count cycles.
- * Returns number of SCCs with more than one node (or one node with a self-loop).
+ * Returns count, sample node IDs, and the list of circular SCCs (for #548 canvas indicators).
  */
 function countCircularDependencies(adj: Map<string, string[]>, nodeIds: Set<string>): {
   count: number;
   sampleNodeIds: string[];
+  circularSccs: string[][];
 } {
   const index = new Map<string, number>();
   const lowLink = new Map<string, number>();
@@ -244,7 +247,7 @@ function countCircularDependencies(adj: Map<string, string[]>, nodeIds: Set<stri
 
   const circularSccs = sccs.filter((scc) => scc.length > 1 || (scc.length === 1 && (adj.get(scc[0])?.includes(scc[0]) ?? false)));
   const sampleNodeIds = circularSccs.flat().slice(0, 10);
-  return { count: circularSccs.length, sampleNodeIds };
+  return { count: circularSccs.length, sampleNodeIds, circularSccs };
 }
 
 function getNodeName(node: Node): string {
@@ -329,11 +332,12 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
 
   const adj = buildDirectedAdjacency(edges);
   const deepestChainLength = computeDeepestChain(adj, nodeIds);
-  const { count: circularDependencyCount, sampleNodeIds } = countCircularDependencies(adj, nodeIds);
+  const { count: circularDependencyCount, sampleNodeIds, circularSccs } = countCircularDependencies(adj, nodeIds);
   const circularSampleNames = sampleNodeIds
     .map((id) => idToNode.get(id))
     .filter(Boolean)
     .map((n) => getNodeName(n!));
+  const circularDependencyNodeIds = circularSccs.flat();
 
   const { complexityScore, complexityLabel, complexityBreakdown } = computeComplexityScore({
     classCount,
@@ -359,6 +363,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     deepestChainLength,
     circularDependencyCount,
     circularSampleNames,
+    circularDependencyNodeIds,
     complexityScore,
     complexityLabel,
     complexityBreakdown,
@@ -367,6 +372,23 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     propertiesMissingDocumentation: docResult.propertiesMissing,
     namingCompliance,
   };
+}
+
+/**
+ * Returns the set of edge IDs that are part of a circular dependency (#548).
+ * Used by the canvas to highlight circular dependency edges with warning styling.
+ */
+export function getCircularDependencyEdgeIds(nodes: Node[], edges: Edge[]): Set<string> {
+  const classNodes = getClassNodes(nodes);
+  const nodeIds = new Set(classNodes.map((n) => n.id));
+  const adj = buildDirectedAdjacency(edges);
+  const { circularSccs } = countCircularDependencies(adj, nodeIds);
+  const edgeIds = new Set<string>();
+  for (const e of edges) {
+    const inSameScc = circularSccs.some((scc) => scc.includes(e.source) && scc.includes(e.target));
+    if (inSameScc) edgeIds.add(e.id);
+  }
+  return edgeIds;
 }
 
 /**

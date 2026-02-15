@@ -440,6 +440,8 @@ type ClassNodeData = {
   heatmapMode?: 'off' | 'complexity' | 'changeFrequency' | 'usage' | 'documentation';
   heatmapValue?: number;
   heatmapLabel?: string;
+  /** #548: Part of a circular dependency – show warning indicator */
+  inCircularDependency?: boolean;
 };
 
 function ClassNode({ id, data, selected }: NodeProps) {
@@ -972,6 +974,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
   const isDropTarget = dragTarget === 'node' || dragTarget === 'property';
   const showValidDropOverlay = isDropTarget && !invalidDropReason;
 
+  // #548: Circular dependency – add warning ring (amber) to node border
+  const defaultShadow = '0 2px 12px -2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04)';
+  const circularRingShadow =
+    typedData.inCircularDependency && !selected
+      ? `0 0 0 2px #f59e0b, ${defaultShadow}`
+      : undefined;
+
   // #560: Heatmap overlay color (cool = low, warm = high). Value 0–1 → blue/green to orange/red.
   const heatmapOverlayStyle: React.CSSProperties | null =
     typedData.heatmapMode && typedData.heatmapMode !== 'off' && typeof typedData.heatmapValue === 'number'
@@ -1010,7 +1019,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
           ? '0 0 0 2px #dc2626, 0 8px 24px -8px rgba(220, 38, 38, 0.3)'
           : dragTarget === 'node'
           ? '0 0 0 2px #10b981, 0 8px 24px -8px rgba(16, 185, 129, 0.25)'
-          : '0 2px 12px -2px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.04)',
+          : circularRingShadow ?? defaultShadow,
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'hidden',
         cursor: 'pointer',
@@ -1186,6 +1195,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
         </div>
 
         {/* #559: Per-node metrics badges (property count, relationship count) */}
+        {/* #548: Circular dependency warning badge */}
         {(() => {
           const propCount = (typedData.properties || []).length;
           const relCount = typedData.relationshipCount ?? 0;
@@ -1204,6 +1214,18 @@ function ClassNode({ id, data, selected }: NodeProps) {
           };
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative', zIndex: 1 }}>
+              {typedData.inCircularDependency && (
+                <span
+                  style={{
+                    ...badgeStyle,
+                    background: 'rgba(245, 158, 11, 0.9)',
+                    color: '#fff',
+                  }}
+                  title="Part of a circular dependency"
+                >
+                  <AlertTriangle size={10} strokeWidth={2.5} />
+                </span>
+              )}
               <span style={badgeStyle} title={`${propCount} propert${propCount === 1 ? 'y' : 'ies'}`}>
                 <List size={10} strokeWidth={2.5} />
                 {propCount}
@@ -2059,6 +2081,11 @@ const arePropsEqual = (prevProps: NodeProps, nextProps: NodeProps) => {
         return false;
       }
     }
+  }
+
+  // #548: Circular dependency indicator
+  if (prevData?.inCircularDependency !== nextData?.inCircularDependency) {
+    return false;
   }
 
   // For other data changes, do a simple reference check
