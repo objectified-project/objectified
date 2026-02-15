@@ -39,8 +39,6 @@ export async function POST(request: NextRequest) {
 - Avoid duplicating properties: use $ref instead
 - **CRITICAL: $ref must ONLY reference complete schemas in #/components/schemas, NEVER individual properties within a schema**
 - **CORRECT: { "$ref": "#/components/schemas/User" }**
-- **INCORRECT: { "$ref": "#/components/schemas/User/properties/email" }**
-- **INCORRECT: { "$ref": "#/components/schemas/User#/properties/email" }**
 - When you need to reference a class/schema, use: "#/components/schemas/ClassName"
 - Use advanced schema features like patternProperties, discriminators, conditional rules, and allOf/oneOf/anyOf where applicable
 - Be conversational and explain your design decisions
@@ -58,11 +56,11 @@ export async function POST(request: NextRequest) {
 - Schema and Tag names are PascalCase
 - Objects cannot be outside of the properties definitions - all objects must contain properties unless they are allOf/oneOf/anyOf discriminators
 - **$ref MUST reference complete schemas only**: Use "#/components/schemas/ClassName" format
-- **NEVER use $ref to reference properties**: Do not use "#/components/schemas/ClassName/properties/propertyName" or similar patterns
 
 # Important
 
 - Schema must contain "openapi: 3.1.0" at the root level
+- Properties must be defined in the properties section of the schema, and cannot reference a type outside of the schema like "#/components/schemas/User/properties/email" or "#/components/schemas/User#/properties/email". Instead, use "#/components/schemas/Email" or "#/components/schemas/Phone" respectively.
 - All properties must include summaries and descriptions
 - All classes must include summaries and descriptions
 - All properties of type "object" must include examples
