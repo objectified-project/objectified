@@ -372,16 +372,6 @@ export default function LLMImportDialog({
           </div>
         </div>
 
-        {/* AI Caveat Warning */}
-        <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              <strong>Important:</strong> AI can make mistakes. Always review and verify generated specifications before importing.
-            </p>
-          </div>
-        </div>
-
         {/* Model Selection */}
         <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
@@ -574,6 +564,9 @@ export default function LLMImportDialog({
               Send
             </Button>
           </div>
+          <p className="mt-2 mb-0 text-xs text-gray-500 dark:text-gray-400 text-center">
+            AI can make mistakes — please review before importing.
+          </p>
         </div>
       </DialogContent>
     </Dialog>
