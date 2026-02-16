@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
+import LLMImportDialog from '../../../components/ade/dashboard/LLMImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { filterSlugInput } from '../../../utils/slug';
 import { SPDX_LICENSES, getLicenseUrl, SPDXLicense } from '../../../utils/spdx-licenses';
@@ -54,6 +55,8 @@ const Projects = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showNewImportDialog, setShowNewImportDialog] = useState(false);
+  const [showAIChatDialog, setShowAIChatDialog] = useState(false);
+  const [pendingLLMSpec, setPendingLLMSpec] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
@@ -326,6 +329,15 @@ const Projects = () => {
           >
             <Upload className="h-5 w-5" />Import
           </Button>
+          <Button
+            onClick={() => setShowAIChatDialog(true)}
+            variant="outline"
+            className="border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/30"
+            disabled={!currentTenantId}
+            title={!currentTenantId ? 'Please select a tenant first' : 'Chat with AI to design API specs'}
+          >
+            <Sparkles className="h-5 w-5" />Design with AI
+          </Button>
           <Button onClick={handleCreateClick} className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
             <Plus className="h-5 w-5" />New Project
           </Button>
@@ -568,6 +580,23 @@ const Projects = () => {
           open={showNewImportDialog}
           onClose={() => setShowNewImportDialog(false)}
           onSuccess={handleImportSuccess}
+          tenantId={currentTenantId}
+          userId={currentUserId}
+          initialLLMSpec={pendingLLMSpec}
+          onConsumeInitialLLMSpec={() => setPendingLLMSpec(null)}
+        />
+      )}
+
+      {/* AI Design Chat - opens as popup to assist with design using an LLM */}
+      {currentTenantId && currentUserId && (
+        <LLMImportDialog
+          open={showAIChatDialog}
+          onClose={() => setShowAIChatDialog(false)}
+          onImportSpec={(specContent) => {
+            setPendingLLMSpec(specContent);
+            setShowAIChatDialog(false);
+            setShowNewImportDialog(true);
+          }}
           tenantId={currentTenantId}
           userId={currentUserId}
         />
