@@ -1,0 +1,287 @@
+# OpenAPI 3.1 example focused on path coverage: parameters (path, query, header, cookie),
+# request bodies ($ref + inline, multiple content types), response bodies, securitySchemes.
+openapi: 3.1.0
+info:
+  title: Paths Comprehensive Example
+  version: 1.0.0
+  description: Full path code coverage - parameters, request/response bodies, security
+
+servers:
+  - url: https://api.example.com/v1
+
+paths:
+  /api/items:
+    summary: Items collection
+    description: Path-level description for items
+    parameters:
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        description: Tenant identifier
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: List items
+      operationId: listItems
+      tags:
+        - items
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - name
+              - createdAt
+              - -name
+              - -createdAt
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Item'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+    post:
+      summary: Create item
+      operationId: createItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Item'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                value:
+                  type: number
+              required:
+                - name
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                        message:
+                          type: string
+
+  /api/items/{itemId}:
+    get:
+      summary: Get item by ID
+      operationId: getItem
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fields
+          in: query
+          required: false
+          description: Sparse fields
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+    delete:
+      summary: Delete item
+      operationId: deleteItem
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: No content
+        '404':
+          description: Not found
+
+  /api/session:
+    post:
+      summary: Create session (cookie param example)
+      operationId: createSession
+      parameters:
+        - name: X-Client-Version
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Session created
+          headers:
+            Set-Cookie:
+              description: Session cookie
+              schema:
+                type: string
+                example: SID=abc123; Path=/; HttpOnly
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+
+  /api/search:
+    get:
+      summary: Search with multiple param locations
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: session_id
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT bearer token
+  schemas:
+    Item:
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier
+        name:
+          type: string
+          description: Item name
+        value:
+          type: number
+          description: Numeric value
+        createdAt:
+          type: string
+          format: date-time
