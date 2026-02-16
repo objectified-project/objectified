@@ -2513,15 +2513,22 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
               {/* Conditional Schema */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2 mb-4">
-                  <GitBranch size={18} className="text-purple-500" />
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Conditional Schema (if/then/else)</h3>
-                </div>
                 <ConditionalSchemaBuilder
                   rules={formData.conditionalRules}
                   onChange={(rules) => setFormData(prev => ({ ...prev, conditionalRules: rules }))}
                   availableProperties={editingClassData?.properties?.map((p: any) => p.name) || []}
                   disabled={isReadOnly}
+                  renderHeader={(addRule) => (
+                    <div className="flex items-center justify-between gap-2 mb-4">
+                      <div className="flex items-center gap-2">
+                        <GitBranch size={18} className="text-purple-500" />
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Conditional Schema (if/then/else)</h3>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={addRule} disabled={isReadOnly}>
+                        <Plus size={14} className="mr-1" /> Add Rule
+                      </Button>
+                    </div>
+                  )}
                 />
               </div>
 

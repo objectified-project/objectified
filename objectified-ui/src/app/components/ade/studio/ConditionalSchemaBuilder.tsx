@@ -51,6 +51,8 @@ interface ConditionalSchemaBuilderProps {
   onChange: (rules: ConditionalRule[]) => void;
   availableProperties: string[];
   disabled?: boolean;
+  /** When provided, replaces the default "Conditional Schema Rules" header with custom content (e.g. section title + Add Rule on one line). */
+  renderHeader?: (addRule: () => void) => React.ReactNode;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -81,6 +83,7 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
   onChange,
   availableProperties,
   disabled = false,
+  renderHeader,
 }) => {
   const isDark = useDarkMode();
 
@@ -570,27 +573,30 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <GitBranch size={18} style={{ color: '#6366f1' }} />
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
-            Conditional Schema Rules
-          </Typography>
-          <Tooltip title="Define if/then/else conditions for complex validation. When the 'if' condition matches, the 'then' schema is applied. Optionally, an 'else' schema applies when the condition doesn't match.">
-            <HelpOutlineIcon sx={{ fontSize: 16, color: isDark ? '#94a3b8' : '#64748b', cursor: 'help' }} />
-          </Tooltip>
+      {renderHeader ? (
+        <Box sx={{ mb: 2 }}>{renderHeader(addRule)}</Box>
+      ) : (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <GitBranch size={18} style={{ color: '#6366f1' }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
+              Conditional Schema Rules
+            </Typography>
+            <Tooltip title="Define if/then/else conditions for complex validation. When the 'if' condition matches, the 'then' schema is applied. Optionally, an 'else' schema applies when the condition doesn't match.">
+              <HelpOutlineIcon sx={{ fontSize: 16, color: isDark ? '#94a3b8' : '#64748b', cursor: 'help' }} />
+            </Tooltip>
+          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={addRule}
+            disabled={disabled}
+          >
+            Add Rule
+          </Button>
         </Box>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={addRule}
-          disabled={disabled}
-        >
-          Add Rule
-        </Button>
-      </Box>
+      )}
 
       {/* Rules list */}
       {rules.length === 0 ? (

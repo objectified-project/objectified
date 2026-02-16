@@ -8,6 +8,7 @@ Bug Fixes:
 - Import now handles paths properly
 - Improved Markdown rendering
 - Improved layout of primitives form
+- Improved layout of class form
 - Improved layout of the linked accounts page
   - Linked accounts page is slightly wider matching those of other dashboard layouts
   - Provider cards now show PAT hints so users can match the PATs that were assigned
