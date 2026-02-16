@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/Dialog';
+import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
 import { AnalysisPanel } from './AnalysisPanel';
 import { PreviewPanel, ImportOptions } from './PreviewPanel';
@@ -65,8 +66,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [postmanFilename, setPostmanFilename] = useState<string | null>(null);
   const [postmanMetadata, setPostmanMetadata] = useState<FileMetadataPreview | null>(null);
   const [showLLMDialog, setShowLLMDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSourceClick = (source: string) => {
+    setErrorMessage(null);
     if (source === 'llm') {
       setShowLLMDialog(true);
       return;
@@ -77,6 +80,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   const handleBack = () => {
+    setErrorMessage(null);
     if (currentStep === 'done') {
       setCurrentStep('preview');
     } else if (currentStep === 'import') {
@@ -156,12 +160,14 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setPostmanContent(null);
     setPostmanFilename(null);
     setPostmanMetadata(null);
+    setErrorMessage(null);
     onClose();
   };
 
   const handleAnalyze = async () => {
     if (!selectedFile && !urlContent && !clipboardContent && !gitContent && !swaggerHubContent && !postmanContent) return;
 
+    setErrorMessage(null);
     console.log('Starting analysis...', {
       selectedFile: selectedFile?.name,
       urlFilename,
@@ -187,7 +193,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       console.log('State updated to analysis step');
     } catch (error) {
       console.error('Analysis error:', error);
-      // TODO: Show error message
+      setErrorMessage(error instanceof Error ? error.message : 'Analysis failed. Please check the specification and try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -278,7 +284,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       }
     } else {
       console.error('Invalid file type');
-      // TODO: Show error message
+      setErrorMessage(`Unsupported file type. Allowed: ${validExtensions.join(', ')}`);
     }
   };
 
@@ -468,6 +474,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
         {/* Scrollable Content Area */}
         <div className="overflow-y-auto py-6 px-6 h-[60vh]">
+          {errorMessage && (
+            <Alert variant="error" className="mb-4 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              {errorMessage}
+            </Alert>
+          )}
           {(() => {
             console.log('Render check:', { currentStep, selectedSource, hasAnalysisResult: !!analysisResult });
 

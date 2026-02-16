@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks -- Playwright fixture callback is named "use", not React's use() hook */
 import { test as base, expect, Page } from '@playwright/test';
 
 /**
