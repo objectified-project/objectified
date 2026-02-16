@@ -2,14 +2,6 @@
 
 These are the tasks remaining for Nginx to button down the support and security.
 
-## Security harden NGINX
-
-- Implement https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
-
-| Ticket | Feature Description                            |
-|--------|------------------------------------------------|
-| #426   | Implement NGINX bad bot blocker                |
-
 ## AI Suggested fixes
 
 - Look into rate limiting
@@ -160,3 +152,7 @@ These are the tasks remaining for Nginx to button down the support and security.
 ---
 
 # Completed
+
+## Security harden NGINX
+
+- Implement https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker

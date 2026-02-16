@@ -730,10 +730,7 @@ const Tenants = () => {
                   <Textarea id="tenantDescription" value={tenantDescription} onChange={(e) => setTenantDescription(e.target.value)} disabled={isLoading} rows={3} />
                 </div>
                 <Alert variant="warning">
-                  <div className="flex gap-2">
-                    <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm"><strong>Note:</strong> The slug is used in OpenAPI specification URLs. Changing it will affect any published specs.</p>
-                  </div>
+                  <p className="text-sm"><strong>Note:</strong> The slug is used in OpenAPI specification URLs. Changing it will affect any published specs.</p>
                 </Alert>
               </>
             )}
