@@ -596,9 +596,10 @@ function normalizeContentSchema(mediaObj: any): { schema?: Record<string, unknow
 }
 
 /**
- * Extract paths from OpenAPI spec.paths (OpenAPI 3.1 pathing - #425)
+ * Extract paths from OpenAPI spec.paths (OpenAPI 3.1 pathing - #425).
+ * Exported for use by import-helper when importing OpenAPI via startImport.
  */
-function extractPaths(spec: any): ParsedPath[] {
+export function extractPaths(spec: any): ParsedPath[] {
   const pathObj = spec.paths;
   if (!pathObj || typeof pathObj !== 'object') return [];
 
@@ -712,9 +713,10 @@ function extractPaths(spec: any): ParsedPath[] {
 }
 
 /**
- * Extract security schemes from OpenAPI spec.components.securitySchemes (#425)
+ * Extract security schemes from OpenAPI spec.components.securitySchemes (#425).
+ * Exported for use by import-helper when importing OpenAPI via startImport.
  */
-function extractSecuritySchemes(spec: any): ParsedSecurityScheme[] {
+export function extractSecuritySchemes(spec: any): ParsedSecurityScheme[] {
   const schemes = spec.components?.securitySchemes;
   if (!schemes || typeof schemes !== 'object') return [];
 

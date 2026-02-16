@@ -1,8 +1,8 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, Sparkles } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,12 @@ import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { Textarea } from '../../../components/ui/Textarea';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
 import { createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
-import LLMImportDialog from '../../../components/ade/dashboard/LLMImportDialog';
+import { LLMChatPanel } from '../../../components/ade/dashboard/LLMImportDialog';
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { filterSlugInput } from '../../../utils/slug';
 import { SPDX_LICENSES, getLicenseUrl, SPDXLicense } from '../../../utils/spdx-licenses';
@@ -52,10 +52,12 @@ const Projects = () => {
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createDialogTab, setCreateDialogTab] = useState<'manual' | 'ai'>('manual');
+  const aiPanelRef = useRef<{ abort: () => void } | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showNewImportDialog, setShowNewImportDialog] = useState(false);
-  const [showAIChatDialog, setShowAIChatDialog] = useState(false);
+  const [importOpenedFromNewProjectAI, setImportOpenedFromNewProjectAI] = useState(false);
   const [pendingLLMSpec, setPendingLLMSpec] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
@@ -64,8 +66,6 @@ const Projects = () => {
   const [projectEnabled, setProjectEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [editTabValue, setEditTabValue] = useState('basic');
-
   // Dropdown state
   const [openProjectDropdown, setOpenProjectDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
@@ -116,6 +116,7 @@ const Projects = () => {
     setProjectSlug('');
     setProjectEnabled(true);
     setErrorMessage('');
+    setCreateDialogTab('manual');
     setMetadataSummary('');
     setMetadataTermsOfService('');
     setMetadataContactName('');
@@ -171,7 +172,6 @@ const Projects = () => {
     setProjectSlug((project as any).slug || '');
     setProjectEnabled(project.enabled);
     setErrorMessage('');
-    setEditTabValue('basic');
     const metadata = project.metadata || {};
     setMetadataSummary(metadata.summary || '');
     setMetadataTermsOfService(metadata.termsOfService || '');
@@ -321,22 +321,16 @@ const Projects = () => {
         </div>
         <div className="flex gap-2">
           <Button
-            onClick={() => setShowNewImportDialog(true)}
+            onClick={() => {
+              setImportOpenedFromNewProjectAI(false);
+              setShowNewImportDialog(true);
+            }}
             variant="outline"
             className="border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
             disabled={!currentTenantId}
             title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
           >
             <Upload className="h-5 w-5" />Import
-          </Button>
-          <Button
-            onClick={() => setShowAIChatDialog(true)}
-            variant="outline"
-            className="border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/30"
-            disabled={!currentTenantId}
-            title={!currentTenantId ? 'Please select a tenant first' : 'Chat with AI to design API specs'}
-          >
-            <Sparkles className="h-5 w-5" />Design with AI
           </Button>
           <Button onClick={handleCreateClick} className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
             <Plus className="h-5 w-5" />New Project
@@ -539,8 +533,21 @@ const Projects = () => {
       )}
 
       {/* Create Project Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
-        <DialogContent className="max-w-lg">
+      <Dialog
+        open={showCreateDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (createDialogTab === 'ai') {
+              aiPanelRef.current?.abort();
+              setCreateDialogTab('manual');
+              return;
+            }
+            aiPanelRef.current?.abort();
+          }
+          if (!isLoading) setShowCreateDialog(open);
+        }}
+      >
+        <DialogContent className="w-[1280px] max-w-[95vw] h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30">
@@ -549,28 +556,164 @@ const Projects = () => {
               Create New Project
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
-            {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
-            <div className="space-y-2">
-              <Label htmlFor="projectName">Project Name *</Label>
-              <Input id="projectName" value={projectName} onChange={(e) => { setProjectName(e.target.value); if (!projectSlug || projectSlug === generateSlug(projectName)) setProjectSlug(generateSlug(e.target.value)); }} disabled={isLoading} autoFocus />
+          <Tabs value={createDialogTab} onValueChange={(v) => setCreateDialogTab(v as 'manual' | 'ai')} className="flex-1 flex flex-col min-h-0 mt-4">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="manual" className="flex items-center gap-2">
+                <FileEdit className="h-4 w-4" />
+                Create manually
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                Design with AI
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="manual" className="mt-4 flex-1 min-h-0">
+          {errorMessage && <Alert variant="error" className="mb-4">{errorMessage}</Alert>}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700">
+            {/* Left: Basic Information */}
+            <div className="flex flex-col pr-4 lg:pr-6">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Basic Information</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="projectName">Project Name *</Label>
+                  <Input id="projectName" value={projectName} onChange={(e) => { setProjectName(e.target.value); if (!projectSlug || projectSlug === generateSlug(projectName)) setProjectSlug(generateSlug(e.target.value)); }} disabled={isLoading} autoFocus />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="projectSlug">Slug *</Label>
+                  <Input id="projectSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">URL-friendly identifier (lowercase letters, numbers, and dashes only)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="projectDescription">Description</Label>
+                  <Textarea id="projectDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="projectSlug">Slug *</Label>
-              <Input id="projectSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
-              <p className="text-xs text-gray-500 dark:text-gray-400">URL-friendly identifier (lowercase letters, numbers, and dashes only)</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="projectDescription">Description</Label>
-              <Textarea id="projectDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={3} />
+            {/* Right: API Metadata */}
+            <div className="flex flex-col pl-4 lg:pl-6 pt-4 lg:pt-0">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">API Metadata</h3>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">OpenAPI</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="createSummary">API Summary</Label>
+                    <Input id="createSummary" value={metadataSummary} onChange={(e) => setMetadataSummary(e.target.value)} disabled={isLoading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="createTermsOfService">Terms of Service URL</Label>
+                    <div className="flex gap-2">
+                      <Input id="createTermsOfService" type="url" value={metadataTermsOfService} onChange={(e) => setMetadataTermsOfService(e.target.value)} disabled={isLoading} placeholder="https://example.com/terms" className="flex-1 min-w-0" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={isLoading || !metadataTermsOfService.trim() || (!metadataTermsOfService.trim().startsWith('http://') && !metadataTermsOfService.trim().startsWith('https://'))}
+                        onClick={() => window.open(metadataTermsOfService.trim(), '_blank', 'noopener,noreferrer')}
+                        title="Open URL in new window"
+                        className="shrink-0"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Contact</h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="createContactName">Name</Label>
+                      <Input id="createContactName" value={metadataContactName} onChange={(e) => setMetadataContactName(e.target.value)} disabled={isLoading} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="createContactUrl">URL</Label>
+                      <div className="flex gap-2">
+                        <Input id="createContactUrl" type="url" value={metadataContactUrl} onChange={(e) => setMetadataContactUrl(e.target.value)} disabled={isLoading} className="flex-1 min-w-0" />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={isLoading || !metadataContactUrl.trim() || (!metadataContactUrl.trim().startsWith('http://') && !metadataContactUrl.trim().startsWith('https://'))}
+                          onClick={() => window.open(metadataContactUrl.trim(), '_blank', 'noopener,noreferrer')}
+                          title="Open URL in new window"
+                          className="shrink-0"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="createContactEmail">Email</Label>
+                      <Input id="createContactEmail" type="email" value={metadataContactEmail} onChange={(e) => setMetadataContactEmail(e.target.value)} disabled={isLoading} />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">License</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="createLicenseIdentifier">License (SPDX)</Label>
+                    <Select value={metadataLicenseIdentifier} onValueChange={handleLicenseSelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a license..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {SPDX_LICENSES.slice(0, 50).map((license: SPDXLicense) => (
+                          <SelectItem key={license.identifier} value={license.identifier}>{license.name} ({license.identifier})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="createLicenseName">License Name</Label>
+                      <Input id="createLicenseName" value={metadataLicenseName} onChange={(e) => setMetadataLicenseName(e.target.value)} disabled={isLoading} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="createLicenseUrl">License URL</Label>
+                      <div className="flex gap-2">
+                        <Input id="createLicenseUrl" type="url" value={metadataLicenseUrl} onChange={(e) => setMetadataLicenseUrl(e.target.value)} disabled={isLoading} className="flex-1 min-w-0" />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={isLoading || !metadataLicenseUrl.trim() || (!metadataLicenseUrl.trim().startsWith('http://') && !metadataLicenseUrl.trim().startsWith('https://'))}
+                          onClick={() => window.open(metadataLicenseUrl.trim(), '_blank', 'noopener,noreferrer')}
+                          title="Open URL in new window"
+                          className="shrink-0"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleCreateSubmit} disabled={isLoading} className="bg-gradient-to-r from-purple-500 to-indigo-600">
               {isLoading ? 'Creating...' : 'Create Project'}
             </Button>
           </DialogFooter>
+            </TabsContent>
+            <TabsContent value="ai" className="mt-4 flex-1 min-h-0 flex flex-col p-0 data-[state=inactive]:hidden">
+              {currentTenantId && currentUserId && (
+                <LLMChatPanel
+                  ref={aiPanelRef}
+                  tenantId={currentTenantId}
+                  userId={currentUserId}
+                  embedded
+                  className="flex-1 min-h-0"
+                  onImportSpec={(specContent) => {
+                    setPendingLLMSpec(specContent);
+                    setImportOpenedFromNewProjectAI(true);
+                    setShowCreateDialog(false);
+                    setShowNewImportDialog(true);
+                  }}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -584,21 +727,13 @@ const Projects = () => {
           userId={currentUserId}
           initialLLMSpec={pendingLLMSpec}
           onConsumeInitialLLMSpec={() => setPendingLLMSpec(null)}
-        />
-      )}
-
-      {/* AI Design Chat - opens as popup to assist with design using an LLM */}
-      {currentTenantId && currentUserId && (
-        <LLMImportDialog
-          open={showAIChatDialog}
-          onClose={() => setShowAIChatDialog(false)}
-          onImportSpec={(specContent) => {
-            setPendingLLMSpec(specContent);
-            setShowAIChatDialog(false);
-            setShowNewImportDialog(true);
+          openedFromNewProjectAI={importOpenedFromNewProjectAI}
+          onReturnToNewProjectAI={() => {
+            setShowNewImportDialog(false);
+            setShowCreateDialog(true);
+            setCreateDialogTab('ai');
+            setImportOpenedFromNewProjectAI(false);
           }}
-          tenantId={currentTenantId}
-          userId={currentUserId}
         />
       )}
 
@@ -609,88 +744,131 @@ const Projects = () => {
 
       {/* Edit Project Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
           </DialogHeader>
           {errorMessage && <Alert variant="error" className="mt-4">{errorMessage}</Alert>}
-          <Tabs value={editTabValue} onValueChange={setEditTabValue} className="mt-4">
-            <TabsList>
-              <TabsTrigger value="basic">Basic Information</TabsTrigger>
-              <TabsTrigger value="metadata">API Metadata</TabsTrigger>
-            </TabsList>
-            <TabsContent value="basic" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="editName">Project Name *</Label>
-                <Input id="editName" value={projectName} onChange={(e) => setProjectName(e.target.value)} disabled={isLoading} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editSlug">Slug *</Label>
-                <Input id="editSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editDescription">Description</Label>
-                <Textarea id="editDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
-              </div>
-            </TabsContent>
-            <TabsContent value="metadata" className="space-y-6 mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700 mt-4">
+            {/* Left: Basic Information */}
+            <div className="flex flex-col pr-4 lg:pr-6">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Basic Information</h3>
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">OpenAPI Metadata</h3>
                 <div className="space-y-2">
-                  <Label htmlFor="summary">API Summary</Label>
-                  <Input id="summary" value={metadataSummary} onChange={(e) => setMetadataSummary(e.target.value)} disabled={isLoading} />
+                  <Label htmlFor="editName">Project Name *</Label>
+                  <Input id="editName" value={projectName} onChange={(e) => setProjectName(e.target.value)} disabled={isLoading} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="termsOfService">Terms of Service URL</Label>
-                  <Input id="termsOfService" type="url" value={metadataTermsOfService} onChange={(e) => setMetadataTermsOfService(e.target.value)} disabled={isLoading} placeholder="https://example.com/terms" />
+                  <Label htmlFor="editSlug">Slug *</Label>
+                  <Input id="editSlug" value={projectSlug} onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))} disabled={isLoading} className="font-mono" />
                 </div>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Contact Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contactName">Name</Label>
-                    <Input id="contactName" value={metadataContactName} onChange={(e) => setMetadataContactName(e.target.value)} disabled={isLoading} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contactUrl">URL</Label>
-                    <Input id="contactUrl" type="url" value={metadataContactUrl} onChange={(e) => setMetadataContactUrl(e.target.value)} disabled={isLoading} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contactEmail">Email</Label>
-                    <Input id="contactEmail" type="email" value={metadataContactEmail} onChange={(e) => setMetadataContactEmail(e.target.value)} disabled={isLoading} />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">License Information</h3>
                 <div className="space-y-2">
-                  <Label htmlFor="licenseIdentifier">License (SPDX)</Label>
-                  <Select value={metadataLicenseIdentifier} onValueChange={handleLicenseSelect}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a license..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {SPDX_LICENSES.slice(0, 50).map((license: SPDXLicense) => (
-                        <SelectItem key={license.identifier} value={license.identifier}>{license.name} ({license.identifier})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="editDescription">Description</Label>
+                  <Textarea id="editDescription" value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} disabled={isLoading} rows={4} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              </div>
+            </div>
+            {/* Right: API Metadata */}
+            <div className="flex flex-col pl-4 lg:pl-6 pt-4 lg:pt-0">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">API Metadata</h3>
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">OpenAPI</h4>
                   <div className="space-y-2">
-                    <Label htmlFor="licenseName">License Name</Label>
-                    <Input id="licenseName" value={metadataLicenseName} onChange={(e) => setMetadataLicenseName(e.target.value)} disabled={isLoading} />
+                    <Label htmlFor="summary">API Summary</Label>
+                    <Input id="summary" value={metadataSummary} onChange={(e) => setMetadataSummary(e.target.value)} disabled={isLoading} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="licenseUrl">License URL</Label>
-                    <Input id="licenseUrl" type="url" value={metadataLicenseUrl} onChange={(e) => setMetadataLicenseUrl(e.target.value)} disabled={isLoading} />
+                    <Label htmlFor="termsOfService">Terms of Service URL</Label>
+                    <div className="flex gap-2">
+                      <Input id="termsOfService" type="url" value={metadataTermsOfService} onChange={(e) => setMetadataTermsOfService(e.target.value)} disabled={isLoading} placeholder="https://example.com/terms" className="flex-1 min-w-0" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={isLoading || !metadataTermsOfService.trim() || (!metadataTermsOfService.trim().startsWith('http://') && !metadataTermsOfService.trim().startsWith('https://'))}
+                        onClick={() => window.open(metadataTermsOfService.trim(), '_blank', 'noopener,noreferrer')}
+                        title="Open URL in new window"
+                        className="shrink-0"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Contact</h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="contactName">Name</Label>
+                      <Input id="contactName" value={metadataContactName} onChange={(e) => setMetadataContactName(e.target.value)} disabled={isLoading} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contactUrl">URL</Label>
+                      <div className="flex gap-2">
+                        <Input id="contactUrl" type="url" value={metadataContactUrl} onChange={(e) => setMetadataContactUrl(e.target.value)} disabled={isLoading} className="flex-1 min-w-0" />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={isLoading || !metadataContactUrl.trim() || (!metadataContactUrl.trim().startsWith('http://') && !metadataContactUrl.trim().startsWith('https://'))}
+                          onClick={() => window.open(metadataContactUrl.trim(), '_blank', 'noopener,noreferrer')}
+                          title="Open URL in new window"
+                          className="shrink-0"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contactEmail">Email</Label>
+                      <Input id="contactEmail" type="email" value={metadataContactEmail} onChange={(e) => setMetadataContactEmail(e.target.value)} disabled={isLoading} />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">License</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseIdentifier">License (SPDX)</Label>
+                    <Select value={metadataLicenseIdentifier} onValueChange={handleLicenseSelect}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a license..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {SPDX_LICENSES.slice(0, 50).map((license: SPDXLicense) => (
+                          <SelectItem key={license.identifier} value={license.identifier}>{license.name} ({license.identifier})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="licenseName">License Name</Label>
+                      <Input id="licenseName" value={metadataLicenseName} onChange={(e) => setMetadataLicenseName(e.target.value)} disabled={isLoading} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="licenseUrl">License URL</Label>
+                      <div className="flex gap-2">
+                        <Input id="licenseUrl" type="url" value={metadataLicenseUrl} onChange={(e) => setMetadataLicenseUrl(e.target.value)} disabled={isLoading} className="flex-1 min-w-0" />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          disabled={isLoading || !metadataLicenseUrl.trim() || (!metadataLicenseUrl.trim().startsWith('http://') && !metadataLicenseUrl.trim().startsWith('https://'))}
+                          onClick={() => window.open(metadataLicenseUrl.trim(), '_blank', 'noopener,noreferrer')}
+                          title="Open URL in new window"
+                          className="shrink-0"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
-          <DialogFooter className="mt-4">
+            </div>
+          </div>
+          <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleEditSubmit} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
           </DialogFooter>

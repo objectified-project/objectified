@@ -7,8 +7,8 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { X, Send, Download, Sparkles, Bot, User, Loader2, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Send, Download, Sparkles, Bot, User, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,17 @@ import { Button } from '../../../components/ui/Button';
 import * as Select from '@radix-ui/react-select';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+export interface LLMChatPanelProps {
+  tenantId: string;
+  userId: string;
+  onImportSpec: (specContent: string) => void;
+  /** When true, use compact layout (e.g. when embedded in a tab). Default false. */
+  embedded?: boolean;
+  className?: string;
+  /** When provided, a Back button is shown to the left of the input (e.g. to return to tab choice). */
+  onBack?: () => void;
+}
 
 interface LLMImportDialogProps {
   open: boolean;
@@ -40,13 +51,10 @@ interface OllamaModel {
   size: number;
 }
 
-export default function LLMImportDialog({
-  open,
-  onClose,
-  onImportSpec,
-  tenantId,
-  userId,
-}: LLMImportDialogProps) {
+export const LLMChatPanel = forwardRef<{ abort: () => void } | null, LLMChatPanelProps>(function LLMChatPanel(
+  { tenantId, userId, onImportSpec, embedded = false, className, onBack },
+  ref
+) {
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -57,12 +65,14 @@ export default function LLMImportDialog({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load available models
+  useImperativeHandle(ref, () => ({
+    abort: () => abortControllerRef.current?.abort(),
+  }), []);
+
+  // Load available models when mounted
   useEffect(() => {
-    if (open) {
-      loadModels();
-    }
-  }, [open]);
+    loadModels();
+  }, []);
 
   const loadModels = async () => {
     setIsLoadingModels(true);
@@ -327,22 +337,12 @@ export default function LLMImportDialog({
     );
   };
 
-  // Handle importing a spec
+  // Handle importing a spec (caller is responsible for closing dialog when used in dialog)
   const handleImport = (content: string) => {
     const spec = extractJsonSpec(content);
     if (spec) {
       onImportSpec(spec);
-      onClose();
     }
-  };
-
-  // Handle dialog close
-  const handleClose = () => {
-    // Abort any ongoing requests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    onClose();
   };
 
   // Reset conversation
@@ -353,9 +353,9 @@ export default function LLMImportDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
+    <div className={`flex flex-col min-h-0 ${embedded ? 'h-full' : ''} ${className ?? ''}`}>
         {/* Header */}
+        {!embedded && (
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
@@ -371,6 +371,7 @@ export default function LLMImportDialog({
             </div>
           </div>
         </div>
+        )}
 
         {/* Model Selection */}
         <div className="px-6 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
@@ -541,7 +542,12 @@ export default function LLMImportDialog({
 
         {/* Input Area */}
         <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {onBack && (
+              <Button type="button" variant="outline" onClick={onBack} className="shrink-0">
+                Back
+              </Button>
+            )}
             <input
               type="text"
               value={input}
@@ -549,7 +555,7 @@ export default function LLMImportDialog({
               onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               placeholder="Describe your API or ask for changes..."
               disabled={isLoading || !selectedModel}
-              className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 min-w-0 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <Button
               onClick={handleSendMessage}
@@ -568,6 +574,38 @@ export default function LLMImportDialog({
             AI can make mistakes — please review before importing.
           </p>
         </div>
+    </div>
+  );
+});
+
+/** Standalone dialog that wraps LLMChatPanel. Use this when opening Design with AI in its own dialog. */
+export default function LLMImportDialog({
+  open,
+  onClose,
+  onImportSpec,
+  tenantId,
+  userId,
+}: LLMImportDialogProps) {
+  const panelRef = useRef<{ abort: () => void } | null>(null);
+
+  const handleClose = () => {
+    panelRef.current?.abort();
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
+        <LLMChatPanel
+          ref={panelRef}
+          tenantId={tenantId}
+          userId={userId}
+          embedded={false}
+          onImportSpec={(spec) => {
+            onImportSpec(spec);
+            onClose();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

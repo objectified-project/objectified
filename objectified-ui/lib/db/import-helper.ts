@@ -17,6 +17,8 @@ import {
 import { ImportSourceKind, getImporter, NormalizedClass, NormalizedProperty } from '../importers';
 import { withRetry } from '../retry';
 import { permanentDeleteProject } from './helper';
+import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
+import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
 
 export type ImportJobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
@@ -675,6 +677,20 @@ export async function startImport(input: ImportJobInput) {
         if (job.summary) job.summary.verification = verificationResultInc;
         if (!verificationResultInc.passed && job.summary) job.summary.warnings++;
 
+        if (input.sourceKind === 'openapi' && input.document) {
+          const paths = extractPaths(input.document);
+          const securitySchemes = extractSecuritySchemes(input.document);
+          if (paths.length > 0 || securitySchemes.length > 0) {
+            emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
+            const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
+            if (pathResult.success) {
+              emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
+            } else {
+              emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
+            }
+          }
+        }
+
         setProgress(job, 'finalizing', 3 + norm.classes.length, 3 + norm.classes.length);
         job.state = 'completed';
         job.result = { projectId, versionId };
@@ -907,6 +923,21 @@ export async function commitImport(jobId: string): Promise<{ success: boolean; e
     // Release the client
     await releaseClient(job.transactionClient);
     job.transactionClient = undefined;
+
+    const versionId = job.result?.versionId as string | undefined;
+    if (versionId && job.input.sourceKind === 'openapi' && job.input.document) {
+      const paths = extractPaths(job.input.document);
+      const securitySchemes = extractSecuritySchemes(job.input.document);
+      if (paths.length > 0 || securitySchemes.length > 0) {
+        emit(job, 'info', 'IMPORTING_PATHS', `Importing ${paths.length} path(s) and ${securitySchemes.length} security scheme(s)...`);
+        const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
+        if (pathResult.success) {
+          emit(job, 'info', 'PATHS_IMPORTED', 'Paths and security schemes imported.');
+        } else {
+          emit(job, 'warn', 'PATHS_IMPORT_WARN', `Paths/security import had issues: ${pathResult.error}`);
+        }
+      }
+    }
 
     job.state = 'completed';
     emit(job, 'info', 'DONE', 'Import completed successfully', job.result);

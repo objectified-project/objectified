@@ -4,6 +4,8 @@ import { createClass, addPropertyToClass, updateClass, getClassesForVersion, get
 import { getImporter, NormalizedClass, type NormalizedProperty } from '../importers';
 import { cookies } from 'next/headers';
 import { mergeClasses, type MergeStrategy, type ArrayMergeStrategy } from '../../src/app/utils/schema-merge';
+import { extractPaths, extractSecuritySchemes } from '../../src/app/utils/openapi-import';
+import { importOpenAPIPathsAndSecurity } from './import-openapi-paths-security';
 
 export interface ImportClassesInput {
   versionId: string;
@@ -329,6 +331,17 @@ export async function importClassesToVersion(input: ImportClassesInput): Promise
           skippedCount++;
         } else {
           throw error;
+        }
+      }
+    }
+
+    if (sourceKind === 'openapi' && document) {
+      const paths = extractPaths(document);
+      const securitySchemes = extractSecuritySchemes(document);
+      if (paths.length > 0 || securitySchemes.length > 0) {
+        const pathResult = await importOpenAPIPathsAndSecurity(versionId, paths, securitySchemes);
+        if (!pathResult.success) {
+          console.warn('Paths/security import had issues:', pathResult.error);
         }
       }
     }

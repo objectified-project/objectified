@@ -4,7 +4,12 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
-## New Features and Improvements
+Bug Fixes:
+- Import now handles paths properly
+- Improved Markdown rendering
+- New project form:
+  - Now includes the metadata section
+  - Moved AI Assistant here
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 

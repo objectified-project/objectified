@@ -50,7 +50,7 @@ export const SPDX_LICENSES: SPDXLicense[] = [
 
   // Proprietary/Commercial
   { identifier: 'UNLICENSED', name: 'Proprietary/Unlicensed' },
-];
+].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
 /**
  * Get license URL from SPDX identifier

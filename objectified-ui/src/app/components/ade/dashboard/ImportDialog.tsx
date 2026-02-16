@@ -33,6 +33,10 @@ interface ImportDialogProps {
   initialLLMSpec?: string | null;
   /** Called when initialLLMSpec has been consumed so parent can clear it. */
   onConsumeInitialLLMSpec?: () => void;
+  /** True when this dialog was opened from New Project → Design with AI → Import This Spec. Back/Cancel then return to the New Project form (AI tab) instead of source selection. */
+  openedFromNewProjectAI?: boolean;
+  /** When openedFromNewProjectAI is true, called instead of onClose when user goes Back to "source" or clicks Cancel, so parent can reopen New Project on AI tab. */
+  onReturnToNewProjectAI?: () => void;
 }
 
 const ImportDialog: React.FC<ImportDialogProps> = ({
@@ -43,6 +47,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   userId,
   initialLLMSpec,
   onConsumeInitialLLMSpec,
+  openedFromNewProjectAI,
+  onReturnToNewProjectAI,
 }) => {
   const [currentStep, setCurrentStep] = useState<'source' | 'file-upload' | 'analysis' | 'preview' | 'import' | 'done'>('source');
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -111,6 +117,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     } else if (currentStep === 'preview') {
       setCurrentStep('analysis');
     } else if (currentStep === 'analysis') {
+      // If the source was LLM and we were opened from New Project AI, return to that conversation instead of source
+      if (selectedSource === 'llm' && openedFromNewProjectAI && onReturnToNewProjectAI) {
+        onReturnToNewProjectAI();
+        return;
+      }
       // If the source was LLM, skip file-upload and go straight back to source selection
       if (selectedSource === 'llm') {
         setCurrentStep('source');
@@ -122,6 +133,11 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       }
       setAnalysisResult(null);
     } else if (currentStep === 'file-upload') {
+      // If we were opened from New Project AI (e.g. landed on analysis then went back to file-upload), return to that conversation
+      if (openedFromNewProjectAI && onReturnToNewProjectAI) {
+        onReturnToNewProjectAI();
+        return;
+      }
       setCurrentStep('source');
       setSelectedSource(null);
       setSelectedFile(null);
@@ -143,22 +159,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     }
   };
 
-  const handleClose = async () => {
-    // If there's a pending import job (during import step), roll back the transaction
-    if (jobId && currentStep === 'import') {
-      try {
-        await rollbackImport(jobId);
-      } catch (e) {
-        console.error('Failed to rollback import on close:', e);
-      }
-    }
-
-    // Call onSuccess callback if import completed successfully
-    if (importSucceeded && onSuccess) {
-      onSuccess();
-    }
-
-    // Reset all state
+  const resetDialogState = () => {
     setCurrentStep('source');
     setSelectedSource(null);
     setSelectedFile(null);
@@ -183,6 +184,38 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setPostmanFilename(null);
     setPostmanMetadata(null);
     setErrorMessage(null);
+  };
+
+  const handleClose = async () => {
+    // If opened from New Project AI, return to that conversation instead of closing to projects list
+    if (openedFromNewProjectAI && onReturnToNewProjectAI) {
+      if (jobId && currentStep === 'import') {
+        try {
+          await rollbackImport(jobId);
+        } catch (e) {
+          console.error('Failed to rollback import on close:', e);
+        }
+      }
+      resetDialogState();
+      onReturnToNewProjectAI();
+      return;
+    }
+
+    // If there's a pending import job (during import step), roll back the transaction
+    if (jobId && currentStep === 'import') {
+      try {
+        await rollbackImport(jobId);
+      } catch (e) {
+        console.error('Failed to rollback import on close:', e);
+      }
+    }
+
+    // Call onSuccess callback if import completed successfully
+    if (importSucceeded && onSuccess) {
+      onSuccess();
+    }
+
+    resetDialogState();
     onClose();
   };
 
