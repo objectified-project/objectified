@@ -1,5 +1,6 @@
 import psycopg2
 import json
+import bcrypt
 from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any
@@ -547,6 +548,8 @@ class Database:
     def validate_api_key(self, api_key: str) -> Optional[Dict[str, Any]]:
         """
         Validate an API key and return tenant information.
+        Uses the same key_prefix format as the UI (first 12 chars + '...') for lookup,
+        then verifies the full key against the stored bcrypt key_hash.
 
         Args:
             api_key: The API key to validate
@@ -554,11 +557,11 @@ class Database:
         Returns:
             Dict with tenant_id and tenant info if valid, None otherwise
         """
-        # Extract key prefix (first 8 characters)
-        if not api_key or len(api_key) < 8:
+        if not api_key or len(api_key) < 12:
             return None
 
-        key_prefix = api_key[:8]
+        # Match UI format: key_prefix is first 12 characters + '...'
+        key_prefix = api_key[:12] + '...'
 
         query = """
             SELECT ak.id, ak.tenant_id, ak.key_hash, ak.expires_at, ak.enabled,
@@ -577,21 +580,29 @@ class Database:
         if not results:
             return None
 
-        # For now, we'll just validate by prefix
-        # In production, you should hash the full key and compare with key_hash
-        api_key_data = results[0]
+        # Verify the full key against the stored bcrypt hash
+        api_key_bytes = api_key.encode('utf-8')
+        for row in results:
+            key_hash = row['key_hash']
+            if isinstance(key_hash, str):
+                key_hash = key_hash.encode('utf-8')
+            try:
+                if bcrypt.checkpw(api_key_bytes, key_hash):
+                    api_key_data = dict(row)
+                    # Update last_used_at
+                    try:
+                        update_query = "UPDATE odb.api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s"
+                        conn = self.connect()
+                        with conn.cursor() as cursor:
+                            cursor.execute(update_query, (api_key_data['id'],))
+                            conn.commit()
+                    except Exception:
+                        pass  # Don't fail if we can't update last_used_at
+                    return api_key_data
+            except (ValueError, TypeError):
+                continue
 
-        # Update last_used_at
-        try:
-            update_query = "UPDATE odb.api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = %s"
-            conn = self.connect()
-            with conn.cursor() as cursor:
-                cursor.execute(update_query, (api_key_data['id'],))
-                conn.commit()
-        except Exception:
-            pass  # Don't fail if we can't update last_used_at
-
-        return api_key_data
+        return None
 
     def get_tags_for_project(self, project_id: str) -> List[Dict[str, Any]]:
         """Get all tags for a specific project."""

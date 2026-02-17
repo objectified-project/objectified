@@ -2,10 +2,19 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, Lock, Globe, Copy, ExternalLink, Search, FileText, MoreVertical } from 'lucide-react';
-import { getPublishedVersionsForTenant, updateVersionVisibility } from '../../../../../lib/db/helper';
+import { Eye, Lock, Globe, Copy, ExternalLink, Search, FileText, MoreVertical, ChevronLeft } from 'lucide-react';
+import { getPublishedVersionsForTenant, updateVersionVisibility, getApiKeysForTenant } from '../../../../../lib/db/helper';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
+import { Label } from '../../../components/ui/Label';
 import { Badge } from '../../../components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/Tooltip';
@@ -29,6 +38,12 @@ interface PublishedVersion {
   creator_email: string;
 }
 
+interface ApiKeySummary {
+  id: string;
+  enabled: boolean;
+  expires_at: string | null;
+}
+
 const PublishedVersions = () => {
   const { data: session } = useSession();
   const { confirm: confirmDialog, alert: alertDialog } = useDialog();
@@ -41,11 +56,35 @@ const PublishedVersions = () => {
   // Dropdown state
   const [openVersionDropdown, setOpenVersionDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; right: number } | null>(null);
+  const [openViewSubmenu, setOpenViewSubmenu] = useState<string | null>(null);
+
+  const [apiKeys, setApiKeys] = useState<ApiKeySummary[]>([]);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
 
+  const isApiKeyExpired = (expiresAt: string | null) => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt) < new Date();
+  };
+  const hasEnabledApiKey = apiKeys.some((k) => k.enabled && !isApiKeyExpired(k.expires_at));
+
   useEffect(() => {
     loadPublishedVersions();
+  }, [currentTenantId]);
+
+  useEffect(() => {
+    if (currentTenantId) {
+      getApiKeysForTenant(currentTenantId).then((result) => {
+        try {
+          const keys = JSON.parse(result) as ApiKeySummary[];
+          setApiKeys(keys);
+        } catch {
+          setApiKeys([]);
+        }
+      });
+    } else {
+      setApiKeys([]);
+    }
   }, [currentTenantId]);
 
   const loadPublishedVersions = async () => {
@@ -63,21 +102,16 @@ const PublishedVersions = () => {
   };
 
   const getAccessUrl = (version: PublishedVersion) => `${version.tenant_slug}/${version.project_slug}/${version.version_id}`;
-  const getFullAccessUrl = (version: PublishedVersion) => {
-    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
-    return `${restApiBaseUrl}/schema/${getAccessUrl(version)}`;
-  };
-  const getSwaggerUrl = (version: PublishedVersion) => {
-    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
-    return `${restApiBaseUrl}/swagger/${getAccessUrl(version)}`;
-  };
-  const getArazzoUrl = (version: PublishedVersion) => {
-    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
-    return `${restApiBaseUrl}/arazzo/${getAccessUrl(version)}`;
-  };
-  const getJsonUrl = (version: PublishedVersion) => {
-    const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
-    return `${restApiBaseUrl}/json/${getAccessUrl(version)}`;
+  const restApiBaseUrl = process.env.NEXT_PUBLIC_REST_API_BASE_URL || 'http://localhost:8000/v1';
+  const getFullAccessUrl = (version: PublishedVersion) => `${restApiBaseUrl}/schema/${getAccessUrl(version)}`;
+  const getSwaggerUrl = (version: PublishedVersion) => `${restApiBaseUrl}/swagger/${getAccessUrl(version)}`;
+  const getArazzoUrl = (version: PublishedVersion) => `${restApiBaseUrl}/arazzo/${getAccessUrl(version)}`;
+  const getJsonUrl = (version: PublishedVersion) => `${restApiBaseUrl}/json/${getAccessUrl(version)}`;
+
+  const withApiKey = (baseUrl: string, apiKey: string | undefined) => {
+    if (!apiKey?.trim()) return baseUrl;
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${sep}api_key=${encodeURIComponent(apiKey.trim())}`;
   };
 
   const handleCopyUrl = async (version: PublishedVersion) => {
@@ -90,10 +124,54 @@ const PublishedVersions = () => {
     }
   };
 
-  const handleOpenUrl = (version: PublishedVersion) => window.open(getFullAccessUrl(version), '_blank');
-  const handleOpenSwagger = (version: PublishedVersion) => window.open(getSwaggerUrl(version), '_blank');
-  const handleOpenArazzo = (version: PublishedVersion) => window.open(getArazzoUrl(version), '_blank');
-  const handleOpenJson = (version: PublishedVersion) => window.open(getJsonUrl(version), '_blank');
+  const [apiKeyDialog, setApiKeyDialog] = useState<{ version: PublishedVersion; action: 'open' | 'arazzo' | 'json' | 'swagger' } | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+
+  const openViewWithKey = (version: PublishedVersion, action: 'open' | 'arazzo' | 'json' | 'swagger', apiKey: string | undefined) => {
+    const url = action === 'open' ? getFullAccessUrl(version) : action === 'arazzo' ? getArazzoUrl(version) : action === 'json' ? getJsonUrl(version) : getSwaggerUrl(version);
+    window.open(withApiKey(url, apiKey), '_blank');
+  };
+
+  const handleOpenUrl = (version: PublishedVersion) => {
+    if (version.visibility === 'private') {
+      setApiKeyInput('');
+      setApiKeyDialog({ version, action: 'open' });
+      return;
+    }
+    window.open(getFullAccessUrl(version), '_blank');
+  };
+  const handleOpenSwagger = (version: PublishedVersion) => {
+    if (version.visibility === 'private') {
+      setApiKeyInput('');
+      setApiKeyDialog({ version, action: 'swagger' });
+      return;
+    }
+    window.open(getSwaggerUrl(version), '_blank');
+  };
+  const handleOpenArazzo = (version: PublishedVersion) => {
+    if (version.visibility === 'private') {
+      setApiKeyInput('');
+      setApiKeyDialog({ version, action: 'arazzo' });
+      return;
+    }
+    window.open(getArazzoUrl(version), '_blank');
+  };
+  const handleOpenJson = (version: PublishedVersion) => {
+    if (version.visibility === 'private') {
+      setApiKeyInput('');
+      setApiKeyDialog({ version, action: 'json' });
+      return;
+    }
+    window.open(getJsonUrl(version), '_blank');
+  };
+  const handleApiKeyDialogOpen = () => {
+    if (!apiKeyDialog) return;
+    openViewWithKey(apiKeyDialog.version, apiKeyDialog.action, apiKeyInput);
+    setApiKeyDialog(null);
+    setApiKeyInput('');
+    setOpenVersionDropdown(null);
+    setOpenViewSubmenu(null);
+  };
 
   const handleToggleVisibility = async (version: PublishedVersion) => {
     const newVisibility = version.visibility === 'public' ? 'private' : 'public';
@@ -279,6 +357,7 @@ const PublishedVersions = () => {
                                 right: window.innerWidth - rect.right
                               });
                               setOpenVersionDropdown(openVersionDropdown === version.id ? null : version.id);
+                              setOpenViewSubmenu(null);
                             }}
                             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white"
                             title="Actions"
@@ -293,6 +372,7 @@ const PublishedVersions = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenVersionDropdown(null);
+                                  setOpenViewSubmenu(null);
                                 }}
                               />
                               <div
@@ -302,39 +382,97 @@ const PublishedVersions = () => {
                                   right: `${dropdownPosition.right}px`
                                 }}>
                                 <div className="py-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenVersionDropdown(null);
-                                      handleAction('open', version);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                                  <div
+                                    className="relative"
+                                    onMouseEnter={() => setOpenViewSubmenu(version.id)}
+                                    onMouseLeave={() => setOpenViewSubmenu(null)}
                                   >
-                                    <ExternalLink className="w-4 h-4 text-blue-500" />
-                                    View OpenAPI
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenVersionDropdown(null);
-                                      handleAction('arazzo', version);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                  >
-                                    <FileText className="w-4 h-4 text-orange-500" />
-                                    View Arazzo
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenVersionDropdown(null);
-                                      handleAction('json', version);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                                  >
-                                    <FileText className="w-4 h-4 text-orange-500" />
-                                    View JSON Schema
-                                  </button>
+                                    <div className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-default">
+                                      <ChevronLeft className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                                      <ExternalLink className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                      View
+                                    </div>
+                                    {openViewSubmenu === version.id && (
+                                      <div
+                                        className="absolute right-full top-0 mr-0 w-48 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-30"
+                                        style={{ minWidth: '10rem' }}
+                                      >
+                                        {(() => {
+                                          const isPrivateNoKey = version.visibility === 'private' && !hasEnabledApiKey;
+                                          const viewItemClass = isPrivateNoKey
+                                            ? 'w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                            : 'w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors';
+                                          return (
+                                            <>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (isPrivateNoKey) return;
+                                                      setOpenVersionDropdown(null);
+                                                      setOpenViewSubmenu(null);
+                                                      handleAction('open', version);
+                                                    }}
+                                                    disabled={isPrivateNoKey}
+                                                    className={viewItemClass}
+                                                  >
+                                                    OpenAPI
+                                                  </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="left">
+                                                  {isPrivateNoKey ? 'Create an API key to access private versions' : 'View OpenAPI spec'}
+                                                </TooltipContent>
+                                              </Tooltip>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (isPrivateNoKey) return;
+                                                      setOpenVersionDropdown(null);
+                                                      setOpenViewSubmenu(null);
+                                                      handleAction('arazzo', version);
+                                                    }}
+                                                    disabled={isPrivateNoKey}
+                                                    className={viewItemClass}
+                                                  >
+                                                    Arazzo
+                                                  </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="left">
+                                                  {isPrivateNoKey ? 'Create an API key to access private versions' : 'View in Arazzo'}
+                                                </TooltipContent>
+                                              </Tooltip>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (isPrivateNoKey) return;
+                                                      setOpenVersionDropdown(null);
+                                                      setOpenViewSubmenu(null);
+                                                      handleAction('json', version);
+                                                    }}
+                                                    disabled={isPrivateNoKey}
+                                                    className={viewItemClass}
+                                                  >
+                                                    JSON Schema
+                                                  </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="left">
+                                                  {isPrivateNoKey ? 'Create an API key to access private versions' : 'View JSON Schema'}
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -399,6 +537,38 @@ const PublishedVersions = () => {
           </div>
         )}
       </div>
+
+      {/* API key dialog for private View links */}
+      <Dialog open={!!apiKeyDialog} onOpenChange={(open) => !open && setApiKeyDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>API key required</DialogTitle>
+            <DialogDescription>
+              This version is private. Enter your API key to open with authentication. You can create or copy a key from the API Keys page.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-key-input">API key</Label>
+              <Input
+                id="api-key-input"
+                type="password"
+                autoComplete="off"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && apiKeyInput.trim() && handleApiKeyDialogOpen()}
+                placeholder="sk_..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApiKeyDialog(null)}>Cancel</Button>
+            <Button onClick={handleApiKeyDialogOpen} disabled={!apiKeyInput.trim()}>
+              Open with key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 };

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Response, Header
+from fastapi import FastAPI, HTTPException, Response, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -143,7 +143,8 @@ async def get_version_openapi_spec(
     tenant_slug: str,
     project_slug: str,
     version_slug: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, description="API key for private versions (alternative to X-API-Key header)")
 ) -> JSONResponse:
     """
     Get the complete OpenAPI specification for all classes in a version.
@@ -152,7 +153,8 @@ async def get_version_openapi_spec(
         tenant_slug: The tenant slug
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
-        x_api_key: Optional API key for private versions
+        x_api_key: Optional API key for private versions (header)
+        api_key: Optional API key for private versions (query, for links)
 
     Returns:
         OpenAPI 3.1.0 specification in JSON format
@@ -173,8 +175,8 @@ async def get_version_openapi_spec(
             detail="This version is not published"
         )
 
-    # Validate access for private versions
-    validate_private_access(version, tenant_slug, x_api_key)
+    # Validate access for private versions (header or query param)
+    validate_private_access(version, tenant_slug, x_api_key or api_key)
 
     # Get all classes for this version
     classes = db.get_classes_for_version(version['id'])
@@ -289,7 +291,8 @@ async def get_swagger_ui(
     tenant_slug: str,
     project_slug: str,
     version_slug: str,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, description="API key for private versions (alternative to X-API-Key header)")
 ) -> HTMLResponse:
     """
     Display the OpenAPI specification in a Swagger UI interface.
@@ -298,7 +301,8 @@ async def get_swagger_ui(
         tenant_slug: The tenant slug
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
-        x_api_key: Optional API key for private versions
+        x_api_key: Optional API key for private versions (header)
+        api_key: Optional API key for private versions (query, for links)
 
     Returns:
         HTML page with Swagger UI displaying the schema
@@ -319,8 +323,8 @@ async def get_swagger_ui(
             detail="This version is not published"
         )
 
-    # Validate access for private versions
-    validate_private_access(version, tenant_slug, x_api_key)
+    # Validate access for private versions (header or query param)
+    validate_private_access(version, tenant_slug, x_api_key or api_key)
 
     # Get all classes for this version
     classes = db.get_classes_for_version(version['id'])
@@ -398,6 +402,7 @@ async def get_version_arazzo_spec(
     project_slug: str,
     version_slug: str,
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, description="API key for private versions (alternative to X-API-Key header)"),
     accept: Optional[str] = Header(None)
 ) -> Response:
     """
@@ -408,7 +413,8 @@ async def get_version_arazzo_spec(
         tenant_slug: The tenant slug
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
-        x_api_key: Optional API key for private versions
+        x_api_key: Optional API key for private versions (header)
+        api_key: Optional API key for private versions (query, for links)
         accept: Accept header for content negotiation
 
     Returns:
@@ -430,8 +436,8 @@ async def get_version_arazzo_spec(
             detail="This version is not published"
         )
 
-    # Validate access for private versions
-    validate_private_access(version, tenant_slug, x_api_key)
+    # Validate access for private versions (header or query param)
+    validate_private_access(version, tenant_slug, x_api_key or api_key)
 
     # Get all classes for this version
     classes = db.get_classes_for_version(version['id'])
@@ -549,6 +555,7 @@ async def get_version_jsonschema_spec(
     project_slug: str,
     version_slug: str,
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    api_key: Optional[str] = Query(None, description="API key for private versions (alternative to X-API-Key header)"),
     accept: Optional[str] = Header(None)
 ) -> Response:
     """
@@ -559,7 +566,8 @@ async def get_version_jsonschema_spec(
         tenant_slug: The tenant slug
         project_slug: The project slug
         version_slug: The version ID (e.g., "1.0.0")
-        x_api_key: Optional API key for private versions
+        x_api_key: Optional API key for private versions (header)
+        api_key: Optional API key for private versions (query, for links)
         accept: Accept header for content negotiation
 
     Returns:
@@ -581,8 +589,8 @@ async def get_version_jsonschema_spec(
             detail="This version is not published"
         )
 
-    # Validate access for private versions
-    validate_private_access(version, tenant_slug, x_api_key)
+    # Validate access for private versions (header or query param)
+    validate_private_access(version, tenant_slug, x_api_key or api_key)
 
     # Get all classes for this version
     classes = db.get_classes_for_version(version['id'])

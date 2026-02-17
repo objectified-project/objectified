@@ -9,6 +9,11 @@ Bug Fixes:
 - Improved Markdown rendering
 - Improved layout of primitives form
 - Improved layout of class form
+- Improved layout of profile page
+- Improved published view page
+  - Now displays the different types of object representations as a submenu (OpenAPI, Arazzo, JSON)
+  - Now applies API Key when viewing private published pages
+  - Fixes REST service to apply API Key on retrieval
 - Improved layout of the linked accounts page
   - Linked accounts page is slightly wider matching those of other dashboard layouts
   - Provider cards now show PAT hints so users can match the PATs that were assigned
