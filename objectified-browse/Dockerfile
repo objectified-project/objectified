@@ -72,4 +72,4 @@ ENV HOSTNAME="0.0.0.0"
 ENV PORT=3003
 
 # Start the application
-CMD ["yarn", "start"]
+CMD ["yarn", "start", "-p", "3003", "-H", "0.0.0.0"]
