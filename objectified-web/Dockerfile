@@ -43,7 +43,8 @@ RUN yarn install --production --ignore-optional
 # Copy built app and config
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts* ./
+# Use .mjs config so runner does not need TypeScript to transpile next.config.ts
+COPY --from=builder /app/next.config.mjs ./
 
 RUN chown -R nextjs:nodejs /app
 
@@ -53,4 +54,4 @@ EXPOSE 3002
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3002
 
-CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3002", "-H", "0.0.0.0"]
+CMD ["node_modules/next/dist/bin/next", "start", "-p", "3002", "-H", "0.0.0.0"]
