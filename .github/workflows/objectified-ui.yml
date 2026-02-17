@@ -3,8 +3,12 @@ name: Objectified UI
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'objectified-ui/**'
   pull_request:
     branches: [ main, develop ]
+    paths:
+      - 'objectified-ui/**'
   # Allow manual trigger
   workflow_dispatch:
 
