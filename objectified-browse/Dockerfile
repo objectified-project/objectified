@@ -65,11 +65,11 @@ RUN chown -R nextjs:nodejs /app
 USER nextjs
 
 # Expose port
-EXPOSE 3001
+EXPOSE 3003
 
 # Set hostname to allow external connections
 ENV HOSTNAME="0.0.0.0"
-ENV PORT=3001
+ENV PORT=3003
 
 # Start the application
 CMD ["yarn", "start"]
