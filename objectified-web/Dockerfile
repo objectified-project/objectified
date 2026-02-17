@@ -67,9 +67,9 @@ USER nextjs
 # Expose port
 EXPOSE 3002
 
-# Set hostname to allow external connections
+# Bind to 0.0.0.0 so connections from outside the container are accepted
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3002
 
-# Start the application
-CMD ["node", "server.js"]
+# Start the application (explicit -H 0.0.0.0 for Docker/remote connections)
+CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3002", "-H", "0.0.0.0"]
