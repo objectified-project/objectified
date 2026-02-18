@@ -10,6 +10,7 @@ Bug Fixes:
 - Improved layout of primitives form
 - Improved layout of class form
 - Improved layout of profile page
+- Conversion of forms to use modern components
 - Improved published view page
   - Now displays the different types of object representations as a submenu (OpenAPI, Arazzo, JSON)
   - Now applies API Key when viewing private published pages

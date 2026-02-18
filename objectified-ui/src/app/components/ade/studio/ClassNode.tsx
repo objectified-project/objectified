@@ -1409,29 +1409,31 @@ function ClassNode({ id, data, selected }: NodeProps) {
                   {/* Label styling (#343) */}
                   <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
                     <div className="text-xs font-medium text-gray-600 dark:text-gray-400">Label</div>
-                    <div>
-                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Font size</div>
-                      <select
-                        value={typedData.theme?.labelFontSize ?? 13}
-                        onChange={(e) => handleLabelStyleChange({ labelFontSize: Number(e.target.value) })}
-                        className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      >
-                        {LABEL_FONT_SIZE_OPTIONS.map((s) => (
-                          <option key={s} value={s}>{s}px</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Font family</div>
-                      <select
-                        value={typedData.theme?.labelFontFamily ?? 'inherit'}
-                        onChange={(e) => handleLabelStyleChange({ labelFontFamily: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      >
-                        {LABEL_FONT_FAMILY_OPTIONS.map((f) => (
-                          <option key={f.value} value={f.value}>{f.label}</option>
-                        ))}
-                      </select>
+                    <div className="flex gap-2">
+                      <div className="w-1/2 min-w-0">
+                        <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Font size</div>
+                        <select
+                          value={typedData.theme?.labelFontSize ?? 13}
+                          onChange={(e) => handleLabelStyleChange({ labelFontSize: Number(e.target.value) })}
+                          className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        >
+                          {LABEL_FONT_SIZE_OPTIONS.map((s) => (
+                            <option key={s} value={s}>{s}px</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-1/2 min-w-0">
+                        <div className="text-[10px] text-gray-500 dark:text-gray-500 mb-1">Font family</div>
+                        <select
+                          value={typedData.theme?.labelFontFamily ?? 'inherit'}
+                          onChange={(e) => handleLabelStyleChange({ labelFontFamily: e.target.value })}
+                          className="w-full px-2 py-1.5 text-xs rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        >
+                          {LABEL_FONT_FAMILY_OPTIONS.map((f) => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <button
@@ -1584,9 +1586,9 @@ function ClassNode({ id, data, selected }: NodeProps) {
                       </button>
                     )}
 
-                    {/* Icon grid */}
-                    <div className="max-h-48 overflow-y-auto">
-                      <div className="grid grid-cols-8 gap-1">
+                    {/* Icon list - vertical scroll only, no horizontal scroll */}
+                    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+                      <div className="grid grid-cols-6 gap-1 w-full min-w-0">
                         {filteredIcons.map((iconOpt) => {
                           const IconComp = iconOpt.icon;
                           const isSelected = typedData.theme?.icon === iconOpt.name;
