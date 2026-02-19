@@ -502,24 +502,32 @@ function ClassNode({ id, data, selected }: NodeProps) {
     };
   }, [id, updateNodeInternals]);
 
-  // Predefined color themes (4x4 grid = 16 colors) - matching GroupNode colors
+  // Predefined color themes (6x4 grid = 24 colors) - square tiles like custom selector
   const colorThemes = [
     { name: 'Slate', hex: '#64748b', headerGradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', backgroundColor: '#f8fafc', borderColor: '#64748b', textColor: '#1e293b', headerTextColor: '#ffffff' },
     { name: 'Gray', hex: '#6b7280', headerGradient: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)', backgroundColor: '#f9fafb', borderColor: '#6b7280', textColor: '#111827', headerTextColor: '#ffffff' },
     { name: 'Zinc', hex: '#71717a', headerGradient: 'linear-gradient(135deg, #71717a 0%, #52525b 100%)', backgroundColor: '#fafafa', borderColor: '#71717a', textColor: '#18181b', headerTextColor: '#ffffff' },
     { name: 'Stone', hex: '#78716c', headerGradient: 'linear-gradient(135deg, #78716c 0%, #57534e 100%)', backgroundColor: '#fafaf9', borderColor: '#78716c', textColor: '#1c1917', headerTextColor: '#ffffff' },
     { name: 'Red', hex: '#ef4444', headerGradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', backgroundColor: '#fef2f2', borderColor: '#ef4444', textColor: '#991b1b', headerTextColor: '#ffffff' },
+    { name: 'Rose', hex: '#f43f5e', headerGradient: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', backgroundColor: '#fff1f2', borderColor: '#f43f5e', textColor: '#9f1239', headerTextColor: '#ffffff' },
     { name: 'Orange', hex: '#f97316', headerGradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', backgroundColor: '#fff7ed', borderColor: '#f97316', textColor: '#9a3412', headerTextColor: '#ffffff' },
     { name: 'Amber', hex: '#f59e0b', headerGradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', backgroundColor: '#fffbeb', borderColor: '#f59e0b', textColor: '#92400e', headerTextColor: '#ffffff' },
     { name: 'Yellow', hex: '#eab308', headerGradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', backgroundColor: '#fefce8', borderColor: '#eab308', textColor: '#854d0e', headerTextColor: '#ffffff' },
     { name: 'Lime', hex: '#84cc16', headerGradient: 'linear-gradient(135deg, #84cc16 0%, #65a30d 100%)', backgroundColor: '#f7fee7', borderColor: '#84cc16', textColor: '#3f6212', headerTextColor: '#ffffff' },
-    { name: 'Green', hex: '#22c55e', headerGradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', backgroundColor: '#ecfdf5', borderColor: '#10b981', textColor: '#065f46', headerTextColor: '#ffffff' },
+    { name: 'Green', hex: '#22c55e', headerGradient: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)', backgroundColor: '#f0fdf4', borderColor: '#22c55e', textColor: '#166534', headerTextColor: '#ffffff' },
     { name: 'Emerald', hex: '#10b981', headerGradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', backgroundColor: '#ecfdf5', borderColor: '#10b981', textColor: '#065f46', headerTextColor: '#ffffff' },
     { name: 'Teal', hex: '#14b8a6', headerGradient: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', backgroundColor: '#f0fdfa', borderColor: '#14b8a6', textColor: '#115e59', headerTextColor: '#ffffff' },
     { name: 'Cyan', hex: '#06b6d4', headerGradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', backgroundColor: '#ecfeff', borderColor: '#06b6d4', textColor: '#164e63', headerTextColor: '#ffffff' },
     { name: 'Sky', hex: '#0ea5e9', headerGradient: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', backgroundColor: '#f0f9ff', borderColor: '#0ea5e9', textColor: '#0c4a6e', headerTextColor: '#ffffff' },
     { name: 'Blue', hex: '#3b82f6', headerGradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', backgroundColor: '#eff6ff', borderColor: '#3b82f6', textColor: '#1e40af', headerTextColor: '#ffffff' },
     { name: 'Indigo', hex: '#6366f1', headerGradient: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', backgroundColor: '#eef2ff', borderColor: '#6366f1', textColor: '#3730a3', headerTextColor: '#ffffff' },
+    { name: 'Violet', hex: '#8b5cf6', headerGradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', backgroundColor: '#f5f3ff', borderColor: '#8b5cf6', textColor: '#5b21b6', headerTextColor: '#ffffff' },
+    { name: 'Purple', hex: '#a855f7', headerGradient: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)', backgroundColor: '#faf5ff', borderColor: '#a855f7', textColor: '#6b21a8', headerTextColor: '#ffffff' },
+    { name: 'Fuchsia', hex: '#d946ef', headerGradient: 'linear-gradient(135deg, #d946ef 0%, #c026d3 100%)', backgroundColor: '#fdf4ff', borderColor: '#d946ef', textColor: '#86198f', headerTextColor: '#ffffff' },
+    { name: 'Pink', hex: '#ec4899', headerGradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)', backgroundColor: '#fdf2f8', borderColor: '#ec4899', textColor: '#9d174d', headerTextColor: '#ffffff' },
+    { name: 'Deep Blue', hex: '#1d4ed8', headerGradient: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)', backgroundColor: '#eff6ff', borderColor: '#1d4ed8', textColor: '#1e3a8a', headerTextColor: '#ffffff' },
+    { name: 'Neutral', hex: '#525252', headerGradient: 'linear-gradient(135deg, #525252 0%, #404040 100%)', backgroundColor: '#fafafa', borderColor: '#525252', textColor: '#171717', headerTextColor: '#ffffff' },
+    { name: 'Slate Blue', hex: '#475569', headerGradient: 'linear-gradient(135deg, #475569 0%, #334155 100%)', backgroundColor: '#f8fafc', borderColor: '#475569', textColor: '#1e293b', headerTextColor: '#ffffff' },
   ];
 
   const handleThemeSelect = (theme: Omit<ClassNodeTheme, 'name'>) => {
@@ -1327,27 +1335,27 @@ function ClassNode({ id, data, selected }: NodeProps) {
                   onOpenAutoFocus={(e) => e.preventDefault()}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Presets</div>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Presets</div>
+                  <div className="grid grid-cols-6 gap-1">
                     {colorThemes.map((color) => (
                       <button
                         key={color.name}
                         onClick={() => handleThemeSelect(color)}
-                        className="w-6 h-6 rounded-full border-2 border-gray-200 dark:border-gray-600 transition-transform hover:scale-110"
+                        className="w-7 h-7 rounded border-2 border-gray-300 dark:border-gray-600 transition-all hover:scale-105 hover:ring-2 hover:ring-offset-1 hover:ring-gray-400 dark:hover:ring-gray-500"
                         style={{ backgroundColor: color.hex }}
                         title={color.name}
                       />
                     ))}
                   </div>
                   {/* Custom color picker */}
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Custom color</div>
+                  <div className="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-gray-700">
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Custom color</div>
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
                         value={customColorValue}
                         onChange={(e) => handleCustomColorChange(e.target.value)}
-                        className="w-9 h-9 rounded cursor-pointer border border-gray-300 dark:border-gray-600 p-0.5 bg-white dark:bg-gray-700"
+                        className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 cursor-pointer p-0.5 bg-white dark:bg-gray-700"
                         title="Pick a color"
                       />
                       <input

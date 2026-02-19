@@ -1585,11 +1585,31 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         ) : (
         <>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="px-6 border-b border-gray-200 dark:border-gray-700 rounded-none justify-start bg-transparent shrink-0">
-            <TabsTrigger value="edit">Edit</TabsTrigger>
-            <TabsTrigger value="json">JSON</TabsTrigger>
-            <TabsTrigger value="yaml">YAML</TabsTrigger>
-            <TabsTrigger value="example">Example</TabsTrigger>
+          <TabsList className="w-full h-auto p-0 px-6 rounded-none bg-transparent border-b border-gray-200 dark:border-gray-700 justify-start gap-0 shrink-0">
+            <TabsTrigger
+              value="edit"
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
+            >
+              Edit
+            </TabsTrigger>
+            <TabsTrigger
+              value="json"
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
+            >
+              JSON
+            </TabsTrigger>
+            <TabsTrigger
+              value="yaml"
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
+            >
+              YAML
+            </TabsTrigger>
+            <TabsTrigger
+              value="example"
+              className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
+            >
+              Example
+            </TabsTrigger>
           </TabsList>
 
           {/* Edit Tab */}

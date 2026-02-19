@@ -18,6 +18,9 @@ Bug Fixes:
 - Improved layout of the linked accounts page
   - Linked accounts page is slightly wider matching those of other dashboard layouts
   - Provider cards now show PAT hints so users can match the PATs that were assigned
+- Improvements in the canvas
+  - Class node customization form is slightly more compact
+  - Class and Properties forms now have tabs instead of button groupings
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here

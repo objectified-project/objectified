@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   X,
@@ -28,6 +29,8 @@ import { useReactFlow } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { useStudio } from '../../../ade/studio/StudioContext';
 
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+
 // Export format types
 type ExportFormat =
   | 'png'
@@ -39,6 +42,21 @@ type ExportFormat =
   | 'plantuml'
   | 'graphml'
   | 'dot';
+
+/** Monaco editor language for text export formats (syntax highlighting). */
+function getMonacoLanguageForFormat(format: ExportFormat): string {
+  switch (format) {
+    case 'json':
+      return 'json';
+    case 'graphml':
+      return 'xml';
+    case 'mermaid':
+    case 'plantuml':
+    case 'dot':
+    default:
+      return 'plaintext';
+  }
+}
 
 interface ExportCategory {
   id: string;
@@ -410,14 +428,14 @@ export default function ExportWizard({
         setPreviewDataUrl(null);
       }
     } else {
-      // For text-based formats, generate preview text (optionally filtered by groups)
+      // For text-based formats, generate full preview text for Monaco (optionally filtered by groups)
       setPreviewDataUrl(null);
       const nodeIdSet =
         options.exportRange === 'groups' && options.selectedGroupIds.length > 0
           ? getNodeIdsForGroups(options.selectedGroupIds)
           : undefined;
       const text = generateTextExport(selectedFormat, nodeIdSet);
-      setPreviewText(text.substring(0, 2000) + (text.length > 2000 ? '\n...' : ''));
+      setPreviewText(text);
     }
   }, [selectedFormat, options, isDark, projectName, versionId, getViewportElement, getPaneElement, imageExportFilter, nodes, edges, withFullCanvasView, withGroupsView, withGridOverride, getNodeIdsForGroups]);
 
@@ -852,9 +870,24 @@ export default function ExportWizard({
                       className="max-w-full max-h-full object-contain"
                     />
                   ) : previewText ? (
-                    <pre className="w-full h-full p-4 text-xs font-mono text-gray-700 dark:text-gray-300 overflow-auto bg-gray-50 dark:bg-gray-900">
-                      {previewText}
-                    </pre>
+                    <div className="w-full h-full min-h-[200px] rounded-lg overflow-hidden">
+                      <MonacoEditor
+                        height="100%"
+                        language={getMonacoLanguageForFormat(selectedFormat)}
+                        value={previewText}
+                        theme={isDark ? 'vs-dark' : 'light'}
+                        options={{
+                          readOnly: true,
+                          minimap: { enabled: false },
+                          scrollBeyondLastLine: false,
+                          fontSize: 12,
+                          wordWrap: 'on',
+                          lineNumbers: 'on',
+                          folding: true,
+                          padding: { top: 8, bottom: 8 },
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div className="text-gray-400 dark:text-gray-500 flex flex-col items-center gap-2">
                       <Eye className="w-8 h-8" />
