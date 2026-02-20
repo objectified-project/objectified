@@ -241,6 +241,33 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
     error: ''
   });
 
+  /** Sections that differ from defaults (empty/new class state) - for visual highlight */
+  const changedSections = useMemo(() => {
+    const d = formData;
+    return {
+      basicInfo: d.description.trim() !== '' || d.deprecated || d.deprecationMessage.trim() !== '' || d.selectedTags.length > 0,
+      propertyValidation: d.additionalPropertiesType !== 'default' || d.additionalPropertiesSchema !== '' || (d.additionalPropertiesType === 'type' && d.additionalPropertiesInlineType !== 'string')
+        || d.unevaluatedPropertiesType !== 'default' || d.unevaluatedPropertiesSchema !== '' || (d.unevaluatedPropertiesType === 'type' && d.unevaluatedPropertiesInlineType !== 'string')
+        || d.patternProperties.length > 0,
+      composition: d.allOf.length > 0 || d.anyOf.length > 0 || d.oneOf.length > 0
+        || d.discriminatorProperty.trim() !== '' || !d.discriminatorUseAuto || Object.keys(d.discriminatorMapping).length > 0,
+      conditionalSchema: d.conditionalRules.length > 0,
+      patternProperties: d.patternProperties.length > 0,
+      dependentSchemas: Object.keys(d.dependentSchemas).length > 0,
+      dependentRequired: d.dependentRequired.length > 0,
+      objectConstraints: d.minProperties.trim() !== '' || d.maxProperties.trim() !== '',
+      examples: d.examples.length > 0,
+      xml: d.xmlName.trim() !== '' || d.xmlNamespace.trim() !== '' || d.xmlPrefix.trim() !== '',
+      schemaMetadata: d.schemaId.trim() !== '' || d.schemaAnchor.trim() !== '' || d.schemaComment.trim() !== '',
+      externalDocs: d.externalDocsUrl.trim() !== '' || d.externalDocsDescription.trim() !== '',
+      extensions: Object.keys(d.extensions).length > 0,
+    };
+  }, [formData]);
+
+  const sectionHighlightClass = 'ring-2 ring-amber-600/70 dark:ring-amber-500/70 ring-offset-2 ring-offset-white dark:ring-offset-gray-800 rounded-lg';
+  const sectionHighlightBg = 'bg-amber-100 dark:bg-amber-900/40';
+  const sectionHighlightBgOverAlternate = 'bg-amber-100 dark:bg-amber-900/50';
+
   // Reset view and form when dialog opens
   useEffect(() => {
     if (open) {
@@ -1585,8 +1612,9 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         ) : (
         <>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="w-full h-auto p-0 px-6 rounded-none bg-transparent border-b border-gray-200 dark:border-gray-700 justify-start gap-0 shrink-0">
-            <TabsTrigger
+          <div className="flex flex-nowrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 px-6 shrink-0">
+            <TabsList className="h-auto p-0 rounded-none bg-transparent justify-start gap-0 -ml-2 shrink-0">
+              <TabsTrigger
               value="edit"
               className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
             >
@@ -1610,7 +1638,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
             >
               Example
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+            <p className="text-xs text-amber-700 dark:text-amber-300 shrink-0 py-3 whitespace-nowrap">
+              Amber-highlighted sections indicate values that differ from defaults.
+            </p>
+          </div>
 
           {/* Edit Tab */}
           <TabsContent value="edit" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
@@ -1620,7 +1652,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <div className="flex flex-col overflow-y-auto min-h-0">
 
               {/* SECTION 1: Basic Information */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.basicInfo ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center gap-2 mb-4">
                   <FileText size={18} className="text-indigo-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Basic Information</h3>
@@ -1727,7 +1759,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* SECTION 2: Property Validation */}
-              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.propertyValidation ? `${sectionHighlightBgOverAlternate} ${sectionHighlightClass}` : isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Settings size={18} className="text-indigo-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Validation</h3>
@@ -1891,7 +1923,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* SECTION 3: Composition & Inheritance */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.composition ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Layers size={18} className="text-indigo-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Composition & Inheritance</h3>
@@ -2076,7 +2108,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* Pattern Properties */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.patternProperties ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Regex size={18} className="text-purple-500" />
@@ -2190,7 +2222,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* Dependent Schemas */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.dependentSchemas ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Link size={18} className="text-purple-500" />
@@ -2454,7 +2486,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* Dependent Required */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.dependentRequired ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <ListChecks size={18} className="text-purple-500" />
@@ -2532,7 +2564,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* Conditional Schema */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.conditionalSchema ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <ConditionalSchemaBuilder
                   rules={formData.conditionalRules}
                   onChange={(rules) => setFormData(prev => ({ ...prev, conditionalRules: rules }))}
@@ -2561,7 +2593,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
                 <div className="space-y-4">
                   {/* Object Constraints */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className={`p-4 rounded-lg border ${changedSections.objectConstraints ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Settings size={16} className="text-indigo-500" />
@@ -2598,7 +2630,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   </div>
 
                   {/* Class Examples */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className={`p-4 rounded-lg border ${changedSections.examples ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Code size={16} className="text-indigo-500" />
@@ -2646,7 +2678,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   </div>
 
                   {/* XML Object */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-orange-200 dark:border-orange-900">
+                  <div className={`p-4 rounded-lg border ${changedSections.xml ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-orange-200 dark:border-orange-900'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Code size={16} className="text-orange-500" />
@@ -2687,7 +2719,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   </div>
 
                   {/* Schema Metadata */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className={`p-4 rounded-lg border ${changedSections.schemaMetadata ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <FileText size={16} className="text-indigo-500" />
@@ -2732,7 +2764,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   </div>
 
                   {/* External Documentation */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className={`p-4 rounded-lg border ${changedSections.externalDocs ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
                     <div className="flex items-center gap-2 mb-3">
                       <ExternalLink size={16} className="text-indigo-500" />
                       <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">External Documentation</h4>
@@ -2762,7 +2794,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   </div>
 
                   {/* Extensions */}
-                  <div className="p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className={`p-4 rounded-lg border ${changedSections.extensions ? 'bg-amber-100 dark:bg-amber-900/45 border-amber-400 dark:border-amber-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700'}`}>
                     <div className="flex items-center gap-2 mb-3">
                       <Code size={16} className="text-indigo-500" />
                       <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Custom Extensions</h4>

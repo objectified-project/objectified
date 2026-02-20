@@ -21,6 +21,8 @@ Bug Fixes:
 - Improvements in the canvas
   - Class node customization form is slightly more compact
   - Class and Properties forms now have tabs instead of button groupings
+  - Export page now uses stylized monaco-editor to display export data
+  - Class and Properties edit forms now display changed elements in more obvious colored background sections
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here

@@ -1111,8 +1111,9 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
         </DialogHeader>
 
         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'form' | 'json')} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="w-full h-auto p-0 px-6 rounded-none bg-transparent border-b border-gray-200 dark:border-gray-700 justify-start gap-0 shrink-0">
-            <TabsTrigger
+          <div className="flex items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 px-6 shrink-0">
+            <TabsList className="h-auto p-0 rounded-none bg-transparent justify-start gap-0 -ml-2">
+              <TabsTrigger
               value="form"
               className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 data-[state=active]:border-indigo-600 data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:bg-transparent data-[state=active]:shadow-none -mb-px"
             >
@@ -1124,7 +1125,11 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
             >
               JSON
             </TabsTrigger>
-          </TabsList>
+            </TabsList>
+            <p className="text-xs text-amber-700 dark:text-amber-300 shrink-0 py-3">
+              Amber-highlighted sections indicate values that differ from defaults.
+            </p>
+          </div>
 
           {/* Form Tab */}
           <TabsContent value="form" className="flex-1 flex flex-col overflow-hidden mt-0 p-0">
@@ -1406,6 +1411,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                     showMetadata={false}
                     showTitle={false}
                     showPrimitiveSelector={false}
+                    showHint={false}
                     size="small"
                     availableClasses={availableClasses}
                   />

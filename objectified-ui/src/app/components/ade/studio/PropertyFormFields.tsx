@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -371,6 +371,7 @@ export interface PropertyFormFieldsProps {
   showMetadata?: boolean;
   showTitle?: boolean;
   showPrimitiveSelector?: boolean;
+  showHint?: boolean;
   size?: 'small' | 'medium';
 
   // Object type information
@@ -429,11 +430,42 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                                                         showMetadata = true,
                                                                         showTitle = true,
                                                                         showPrimitiveSelector = true,
+                                                                        showHint = true,
                                                                         size = 'medium',
                                                                         nestedProperties,
                                                                         availableClasses = [],
                                                                       }) => {
   const isDark = useDarkMode();
+
+  /** Sections that differ from defaults (empty/new property state) - for visual highlight */
+  const changedSections = useMemo(() => {
+    const d = data;
+    return {
+      basicInfo: (d.description || '').trim() !== '' || (d.default || '').trim() !== ''
+        || (d.examples && d.examples.length > 0) || (d.title || '').trim() !== '',
+      propertyFlags: d.required || d.nullable || d.readOnly || d.writeOnly || d.deprecated || (d.deprecationMessage || '').trim() !== '',
+      stringConstraints: (d.minLength || '').trim() !== '' || (d.maxLength || '').trim() !== '' || (d.pattern || '').trim() !== '' || (d.format || '').trim() !== '',
+      numberConstraints: (d.minimum || '').trim() !== '' || (d.maximum || '').trim() !== '' || (d.multipleOf || '').trim() !== '' || d.minimumType || d.maximumType,
+      arrayConstraints: (d.minItems || '').trim() !== '' || (d.maxItems || '').trim() !== '' || d.uniqueItems
+        || (d.contains || '').trim() !== '' || (d.minContains || '').trim() !== '' || (d.maxContains || '').trim() !== ''
+        || d.tupleMode || (d.prefixItems && d.prefixItems.length > 0) || (d.itemsSchema || '').trim() !== ''
+        || (d.unevaluatedItems && d.unevaluatedItems !== 'default') || (d.unevaluatedItemsSchema || '').trim() !== '',
+      objectConstraints: (d.additionalProperties && d.additionalProperties !== 'default') || (d.additionalPropertiesSchema || '').trim() !== ''
+        || (d.minProperties || '').trim() !== '' || (d.maxProperties || '').trim() !== ''
+        || (d.patternProperties && Object.keys(d.patternProperties).length > 0)
+        || (d.unevaluatedProperties && d.unevaluatedProperties !== 'default') || (d.unevaluatedPropertiesSchema || '').trim() !== ''
+        || (d.propertyNamesPattern || '').trim() !== '' || (d.propertyNamesMinLength || '').trim() !== '' || (d.propertyNamesMaxLength || '').trim() !== ''
+        || (d.propertyNamesFormat || '').trim() !== '' || (d.propertyNamesDescription || '').trim() !== ''
+        || (d.dependentSchemas && Object.keys(d.dependentSchemas).length > 0),
+      values: (d.const || '').trim() !== '' || (d.enum && d.enum.length > 0),
+      advanced: (d.not || '').trim() !== '' || (d.extensions && Object.keys(d.extensions).length > 0)
+        || (d.externalDocsUrl || '').trim() !== '' || (d.externalDocsDescription || '').trim() !== ''
+        || (d.xmlName || '').trim() !== '' || (d.xmlNamespace || '').trim() !== '' || (d.xmlPrefix || '').trim() !== ''
+        || d.xmlAttribute || d.xmlWrapped
+        || (d.contentMediaType || '').trim() !== '' || (d.contentEncoding || '').trim() !== '' || (d.contentSchema || '').trim() !== ''
+        || (d.$comment || '').trim() !== '',
+    };
+  }, [data]);
 
   const [enumInput, setEnumInput] = React.useState('');
   const [enumError, setEnumError] = React.useState('');
@@ -697,13 +729,26 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       bgcolor: isDark ? '#0f172a' : '#f8fafc',
       minHeight: '100%',
     }}>
+      {showHint && (
+        <Box sx={{
+          px: 3,
+          py: 1.5,
+          fontSize: '0.75rem',
+          color: isDark ? 'rgba(253, 230, 138, 0.9)' : '#b45309',
+          bgcolor: isDark ? 'rgba(180, 83, 9, 0.15)' : 'rgba(253, 230, 138, 0.4)',
+          borderBottom: isDark ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(217, 119, 6, 0.2)',
+        }}>
+          Amber-highlighted sections indicate values that differ from defaults.
+        </Box>
+      )}
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 1: Basic Information
           ═══════════════════════════════════════════════════════════════════════════ */}
       <Box sx={{
         p: 3,
-        bgcolor: isDark ? '#1e293b' : 'white',
+        bgcolor: changedSections.basicInfo ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : 'white'),
         borderBottom: '1px solid #e2e8f0',
+        ...(changedSections.basicInfo ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
       }}>
         <SectionHeader
           icon={<InfoOutlinedIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
@@ -913,7 +958,8 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         <Box sx={{
           p: 2,
           borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: isDark ? '#1e293b' : '#f8fafc',
+          bgcolor: changedSections.propertyFlags ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : '#f8fafc'),
+          ...(changedSections.propertyFlags ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
             <TuneIcon sx={{ color: '#6366f1', fontSize: 16 }} />
@@ -1033,7 +1079,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       <Box sx={{
         p: 3,
         borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-        bgcolor: isDark ? '#1e293b' : 'white',
+        bgcolor: (changedSections.stringConstraints || changedSections.numberConstraints || changedSections.arrayConstraints || changedSections.objectConstraints)
+          ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)')
+          : (isDark ? '#1e293b' : 'white'),
+        ...((changedSections.stringConstraints || changedSections.numberConstraints || changedSections.arrayConstraints || changedSections.objectConstraints)
+          ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
       }}>
         <SectionHeader
           icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
@@ -3036,8 +3086,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         <Box sx={{
           p: 3,
           borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          bgcolor: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          background: isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+          bgcolor: changedSections.values ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : undefined,
+          background: changedSections.values ? undefined : (isDark ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'),
+          ...(changedSections.values ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
         }}>
           <SectionHeader
             icon={<CodeIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
@@ -3224,7 +3275,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 5: Advanced (NOT Composition, External Docs, Extensions)
           ═══════════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{ p: 3, bgcolor: isDark ? '#1e293b' : 'white' }}>
+      <Box sx={{
+        p: 3,
+        bgcolor: changedSections.advanced ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : 'white'),
+        ...(changedSections.advanced ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
+      }}>
         <SectionHeader
           icon={<SettingsIcon sx={{ color: '#6366f1', fontSize: 18 }} />}
           title="Advanced"
