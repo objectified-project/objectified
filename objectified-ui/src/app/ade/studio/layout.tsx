@@ -36,7 +36,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, createGroupFn, clickToFocusEnabled, groups, deleteGroup, deleteAllClassesInGroupFn } = useStudio();
+  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, triggerSidebarRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, createGroupFn, clickToFocusEnabled, groups, deleteGroup, updateGroup } = useStudio();
 
   // Check if we're on the code or paths view - hide sidebar for these views
   const isCodeView = pathname?.includes('/code') || pathname?.includes('/paths');
@@ -342,7 +342,36 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     onGroupDeleteAllClasses: async (groupId) => {
       if (isReadOnly) return;
       const group = groups.find(g => g.id === groupId);
-      await deleteAllClassesInGroupFn?.(groupId, group?.nodeIds, group?.name);
+      const classIds = group?.nodeIds ?? [];
+      const groupName = group?.name ?? 'this group';
+      if (classIds.length === 0) return;
+
+      const confirmed = await confirmDialog({
+        title: 'Delete All Classes in Group',
+        message: `Are you sure you want to delete all ${classIds.length} class${classIds.length === 1 ? '' : 'es'} in "${groupName}"? This action cannot be undone.`,
+        variant: 'danger',
+        confirmLabel: 'Delete All',
+        cancelLabel: 'Cancel',
+      });
+      if (!confirmed) return;
+
+      const errors: string[] = [];
+      for (const classId of classIds) {
+        const response = await deleteClassWithSession(classId);
+        if (!response.success) {
+          errors.push(response.error || classId);
+        }
+      }
+      if (errors.length > 0) {
+        await alertDialog({
+          message: `Failed to delete ${errors.length} class${errors.length === 1 ? '' : 'es'}: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`,
+          variant: 'error',
+        });
+      }
+
+      updateGroup(groupId, { nodeIds: [] });
+      setRefreshKey(prev => prev + 1);
+      triggerSidebarRefresh();
       triggerCanvasRefresh();
     },
   };
