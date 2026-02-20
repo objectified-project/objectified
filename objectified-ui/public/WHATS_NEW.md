@@ -23,6 +23,7 @@ Bug Fixes:
   - Class and Properties forms now have tabs instead of button groupings
   - Export page now uses stylized monaco-editor to display export data
   - Class and Properties edit forms now display changed elements in more obvious colored background sections
+  - Removal of groups and group classes are now working properly
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here
