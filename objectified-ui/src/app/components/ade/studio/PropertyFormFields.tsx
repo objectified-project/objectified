@@ -1198,7 +1198,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               {isArray && <Typography component="span" variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b', ml: 1 }}>(per item)</Typography>}
             </Typography>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+            <Box sx={{ mb: 2.5 }}>
               <Autocomplete
                 freeSolo
                 size={size}
@@ -1236,35 +1236,35 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   />
                 )}
               />
+            </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                <TextField
-                  label="Min Length"
-                  type="number"
-                  size={size}
-                  fullWidth
-                  value={data.minLength || ''}
-                  onChange={(e) => onChange('minLength', e.target.value)}
-                  inputProps={{ min: 0 }}
-                  sx={{
-                    bgcolor: isDark ? '#0f172a' : 'white',
-                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                  }}
-                />
-                <TextField
-                  label="Max Length"
-                  type="number"
-                  size={size}
-                  fullWidth
-                  value={data.maxLength || ''}
-                  onChange={(e) => onChange('maxLength', e.target.value)}
-                  inputProps={{ min: 0 }}
-                  sx={{
-                    bgcolor: isDark ? '#0f172a' : 'white',
-                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                  }}
-                />
-              </Box>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' }, gap: 1.5, mb: 2.5 }}>
+              <TextField
+                label="Min Length"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.minLength || ''}
+                onChange={(e) => onChange('minLength', e.target.value)}
+                inputProps={{ min: 0 }}
+                sx={{
+                  bgcolor: isDark ? '#0f172a' : 'white',
+                  '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                }}
+              />
+              <TextField
+                label="Max Length"
+                type="number"
+                size={size}
+                fullWidth
+                value={data.maxLength || ''}
+                onChange={(e) => onChange('maxLength', e.target.value)}
+                inputProps={{ min: 0 }}
+                sx={{
+                  bgcolor: isDark ? '#0f172a' : 'white',
+                  '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                }}
+              />
             </Box>
 
             <TextField
@@ -1437,7 +1437,8 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               />
             </Box>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+            {/* Min/Max on separate row, 50/50 */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' }, gap: 2.5, mb: 2.5 }}>
               {/* Minimum */}
               <Box sx={{
                 p: 2,
@@ -1476,7 +1477,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≥ inclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≥ incl.</Typography>}
                     sx={{ m: 0 }}
                   />
                   <FormControlLabel
@@ -1489,7 +1490,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&gt; exclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&gt; excl.</Typography>}
                     sx={{ m: 0 }}
                   />
                 </Box>
@@ -1533,7 +1534,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≤ inclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>≤ incl.</Typography>}
                     sx={{ m: 0 }}
                   />
                   <FormControlLabel
@@ -1546,7 +1547,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         sx={{ '&.Mui-checked': { color: '#6366f1' } }}
                       />
                     }
-                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&lt; exclusive</Typography>}
+                    label={<Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#475569' }}>&lt; excl.</Typography>}
                     sx={{ m: 0 }}
                   />
                 </Box>
