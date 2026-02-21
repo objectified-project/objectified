@@ -244,11 +244,15 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   /** Sections that differ from defaults (empty/new class state) - for visual highlight */
   const changedSections = useMemo(() => {
     const d = formData;
+    const apType = d.additionalPropertiesType;
+    const upType = d.unevaluatedPropertiesType;
+    const apTypeWithNonString = apType === 'type' && d.additionalPropertiesInlineType !== 'string';
+    const upTypeWithNonString = upType === 'type' && d.additionalPropertiesInlineType !== 'string';
+    const apChanged = apType !== 'default' || d.additionalPropertiesSchema !== '' || apTypeWithNonString;
+    const upChanged = upType !== 'default' || d.unevaluatedPropertiesSchema !== '' || upTypeWithNonString;
     return {
       basicInfo: d.description.trim() !== '' || d.deprecated || d.deprecationMessage.trim() !== '' || d.selectedTags.length > 0,
-      propertyValidation: d.additionalPropertiesType !== 'default' || d.additionalPropertiesSchema !== '' || (d.additionalPropertiesType === 'type' && d.additionalPropertiesInlineType !== 'string')
-        || d.unevaluatedPropertiesType !== 'default' || d.unevaluatedPropertiesSchema !== '' || (d.unevaluatedPropertiesType === 'type' && d.unevaluatedPropertiesInlineType !== 'string')
-        || d.patternProperties.length > 0,
+      propertyValidation: apChanged || upChanged || d.patternProperties.length > 0,
       composition: d.allOf.length > 0 || d.anyOf.length > 0 || d.oneOf.length > 0
         || d.discriminatorProperty.trim() !== '' || !d.discriminatorUseAuto || Object.keys(d.discriminatorMapping).length > 0,
       conditionalSchema: d.conditionalRules.length > 0,
