@@ -244,7 +244,7 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-[95vw] max-w-5xl h-[90vh] min-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-[80%] h-[90vh] min-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-800">
             <div className="flex items-center gap-3">
@@ -269,8 +269,8 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
 
           {/* Content */}
           <div className="flex flex-1 overflow-hidden">
-            {/* Categories Sidebar */}
-            <div className="w-56 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
+            {/* Sidebar - its own column */}
+            <div className="w-56 shrink-0 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
               <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Categories
@@ -315,8 +315,8 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
               </div>
             </div>
 
-            {/* Templates List */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Templates List - 50% of remaining space */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
               {/* Search Bar */}
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                 <div className="relative">
@@ -400,9 +400,9 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
               </div>
             </div>
 
-            {/* Selected Template Preview */}
+            {/* Template Preview - 50% of remaining space */}
             {selectedTemplate ? (
-              <div className="w-80 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex-1 min-w-0 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     Template Preview
@@ -627,7 +627,7 @@ const ClassTemplateBrowserDialog: React.FC<ClassTemplateBrowserDialogProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="w-80 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex-1 min-w-0 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-gray-50 dark:bg-gray-800/50">
                 <div className="flex-1 flex items-center justify-center p-4">
                   <div className="text-center text-gray-500 dark:text-gray-400">
                     <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />

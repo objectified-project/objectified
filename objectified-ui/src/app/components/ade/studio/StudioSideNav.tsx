@@ -600,6 +600,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     },
                     '&:disabled': {
                       background: isDark ? '#475569' : '#e2e8f0',
+                      color: isDark ? '#94a3b8' : '#64748b',
                       boxShadow: 'none',
                     },
                   }}
@@ -1054,7 +1055,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Browse property templates'}
                   sx={{
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: '#ffffff',
+                    color: isDark ? '#0f172a' : '#ffffff',
                     boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
                     transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
@@ -1063,6 +1064,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                     },
                     '&:disabled': {
                       background: isDark ? '#475569' : '#e2e8f0',
+                      color: isDark ? '#94a3b8' : '#64748b',
                       boxShadow: 'none',
                     },
                   }}

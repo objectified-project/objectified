@@ -25,6 +25,9 @@ Bug Fixes:
   - Class and Properties edit forms now display changed elements in more obvious colored background sections
   - Removal of groups and group classes are now working properly
   - Class nodes show the name of the singular reference - arrays were already correct
+  - Class form was displaying a prompt for dependent schemas - this has been corrected
+  - Class template library form is wider to show better detail
+  - Property template button now appears properly when in dark mode
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here

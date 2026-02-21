@@ -195,6 +195,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   const [aiLoadingModels, setAiLoadingModels] = useState(true);
   const [aiCreateError, setAiCreateError] = useState('');
   const [aiProjectProperties, setAiProjectProperties] = useState<Array<{ id: string; name: string; description?: string | null; data: any }>>([]);
+  const [newDependentSchemaProperty, setNewDependentSchemaProperty] = useState('');
   const aiMessagesEndRef = useRef<HTMLDivElement>(null);
   const aiAbortControllerRef = useRef<AbortController | null>(null);
 
@@ -281,6 +282,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       setAiMessages([]);
       setAiInput('');
       setAiCreateError('');
+      setNewDependentSchemaProperty('');
 
       if (editingClassData) {
         // Edit mode - populate form with existing class data
@@ -2232,32 +2234,63 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     <Link size={18} className="text-purple-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Schemas</h3>
                   </div>
-                  {!isReadOnly && (
+                </div>
+                <p className="text-xs text-gray-500 mb-4">Define conditional validation: when a property has a specific value, apply additional constraints.</p>
+
+                {!isReadOnly && (
+                  <div className="flex gap-2 mb-4 w-full">
+                    <Input
+                      value={newDependentSchemaProperty}
+                      onChange={(e) => setNewDependentSchemaProperty(e.target.value)}
+                      placeholder="Trigger property name"
+                      className="flex-1 min-w-0 font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const name = newDependentSchemaProperty.trim();
+                          if (name && !formData.dependentSchemas[name]) {
+                            setFormData(prev => ({
+                              ...prev,
+                              dependentSchemas: {
+                                ...prev.dependentSchemas,
+                                [name]: {
+                                  if: { properties: { [name]: {} } },
+                                  then: { required: [] },
+                                  else: { required: [] }
+                                }
+                              }
+                            }));
+                            setNewDependentSchemaProperty('');
+                          }
+                        }
+                      }}
+                    />
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        const propertyName = prompt('Enter the trigger property name:');
-                        if (propertyName && propertyName.trim()) {
-                          setFormData(prev => ({
-                            ...prev,
-                            dependentSchemas: {
-                              ...prev.dependentSchemas,
-                              [propertyName.trim()]: {
-                                if: { properties: { [propertyName.trim()]: {} } },
-                                then: { required: [] },
-                                else: { required: [] }
-                              }
+                        const name = newDependentSchemaProperty.trim();
+                        if (!name) return;
+                        if (formData.dependentSchemas[name]) return;
+                        setFormData(prev => ({
+                          ...prev,
+                          dependentSchemas: {
+                            ...prev.dependentSchemas,
+                            [name]: {
+                              if: { properties: { [name]: {} } },
+                              then: { required: [] },
+                              else: { required: [] }
                             }
-                          }));
-                        }
+                          }
+                        }));
+                        setNewDependentSchemaProperty('');
                       }}
+                      disabled={!newDependentSchemaProperty.trim() || !!formData.dependentSchemas[newDependentSchemaProperty.trim()]}
                     >
-                      <Plus size={14} className="mr-1" /> Add Dependent Schema
+                      <Plus size={14} className="mr-1" /> Add
                     </Button>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 mb-4">Define conditional validation: when a property has a specific value, apply additional constraints.</p>
+                  </div>
+                )}
 
                 {Object.keys(formData.dependentSchemas).length === 0 ? (
                   <div className="p-6 text-center bg-white dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
