@@ -132,7 +132,7 @@ export default function ForTeamsPage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="container relative mx-auto max-w-6xl">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
               <Building2 className="h-4 w-4" />
               For Development Teams
             </div>
@@ -142,7 +142,7 @@ export default function ForTeamsPage() {
                 Ship Faster
               </span>
             </h1>
-            <p className="mb-10 text-xl text-zinc-600 dark:text-zinc-400">
+            <p className="mb-8 text-xl text-zinc-600 dark:text-zinc-400">
               Reduce development time, cut costs, and eliminate documentation debt with the platform that brings
               your entire team together around a single source of truth.
             </p>

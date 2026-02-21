@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Tag } from "lucide-react";
 import { buttonVariants } from "../components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -108,13 +108,21 @@ function PricingCard({
 export default function PricingPage() {
   return (
     <div className="flex flex-col">
-      <section className="relative overflow-hidden border-b border-zinc-200 bg-gradient-to-b from-white to-zinc-50 px-6 py-16 dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900">
+      <section className="relative overflow-hidden border-b border-zinc-200 bg-gradient-to-b from-white to-zinc-50 px-6 py-20 dark:border-zinc-800 dark:from-zinc-950 dark:to-zinc-900 sm:py-32">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
         <div className="container relative mx-auto max-w-4xl text-center">
-          <h1 className="mb-4 text-5xl font-bold text-zinc-900 dark:text-zinc-50">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300">
+            <Tag className="h-4 w-4" />
             Simple, Transparent Pricing
+          </div>
+          <h1 className="mb-6 text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
+            Affordable Plans for
+            <br />
+            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Every Team
+            </span>
           </h1>
-          <p className="text-xl text-zinc-600 dark:text-zinc-400">
+          <p className="mb-8 text-xl text-zinc-600 dark:text-zinc-400">
             Choose the plan that&apos;s right for you and your team
           </p>
         </div>
