@@ -130,6 +130,9 @@ export default function PricingPage() {
 
       <section className="px-6 py-20">
         <div className="container mx-auto max-w-6xl">
+          <p className="mb-10 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
+            Early adopters receive free Pro accounts for a year.
+          </p>
           <h2 className="mb-10 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
             Individual Plans
           </h2>
