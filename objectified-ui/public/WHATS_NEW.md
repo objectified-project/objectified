@@ -24,6 +24,7 @@ Bug Fixes:
   - Export page now uses stylized monaco-editor to display export data
   - Class and Properties edit forms now display changed elements in more obvious colored background sections
   - Removal of groups and group classes are now working properly
+  - Class nodes show the name of the singular reference - arrays were already correct
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here

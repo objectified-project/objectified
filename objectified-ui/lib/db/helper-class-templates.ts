@@ -578,11 +578,15 @@ export async function useClassTemplate(
     }
     console.error('Error using class template:', error);
 
-    if (error.code === '23505') {
-      return JSON.stringify({ success: false, error: 'A class with this name already exists' });
+    if (error.code === '23505' || error.constraint === 'classes_version_name_unique' || (error.message && String(error.message).includes('duplicate key value'))) {
+      const nameHint = error.detail ? (error.detail.match(/\(version_id, name\)=\([^,]+, ([^)]+)\)/)?.[1] ?? '') : '';
+      const friendly = nameHint
+        ? `A class named "${nameHint}" already exists in this version. Please choose a different name in the Class Name field.`
+        : 'A class with this name already exists in this version. Please choose a different name in the Class Name field.';
+      return JSON.stringify({ success: false, error: friendly });
     }
 
-    return JSON.stringify({ success: false, error: error.message });
+    return JSON.stringify({ success: false, error: error.message || 'Failed to create class from template' });
   } finally {
     try {
       client.release();
@@ -604,6 +608,18 @@ async function createClassFromTemplate(
   projectId: string,
   templateId: string
 ) {
+  // Re-check for duplicate name (e.g. when reconnecting after creating dependencies)
+  const dupCheck = await client.query(
+    `SELECT id FROM odb.classes WHERE version_id = $1 AND name = $2 AND deleted_at IS NULL`,
+    [versionId, className]
+  );
+  if (dupCheck.rowCount > 0) {
+    const err: any = new Error(`A class named "${className}" already exists in this version. Please choose a different name in the Class Name field.`);
+    err.code = '23505';
+    err.duplicateClassName = true;
+    throw err;
+  }
+
   // Create the class with the full schema
   const classResult = await client.query(
     `INSERT INTO odb.classes (version_id, name, description, schema)

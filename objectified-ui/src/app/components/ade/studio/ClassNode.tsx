@@ -819,7 +819,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
       const refName = d.$ref.split('/').pop();
       if (refName === '__unassigned__') return '(unassigned)';
       const suffix = isNullable ? '?' : '';
-      return `$ref${suffix}`;
+      return `${refName ?? 'ref'}${suffix}`;
     }
 
     const typeName = baseType || prop.type || 'object';
