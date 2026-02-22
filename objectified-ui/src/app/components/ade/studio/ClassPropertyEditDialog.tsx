@@ -1256,7 +1256,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
             </div>
 
             {/* RIGHT COLUMN - Advanced Configuration */}
-            <div className="flex flex-col overflow-y-auto min-h-0">
+            <div className="flex flex-col overflow-y-auto min-h-0 w-full min-w-0">
               {/* Advanced Header */}
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                 <div className="flex items-center gap-3 mb-2">
@@ -1285,7 +1285,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                 // Show reference editing UI for reference types
                 if (isReferenceType) {
                   return (
-                    <div className="p-6 flex-1 overflow-y-auto space-y-6">
+                    <div className="p-6 flex-1 overflow-y-auto space-y-6 w-full min-w-0">
                       {/* Reference Type Header */}
                       <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
                         <GitBranch size={20} />
@@ -1519,7 +1519,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                 }
 
                 return (
-                  <div className="p-6 flex-1 overflow-y-auto">
+                  <div className="p-6 flex-1 overflow-y-auto w-full min-w-0">
                     <PropertyFormFields
                       baseType={baseType}
                       isArray={typeInfo.isArray}

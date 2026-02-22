@@ -2118,21 +2118,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
 
               {/* RIGHT COLUMN - Advanced/Optional Fields */}
               <div className="flex flex-col overflow-y-auto min-h-0">
-              {/* ===================== ADVANCED VALIDATION ===================== */}
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                <div className="flex items-center gap-3 mb-2">
-                  <Code size={20} className="text-purple-500" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Advanced Validation</h3>
-                  <span className="px-2 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">Optional</span>
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Configure complex validation rules for dynamic properties, conditional requirements, and schema dependencies.</p>
-              </div>
-
               {/* Pattern Properties */}
               <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.patternProperties ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Regex size={18} className="text-purple-500" />
+                    <Regex size={18} className="text-indigo-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Pattern Properties</h3>
                   </div>
                   {!isReadOnly && (
@@ -2148,7 +2138,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mb-4">Define regex patterns that map dynamic property names to schemas.</p>
+                <p className="text-sm text-gray-500 mb-4">Define regex patterns that map dynamic property names to schemas.</p>
 
                 {formData.patternProperties.length === 0 ? (
                   <div className="p-6 text-center bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
@@ -2246,11 +2236,11 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.dependentSchemas ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Link size={18} className="text-purple-500" />
+                    <Link size={18} className="text-indigo-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Schemas</h3>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mb-4">Define conditional validation: when a property has a specific value, apply additional constraints.</p>
+                <p className="text-sm text-gray-500 mb-4">Define conditional validation: when a property has a specific value, apply additional constraints.</p>
 
                 {!isReadOnly && (
                   <div className="flex gap-2 mb-4 w-full">
@@ -2308,7 +2298,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                 )}
 
                 {Object.keys(formData.dependentSchemas).length === 0 ? (
-                  <div className="p-6 text-center bg-white dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
+                  <div className="p-6 text-center bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
                     <p className="text-sm text-gray-500">No dependent schemas defined.</p>
                     <p className="text-xs text-gray-400 mt-1">Add conditional validation rules based on property values.</p>
                   </div>
@@ -2541,7 +2531,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${changedSections.dependentRequired ? `${sectionHighlightBg} ${sectionHighlightClass}` : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <ListChecks size={18} className="text-purple-500" />
+                    <ListChecks size={18} className="text-indigo-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Dependent Required</h3>
                   </div>
                   {!isReadOnly && (
@@ -2557,7 +2547,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                     </Button>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mb-4">When a trigger property is present, other properties become required.</p>
+                <p className="text-sm text-gray-500 mb-4">When a trigger property is present, other properties become required.</p>
 
                 {formData.dependentRequired.length === 0 ? (
                   <div className="p-6 text-center bg-gray-50 dark:bg-slate-800 rounded-lg border border-dashed border-gray-300 dark:border-gray-600">
@@ -2625,7 +2615,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
                   renderHeader={(addRule) => (
                     <div className="flex items-center justify-between gap-2 mb-4">
                       <div className="flex items-center gap-2">
-                        <GitBranch size={18} className="text-purple-500" />
+                        <GitBranch size={18} className="text-indigo-500" />
                         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Conditional Schema (if/then/else)</h3>
                       </div>
                       <Button type="button" variant="outline" size="sm" onClick={addRule} disabled={isReadOnly}>
@@ -2637,8 +2627,8 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
               </div>
 
               {/* Documentation & Extensions */}
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-4">
                   <ExternalLink size={18} className="text-indigo-500" />
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Documentation & Extensions</h3>
                 </div>

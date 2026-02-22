@@ -1390,7 +1390,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               </div>
 
               {/* RIGHT COLUMN - Advanced Configuration */}
-              <div className={`flex flex-col overflow-y-auto min-h-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
+              <div className={`flex flex-col overflow-y-auto min-h-0 w-full min-w-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
                 {/* Advanced Header */}
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                   <div className="flex items-center gap-3 mb-2">
@@ -1402,7 +1402,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 </div>
 
                 {/* Property Constraints Section */}
-                <div className="p-6 flex-1 overflow-y-auto">
+                <div className="p-6 flex-1 overflow-y-auto w-full min-w-0">
                   <PropertyFormFields
                     baseType={propertyType}
                     isArray={propertyIsArray}

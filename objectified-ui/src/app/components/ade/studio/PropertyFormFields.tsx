@@ -98,7 +98,9 @@ const Chip = ({ label, size, sx, color, icon, onDelete, ...rest }: any) => (
     {onDelete && <button type="button" onClick={onDelete} aria-label="Remove">×</button>}
   </span>
 );
-const FormControl = ({ sx, children, ...rest }: any) => <div style={sxToStyle(sx)} {...rest}>{children}</div>;
+const FormControl = ({ sx, children, fullWidth, ...rest }: any) => (
+  <div style={{ ...(fullWidth ? { width: '100%', minWidth: 0 } : {}), ...sxToStyle(sx) }} {...rest}>{children}</div>
+);
 const FormControlLabel = ({ control, label, sx, ...rest }: any) => (
   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', ...sxToStyle(sx) }} {...rest}>
     {control}
@@ -142,7 +144,7 @@ const TextField = ({ label, value, onChange, fullWidth, size, error, helperText,
   const startAdornment = inputProps.startAdornment;
   const endAdornment = inputProps.endAdornment;
   const style = { width: fullWidth ? '100%' : undefined, ...sxToStyle(sx) };
-  const inputClass = 'px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm';
+  const inputClass = `px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm ${fullWidth ? 'w-full min-w-0' : ''}`;
   const el = select ? (
     <select value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} className={inputClass} disabled={disabled} style={{ minHeight: size === 'small' ? 32 : 40 }} {...rest}>
       {children}
@@ -163,9 +165,9 @@ const TextField = ({ label, value, onChange, fullWidth, size, error, helperText,
   return (
     <div style={{ marginBottom: 16, ...style }}>
       {label && <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{label}</label>}
-      <div className="flex items-center">
+      <div className={`flex items-center ${fullWidth ? 'w-full min-w-0' : ''}`}>
         {startAdornment}
-        {el}
+        {fullWidth ? <span className="flex-1 min-w-0 flex flex-col">{el}</span> : el}
         {endAdornment}
       </div>
       {helperText && <p className="text-xs text-slate-500 mt-1">{helperText}</p>}
@@ -430,7 +432,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ icon, title, subtitle, ba
           {title}
         </Typography>
         {subtitle && (
-          <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: isDark ? '#94a3b8' : '#64748b' }}>
             {subtitle}
           </Typography>
         )}
@@ -990,7 +992,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           />
 
           <Box sx={{ gridColumn: showTitle ? 'auto' : '1 / -1' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#334155' }}>
                 Examples
               </Typography>
@@ -3473,6 +3475,8 @@ value={data.format || ''}
           ═══════════════════════════════════════════════════════════════════════════ */}
       <Box sx={{
         p: 3,
+        width: '100%',
+        minWidth: 0,
         bgcolor: changedSections.advanced ? (isDark ? 'rgba(180, 83, 9, 0.25)' : 'rgba(253, 230, 138, 0.6)') : (isDark ? '#1e293b' : 'white'),
         ...(changedSections.advanced ? { border: '2px solid', borderColor: isDark ? 'rgba(245, 158, 11, 0.5)' : 'rgba(217, 119, 6, 0.5)', borderRadius: 2 } : {}),
       }}>
@@ -3482,10 +3486,11 @@ value={data.format || ''}
           subtitle="Extended schema options"
         />
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, width: '100%', minWidth: 0 }}>
           {/* NOT Composition */}
           <Box sx={{
             p: 2.5,
+            minWidth: 0,
             bgcolor: isDark ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
             background: isDark ? 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)' : 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
             borderRadius: 2.5,
@@ -3537,6 +3542,7 @@ value={data.format || ''}
           {/* External Documentation */}
           <Box sx={{
             p: 2.5,
+            minWidth: 0,
             bgcolor: isDark ? '#0f172a' : 'white',
             borderRadius: 2.5,
             border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
@@ -3611,6 +3617,8 @@ value={data.format || ''}
         <Box sx={{
           mt: 3,
           p: 2.5,
+          width: '100%',
+          minWidth: 0,
           bgcolor: isDark ? '#0f172a' : 'white',
           borderRadius: 2.5,
           border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
@@ -3661,7 +3669,7 @@ value={data.format || ''}
             Configure how this property is represented when serialized to XML format. These settings are useful for APIs that support both JSON and XML content types.
           </Typography>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2, mb: 2, width: '100%', minWidth: 0 }}>
             <TextField
               label="XML Name"
               size={size}
