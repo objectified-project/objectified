@@ -298,7 +298,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
           </Tabs.List>
 
           <Tabs.Content value="classes" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-            <div className="flex flex-col h-full">
+            <div className="relative flex flex-col h-full">
               {/* Search Bar */}
               <div className="p-4 pb-3">
                 <div className="relative">
@@ -422,7 +422,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
             </div>
           </Tabs.Content>
           <Tabs.Content value="properties" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-            <div className="flex flex-col h-full">
+            <div className="relative flex flex-col h-full">
               {/* Search Bar */}
               <div className="p-4 pb-3">
                 <div className="relative">
@@ -614,7 +614,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
           </Tabs.Content>
 
           <Tabs.Content value="groups" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
-            <div className="flex flex-col h-full">
+            <div className="relative flex flex-col h-full">
               {/* Search Bar */}
               <div className="p-4 pb-3">
                 <div className="relative">
