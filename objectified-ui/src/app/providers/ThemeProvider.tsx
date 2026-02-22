@@ -25,18 +25,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Get the effective theme for system preference
+  // Get the effective theme for system preference.
+  // Prefer matchMedia on the client so we always use the actual OS preference (e.g. when
+  // switching from Dark to System while OS is light, resolvedTheme can still be 'dark').
   const getSystemPreferredTheme = useCallback(() => {
-    // First try resolvedTheme from next-themes, then fall back to matchMedia
-    let prefersDark = resolvedTheme === 'dark';
-
-    // If resolvedTheme is undefined or not set, check system preference directly
-    if (resolvedTheme === undefined || resolvedTheme === null) {
-      if (typeof window !== 'undefined') {
-        prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      }
+    if (typeof window !== 'undefined') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return prefersDark ? getThemeById('dark') || getDefaultTheme() : getThemeById('light') || getDefaultTheme();
     }
-
+    // SSR/fallback: use resolvedTheme from next-themes when available
+    const prefersDark = resolvedTheme === 'dark';
     return prefersDark ? getThemeById('dark') || getDefaultTheme() : getThemeById('light') || getDefaultTheme();
   }, [resolvedTheme]);
 
@@ -62,8 +60,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const darkThemes = ['dark', 'high-contrast', 'blueprint', 'solarized', 'nord', 'darcula'];
     const isDarkBased = darkThemes.includes(effectiveTheme.id);
 
-    // Use next-themes to set the theme class (it will handle .dark class)
-    if (isDarkBased) {
+    // Use next-themes: when following system, set 'system' so it tracks OS and updates .dark;
+    // when using a fixed theme, set 'light' or 'dark' so .dark is correct.
+    if (isSystem) {
+      setNextTheme('system');
+    } else if (isDarkBased) {
       setNextTheme('dark');
     } else {
       setNextTheme('light');

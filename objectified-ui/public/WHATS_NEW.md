@@ -10,6 +10,7 @@ Bug Fixes:
 - Improved layout of primitives form
 - Improved layout of class form
 - Improved layout of profile page
+- Improved handling of light/dark system theme settings
 - Conversion of forms to use modern components
 - Improved published view page
   - Now displays the different types of object representations as a submenu (OpenAPI, Arazzo, JSON)
@@ -28,6 +29,7 @@ Bug Fixes:
   - Class form was displaying a prompt for dependent schemas - this has been corrected
   - Class template library form is wider to show better detail
   - Property template button now appears properly when in dark mode
+  - Property template form is also now wider to show better detail
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here
@@ -45,5 +47,5 @@ We'd love to hear your thoughts! Your feedback helps us make Objectified better.
 
 **Thank you for using Objectified!**
 
-*Last updated: February 1, 2026*
+*Last updated: March 1, 2026*
 
