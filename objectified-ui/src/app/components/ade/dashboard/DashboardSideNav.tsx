@@ -6,15 +6,6 @@ import { usePathname } from 'next/navigation';
 import React from 'react';
 import { useSession } from 'next-auth/react';
 import { User, Building2, Folders, FileDigit, Key, Eye, Link as LinkIcon, Database } from 'lucide-react';
-import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import Typography from '@mui/material/Typography';
-import Divider from '@mui/material/Divider';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
 interface NavItem {
@@ -36,8 +27,6 @@ const DashboardSideNav: React.FC = () => {
 
   const currentTenantId = (session?.user as { current_tenant_id?: string })?.current_tenant_id;
   const hasTenant = !!currentTenantId;
-
-  console.log('Current Tenant ID:', currentTenantId);
 
   const navSections: NavSection[] = [
     {
@@ -72,140 +61,97 @@ const DashboardSideNav: React.FC = () => {
 
   const isActive = (href: string) => pathname === href;
 
+  const sidebarBg = isDark
+    ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
+    : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)';
+  const sidebarShadow = isDark ? '4px 0 24px rgba(0, 0, 0, 0.3)' : '4px 0 24px rgba(0, 0, 0, 0.06)';
+
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
+    <aside
+      className="flex-shrink-0 w-[280px] border-r-0"
+      style={{
         width: 280,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: 280,
-          boxSizing: 'border-box',
-          top: 48, // Offset for top header
-          height: 'calc(100vh - 48px)',
-          borderRight: 'none',
-          background: isDark
-            ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          boxShadow: isDark
-            ? '4px 0 24px rgba(0, 0, 0, 0.3)'
-            : '4px 0 24px rgba(0, 0, 0, 0.06)',
-        },
+        boxSizing: 'border-box',
+        top: 48,
+        height: 'calc(100vh - 48px)',
+        background: sidebarBg,
+        boxShadow: sidebarShadow,
       }}
     >
-      <Box sx={{ overflow: 'auto', p: 2.5 }}>
+      <div className="overflow-auto p-5">
         {navSections.map((section, index) => (
-          <Box key={section.header} sx={{ mb: index < navSections.length - 1 ? 3 : 0 }}>
-            <Typography
-              variant="overline"
-              sx={{
-                px: 1.5,
-                py: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                fontWeight: 700,
-                color: isDark ? '#94a3b8' : '#64748b',
-                letterSpacing: '0.08em',
-                fontSize: '0.65rem',
-              }}
+          <div key={section.header} className={index < navSections.length - 1 ? 'mb-6' : ''}>
+            <div
+              className="px-3 py-2 flex items-center gap-2 font-bold text-[0.65rem] uppercase tracking-wider"
+              style={{ color: isDark ? '#94a3b8' : '#64748b' }}
             >
-              <Box
-                component="span"
-                sx={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: '50%',
-                  bgcolor: '#6366f1',
-                  opacity: 0.6,
-                }}
+              <span
+                className="w-1 h-1 rounded-full opacity-60"
+                style={{ backgroundColor: '#6366f1' }}
               />
               {section.header}
-            </Typography>
-            <List disablePadding sx={{ mt: 0.5 }}>
+            </div>
+            <ul className="mt-1 space-y-1 list-none p-0 m-0">
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
 
                 return (
-                  <ListItem key={item.href} disablePadding sx={{ mb: 0.5 }}>
-                    <ListItemButton
-                      component={item.disabled ? 'div' : Link}
-                      href={item.disabled ? undefined : item.href}
-                      disabled={item.disabled}
-                      selected={active}
-                      sx={{
-                        borderRadius: 2,
-                        py: 1.25,
-                        px: 1.5,
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                        '&:hover': {
-                          bgcolor: 'rgba(99, 102, 241, 0.08)',
-                          transform: 'translateX(4px)',
-                        },
-                        '&.Mui-selected': {
-                          bgcolor: 'rgba(99, 102, 241, 0.1)',
-                          borderLeft: '3px solid #6366f1',
-                          borderRadius: '0 8px 8px 0',
-                          ml: -0.5,
-                          pl: 2,
-                          '&:hover': {
-                            bgcolor: 'rgba(99, 102, 241, 0.15)',
-                          },
-                          '& .MuiListItemIcon-root': {
-                            color: '#6366f1',
-                          },
-                          '& .MuiListItemText-primary': {
-                            color: '#6366f1',
-                          },
-                        },
-                        '&.Mui-disabled': {
-                          opacity: 0.4,
-                        },
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: 40,
-                          color: active ? '#6366f1' : (isDark ? '#94a3b8' : '#64748b'),
-                          transition: 'color 0.2s ease',
+                  <li key={item.href} className="mb-1">
+                    {item.disabled ? (
+                      <div
+                        className="flex items-center gap-3 py-2.5 px-3 rounded-lg opacity-40 cursor-not-allowed"
+                        style={{
+                          color: isDark ? '#e2e8f0' : '#334155',
                         }}
                       >
-                        <Icon size={20} />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={item.label}
-                        slotProps={{
-                          primary: {
-                            fontSize: '0.875rem',
-                            fontWeight: active ? 600 : 500,
-                            color: active ? '#6366f1' : (isDark ? '#e2e8f0' : '#334155'),
-                          },
+                        <Icon size={20} className="flex-shrink-0 text-slate-500 dark:text-slate-400" />
+                        <span className="text-sm font-medium">{item.label}</span>
+                      </div>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        className={`flex items-center gap-3 py-2.5 px-3 rounded-lg transition-all duration-200 hover:bg-indigo-500/10 hover:translate-x-1 ${
+                          active
+                            ? 'bg-indigo-500/10 border-l-[3px] border-indigo-500 -ml-0.5 pl-5 rounded-l-none'
+                            : ''
+                        }`}
+                        style={{
+                          borderLeftColor: active ? '#6366f1' : 'transparent',
                         }}
-                      />
-                      {active && (
-                        <Box
-                          sx={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            bgcolor: '#6366f1',
-                            boxShadow: '0 0 8px rgba(99, 102, 241, 0.5)',
-                          }}
+                      >
+                        <Icon
+                          size={20}
+                          className={`flex-shrink-0 transition-colors ${active ? 'text-indigo-500' : 'text-slate-500 dark:text-slate-400'}`}
                         />
-                      )}
-                    </ListItemButton>
-                  </ListItem>
+                        <span
+                          className="text-sm flex-1"
+                          style={{
+                            fontWeight: active ? 600 : 500,
+                            color: active ? '#6366f1' : isDark ? '#e2e8f0' : '#334155',
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                        {active && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: '#6366f1', boxShadow: '0 0 8px rgba(99, 102, 241, 0.5)' }}
+                          />
+                        )}
+                      </Link>
+                    )}
+                  </li>
                 );
               })}
-            </List>
+            </ul>
             {index < navSections.length - 1 && (
-              <Divider sx={{ my: 2, borderColor: 'rgba(99, 102, 241, 0.1)' }} />
+              <hr className="my-4 border-indigo-500/10" />
             )}
-          </Box>
+          </div>
         ))}
-      </Box>
-    </Drawer>
+      </div>
+    </aside>
   );
 };
 

@@ -1,16 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
-import MenuItem from '@mui/material/MenuItem';
-import Paper from '@mui/material/Paper';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import { Plus, Trash2, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -44,27 +35,14 @@ interface SortableItemProps {
 }
 
 const SortableItem: React.FC<SortableItemProps> = ({ id, index, schema, onUpdate, onRemove }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   const [description, setDescription] = useState<string>(schema?.description || '');
   const [examplesText, setExamplesText] = useState<string>(
     schema?.examples ? schema.examples.map((e: any) => typeof e === 'string' ? e : JSON.stringify(e)).join(', ') : ''
   );
 
-  // Sync fields when schema prop changes (e.g., when loading existing data)
   useEffect(() => {
     setDescription(schema?.description || '');
     setExamplesText(
@@ -73,45 +51,35 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, index, schema, onUpdate
   }, [schema]);
 
   const handleTypeChange = (newType: string) => {
-    const updated = { ...schema, type: newType || undefined };
-    onUpdate(index, updated);
+    onUpdate(index, { ...schema, type: newType || undefined });
   };
 
   const handleDescriptionChange = (newDescription: string) => {
     setDescription(newDescription);
     const updated = { ...schema };
-    if (newDescription.trim()) {
-      updated.description = newDescription;
-    } else {
-      delete updated.description;
-    }
+    if (newDescription.trim()) updated.description = newDescription;
+    else delete updated.description;
     onUpdate(index, updated);
   };
 
   const handleExamplesChange = (value: string) => {
     setExamplesText(value);
     const updated = { ...schema };
-
+    const type = getType();
+    const parts = value.split(',').map(s => s.trim()).filter(Boolean);
     if (value.trim()) {
-      // Parse examples based on type
-      const type = getType();
-      const parts = value.split(',').map(s => s.trim()).filter(Boolean);
-
       updated.examples = parts.map(part => {
-        // Try to parse based on type
         if (type === 'number' || type === 'integer') {
           const num = Number(part);
           return isNaN(num) ? part : num;
-        } else if (type === 'boolean') {
+        }
+        if (type === 'boolean') {
           if (part.toLowerCase() === 'true') return true;
           if (part.toLowerCase() === 'false') return false;
           return part;
-        } else if (type === 'object' || type === 'array') {
-          try {
-            return JSON.parse(part);
-          } catch {
-            return part;
-          }
+        }
+        if (type === 'object' || type === 'array') {
+          try { return JSON.parse(part); } catch { return part; }
         }
         return part;
       });
@@ -122,113 +90,85 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, index, schema, onUpdate
   };
 
   const getType = () => {
-    if (!schema || !schema.type) return '';
+    if (!schema?.type) return '';
     return Array.isArray(schema.type) ? schema.type[0] : schema.type;
   };
 
   return (
-    <Paper
+    <div
       ref={setNodeRef}
       style={style}
-      sx={{
-        mb: 1,
-        p: 2,
-        backgroundColor: 'background.default',
-        border: '1px solid',
-        borderColor: 'divider',
-      }}
+      className="mb-2 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-        <Box
+      <div className="flex items-center gap-2 mb-3">
+        <button
+          type="button"
           {...attributes}
           {...listeners}
-          sx={{
-            cursor: 'grab',
-            display: 'flex',
-            alignItems: 'center',
-            color: 'text.secondary',
-            '&:active': { cursor: 'grabbing' },
-          }}
+          className="cursor-grab active:cursor-grabbing flex items-center text-slate-500 dark:text-slate-400 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
         >
-          <DragIndicatorIcon />
-        </Box>
-
-        <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 80 }}>
-          Position {index}
-        </Typography>
-
-        <TextField
-          select
-          size="small"
+          <GripVertical className="w-5 h-5" />
+        </button>
+        <span className="text-sm font-semibold min-w-[80px]">Position {index}</span>
+        <select
           value={getType()}
           onChange={(e) => handleTypeChange(e.target.value)}
-          sx={{ minWidth: 140 }}
-          label="Type"
+          className="min-w-[140px] px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm"
         >
-          <MenuItem value="">Any</MenuItem>
-          <MenuItem value="string">string</MenuItem>
-          <MenuItem value="number">number</MenuItem>
-          <MenuItem value="integer">integer</MenuItem>
-          <MenuItem value="boolean">boolean</MenuItem>
-          <MenuItem value="object">object</MenuItem>
-          <MenuItem value="array">array</MenuItem>
-          <MenuItem value="null">null</MenuItem>
-        </TextField>
-
-        <Box sx={{ flex: 1 }} />
-
-        <IconButton
-          size="small"
+          <option value="">Any</option>
+          <option value="string">string</option>
+          <option value="number">number</option>
+          <option value="integer">integer</option>
+          <option value="boolean">boolean</option>
+          <option value="object">object</option>
+          <option value="array">array</option>
+          <option value="null">null</option>
+        </select>
+        <div className="flex-1" />
+        <button
+          type="button"
           onClick={() => onRemove(index)}
-          color="error"
+          className="p-2 rounded text-red-600 hover:bg-red-500/10"
         >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
-      </Box>
-
-      {/* Description field */}
-      <TextField
-        fullWidth
-        size="small"
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+      <input
+        type="text"
+        className="w-full mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm"
+        placeholder="Description for this position (e.g., X coordinate, Name column)"
         value={description}
         onChange={(e) => handleDescriptionChange(e.target.value)}
-        placeholder="Description for this position (e.g., X coordinate, Name column)"
-        label="Description"
-        sx={{ mb: 1.5 }}
       />
-
-      {/* Examples field */}
-      <TextField
-        fullWidth
-        size="small"
-        value={examplesText}
-        onChange={(e) => handleExamplesChange(e.target.value)}
-        placeholder={getType() === 'number' ? 'e.g., 10.5, 20.3' : getType() === 'boolean' ? 'e.g., true, false' : 'e.g., value1, value2'}
-        label="Examples (comma-separated)"
-        helperText={`Example values for this ${getType() || 'position'}`}
-      />
-    </Paper>
+      <div>
+        <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+          Examples (comma-separated)
+        </label>
+        <input
+          type="text"
+          className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm"
+          placeholder={getType() === 'number' ? 'e.g., 10.5, 20.3' : getType() === 'boolean' ? 'e.g., true, false' : 'e.g., value1, value2'}
+          value={examplesText}
+          onChange={(e) => handleExamplesChange(e.target.value)}
+        />
+        <p className="text-xs text-slate-500 mt-1">Example values for this {getType() || 'position'}</p>
+      </div>
+    </div>
   );
 };
 
 export const PrefixItemsEditor: React.FC<PrefixItemsEditorProps> = ({ value = [], onChange }) => {
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
-
-    if (active.id !== over.id) {
+    if (active.id !== over?.id) {
       const oldIndex = value.findIndex((_, i) => `prefix-${i}` === active.id);
-      const newIndex = value.findIndex((_, i) => `prefix-${i}` === over.id);
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        onChange(arrayMove(value, oldIndex, newIndex));
-      }
+      const newIndex = value.findIndex((_, i) => `prefix-${i}` === over?.id);
+      if (oldIndex !== -1 && newIndex !== -1) onChange(arrayMove(value, oldIndex, newIndex));
     }
   };
 
@@ -239,8 +179,7 @@ export const PrefixItemsEditor: React.FC<PrefixItemsEditorProps> = ({ value = []
   };
 
   const handleRemove = (index: number) => {
-    const updated = value.filter((_, i) => i !== index);
-    onChange(updated);
+    onChange(value.filter((_, i) => i !== index));
   };
 
   const handleAdd = () => {
@@ -248,36 +187,19 @@ export const PrefixItemsEditor: React.FC<PrefixItemsEditorProps> = ({ value = []
   };
 
   return (
-    <Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Define schemas for specific array positions. Items beyond these positions will use the regular <code>items</code> schema.
-      </Typography>
+    <div>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+        Define schemas for specific array positions. Items beyond these positions will use the regular <code className="px-1 py-0.5 rounded bg-slate-200 dark:bg-slate-700">items</code> schema.
+      </p>
 
       {value.length === 0 && (
-        <Box
-          sx={{
-            p: 3,
-            mb: 2,
-            textAlign: 'center',
-            color: 'text.secondary',
-            border: '1px dashed',
-            borderColor: 'divider',
-            borderRadius: 1,
-          }}
-        >
-          No prefix items defined. Click "Add Position" to define schemas for specific array positions.
-        </Box>
+        <div className="p-6 mb-4 text-center text-slate-500 dark:text-slate-400 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+          No prefix items defined. Click &quot;Add Position&quot; to define schemas for specific array positions.
+        </div>
       )}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={value.map((_, i) => `prefix-${i}`)}
-          strategy={verticalListSortingStrategy}
-        >
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={value.map((_, i) => `prefix-${i}`)} strategy={verticalListSortingStrategy}>
           {value.map((schema, index) => (
             <SortableItem
               key={`prefix-${index}`}
@@ -291,23 +213,21 @@ export const PrefixItemsEditor: React.FC<PrefixItemsEditorProps> = ({ value = []
         </SortableContext>
       </DndContext>
 
-      <Button
-        startIcon={<AddIcon />}
-        variant="outlined"
+      <button
+        type="button"
         onClick={handleAdd}
-        fullWidth
-        sx={{ mt: 1 }}
+        className="mt-2 w-full py-2 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"
       >
+        <Plus className="w-4 h-4" />
         Add Position
-      </Button>
+      </button>
 
       {value.length > 0 && (
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-          <strong>Example:</strong> For a tuple like <code>[string, number, boolean]</code>,
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
+          <strong>Example:</strong> For a tuple like <code className="px-1 rounded bg-slate-200 dark:bg-slate-700">[string, number, boolean]</code>,
           define 3 positions with types string, number, and boolean respectively.
-        </Typography>
+        </p>
       )}
-    </Box>
+    </div>
   );
 };
-

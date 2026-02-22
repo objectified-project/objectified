@@ -1,21 +1,9 @@
 // SideNav.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
-import Typography from '@mui/material/Typography';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemText from '@mui/material/ListItemText';
-import Fab from '@mui/material/Fab';
-import { Search, Add, Edit, Delete, DeleteSweep, Upload, LibraryBooks, ExpandMore, ExpandLess } from '@mui/icons-material';
+import React, { useState } from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
+import { Search, Plus, Pencil, Trash2, Trash2 as DeleteSweep, Upload, Library, ChevronDown, ChevronUp } from 'lucide-react';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
@@ -219,8 +207,8 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     computeWarnings();
   }, [classes, selectedVersionId, refreshKey]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: 'classes' | 'properties' | 'groups') => {
-    setCurrentTab(newValue);
+  const handleTabChange = (newValue: string) => {
+    setCurrentTab(newValue as 'classes' | 'properties' | 'groups');
   };
 
   // Filter classes based on search query
@@ -261,502 +249,231 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     callbacks.onPropertySelect?.(propertyItem);
   };
 
+  const drawerStyle = {
+    width: 280,
+    flexShrink: 0,
+    boxSizing: 'border-box' as const,
+    top: 102,
+    height: 'calc(100vh - 102px)',
+    borderRight: 'none',
+    background: isDark
+      ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
+      : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+    boxShadow: isDark ? '4px 0 24px rgba(0, 0, 0, 0.3)' : '4px 0 24px rgba(0, 0, 0, 0.06)',
+  };
+
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: 280,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: 280,
-          boxSizing: 'border-box',
-          top: 102, // TopHeader (48px) + Studio Header (~48px with py-2)
-          height: 'calc(100vh - 102px)',
-          borderRight: 'none',
-          background: isDark
-            ? 'linear-gradient(180deg, #1e293b 0%, #0f172a 100%)'
-            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          boxShadow: isDark
-            ? '4px 0 24px rgba(0, 0, 0, 0.3)'
-            : '4px 0 24px rgba(0, 0, 0, 0.06)',
-        },
-      }}
-    >
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <aside className="flex-shrink-0" style={drawerStyle}>
+      <div className="flex flex-col h-full">
         {/* Version/Project Status Indicator */}
         {((currentTab === 'classes' && !selectedVersionId) || (currentTab === 'properties' && !selectedProjectId)) && (
-          <Box
-            sx={{
-              p: 2,
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              color: '#92400e',
-              textAlign: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1,
-            }}
-          >
-            <span style={{ fontSize: '1rem' }}>⚠️</span>
+          <div className="p-4 text-center text-xs font-semibold border-b border-amber-300/30 flex items-center justify-center gap-2 bg-gradient-to-br from-amber-100 to-amber-200 text-amber-800 dark:from-amber-900/30 dark:to-amber-800/30 dark:text-amber-200">
+            <span className="text-base">⚠️</span>
             {currentTab === 'classes'
               ? 'Select a version from the canvas to manage classes'
               : 'Select a project from the canvas to manage properties'}
-          </Box>
+          </div>
         )}
 
-        {/* Tabs Navigation */}
-        <Tabs
-          value={currentTab}
-          onChange={handleTabChange}
-          variant="fullWidth"
-          sx={{
-            borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            minHeight: 44,
-            '& .MuiTabs-indicator': {
-              height: 3,
-              borderRadius: '3px 3px 0 0',
-              background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)',
-            },
-          }}
-        >
-          <Tab
-            label="Classes"
-            value="classes"
-            sx={{
-              minHeight: 44,
-              fontWeight: currentTab === 'classes' ? 700 : 500,
-              fontSize: '0.75rem',
-              color: currentTab === 'classes'
-                ? '#6366f1'
-                : (isDark ? '#94a3b8' : '#64748b'),
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                color: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-              },
-            }}
-          />
-          <Tab
-            label="Properties"
-            value="properties"
-            sx={{
-              minHeight: 44,
-              fontWeight: currentTab === 'properties' ? 700 : 500,
-              fontSize: '0.75rem',
-              color: currentTab === 'properties'
-                ? '#6366f1'
-                : (isDark ? '#94a3b8' : '#64748b'),
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                color: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-              },
-            }}
-          />
-          <Tab
-            label="Groups"
-            value="groups"
-            sx={{
-              minHeight: 44,
-              fontWeight: currentTab === 'groups' ? 700 : 500,
-              fontSize: '0.75rem',
-              color: currentTab === 'groups'
-                ? '#6366f1'
-                : (isDark ? '#94a3b8' : '#64748b'),
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                color: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-              },
-            }}
-          />
-        </Tabs>
+        <Tabs.Root value={currentTab} onValueChange={handleTabChange} className="flex flex-col flex-1 min-h-0">
+          <Tabs.List className="flex border-b min-h-[44px] shrink-0" style={{ borderColor: isDark ? '#334155' : '#e2e8f0' }}>
+            <Tabs.Trigger
+              value="classes"
+              className="flex-1 min-h-[44px] text-xs font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent"
+            >
+              Classes
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="properties"
+              className="flex-1 min-h-[44px] text-xs font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent"
+            >
+              Properties
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="groups"
+              className="flex-1 min-h-[44px] text-xs font-medium transition-all data-[state=active]:font-bold data-[state=active]:text-indigo-500 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 hover:bg-indigo-500/5 hover:text-indigo-500 rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent"
+            >
+              Groups
+            </Tabs.Trigger>
+          </Tabs.List>
 
-        {/* Tab Content */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {currentTab === 'classes' && (
-            // Classes View
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Tabs.Content value="classes" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+            <div className="flex flex-col h-full">
               {/* Search Bar */}
-              <Box sx={{ p: 2, pb: 1.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search classes..."
-                  value={classesSearchQuery}
-                  onChange={(e) => setClassesSearchQuery(e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      backgroundColor: isDark ? '#334155' : '#f8fafc',
-                      transition: 'all 0.2s ease',
-                      '& input': {
-                        color: isDark ? '#e2e8f0' : 'inherit',
-                      },
-                      '& input::placeholder': {
-                        color: isDark ? '#94a3b8' : 'inherit',
-                        opacity: 1,
-                      },
-                      '& fieldset': {
-                        borderColor: isDark ? '#475569' : 'rgba(0, 0, 0, 0.23)',
-                      },
-                      '&:hover': {
-                        backgroundColor: isDark ? '#475569' : '#f1f5f9',
-                      },
-                      '&.Mui-focused': {
-                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                        boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
-                      },
-                    },
-                  }}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search fontSize="small" sx={{ color: '#94a3b8' }} />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-              </Box>
+              <div className="p-4 pb-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search classes..."
+                    value={classesSearchQuery}
+                    onChange={(e) => setClassesSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm border bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+              </div>
 
               {/* Classes List */}
-              <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
+              <div className="flex-1 overflow-auto px-2 py-1">
                 {filteredClasses.length === 0 ? (
-                  <Box sx={{
-                    textAlign: 'center',
-                    mt: 6,
-                    px: 3,
-                  }}>
-                    <Box sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: '50%',
-                      bgcolor: 'rgba(99, 102, 241, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 16px',
-                    }}>
-                      <Add sx={{ color: '#6366f1', fontSize: 24 }} />
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, mb: 0.5 }}
-                    >
-                      {classes.length === 0
-                        ? 'No classes yet'
-                        : 'No classes match your search'}
-                    </Typography>
+                  <div className="text-center mt-8 px-4">
+                    <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
+                      <Plus className="w-6 h-6 text-indigo-500" />
+                    </div>
+                    <p className="text-sm font-medium mb-1" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {classes.length === 0 ? 'No classes yet' : 'No classes match your search'}
+                    </p>
                     {classes.length === 0 && (
-                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8' }}>
+                      <p className="text-xs" style={{ color: isDark ? '#64748b' : '#94a3b8' }}>
                         Click the + button to add one
-                      </Typography>
+                      </p>
                     )}
-                  </Box>
+                  </div>
                 ) : (
-                  <List dense sx={{ py: 0.5 }}>
+                  <ul className="py-1 space-y-1 list-none p-0 m-0">
                     {filteredClasses.map((classItem) => (
-                      <ListItem
-                        key={classItem.id}
-                        disablePadding
-                        sx={{ mb: 0.5 }}
-                        secondaryAction={
-                          <Box sx={{ display: 'flex', gap: 0.25 }}>
-                            <IconButton
-                              edge="end"
-                              size="small"
-                              disabled={!selectedVersionId || isReadOnly}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                callbacks.onClassEdit?.(classItem);
-                              }}
-                              title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Edit class'}
-                              sx={{
-                                opacity: 0.6,
-                                transition: 'all 0.2s ease',
-                                '&:hover': {
-                                  opacity: 1,
-                                  color: '#6366f1',
-                                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                                },
-                              }}
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              edge="end"
-                              size="small"
-                              disabled={!selectedVersionId || isReadOnly}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                callbacks.onClassDelete?.(classItem.id);
-                              }}
-                              title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Delete class'}
-                              sx={{
-                                opacity: 0.6,
-                                transition: 'all 0.2s ease',
-                                '&:hover': {
-                                  opacity: 1,
-                                  color: '#ef4444',
-                                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                },
-                              }}
-                            >
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        }
-                      >
-                        <ListItemButton
-                          selected={selectedClassId === classItem.id}
+                      <li key={classItem.id} className="mb-1 flex items-stretch rounded-lg group">
+                        <button
+                          type="button"
                           onClick={() => handleClassSelect(classItem)}
-                          sx={{
-                            borderRadius: 2,
-                            transition: 'all 0.2s ease',
-                            '&.Mui-selected': {
-                              backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                              borderLeft: '3px solid #6366f1',
-                              '&:hover': {
-                                backgroundColor: 'rgba(99, 102, 241, 0.15)',
-                              },
-                            },
-                            '&:hover': {
-                              backgroundColor: 'rgba(99, 102, 241, 0.05)',
-                            },
-                          }}
+                          className={`flex-1 text-left rounded-lg px-3 py-2 transition-all min-w-0 ${
+                            selectedClassId === classItem.id
+                              ? 'bg-indigo-500/10 border-l-[3px] border-indigo-500 hover:bg-indigo-500/15'
+                              : 'hover:bg-indigo-500/5 border-l-[3px] border-transparent'
+                          }`}
                         >
-                          <ListItemText
-                            primary={
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  textDecoration: classItem.schema?.deprecated ? 'line-through' : 'none',
-                                  color: classItem.schema?.deprecated ? '#9ca3af' : 'inherit'
-                                }}>{classItem.name}</span>
-                                {classWarnings[classItem.id] && (
-                                  <span title="This class has properties referencing missing classes" style={{ color: '#b91c1c', fontSize: 12 }}>⚠️</span>
-                                )}
-                              </span>
-                            }
-                            secondary={classItem.description}
-                            slotProps={{
-                              primary: { noWrap: true },
-                              secondary: { noWrap: true },
-                            }}
-                          />
-                        </ListItemButton>
-                      </ListItem>
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            <span
+                              className="truncate block"
+                              style={{
+                                textDecoration: classItem.schema?.deprecated ? 'line-through' : 'none',
+                                color: classItem.schema?.deprecated ? '#9ca3af' : 'inherit',
+                              }}
+                            >
+                              {classItem.name}
+                            </span>
+                            {classWarnings[classItem.id] && (
+                              <span title="This class has properties referencing missing classes" className="text-red-700 text-xs">⚠️</span>
+                            )}
+                          </span>
+                          {classItem.description && (
+                            <span className="block text-xs truncate mt-0.5 text-slate-500 dark:text-slate-400">{classItem.description}</span>
+                          )}
+                        </button>
+                        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100">
+                          <button
+                            type="button"
+                            disabled={!selectedVersionId || isReadOnly}
+                            onClick={(e) => { e.stopPropagation(); callbacks.onClassEdit?.(classItem); }}
+                            title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Edit class'}
+                            className="p-1.5 rounded hover:bg-indigo-500/10 hover:text-indigo-500 disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!selectedVersionId || isReadOnly}
+                            onClick={(e) => { e.stopPropagation(); callbacks.onClassDelete?.(classItem.id); }}
+                            title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Delete class'}
+                            className="p-1.5 rounded hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </li>
                     ))}
-                  </List>
+                  </ul>
                 )}
-              </Box>
+              </div>
 
               {/* Add and Import Buttons */}
-              <Box sx={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 1 }}>
-                <Fab
-                  color="secondary"
-                  size="small"
+              <div className="absolute bottom-5 right-5 flex gap-2">
+                <button
+                  type="button"
                   onClick={() => callbacks.onClassImport?.()}
                   disabled={!selectedVersionId || isReadOnly}
                   aria-label="Import classes"
                   title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot import to published version' : 'Import classes from file'}
-                  sx={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-2px) scale(1.05)',
-                      boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)',
-                    },
-                    '&:disabled': {
-                      background: isDark ? '#475569' : '#e2e8f0',
-                      boxShadow: 'none',
-                    },
-                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
                 >
-                  <Upload />
-                </Fab>
-                <Fab
-                  color="secondary"
-                  size="small"
+                  <Upload className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => callbacks.onClassTemplates?.()}
                   disabled={!selectedVersionId || isReadOnly}
                   aria-label="Class templates"
                   title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Browse class templates'}
-                  sx={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-2px) scale(1.05)',
-                      boxShadow: '0 6px 20px rgba(245, 158, 11, 0.5)',
-                    },
-                    '&:disabled': {
-                      background: isDark ? '#475569' : '#e2e8f0',
-                      color: isDark ? '#94a3b8' : '#64748b',
-                      boxShadow: 'none',
-                    },
-                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-amber-500 to-amber-600 text-white hover:shadow-amber-500/40"
                 >
-                  <LibraryBooks />
-                </Fab>
-                <Fab
-                  color="primary"
-                  size="small"
+                  <Library className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => callbacks.onClassAdd?.()}
                   disabled={!selectedVersionId || isReadOnly}
                   aria-label="Add class"
                   title={!selectedVersionId ? 'Select a version first' : isReadOnly ? 'Cannot edit published version' : 'Add class'}
-                  sx={{
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-2px) scale(1.05)',
-                      boxShadow: '0 6px 20px rgba(99, 102, 241, 0.5)',
-                    },
-                    '&:disabled': {
-                      background: isDark ? '#475569' : '#e2e8f0',
-                      boxShadow: 'none',
-                    },
-                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:shadow-indigo-500/40"
                 >
-                  <Add />
-                </Fab>
-              </Box>
-            </Box>
-          )}
-          {currentTab === 'properties' && (
-            // Properties View
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </Tabs.Content>
+          <Tabs.Content value="properties" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+            <div className="flex flex-col h-full">
               {/* Search Bar */}
-              <Box sx={{ p: 2, pb: 1.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search properties..."
-                  value={propertiesSearchQuery}
-                  onChange={(e) => setPropertiesSearchQuery(e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      backgroundColor: isDark ? '#334155' : '#f8fafc',
-                      transition: 'all 0.2s ease',
-                      '& input': {
-                        color: isDark ? '#e2e8f0' : 'inherit',
-                      },
-                      '& input::placeholder': {
-                        color: isDark ? '#94a3b8' : 'inherit',
-                        opacity: 1,
-                      },
-                      '& fieldset': {
-                        borderColor: isDark ? '#475569' : 'rgba(0, 0, 0, 0.23)',
-                      },
-                      '&:hover': {
-                        backgroundColor: isDark ? '#475569' : '#f1f5f9',
-                      },
-                      '&.Mui-focused': {
-                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                        boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
-                      },
-                    },
-                  }}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search fontSize="small" sx={{ color: '#94a3b8' }} />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-              </Box>
+              <div className="p-4 pb-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search properties..."
+                    value={propertiesSearchQuery}
+                    onChange={(e) => setPropertiesSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm border bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+              </div>
 
               {/* New Reference draggable */}
               {!isReadOnly && (
-                <Box sx={{ px: 2, pb: 1.5 }}>
-                  <Box
+                <div className="px-4 pb-3">
+                  <div
                     role="button"
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.effectAllowed = 'copy';
                       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-reference' }));
                     }}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      px: 2,
-                      py: 1.5,
-                      borderRadius: 2,
-                      border: '2px dashed',
-                      borderColor: 'rgba(34, 197, 94, 0.4)',
-                      background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.04) 100%)',
-                      cursor: 'grab',
-                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                      '&:hover': {
-                        borderColor: '#22c55e',
-                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.08) 100%)',
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
-                      },
-                      '&:active': {
-                        cursor: 'grabbing',
-                        transform: 'scale(0.98)',
-                      },
-                    }}
+                    className="flex items-center justify-between px-4 py-3 rounded-lg border-2 border-dashed border-green-500/40 bg-green-500/10 cursor-grab hover:border-green-500 hover:bg-green-500/15 hover:-translate-y-px hover:shadow-lg hover:shadow-green-500/20 active:cursor-grabbing active:scale-[0.98] transition-all"
                     title="Drag to create a new reference on a class or inside an object"
                   >
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#16a34a' }}>+ New Reference</Typography>
-                    <Typography variant="caption" sx={{ color: '#22c55e', fontSize: '0.7rem' }}>drag to class</Typography>
-                  </Box>
-                </Box>
+                    <span className="text-sm font-semibold text-green-700 dark:text-green-400">+ New Reference</span>
+                    <span className="text-xs text-green-600 dark:text-green-500">drag to class</span>
+                  </div>
+                </div>
               )}
 
               {/* Properties List */}
-              <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
+              <div className="flex-1 overflow-auto px-2 py-1">
                 {filteredProperties.length === 0 ? (
-                  <Box sx={{
-                    textAlign: 'center',
-                    mt: 6,
-                    px: 3,
-                  }}>
-                    <Box sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: '50%',
-                      bgcolor: 'rgba(99, 102, 241, 0.1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 16px',
-                    }}>
-                      <Add sx={{ color: '#6366f1', fontSize: 24 }} />
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, mb: 0.5 }}
-                    >
-                      {properties.length === 0
-                        ? 'No properties yet'
-                        : 'No properties match your search'}
-                    </Typography>
+                  <div className="text-center mt-8 px-4">
+                    <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto mb-4">
+                      <Plus className="w-6 h-6 text-indigo-500" />
+                    </div>
+                    <p className="text-sm font-medium mb-1" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {properties.length === 0 ? 'No properties yet' : 'No properties match your search'}
+                    </p>
                     {properties.length === 0 && (
-                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8' }}>
+                      <p className="text-xs" style={{ color: isDark ? '#64748b' : '#94a3b8' }}>
                         Click the + button to add one
-                      </Typography>
+                      </p>
                     )}
-                  </Box>
+                  </div>
                 ) : (
-                  <Box sx={{ py: 0.5 }}>
+                  <div className="py-1">
                     {filteredProperties.map((propertyItem) => {
                       const hasChildren = hasInlineProperties(propertyItem);
                       const isExpanded = expandedPropertyIds.has(propertyItem.id);
@@ -764,390 +481,158 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
 
                       return (
                         <React.Fragment key={propertyItem.id}>
-                          <Box
+                          <div
                             draggable={!isReadOnly}
                             onDragStart={(e) => {
-                              // Prevent drag in read-only mode
-                              if (isReadOnly) {
-                                e.preventDefault();
-                                return;
-                              }
-                              // Set the property data as the drag payload
+                              if (isReadOnly) { e.preventDefault(); return; }
                               e.dataTransfer.effectAllowed = 'copy';
-                              e.dataTransfer.setData('application/json', JSON.stringify({
-                                type: 'property',
-                                property: propertyItem
-                              }));
+                              e.dataTransfer.setData('application/json', JSON.stringify({ type: 'property', property: propertyItem }));
                             }}
                             onClick={() => handlePropertySelect(propertyItem)}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1,
-                              px: 2,
-                              py: 1.5,
-                              mb: 0.5,
-                              mx: 0.5,
-                              cursor: isReadOnly ? 'default' : 'grab',
-                              backgroundColor: selectedPropertyId === propertyItem.id
-                                ? 'rgba(99, 102, 241, 0.1)'
-                                : 'transparent',
-                              borderRadius: 2,
-                              borderLeft: selectedPropertyId === propertyItem.id ? '3px solid #6366f1' : '3px solid transparent',
-                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                              '&:hover': {
-                                backgroundColor: selectedPropertyId === propertyItem.id
-                                  ? 'rgba(99, 102, 241, 0.15)'
-                                  : 'rgba(99, 102, 241, 0.05)',
-                                transform: isReadOnly ? 'none' : 'translateX(2px)',
-                              },
-                              '&:active': {
-                                cursor: 'grabbing',
-                                transform: 'scale(0.98)',
-                              },
-                            }}
+                            className={`flex items-center gap-2 px-4 py-3 mb-1 mx-1 rounded-lg transition-all cursor-${isReadOnly ? 'default' : 'grab'} active:cursor-grabbing active:scale-[0.98] ${
+                              selectedPropertyId === propertyItem.id ? 'bg-indigo-500/10 border-l-[3px] border-indigo-500 hover:bg-indigo-500/15' : 'border-l-[3px] border-transparent hover:bg-indigo-500/5 hover:translate-x-0.5'
+                            }`}
                           >
-                            {/* Expand/Collapse button for object types with inline properties */}
                             {hasChildren ? (
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  togglePropertyExpanded(propertyItem.id);
-                                }}
-                                sx={{
-                                  p: 0.25,
-                                  color: isDark ? '#94a3b8' : '#64748b',
-                                  '&:hover': {
-                                    color: '#6366f1',
-                                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                                  },
-                                }}
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); togglePropertyExpanded(propertyItem.id); }}
                                 title={isExpanded ? 'Collapse nested properties' : 'Expand nested properties'}
+                                className="p-1 rounded text-slate-500 hover:text-indigo-500 hover:bg-indigo-500/10"
                               >
-                                {isExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                              </IconButton>
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </button>
                             ) : (
-                              <Box sx={{ width: 24 }} /> // Spacer for alignment
+                              <div className="w-6" />
                             )}
-
-                            {/* Property content */}
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: 600,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-sm font-semibold truncate"
+                                style={{
                                   textDecoration: propertyItem.deprecated ? 'line-through' : 'none',
-                                  color: propertyItem.deprecated
-                                    ? '#94a3b8'
-                                    : (isDark ? '#e2e8f0' : '#334155'),
+                                  color: propertyItem.deprecated ? '#94a3b8' : (isDark ? '#e2e8f0' : '#334155'),
                                 }}
                                 title={propertyItem.deprecated ? ((propertyItem as any).deprecationMessage || 'Deprecated') : undefined}
                               >
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}>{propertyItem.name}</span>
+                                <span className="flex items-center gap-2">
+                                  <span className="truncate">{propertyItem.name}</span>
                                   {hasChildren && (
-                                    <span
-                                      style={{
-                                        background: isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                                        color: '#6366f1',
-                                        fontSize: 9,
-                                        fontWeight: 600,
-                                        padding: '2px 6px',
-                                        borderRadius: '6px',
-                                        flexShrink: 0,
-                                      }}
-                                    >
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-500 flex-shrink-0">
                                       {inlineProps.length}
                                     </span>
                                   )}
                                   {propertyItem.enum && Array.isArray(propertyItem.enum) && propertyItem.enum.length > 0 && (
-                                    <span
-                                      title={`Enumeration: ${propertyItem.enum.join(', ')}`}
-                                      style={{
-                                        background: 'linear-gradient(135deg, #dbeafe 0%, #c7d2fe 100%)',
-                                        color: '#4338ca',
-                                        fontSize: 9,
-                                        fontWeight: 700,
-                                        padding: '2px 6px',
-                                        borderRadius: '6px',
-                                        flexShrink: 0,
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
-                                      }}
-                                    >
+                                    <span title={`Enumeration: ${propertyItem.enum.join(', ')}`} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-indigo-700 dark:text-indigo-300 uppercase tracking-wide flex-shrink-0">
                                       ENUM
                                     </span>
                                   )}
                                 </span>
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  display: 'block',
-                                  color: isDark ? '#94a3b8' : '#64748b',
-                                  mt: 0.25,
-                                }}
-                              >
-                                {propertyItem.type && (Array.isArray(propertyItem.type) ? (
-                                  <>
-                                    {propertyItem.type[0]}{propertyItem.type[1] === 'null' && ' [nullable]'}
-                                  </>
-                                ) : (
-                                  <>
-                                    {propertyItem.type}
-                                  </>
-                                )) || propertyItem.description}
-                              </Typography>
-                            </Box>
-
-                            {/* Action buttons */}
-                            <Box sx={{ display: 'flex', gap: 0.25 }}>
-                              <IconButton
-                                size="small"
+                              </p>
+                              <p className="text-xs truncate mt-0.5 text-slate-500 dark:text-slate-400">
+                                {propertyItem.type && (Array.isArray(propertyItem.type) ? `${propertyItem.type[0]}${propertyItem.type[1] === 'null' ? ' [nullable]' : ''}` : propertyItem.type) || propertyItem.description}
+                              </p>
+                            </div>
+                            <div className="flex gap-0.5 opacity-60 hover:opacity-100">
+                              <button
+                                type="button"
                                 disabled={!selectedProjectId || isReadOnly}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  callbacks.onPropertyEdit?.(propertyItem);
-                                }}
+                                onClick={(e) => { e.stopPropagation(); callbacks.onPropertyEdit?.(propertyItem); }}
                                 title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Edit property'}
-                                sx={{
-                                  opacity: 0.6,
-                                  transition: 'all 0.2s ease',
-                                  '&:hover': {
-                                    opacity: 1,
-                                    color: '#6366f1',
-                                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                                  },
-                                }}
+                                className="p-1.5 rounded hover:bg-indigo-500/10 hover:text-indigo-500 disabled:opacity-50 disabled:pointer-events-none"
                               >
-                                <Edit fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                size="small"
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
                                 disabled={!selectedProjectId || isReadOnly}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  callbacks.onPropertyDelete?.(propertyItem.id);
-                                }}
+                                onClick={(e) => { e.stopPropagation(); callbacks.onPropertyDelete?.(propertyItem.id); }}
                                 title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Delete property'}
-                                sx={{
-                                  opacity: 0.6,
-                                  transition: 'all 0.2s ease',
-                                  '&:hover': {
-                                    opacity: 1,
-                                    color: '#ef4444',
-                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                  },
-                                }}
+                                className="p-1.5 rounded hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 disabled:pointer-events-none"
                               >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Box>
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
 
                           {/* Nested Properties (shown when expanded) */}
                           {hasChildren && isExpanded && (
-                            <Box
-                              sx={{
-                                ml: 4,
-                                mr: 1,
-                                mb: 1,
-                                pl: 2,
-                                borderLeft: '2px solid',
-                                borderColor: isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.2)',
-                                backgroundColor: isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(99, 102, 241, 0.03)',
-                                borderRadius: '0 8px 8px 0',
-                              }}
+                            <div
+                              className="ml-4 mr-2 mb-2 pl-4 rounded-r-lg border-l-2 border-indigo-500/30 bg-indigo-500/5"
                             >
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  display: 'block',
-                                  color: isDark ? '#818cf8' : '#6366f1',
-                                  fontWeight: 600,
-                                  fontSize: 10,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.5px',
-                                  py: 0.75,
-                                  px: 1,
-                                }}
-                              >
+                              <span className="block text-[10px] font-semibold uppercase tracking-wider py-2 px-2 text-indigo-400 dark:text-indigo-300">
                                 Nested Properties
-                              </Typography>
+                              </span>
                               {inlineProps.map((child, idx) => (
-                                <Box
+                                <div
                                   key={`${propertyItem.id}-${child.name}-${idx}`}
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                    py: 0.75,
-                                    px: 1,
-                                    borderRadius: 1,
-                                    '&:hover': {
-                                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
-                                    },
-                                  }}
+                                  className="flex items-center gap-2 py-2 px-2 rounded hover:bg-white/5 dark:hover:bg-white/5"
                                 >
-                                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography
-                                      variant="body2"
-                                      sx={{
-                                        fontSize: 12,
-                                        fontWeight: 500,
-                                        color: isDark ? '#e2e8f0' : '#334155',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 0.5,
-                                      }}
-                                    >
-                                      {child.required && (
-                                        <span style={{ color: '#ef4444', fontWeight: 700 }}>*</span>
-                                      )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate flex items-center gap-1">
+                                      {child.required && <span className="text-red-500 font-bold">*</span>}
                                       {child.name}
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        display: 'block',
-                                        fontSize: 10,
-                                        color: isDark ? '#94a3b8' : '#64748b',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                      }}
-                                    >
+                                    </p>
+                                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                                       {child.type}{child.description ? ` — ${child.description}` : ''}
-                                    </Typography>
-                                  </Box>
-                                </Box>
+                                    </p>
+                                  </div>
+                                </div>
                               ))}
-                            </Box>
+                            </div>
                           )}
                         </React.Fragment>
                       );
                     })}
-                  </Box>
+                  </div>
                 )}
-              </Box>
+              </div>
 
               {/* Action Buttons */}
-              <Box sx={{ position: 'absolute', bottom: 20, right: 20, display: 'flex', gap: 1 }}>
-                <Fab
-                  size="small"
+              <div className="absolute bottom-5 right-5 flex gap-2">
+                <button
+                  type="button"
                   onClick={() => callbacks.onPropertyTemplates?.()}
                   disabled={!selectedProjectId || isReadOnly}
                   aria-label="Browse property templates"
                   title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Browse property templates'}
-                  sx={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: isDark ? '#0f172a' : '#ffffff',
-                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-2px) scale(1.05)',
-                      boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)',
-                    },
-                    '&:disabled': {
-                      background: isDark ? '#475569' : '#e2e8f0',
-                      color: isDark ? '#94a3b8' : '#64748b',
-                      boxShadow: 'none',
-                    },
-                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-emerald-500 to-emerald-600 text-white hover:shadow-emerald-500/40"
                 >
-                  <LibraryBooks />
-                </Fab>
-                <Fab
-                  color="primary"
-                  size="small"
+                  <Library className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => callbacks.onPropertyAdd?.()}
                   disabled={!selectedProjectId || isReadOnly}
                   aria-label="Add property"
                   title={!selectedProjectId ? 'Select a project first' : isReadOnly ? 'Cannot edit published version' : 'Add property'}
-                  sx={{
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      transform: 'translateY(-2px) scale(1.05)',
-                      boxShadow: '0 6px 20px rgba(99, 102, 241, 0.5)',
-                    },
-                    '&:disabled': {
-                      background: isDark ? '#475569' : '#e2e8f0',
-                      boxShadow: 'none',
-                    },
-                  }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all hover:-translate-y-0.5 hover:scale-105 disabled:opacity-50 disabled:pointer-events-none disabled:transform-none bg-gradient-to-br from-indigo-500 to-purple-600 text-white hover:shadow-indigo-500/40"
                 >
-                  <Add />
-                </Fab>
-              </Box>
-            </Box>
-          )}
-          {currentTab === 'groups' && (
-            // Groups View
-            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </Tabs.Content>
+
+          <Tabs.Content value="groups" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
+            <div className="flex flex-col h-full">
               {/* Search Bar */}
-              <Box sx={{ p: 2, pb: 1.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Search groups..."
-                  value={groupsSearchQuery}
-                  onChange={(e) => setGroupsSearchQuery(e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      backgroundColor: isDark ? '#334155' : '#f8fafc',
-                      transition: 'all 0.2s ease',
-                      '& input': {
-                        color: isDark ? '#e2e8f0' : 'inherit',
-                      },
-                      '& input::placeholder': {
-                        color: isDark ? '#94a3b8' : 'inherit',
-                        opacity: 1,
-                      },
-                      '& fieldset': {
-                        borderColor: isDark ? '#475569' : 'rgba(0, 0, 0, 0.23)',
-                      },
-                      '&:hover': {
-                        backgroundColor: isDark ? '#475569' : '#f1f5f9',
-                      },
-                      '&.Mui-focused': {
-                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                        boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)',
-                      },
-                    },
-                  }}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search fontSize="small" sx={{ color: '#94a3b8' }} />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-              </Box>
+              <div className="p-4 pb-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search groups..."
+                    value={groupsSearchQuery}
+                    onChange={(e) => setGroupsSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg text-sm border bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800"
+                  />
+                </div>
+              </div>
 
               {/* New Group draggable */}
               {!isReadOnly && selectedVersionId && (
-                <Box sx={{ px: 2, pb: 1.5 }}>
-                  <Box
+                <div className="px-4 pb-3">
+                  <div
                     role="button"
                     draggable
                     onDragStart={(e) => {
@@ -1155,150 +640,80 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'new-group' }));
                       e.dataTransfer.setData('application/x-objectified-drag-type', 'new-group');
                     }}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      px: 2,
-                      py: 1.5,
-                      borderRadius: 2,
-                      border: '2px dashed',
-                      borderColor: 'rgba(139, 92, 246, 0.4)',
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%)',
-                      cursor: 'grab',
-                      transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                      '&:hover': {
-                        borderColor: '#8b5cf6',
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(99, 102, 241, 0.08) 100%)',
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)',
-                      },
-                      '&:active': {
-                        cursor: 'grabbing',
-                        transform: 'scale(0.98)',
-                      },
-                    }}
+                    className="flex items-center justify-between px-4 py-3 rounded-lg border-2 border-dashed border-violet-500/40 bg-violet-500/10 cursor-grab hover:border-violet-500 hover:bg-violet-500/15 hover:-translate-y-px hover:shadow-lg hover:shadow-violet-500/20 active:cursor-grabbing active:scale-[0.98] transition-all"
                     title="Drag to create a new group on the canvas"
                   >
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#8b5cf6' }}>+ New Group</Typography>
-                    <Typography variant="caption" sx={{ color: '#a78bfa', fontSize: '0.7rem' }}>drag to canvas</Typography>
-                  </Box>
-                </Box>
+                    <span className="text-sm font-semibold text-violet-600 dark:text-violet-400">+ New Group</span>
+                    <span className="text-xs text-violet-500 dark:text-violet-400">drag to canvas</span>
+                  </div>
+                </div>
               )}
 
               {/* Groups List */}
-              <Box sx={{ flex: 1, overflow: 'auto', px: 1 }}>
+              <div className="flex-1 overflow-auto px-2 py-1">
                 {filteredGroups.length === 0 ? (
-                  <Box sx={{
-                    textAlign: 'center',
-                    mt: 4,
-                    px: 3,
-                  }}>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, mb: 0.5 }}
-                    >
-                      {groups.length === 0
-                        ? 'No groups yet'
-                        : 'No groups match your search'}
-                    </Typography>
+                  <div className="text-center mt-6 px-4">
+                    <p className="text-sm font-medium mb-1" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+                      {groups.length === 0 ? 'No groups yet' : 'No groups match your search'}
+                    </p>
                     {groups.length === 0 && (
-                      <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8', display: 'block' }}>
+                      <p className="text-xs block" style={{ color: isDark ? '#64748b' : '#94a3b8' }}>
                         Drag &quot;+ New Group&quot; above onto the canvas to create one
-                      </Typography>
+                      </p>
                     )}
-                  </Box>
+                  </div>
                 ) : (
-                  <List dense sx={{ py: 0.5 }}>
+                  <ul className="py-1 space-y-1 list-none p-0 m-0">
                     {filteredGroups.map((group) => (
-                      <ListItem
-                        key={group.id}
-                        disablePadding
-                        sx={{ mb: 0.5 }}
-                        secondaryAction={
-                          !isReadOnly && (
-                            <Box sx={{ display: 'flex', gap: 0, alignItems: 'center' }}>
-                              {(group.nodeIds?.length ?? 0) > 0 && (
-                                <IconButton
-                                  edge="end"
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    callbacks.onGroupDeleteAllClasses?.(group.id);
-                                  }}
-                                  sx={{
-                                    color: isDark ? '#94a3b8' : '#64748b',
-                                    '&:hover': { color: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)' },
-                                  }}
-                                  title="Delete all classes in group"
-                                >
-                                  <DeleteSweep fontSize="small" />
-                                </IconButton>
-                              )}
-                              <IconButton
-                                edge="end"
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  callbacks.onGroupDelete?.(group.id);
-                                }}
-                                sx={{
-                                  color: isDark ? '#94a3b8' : '#64748b',
-                                  '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' },
-                                }}
-                                title="Delete group"
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          )
-                        }
-                      >
-                        <ListItemButton
+                      <li key={group.id} className="mb-1 flex items-stretch rounded-lg group">
+                        <button
+                          type="button"
                           onClick={() => callbacks.onGroupSelect?.(group.id)}
-                          sx={{
-                            borderRadius: 2,
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              backgroundColor: 'rgba(139, 92, 246, 0.05)',
-                            },
-                          }}
+                          className="flex-1 flex items-center gap-3 text-left rounded-lg px-3 py-2 transition-all hover:bg-violet-500/5 min-w-0"
                         >
-                          <Box
-                            sx={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: '3px',
-                              backgroundColor: group.color || '#8b5cf6',
-                              mr: 1.5,
-                              flexShrink: 0,
-                            }}
+                          <span
+                            className="w-3 h-3 rounded flex-shrink-0"
+                            style={{ backgroundColor: group.color || '#8b5cf6' }}
                           />
-                          <ListItemText
-                            primary={group.name}
-                            secondary={`${group.nodeIds?.length || 0} classes`}
-                            slotProps={{
-                              primary: {
-                                noWrap: true,
-                                sx: { fontWeight: 500, fontSize: '0.875rem' }
-                              },
-                              secondary: {
-                                noWrap: true,
-                                sx: { fontSize: '0.75rem' }
-                              },
-                            }}
-                          />
-                        </ListItemButton>
-                      </ListItem>
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-sm font-medium truncate">{group.name}</span>
+                            <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">
+                              {group.nodeIds?.length || 0} classes
+                            </span>
+                          </div>
+                        </button>
+                        {!isReadOnly && (
+                          <div className="flex items-center opacity-60 group-hover:opacity-100">
+                            {(group.nodeIds?.length ?? 0) > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); callbacks.onGroupDeleteAllClasses?.(group.id); }}
+                                title="Delete all classes in group"
+                                className="p-1.5 rounded hover:bg-amber-500/10 hover:text-amber-500"
+                              >
+                                <DeleteSweep className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); callbacks.onGroupDelete?.(group.id); }}
+                              title="Delete group"
+                              className="p-1.5 rounded hover:bg-red-500/10 hover:text-red-500"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </li>
                     ))}
-                  </List>
+                  </ul>
                 )}
-              </Box>
-            </Box>
-          )}
-        </Box>
-      </Box>
-    </Drawer>
+              </div>
+            </div>
+          </Tabs.Content>
+        </Tabs.Root>
+      </div>
+    </aside>
   );
 };
 

@@ -1,36 +1,11 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Radix/native stubs replace MUI; some callback params are typed loosely for compatibility.
 
 import React, { useMemo } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormControl from '@mui/material/FormControl';
-import Checkbox from '@mui/material/Checkbox';
-import Radio from '@mui/material/Radio';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
-import InputAdornment from '@mui/material/InputAdornment';
-import Tooltip from '@mui/material/Tooltip';
-import MuiSelect from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import TuneIcon from '@mui/icons-material/Tune';
-import SettingsIcon from '@mui/icons-material/Settings';
-import CodeIcon from '@mui/icons-material/Code';
-import Collapse from '@mui/material/Collapse';
-import Autocomplete from '@mui/material/Autocomplete';
+import { Plus, Trash2, Sparkles, ArrowUpDown, GripVertical, ExternalLink, Info, SlidersHorizontal, Settings, Code } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -51,6 +26,189 @@ import { RegexTester } from './RegexTester';
 import { PrefixItemsEditor } from './PrefixItemsEditor';
 import { ExtensionsEditor } from './ExtensionsEditor';
 import { PrimitiveSelector } from './PrimitiveSelector';
+
+// Radix/native stubs replacing MUI (no MUI dependency)
+const spacing = (n: number) => (typeof n === 'number' ? n * 8 : 0);
+const sxToStyle = (sx: any): React.CSSProperties => {
+  if (!sx || typeof sx !== 'object') return {};
+  const style: React.CSSProperties = {};
+  if (sx.p != null) style.padding = spacing(Number(sx.p));
+  if (sx.px != null) { style.paddingLeft = spacing(Number(sx.px)); style.paddingRight = spacing(Number(sx.px)); }
+  if (sx.py != null) { style.paddingTop = spacing(Number(sx.py)); style.paddingBottom = spacing(Number(sx.py)); }
+  if (sx.m != null) style.margin = spacing(Number(sx.m));
+  if (sx.mb != null) style.marginBottom = spacing(Number(sx.mb));
+  if (sx.mt != null) style.marginTop = spacing(Number(sx.mt));
+  if (sx.mr != null) style.marginRight = spacing(Number(sx.mr));
+  if (sx.ml != null) style.marginLeft = spacing(Number(sx.ml));
+  if (sx.gap != null) style.gap = spacing(Number(sx.gap));
+  if (sx.display != null) style.display = sx.display;
+  if (sx.flex != null) style.flex = sx.flex;
+  if (sx.flexDirection != null) style.flexDirection = sx.flexDirection;
+  if (sx.alignItems != null) style.alignItems = sx.alignItems;
+  if (sx.justifyContent != null) style.justifyContent = sx.justifyContent;
+  if (sx.borderRadius != null) style.borderRadius = typeof sx.borderRadius === 'number' ? sx.borderRadius * 8 : sx.borderRadius;
+  if (sx.border != null) style.border = sx.border;
+  if (sx.borderBottom != null) style.borderBottom = sx.borderBottom;
+  if (sx.borderColor != null) style.borderColor = sx.borderColor;
+  if (sx.borderLeft != null) style.borderLeft = sx.borderLeft;
+  if (sx.bgcolor != null || sx.backgroundColor != null) style.backgroundColor = sx.bgcolor ?? sx.backgroundColor;
+  if (sx.background != null) style.background = sx.background;
+  if (sx.color != null) style.color = sx.color;
+  if (sx.fontWeight != null) style.fontWeight = sx.fontWeight;
+  if (sx.fontSize != null) style.fontSize = typeof sx.fontSize === 'number' ? sx.fontSize : sx.fontSize;
+  if (sx.fontFamily != null) style.fontFamily = sx.fontFamily;
+  if (sx.letterSpacing != null) style.letterSpacing = sx.letterSpacing;
+  if (sx.textTransform != null) style.textTransform = sx.textTransform;
+  if (sx.overflow != null) style.overflow = sx.overflow;
+  if (sx.minWidth != null) style.minWidth = sx.minWidth;
+  if (sx.width != null) style.width = sx.width;
+  if (sx.cursor != null) style.cursor = sx.cursor;
+  if (sx.transition != null) style.transition = sx.transition;
+  if (sx.opacity != null) style.opacity = sx.opacity;
+  if (sx.flexShrink != null) style.flexShrink = sx.flexShrink;
+  if (sx.my != null) { style.marginTop = spacing(Number(sx.my)); style.marginBottom = spacing(Number(sx.my)); }
+  if (sx.mx != null) { style.marginLeft = spacing(Number(sx.mx)); style.marginRight = spacing(Number(sx.mx)); }
+  return style;
+};
+const Box = ({ sx, component: Comp = 'div', children, ...rest }: any) => <Comp style={sxToStyle(sx)} {...rest}>{children}</Comp>;
+const Typography = ({ variant, sx, children, component: Comp = 'span', ...rest }: any) => <Comp style={sxToStyle(sx)} {...rest}>{children}</Comp>;
+const Button = ({ sx, children, startIcon, endIcon, ...rest }: any) => (
+  <button type="button" style={sxToStyle(sx)} {...rest}>{startIcon}{children}{endIcon}</button>
+);
+const IconButton = ({ sx, children, size, ...rest }: any) => (
+  <button type="button" style={{ ...sxToStyle(sx), padding: size === 'small' ? 4 : 8, background: 'none', border: 'none', cursor: 'pointer' }} {...rest}>{children}</button>
+);
+const List = ({ sx, children, ...rest }: any) => <ul style={{ listStyle: 'none', padding: 0, margin: 0, ...sxToStyle(sx) }} {...rest}>{children}</ul>;
+const ListItem = ({ sx, children, secondaryAction, disablePadding, ...rest }: any) => (
+  <li style={{ display: 'flex', alignItems: 'center', padding: disablePadding ? 0 : '8px 0', ...sxToStyle(sx) }} {...rest}>
+    <span style={{ flex: 1 }}>{children}</span>
+    {secondaryAction}
+  </li>
+);
+const ListItemText = ({ primary, secondary, primaryTypographyProps, sx, ...rest }: any) => (
+  <span style={{ flex: 1, ...sxToStyle(sx), ...(primaryTypographyProps || {}) }} {...rest}>
+    {typeof primary === 'string' ? primary : primary}
+    {secondary && <span className="block text-xs text-slate-500 mt-0.5">{secondary}</span>}
+  </span>
+);
+const InputAdornment = ({ position, children }: any) => <span className={position === 'start' ? 'pl-3' : 'pr-3'}>{children}</span>;
+const Chip = ({ label, size, sx, color, icon, onDelete, ...rest }: any) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 16, fontSize: 12, ...sxToStyle(sx) }} {...rest}>
+    {icon}{label}
+    {onDelete && <button type="button" onClick={onDelete} aria-label="Remove">×</button>}
+  </span>
+);
+const FormControl = ({ sx, children, ...rest }: any) => <div style={sxToStyle(sx)} {...rest}>{children}</div>;
+const FormControlLabel = ({ control, label, sx, ...rest }: any) => (
+  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', ...sxToStyle(sx) }} {...rest}>
+    {control}
+    {label}
+  </label>
+);
+const Checkbox = ({ checked, onChange, disabled, sx, ...rest }: any) => (
+  <input type="checkbox" checked={checked} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange?.(e, e.target.checked)} disabled={disabled} {...rest} />
+);
+const Radio = ({ checked, onChange, value, disabled, sx, ...rest }: any) => (
+  <input type="radio" checked={checked} onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange?.(e, e.target.value)} value={value} disabled={disabled} {...rest} />
+);
+const Collapse = ({ in: inProp, children }: any) => inProp ? <div>{children}</div> : null;
+const MenuItem = ({ value, children, ...rest }: any) => <option value={value} {...rest}>{children}</option>;
+const MuiSelect = ({ value, onChange, children, label, sx, size, disabled, SelectProps, ...rest }: any) => (
+  <select
+    value={value ?? ''}
+    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const v = e.target.value;
+      (onChange as any)?.(e, v);
+    }}
+    disabled={disabled}
+    style={{ minHeight: size === 'small' ? 32 : 40, ...sxToStyle(sx) }}
+    {...rest}
+  >
+    {children}
+  </select>
+);
+const Tooltip = ({ title, children, arrow, ...rest }: any) => (
+  <TooltipPrimitive.Provider>
+    <TooltipPrimitive.Root>
+      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Content sideOffset={5} className="max-w-xs px-3 py-2 text-xs bg-slate-900 text-white rounded shadow-lg">
+        {title}
+      </TooltipPrimitive.Content>
+    </TooltipPrimitive.Root>
+  </TooltipPrimitive.Provider>
+);
+const TextField = ({ label, value, onChange, fullWidth, size, error, helperText, placeholder, disabled, multiline, rows, select, SelectProps, InputProps, slotProps, sx, children, ...rest }: any) => {
+  const inputProps = InputProps || slotProps?.input || {};
+  const startAdornment = inputProps.startAdornment;
+  const endAdornment = inputProps.endAdornment;
+  const style = { width: fullWidth ? '100%' : undefined, ...sxToStyle(sx) };
+  const inputClass = 'px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm';
+  const el = select ? (
+    <select value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} className={inputClass} disabled={disabled} style={{ minHeight: size === 'small' ? 32 : 40 }} {...rest}>
+      {children}
+    </select>
+  ) : multiline ? (
+    <textarea value={value ?? ''} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)} placeholder={placeholder} disabled={disabled} rows={rows || 3} className={inputClass} {...rest} />
+  ) : (
+    <input
+      type="text"
+      value={value ?? ''}
+      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(e)}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={inputClass}
+      {...rest}
+    />
+  );
+  return (
+    <div style={{ marginBottom: 16, ...style }}>
+      {label && <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">{label}</label>}
+      <div className="flex items-center">
+        {startAdornment}
+        {el}
+        {endAdornment}
+      </div>
+      {helperText && <p className="text-xs text-slate-500 mt-1">{helperText}</p>}
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+    </div>
+  );
+};
+const Autocomplete = ({ options, value, onChange, freeSolo, renderInput, multiple, renderTags, ...rest }: any) => {
+  const val = multiple ? (value || []) : (value ?? '');
+  if (multiple) {
+    const arr = Array.isArray(val) ? val : [];
+    return (
+      <div>
+        {renderInput?.({})}
+        <div className="flex flex-wrap gap-2 mt-2">
+          {arr.map((opt: string, i: number) => (
+            <span key={opt} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-sm">
+              {opt}
+              <button type="button" onClick={() => onChange?.(null, arr.filter((_: any, j: number) => j !== i))}>×</button>
+            </span>
+          ))}
+        </div>
+        <input
+          list={`autocomplete-${Math.random()}`}
+          className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm w-full mt-1"
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value; if (v && !arr.includes(v)) onChange?.(null, [...arr, v]); (e.target as HTMLInputElement).value = ''; } }}
+        />
+        <datalist>{options?.map((o: string) => <option key={o} value={o} />)}</datalist>
+      </div>
+    );
+  }
+  return renderInput ? renderInput({}) : <input value={val} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange?.(null, e.target.value)} {...rest} />;
+};
+const AddIcon = (props: any) => <Plus className="w-4 h-4" {...props} />;
+const DeleteIcon = (props: any) => <Trash2 className="w-4 h-4" {...props} />;
+const AutoAwesomeIcon = (props: any) => <Sparkles className="w-4 h-4" {...props} />;
+const SortByAlphaIcon = (props: any) => <ArrowUpDown className="w-4 h-4" {...props} />;
+const DragIndicatorIcon = (props: any) => <GripVertical className="w-4 h-4" {...props} />;
+const OpenInNewIcon = (props: any) => <ExternalLink className="w-4 h-4" {...props} />;
+const InfoOutlinedIcon = (props: any) => <Info className="w-4 h-4" {...props} />;
+const TuneIcon = (props: any) => <SlidersHorizontal className="w-4 h-4" {...props} />;
+const SettingsIcon = (props: any) => <Settings className="w-4 h-4" {...props} />;
+const CodeIcon = (props: any) => <Code className="w-4 h-4" {...props} />;
 
 export interface PropertyFormData {
   // Basic fields
@@ -334,7 +492,7 @@ const PatternPropertySchemaEditor: React.FC<PatternPropertySchemaEditorProps> = 
       multiline
       rows={rows}
       value={localValue}
-      onChange={(e) => {
+      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setLocalValue(e.target.value);
         try {
           const parsed = e.target.value ? JSON.parse(e.target.value) : { type: 'string' };
@@ -763,7 +921,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               size={size}
               fullWidth
               value={data.title || ''}
-              onChange={(e) => onChange('title', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('title', e.target.value)}
               helperText="Display title"
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -783,7 +941,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             multiline
             rows={2}
             value={data.description || ''}
-            onChange={(e) => onChange('description', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('description', e.target.value)}
             helperText="What this property represents"
             sx={{
               gridColumn: showTitle ? 'auto' : '1 / -1',
@@ -804,7 +962,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             size={size}
             fullWidth
             value={data.default || ''}
-            onChange={(e) => onChange('default', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('default', e.target.value)}
             helperText="JSON default value"
             sx={{
               '& .MuiInputBase-input': { fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: '0.875rem' },
@@ -846,7 +1004,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               multiline
               rows={2}
               value={exampleInput}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                 setExampleInput(e.target.value);
                 setExampleError('');
               }}
@@ -980,7 +1138,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.required || false}
-                  onChange={(e) => onChange('required', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('required', e.target.checked)}
                   size="small"
                   sx={{ py: 0.5, '&.Mui-checked': { color: '#ef4444' } }}
                 />
@@ -994,7 +1152,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.nullable || false}
-                  onChange={(e) => onChange('nullable', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('nullable', e.target.checked)}
                   size="small"
                   sx={{ py: 0.5, '&.Mui-checked': { color: '#a855f7' } }}
                 />
@@ -1008,7 +1166,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.readOnly || false}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     onChange('readOnly', e.target.checked);
                     if (e.target.checked) onChange('writeOnly', false);
                   }}
@@ -1025,7 +1183,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.writeOnly || false}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     onChange('writeOnly', e.target.checked);
                     if (e.target.checked) onChange('readOnly', false);
                   }}
@@ -1042,7 +1200,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.deprecated || false}
-                  onChange={(e) => onChange('deprecated', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('deprecated', e.target.checked)}
                   size="small"
                   sx={{ py: 0.5, '&.Mui-checked': { color: '#f59e0b' } }}
                 />
@@ -1061,7 +1219,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               multiline
               rows={2}
               value={data.deprecationMessage || ''}
-              onChange={(e) => onChange('deprecationMessage', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('deprecationMessage', e.target.value)}
               placeholder="e.g., Use newProperty instead. Will be removed in v2.0."
               sx={{
                 mt: 1.5,
@@ -1202,11 +1360,11 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               <Autocomplete
                 freeSolo
                 size={size}
-                value={data.format || ''}
-                onChange={(_, newValue) => onChange('format', newValue || '')}
-                onInputChange={(_, newInputValue) => onChange('format', newInputValue)}
-                options={FORMAT_OPTIONS.string?.map(opt => opt.value) || []}
-                renderOption={(props, option) => {
+value={data.format || ''}
+                 onChange={(_e: unknown, newValue: string | null) => onChange('format', newValue || '')}
+                 onInputChange={(_e: React.ChangeEvent<HTMLInputElement>, newInputValue: string) => onChange('format', newInputValue)}
+                 options={FORMAT_OPTIONS.string?.map(opt => opt.value) || []}
+                renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: string) => {
                   const formatOption = FORMAT_OPTIONS.string?.find(o => o.value === option);
                   return (
                     <li {...props} key={option}>
@@ -1223,7 +1381,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     </li>
                   );
                 }}
-                renderInput={(params) => (
+                renderInput={(params: any) => (
                   <TextField
                     {...params}
                     label="Format"
@@ -1245,7 +1403,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.minLength || ''}
-                onChange={(e) => onChange('minLength', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('minLength', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#0f172a' : 'white',
@@ -1258,7 +1416,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.maxLength || ''}
-                onChange={(e) => onChange('maxLength', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('maxLength', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#0f172a' : 'white',
@@ -1272,7 +1430,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               size={size}
               fullWidth
               value={data.pattern || ''}
-              onChange={(e) => onChange('pattern', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('pattern', e.target.value)}
               placeholder="e.g., ^[A-Z]{3}$"
               helperText="Regular expression for validation"
               sx={{
@@ -1328,7 +1486,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     size={size}
                     fullWidth
                     value={data.contentMediaType || ''}
-                    onChange={(e) => onChange('contentMediaType', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('contentMediaType', e.target.value)}
                     placeholder="e.g., image/png, application/pdf"
                     helperText="MIME type of the binary content"
                     sx={{
@@ -1342,7 +1500,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     size={size}
                     fullWidth
                     value={data.contentEncoding || ''}
-                    onChange={(e) => onChange('contentEncoding', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('contentEncoding', e.target.value)}
                     placeholder="e.g., base64, base32"
                     helperText="Encoding used for the content"
                     sx={{
@@ -1360,7 +1518,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   multiline
                   rows={2}
                   value={data.contentSchema || ''}
-                  onChange={(e) => onChange('contentSchema', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('contentSchema', e.target.value)}
                   placeholder='{"type": "object", "properties": {...}}'
                   helperText="JSON Schema for the decoded content (optional)"
                   sx={{
@@ -1402,10 +1560,10 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 freeSolo
                 size={size}
                 value={data.format || ''}
-                onChange={(_, newValue) => onChange('format', newValue || '')}
-                onInputChange={(_, newInputValue) => onChange('format', newInputValue)}
+                onChange={(_: any, newValue: string | null) => onChange('format', newValue || '')}
+                onInputChange={(_: any, newInputValue: string) => onChange('format', newInputValue)}
                 options={FORMAT_OPTIONS[baseType]?.map(opt => opt.value) || []}
-                renderOption={(props, option) => {
+                renderOption={(props: any, option: string) => {
                   const formatOption = FORMAT_OPTIONS[baseType]?.find(o => o.value === option);
                   return (
                     <li {...props} key={option}>
@@ -1422,7 +1580,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     </li>
                   );
                 }}
-                renderInput={(params) => (
+                renderInput={(params: any) => (
                   <TextField
                     {...params}
                     label="Format"
@@ -1453,7 +1611,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   size={size}
                   fullWidth
                   value={data.minimum || ''}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                     onChange('minimum', e.target.value);
                     if (e.target.value && !data.minimumType) {
                       onChange('minimumType', 'inclusive');
@@ -1510,7 +1668,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   size={size}
                   fullWidth
                   value={data.maximum || ''}
-                  onChange={(e) => {
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                     onChange('maximum', e.target.value);
                     if (e.target.value && !data.maximumType) {
                       onChange('maximumType', 'inclusive');
@@ -1560,7 +1718,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               size={size}
               fullWidth
               value={data.multipleOf || ''}
-              onChange={(e) => onChange('multipleOf', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('multipleOf', e.target.value)}
               helperText="Value must be divisible by this number"
               sx={{
                 bgcolor: isDark ? '#0f172a' : 'white',
@@ -1598,7 +1756,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.minItems || ''}
-                onChange={(e) => onChange('minItems', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('minItems', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#1e293b' : 'white',
@@ -1611,7 +1769,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.maxItems || ''}
-                onChange={(e) => onChange('maxItems', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('maxItems', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#1e293b' : 'white',
@@ -1640,7 +1798,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   control={
                     <Checkbox
                       checked={data.uniqueItems || false}
-                      onChange={(e) => onChange('uniqueItems', e.target.checked)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('uniqueItems', e.target.checked)}
                       size="small"
                       sx={{ '&.Mui-checked': { color: '#22c55e' } }}
                     />
@@ -1668,7 +1826,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 multiline
                 rows={2}
                 value={data.contains || ''}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                   onChange('contains', e.target.value);
                   if (!e.target.value.trim()) {
                     onChange('minContains', undefined);
@@ -1691,7 +1849,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     size={size}
                     fullWidth
                     value={data.minContains || ''}
-                    onChange={(e) => onChange('minContains', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('minContains', e.target.value)}
                     inputProps={{ min: 1 }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                   />
@@ -1701,7 +1859,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     size={size}
                     fullWidth
                     value={data.maxContains || ''}
-                    onChange={(e) => onChange('maxContains', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('maxContains', e.target.value)}
                     inputProps={{ min: 1 }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                   />
@@ -1721,7 +1879,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 control={
                   <Checkbox
                     checked={data.tupleMode || false}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       onChange('tupleMode', e.target.checked);
                       if (!e.target.checked) {
                         onChange('prefixItems', undefined);
@@ -1764,7 +1922,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       rows={3}
                       size={size}
                       value={data.itemsSchema || ''}
-                      onChange={(e) => onChange('itemsSchema', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('itemsSchema', e.target.value)}
                       placeholder='{"type": "string"}'
                       helperText="Schema for items beyond defined positions"
                       sx={{
@@ -1862,7 +2020,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       rows={3}
                       size={size}
                       value={data.unevaluatedItemsSchema || ''}
-                      onChange={(e) => onChange('unevaluatedItemsSchema', e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('unevaluatedItemsSchema', e.target.value)}
                       placeholder='{"type": "string", "maxLength": 100}'
                       helperText="Schema that unevaluated items must match"
                       sx={{
@@ -1904,7 +2062,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.minProperties || ''}
-                onChange={(e) => onChange('minProperties', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('minProperties', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#0f172a' : 'white',
@@ -1917,7 +2075,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.maxProperties || ''}
-                onChange={(e) => onChange('maxProperties', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('maxProperties', e.target.value)}
                 inputProps={{ min: 0 }}
                 sx={{
                   bgcolor: isDark ? '#0f172a' : 'white',
@@ -1961,7 +2119,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     <FormControl size="small" fullWidth>
                       <MuiSelect
                         value={data.additionalPropertiesType || 'string'}
-                        onChange={(e) => onChange('additionalPropertiesType', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('additionalPropertiesType', e.target.value)}
                         sx={{ fontSize: '0.85rem' }}
                       >
                         <MenuItem value="string">string</MenuItem>
@@ -1985,7 +2143,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       <FormControl size="small" fullWidth>
                         <MuiSelect
                           value={data.additionalPropertiesSchema || ''}
-                          onChange={(e) => onChange('additionalPropertiesSchema', e.target.value)}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('additionalPropertiesSchema', e.target.value)}
                           displayEmpty
                           sx={{ fontSize: '0.85rem' }}
                         >
@@ -2002,7 +2160,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         size="small"
                         fullWidth
                         value={data.additionalPropertiesSchema || ''}
-                        onChange={(e) => onChange('additionalPropertiesSchema', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('additionalPropertiesSchema', e.target.value)}
                         placeholder="ClassName or #/components/schemas/ClassName"
                         helperText="Enter class name or $ref path"
                         sx={{
@@ -2131,7 +2289,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                         size={size}
                         fullWidth
                         value={newPattern}
-                        onChange={(e) => setNewPattern(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setNewPattern(e.target.value)}
                         placeholder="^env_|^flag_"
                         helperText="Regular expression to match property names"
                         sx={{
@@ -2276,7 +2434,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   multiline
                   rows={3}
                   value={data.unevaluatedPropertiesSchema ?? ''}
-                  onChange={(e) => onChange('unevaluatedPropertiesSchema', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('unevaluatedPropertiesSchema', e.target.value)}
                   placeholder='{ "type": "string" }'
                   helperText="JSON Schema that unevaluated properties must match"
                   sx={{
@@ -2363,7 +2521,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   size={size}
                   fullWidth
                   value={data.propertyNamesMinLength ?? ''}
-                  onChange={(e) => onChange('propertyNamesMinLength', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('propertyNamesMinLength', e.target.value)}
                   inputProps={{ min: 0 }}
                   placeholder="e.g., 1"
                   helperText="Minimum"
@@ -2379,7 +2537,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   size={size}
                   fullWidth
                   value={data.propertyNamesMaxLength ?? ''}
-                  onChange={(e) => onChange('propertyNamesMaxLength', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('propertyNamesMaxLength', e.target.value)}
                   inputProps={{ min: 0 }}
                   placeholder="e.g., 50"
                   helperText="Maximum"
@@ -2393,7 +2551,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                   <Typography variant="caption" sx={{ mb: 0.5, color: isDark ? '#94a3b8' : '#64748b', fontSize: '0.7rem' }}>Format</Typography>
                   <MuiSelect
                     value={data.propertyNamesFormat ?? ''}
-                    onChange={(e) => onChange('propertyNamesFormat', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('propertyNamesFormat', e.target.value)}
                     displayEmpty
                     sx={{
                       bgcolor: isDark ? '#1e293b' : 'white',
@@ -2419,7 +2577,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 size={size}
                 fullWidth
                 value={data.propertyNamesPattern ?? ''}
-                onChange={(e) => onChange('propertyNamesPattern', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('propertyNamesPattern', e.target.value)}
                 placeholder="e.g., ^[a-z][a-zA-Z0-9]*$"
                 helperText="Regular expression that all property names must match"
                 InputProps={{
@@ -2449,7 +2607,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 multiline
                 rows={2}
                 value={data.propertyNamesDescription ?? ''}
-                onChange={(e) => onChange('propertyNamesDescription', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('propertyNamesDescription', e.target.value)}
                 placeholder="e.g., Property names must be lowercase, start with letter..."
                 helperText="Describe the property name requirements"
                 sx={{
@@ -2630,7 +2788,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                   <FormControl size="small" sx={{ minWidth: 120 }}>
                                     <MuiSelect
                                       value={conditionType}
-                                      onChange={(e) => {
+                                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                                         const val = e.target.value;
                                         const newSchemas = { ...dependentSchemas };
                                         const newSchema = { ...depSchema };
@@ -2655,7 +2813,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                     <TextField
                                       size="small"
                                       value={conditionValue}
-                                      onChange={(e) => {
+                                      onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                                         const newSchemas = { ...dependentSchemas };
                                         const newSchema = { ...depSchema };
                                         if (conditionType === 'const') {
@@ -2712,7 +2870,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                   <TextField
                                     size="small"
                                     placeholder="+ Add property"
-                                    onKeyDown={(e) => {
+                                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                                       if (e.key === 'Enter') {
                                         const input = e.target as HTMLInputElement;
                                         const val = input.value.trim();
@@ -2771,7 +2929,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                   <TextField
                                     size="small"
                                     placeholder="+ Add property"
-                                    onKeyDown={(e) => {
+                                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                                       if (e.key === 'Enter') {
                                         const input = e.target as HTMLInputElement;
                                         const val = input.value.trim();
@@ -2801,7 +2959,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                                     multiline
                                     rows={4}
                                     value={JSON.stringify(depSchema, null, 2)}
-                                    onChange={(e) => {
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                                       try {
                                         const parsed = JSON.parse(e.target.value);
                                         const newSchemas = { ...dependentSchemas };
@@ -2832,7 +2990,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                       <TextField
                         size="small"
                         value={newDepPropName}
-                        onChange={(e) => setNewDepPropName(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setNewDepPropName(e.target.value)}
                         placeholder="Enter trigger property name"
                         sx={{
                           flex: 1,
@@ -3124,7 +3282,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                 fullWidth
                 type={baseType === 'string' || baseType === 'boolean' ? 'text' : 'number'}
                 value={data.const || ''}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                   onChange('const', e.target.value);
                   if (e.target.value && data.enum && data.enum.length > 0) {
                     onChange('enum', []);
@@ -3227,7 +3385,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
                     fullWidth
                     type={baseType === 'string' ? 'text' : 'number'}
                     value={enumInput}
-                    onChange={(e) => { setEnumInput(e.target.value); setEnumError(''); }}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { setEnumInput(e.target.value); setEnumError(''); }}
                     onKeyDown={handleEnumKeyPress}
                     error={!!enumError}
                     helperText={enumError}
@@ -3315,7 +3473,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               multiline
               rows={3}
               value={data.not || ''}
-              onChange={(e) => onChange('not', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('not', e.target.value)}
               placeholder='{"type": "string", "maxLength": 0}'
               sx={{
                 bgcolor: isDark ? '#1e293b' : 'white',
@@ -3369,7 +3527,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               fullWidth
               type="url"
               value={data.externalDocsUrl || ''}
-              onChange={(e) => onChange('externalDocsUrl', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('externalDocsUrl', e.target.value)}
               placeholder="https://docs.example.com/..."
               sx={{
                 mb: 2,
@@ -3405,7 +3563,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               multiline
               rows={2}
               value={data.externalDocsDescription || ''}
-              onChange={(e) => onChange('externalDocsDescription', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('externalDocsDescription', e.target.value)}
               placeholder="Brief description..."
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
@@ -3472,7 +3630,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               size={size}
               fullWidth
               value={data.xmlName || ''}
-              onChange={(e) => onChange('xmlName', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('xmlName', e.target.value)}
               placeholder="e.g., customName"
               helperText="Replaces element/attribute name"
               sx={{
@@ -3485,7 +3643,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               size={size}
               fullWidth
               value={data.xmlNamespace || ''}
-              onChange={(e) => onChange('xmlNamespace', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('xmlNamespace', e.target.value)}
               placeholder="e.g., http://example.com/ns"
               helperText="URI of namespace"
               sx={{
@@ -3498,7 +3656,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               size={size}
               fullWidth
               value={data.xmlPrefix || ''}
-              onChange={(e) => onChange('xmlPrefix', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('xmlPrefix', e.target.value)}
               placeholder="e.g., ns1"
               helperText="Prefix for the name"
               sx={{
@@ -3513,7 +3671,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.xmlAttribute || false}
-                  onChange={(e) => onChange('xmlAttribute', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('xmlAttribute', e.target.checked)}
                   size="small"
                   sx={{ '&.Mui-checked': { color: '#ea580c' } }}
                 />
@@ -3534,7 +3692,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               control={
                 <Checkbox
                   checked={data.xmlWrapped || false}
-                  onChange={(e) => onChange('xmlWrapped', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange('xmlWrapped', e.target.checked)}
                   size="small"
                   disabled={!isArray}
                   sx={{ '&.Mui-checked': { color: '#ea580c' } }}
@@ -3621,7 +3779,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
             multiline
             rows={2}
             value={data.$comment || ''}
-            onChange={(e) => onChange('$comment', e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('$comment', e.target.value)}
             placeholder="Internal notes about this property (not for end users)"
             helperText="JSON Schema $comment - visible only to schema authors, not API consumers"
             sx={{

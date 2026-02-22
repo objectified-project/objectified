@@ -12,6 +12,7 @@ Bug Fixes:
 - Improved layout of profile page
 - Improved handling of light/dark system theme settings
 - Conversion of forms to use modern components
+- System-wide clean up of modern UI
 - Improved published view page
   - Now displays the different types of object representations as a submenu (OpenAPI, Arazzo, JSON)
   - Now applies API Key when viewing private published pages

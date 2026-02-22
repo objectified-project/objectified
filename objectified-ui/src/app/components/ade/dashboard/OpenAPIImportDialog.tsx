@@ -1,24 +1,49 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import TextField from '@mui/material/TextField';
-import Alert from '@mui/material/Alert';
-import Checkbox from '@mui/material/Checkbox';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import CircularProgress from '@mui/material/CircularProgress';
+import * as Dialog from '@radix-ui/react-dialog';
+import * as Tabs from '@radix-ui/react-tabs';
 import { Upload, FileJson, AlertCircle, CheckCircle2, Link2, Globe, FolderOpen, File, ArrowLeft, Lock, Search } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
+
+const spacing = (n: number) => (typeof n === 'number' ? n * 8 : 0);
+const sxToStyle = (sx: any): React.CSSProperties => {
+  if (!sx || typeof sx !== 'object') return {};
+  const s: React.CSSProperties = {};
+  if (sx.p != null) s.padding = spacing(Number(sx.p)); if (sx.px != null) { s.paddingLeft = spacing(Number(sx.px)); s.paddingRight = spacing(Number(sx.px)); }
+  if (sx.py != null) { s.paddingTop = spacing(Number(sx.py)); s.paddingBottom = spacing(Number(sx.py)); }
+  if (sx.m != null) s.margin = spacing(Number(sx.m)); if (sx.mb != null) s.marginBottom = spacing(Number(sx.mb)); if (sx.mt != null) s.marginTop = spacing(Number(sx.mt));
+  if (sx.ml != null) s.marginLeft = spacing(Number(sx.ml)); if (sx.mr != null) s.marginRight = spacing(Number(sx.mr));
+  if (sx.gap != null) s.gap = spacing(Number(sx.gap)); if (sx.display != null) s.display = sx.display; if (sx.flex != null) s.flex = sx.flex;
+  if (sx.flexDirection != null) s.flexDirection = sx.flexDirection; if (sx.alignItems != null) s.alignItems = sx.alignItems; if (sx.justifyContent != null) s.justifyContent = sx.justifyContent;
+  if (sx.borderRadius != null) s.borderRadius = typeof sx.borderRadius === 'number' ? sx.borderRadius * 8 : sx.borderRadius;
+  if (sx.border != null) s.border = sx.border; if (sx.borderBottom != null) s.borderBottom = sx.borderBottom; if (sx.borderColor != null) s.borderColor = sx.borderColor;
+  if (sx.borderRight != null) s.borderRight = sx.borderRight; if (sx.bgcolor != null) s.backgroundColor = sx.bgcolor; if (sx.color != null) s.color = sx.color;
+  if (sx.fontSize != null) s.fontSize = typeof sx.fontSize === 'number' ? sx.fontSize : sx.fontSize; if (sx.fontWeight != null) s.fontWeight = sx.fontWeight;
+  if (sx.overflow != null) s.overflow = sx.overflow; if (sx.overflowY != null) s.overflowY = sx.overflowY; if (sx.minWidth != null) s.minWidth = sx.minWidth;
+  if (sx.maxWidth != null) s.maxWidth = sx.maxWidth; if (sx.width != null) s.width = sx.width; if (sx.height != null) s.height = sx.height;
+  if (sx.minHeight != null) s.minHeight = sx.minHeight; if (sx.flexShrink != null) s.flexShrink = sx.flexShrink; if (sx.cursor != null) s.cursor = sx.cursor;
+  if (sx.opacity != null) s.opacity = sx.opacity; if (sx.textAlign != null) s.textAlign = sx.textAlign;
+  return s;
+};
+const Box = ({ sx, children, component: C = 'div', ...rest }: any) => <C style={sxToStyle(sx)} {...rest}>{children}</C>;
+const Typography = ({ variant, sx, children, component: C = 'span', ...rest }: any) => <C style={sxToStyle(sx)} {...rest}>{children}</C>;
+const Alert = ({ severity, sx, children, ...rest }: any) => <div role="alert" style={sxToStyle(sx)} className={`p-3 rounded-lg ${severity === 'error' ? 'bg-red-50 dark:bg-red-900/20 text-red-800' : severity === 'warning' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-800'}`} {...rest}>{children}</div>;
+const TextField = ({ label, value, onChange, fullWidth, sx, margin, helperText, ...rest }: any) => (
+  <div style={{ marginBottom: margin === 'dense' ? 8 : 16, ...sxToStyle(sx) }}>
+    {label && <label className="block text-sm font-medium mb-1">{label}</label>}
+    <input type="text" value={value ?? ''} onChange={(e) => onChange?.(e)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800" style={sxToStyle(sx)} {...rest} />
+    {helperText && <p className="text-xs text-slate-500 mt-1">{helperText}</p>}
+  </div>
+);
+const Button = ({ onClick, children, variant, disabled, startIcon, fullWidth, ...rest }: any) => (
+  <button type="button" onClick={onClick} disabled={disabled} className={`px-4 py-2 rounded-lg ${variant === 'contained' ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'border border-slate-300 hover:bg-slate-50'} disabled:opacity-50 ${fullWidth ? 'w-full' : ''}`} {...rest}>{startIcon}{children}</button>
+);
+const IconButton = ({ onClick, size, children, disabled, sx, ...rest }: any) => <button type="button" onClick={onClick} disabled={disabled} style={{ padding: size === 'small' ? 4 : 8, background: 'none', border: 'none', cursor: 'pointer', ...sxToStyle(sx) }} {...rest}>{children}</button>;
+const Chip = ({ label, size, icon, variant, sx, ...rest }: any) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 16, fontSize: 12, ...sxToStyle(sx) }} {...rest}>{icon}{label}</span>;
+const FormControlLabel = ({ control, label, ...rest }: any) => <label className="flex items-center gap-2 cursor-pointer" {...rest}>{control}{label}</label>;
+const Checkbox = ({ checked, onChange, disabled, ...rest }: any) => <input type="checkbox" checked={checked} onChange={(e) => onChange?.(e, e.target.checked)} disabled={disabled} {...rest} />;
+const CircularProgress = ({ size }: any) => <span className="animate-spin rounded-full border-2 border-current border-t-transparent" style={{ width: size || 24, height: size || 24 }} />;
 import { parseOpenAPISpec, ParsedClass, type ParsedPath, type ParsedSecurityScheme, type ParsedOpenAPIServer } from '../../../utils/openapi-import';
 import { importProjectFromOpenAPI, getLinkedAccountsForUser } from '../../../../../lib/db/helper';
 import { filterSlugInput, generateSlug } from '../../../utils/slug';
@@ -470,137 +495,125 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        {step === 'upload' && 'Import from OpenAPI Specification'}
-        {step === 'review' && 'Select Classes to Import'}
-        {step === 'summary' && 'Review Import Summary'}
-        {step === 'details' && 'Project Details'}
-      </DialogTitle>
+    <Dialog.Root open={open} onOpenChange={(o) => !o && handleClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10001]" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col bg-white dark:bg-gray-900 rounded-xl shadow-xl">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+            <Dialog.Title className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {step === 'upload' && 'Import from OpenAPI Specification'}
+              {step === 'review' && 'Select Classes to Import'}
+              {step === 'summary' && 'Review Import Summary'}
+              {step === 'details' && 'Project Details'}
+            </Dialog.Title>
+          </div>
 
-      <DialogContent>
+          <div className="p-4 overflow-auto flex-1 min-h-0">
         {errorMessage && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <div className="mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 text-sm">
             {errorMessage}
-          </Alert>
+          </div>
         )}
 
         {/* Upload Step */}
         {step === 'upload' && (
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
               Import an OpenAPI 3.x specification from a file, URL, or your connected SSO accounts.
-            </Typography>
+            </p>
 
-            {/* Import Method Tabs */}
-            <Tabs
-              value={importMethod}
-              onChange={(_, newValue) => {
-                setImportMethod(newValue);
-                setErrorMessage('');
-              }}
-              sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}
-            >
-              <Tab icon={<Upload size={20} />} iconPosition="start" label="File Upload" value="file" />
-              <Tab icon={<Link2 size={20} />} iconPosition="start" label="From URL" value="url" />
-              <Tab icon={<Globe size={20} />} iconPosition="start" label="From SSO" value="sso" disabled={linkedAccounts.length === 0} />
-            </Tabs>
+            <Tabs.Root value={importMethod} onValueChange={(v) => { setImportMethod(v as any); setErrorMessage(''); }} className="mb-6">
+              <Tabs.List className="flex border-b border-slate-200 dark:border-slate-700 mb-4">
+                <Tabs.Trigger value="file" className="flex items-center gap-2 px-4 py-2 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 data-[state=active]:font-medium">
+                  <Upload size={20} /> File Upload
+                </Tabs.Trigger>
+                <Tabs.Trigger value="url" className="flex items-center gap-2 px-4 py-2 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 data-[state=active]:font-medium">
+                  <Link2 size={20} /> From URL
+                </Tabs.Trigger>
+                <Tabs.Trigger value="sso" className="flex items-center gap-2 px-4 py-2 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 data-[state=active]:font-medium disabled:opacity-50" disabled={linkedAccounts.length === 0}>
+                  <Globe size={20} /> From SSO
+                </Tabs.Trigger>
+              </Tabs.List>
 
             {/* File Upload Tab */}
             {importMethod === 'file' && (
-              <Box>
-                <Box
+              <Tabs.Content value="file" className="mt-0">
+              <div>
+                <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  sx={{
-                    border: '2px dashed',
-                    borderColor: isDragging ? 'primary.main' : 'grey.300',
-                    borderRadius: 2,
-                    p: 4,
-                    textAlign: 'center',
-                    backgroundColor: isDragging ? 'action.hover' : 'background.paper',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                      backgroundColor: 'action.hover'
-                    }
-                  }}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
+                    isDragging ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
                   onClick={() => document.getElementById('openapi-file-input')?.click()}
                 >
                   {file ? (
-                    <Box>
-                      <FileJson size={48} style={{ margin: '0 auto 16px', color: '#22c55e' }} />
-                      <Typography variant="h6" gutterBottom>
-                        {file.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Click to select a different file
-                      </Typography>
-                    </Box>
+                    <div>
+                      <FileJson size={48} className="mx-auto mb-4 text-green-600" />
+                      <p className="text-lg font-semibold mb-1">{file.name}</p>
+                      <p className="text-sm text-slate-500">Click to select a different file</p>
+                    </div>
                   ) : (
-                    <Box>
-                      <Upload size={48} style={{ margin: '0 auto 16px', color: '#94a3b8' }} />
-                      <Typography variant="h6" gutterBottom>
-                        Drag & Drop or Click to Select
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        OpenAPI 3.x JSON or YAML specification file
-                      </Typography>
-                    </Box>
+                    <div>
+                      <Upload size={48} className="mx-auto mb-4 text-slate-400" />
+                      <p className="text-lg font-semibold mb-1">Drag & Drop or Click to Select</p>
+                      <p className="text-sm text-slate-500">OpenAPI 3.x JSON or YAML specification file</p>
+                    </div>
                   )}
-                </Box>
+                </div>
 
                 <input
                   id="openapi-file-input"
                   type="file"
                   accept=".json,.yaml,.yml,.graphql,.gql,.raml,.proto,.avsc,.thrift"
-                  style={{ display: 'none' }}
+                  className="hidden"
                   onChange={handleFileInputChange}
                 />
-              </Box>
+              </div>
+              </Tabs.Content>
             )}
 
             {/* URL Import Tab */}
             {importMethod === 'url' && (
-              <Box>
-                <TextField
-                  fullWidth
-                  label="OpenAPI Specification URL"
+              <Tabs.Content value="url" className="mt-0">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">OpenAPI Specification URL</label>
+                <input
+                  type="url"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 mb-2"
                   placeholder="https://example.com/api/openapi.json"
                   value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrlInput(e.target.value)}
                   disabled={isLoading}
-                  sx={{ mb: 2 }}
-                  helperText="Enter the URL of a publicly accessible OpenAPI specification file"
                 />
+                <p className="text-xs text-slate-500 mb-4">Enter the URL of a publicly accessible OpenAPI specification file</p>
 
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    <strong>Examples:</strong>
-                  </Typography>
-                  <Typography variant="caption" component="div" sx={{ mt: 1 }}>
+                <div className="mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 text-sm">
+                  <p><strong>Examples:</strong></p>
+                  <p className="mt-2 text-xs">
                     • GitHub Raw: https://raw.githubusercontent.com/user/repo/main/openapi.json<br />
                     • GitLab Raw: https://gitlab.com/user/repo/-/raw/main/openapi.json<br />
                     • Direct URL: https://api.example.com/openapi.json
-                  </Typography>
-                </Alert>
+                  </p>
+                </div>
 
-                <Button
-                  fullWidth
-                  variant="contained"
+                <button
+                  type="button"
+                  className="w-full py-2 px-4 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
                   onClick={handleUrlImport}
                   disabled={!urlInput.trim() || isLoading}
-                  startIcon={isLoading ? <CircularProgress size={20} /> : <Link2 size={20} />}
                 >
+                  {isLoading ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Link2 size={20} />}
                   {isLoading ? 'Fetching...' : 'Import from URL'}
-                </Button>
-              </Box>
+                </button>
+              </div>
+              </Tabs.Content>
             )}
 
             {/* SSO Import Tab */}
             {importMethod === 'sso' && (
+              <Tabs.Content value="sso" className="mt-0">
               <Box>
                 {linkedAccounts.length === 0 ? (
                   <Alert severity="info">
@@ -713,7 +726,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                             size="small"
                             placeholder="Search repositories..."
                             value={repoSearchQuery}
-                            onChange={(e) => setRepoSearchQuery(e.target.value)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRepoSearchQuery(e.target.value)}
                             fullWidth
                             InputProps={{
                               startAdornment: <Search size={16} style={{ marginRight: 8, opacity: 0.6 }} />,
@@ -909,8 +922,10 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
                   </Box>
                 )}
               </Box>
+              </Tabs.Content>
             )}
-          </Box>
+            </Tabs.Root>
+          </div>
         )}
 
         {/* Review Step */}
@@ -1221,7 +1236,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               fullWidth
               variant="outlined"
               value={projectName}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 setProjectName(e.target.value);
                 if (!projectSlug || projectSlug === generateSlug(projectName)) {
                   setProjectSlug(generateSlug(e.target.value));
@@ -1239,7 +1254,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               fullWidth
               variant="outlined"
               value={projectSlug}
-              onChange={(e) => setProjectSlug(filterSlugInput(e.target.value))}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectSlug(filterSlugInput(e.target.value))}
               disabled={isLoading}
               required
               helperText="URL-friendly identifier (lowercase letters, numbers, and dashes only)"
@@ -1255,7 +1270,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               multiline
               rows={3}
               value={projectDescription}
-              onChange={(e) => setProjectDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setProjectDescription(e.target.value)}
               disabled={isLoading}
               sx={{ mb: 2 }}
             />
@@ -1267,7 +1282,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               fullWidth
               variant="outlined"
               value={versionId}
-              onChange={(e) => setVersionId(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVersionId(e.target.value)}
               disabled={isLoading}
               required
               helperText="Semantic version (e.g., 1.0.0)"
@@ -1283,7 +1298,7 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
               multiline
               rows={2}
               value={versionDescription}
-              onChange={(e) => setVersionDescription(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setVersionDescription(e.target.value)}
               disabled={isLoading}
             />
 
@@ -1295,84 +1310,44 @@ const OpenAPIImportDialog: React.FC<OpenAPIImportDialogProps> = ({
             </Box>
           </Box>
         )}
-      </DialogContent>
+          </div>
 
-      <DialogActions>
-        <Button onClick={handleClose} disabled={isLoading}>
-          Cancel
-        </Button>
-
-        {step === 'upload' && (
-          <Button
-            onClick={() => {
-              if (importMethod === 'file' && file) {
-                setStep('review');
-              } else if (importMethod === 'url') {
-                handleUrlImport();
-              }
-              // SSO import is handled by the Browse Repositories button
-            }}
-            variant="contained"
-            disabled={
-              (importMethod === 'file' && !file) ||
-              (importMethod === 'url' && !urlInput.trim()) ||
-              (importMethod === 'sso') ||
-              isLoading
-            }
-          >
-            {isLoading ? 'Loading...' : importMethod === 'file' ? 'Next' : 'Import'}
-          </Button>
-        )}
-
-        {step === 'review' && (
-          <>
-            <Button onClick={() => setStep('upload')} disabled={isLoading}>
-              Back
-            </Button>
-            <Button
-              onClick={() => setStep('summary')}
-              variant="contained"
-              disabled={
-                (classes.filter(c => c.selected).length === 0 && parsedPaths.length === 0 && parsedSecuritySchemes.length === 0) ||
-                isLoading
-              }
-            >
-              Next
-            </Button>
-          </>
-        )}
-
-        {step === 'summary' && (
-          <>
-            <Button onClick={() => setStep('review')} disabled={isLoading}>
-              Back
-            </Button>
-            <Button
-              onClick={() => setStep('details')}
-              variant="contained"
-              disabled={isLoading}
-            >
-              Continue to Project Details
-            </Button>
-          </>
-        )}
-
-        {step === 'details' && (
-          <>
-            <Button onClick={() => setStep('summary')} disabled={isLoading}>
-              Back
-            </Button>
-            <Button
-              onClick={handleImport}
-              variant="contained"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Importing...' : 'Import Project'}
-            </Button>
-          </>
-        )}
-      </DialogActions>
-    </Dialog>
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2 shrink-0">
+            <Button onClick={handleClose} disabled={isLoading}>Cancel</Button>
+            {step === 'upload' && (
+              <Button
+                onClick={() => {
+                  if (importMethod === 'file' && file) setStep('review');
+                  else if (importMethod === 'url') handleUrlImport();
+                }}
+                variant="contained"
+                disabled={(importMethod === 'file' && !file) || (importMethod === 'url' && !urlInput.trim()) || (importMethod === 'sso') || isLoading}
+              >
+                {isLoading ? 'Loading...' : importMethod === 'file' ? 'Next' : 'Import'}
+              </Button>
+            )}
+            {step === 'review' && (
+              <>
+                <Button onClick={() => setStep('upload')} disabled={isLoading}>Back</Button>
+                <Button onClick={() => setStep('summary')} variant="contained" disabled={(classes.filter(c => c.selected).length === 0 && parsedPaths.length === 0 && parsedSecuritySchemes.length === 0) || isLoading}>Next</Button>
+              </>
+            )}
+            {step === 'summary' && (
+              <>
+                <Button onClick={() => setStep('review')} disabled={isLoading}>Back</Button>
+                <Button onClick={() => setStep('details')} variant="contained" disabled={isLoading}>Continue to Project Details</Button>
+              </>
+            )}
+            {step === 'details' && (
+              <>
+                <Button onClick={() => setStep('summary')} disabled={isLoading}>Back</Button>
+                <Button onClick={handleImport} variant="contained" disabled={isLoading}>{isLoading ? 'Importing...' : 'Import Project'}</Button>
+              </>
+            )}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 };
 

@@ -1,12 +1,7 @@
 'use client';
 
 import React from 'react';
-import Box from '@mui/material/Box';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
+import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
 
 export type AlertDialogVariant = 'error' | 'warning' | 'info' | 'success';
@@ -56,54 +51,43 @@ const AlertDialog: React.FC<AlertDialogProps> = ({
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      slotProps={{
-        root: {
-          sx: { zIndex: 10002 },
-        },
-      }}
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-        }
-      }}
-    >
-      <DialogTitle>
-        <div className="flex items-center gap-3">
-          {getIcon()}
-          <span className="text-xl font-semibold">
-            {getTitle()}
-          </span>
-        </div>
-      </DialogTitle>
-      <DialogContent>
-        {typeof message === 'string' ? (
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-            {message}
-          </p>
-        ) : (
-          <div className="text-gray-700 dark:text-gray-300">
-            {message}
-          </div>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ padding: '16px 24px' }}>
-        <Button
-          onClick={onClose}
-          variant="contained"
-          color="primary"
-          autoFocus
+    <Dialog.Root open={open} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10001]" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-0 flex flex-col max-h-[90vh]"
+          onEscapeKeyDown={onClose}
+          onPointerDownOutside={onClose}
         >
-          {confirmLabel}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <div className="p-6 pb-2">
+            <Dialog.Title className="flex items-center gap-3 text-xl font-semibold text-gray-900 dark:text-gray-100">
+              {getIcon()}
+              <span>{getTitle()}</span>
+            </Dialog.Title>
+          </div>
+          <div className="px-6 py-2 flex-1 overflow-auto">
+            {typeof message === 'string' ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {message}
+              </p>
+            ) : (
+              <div className="text-gray-700 dark:text-gray-300">{message}</div>
+            )}
+          </div>
+          <div className="flex justify-end p-4 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              autoFocus
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 };
 
 export default AlertDialog;
-

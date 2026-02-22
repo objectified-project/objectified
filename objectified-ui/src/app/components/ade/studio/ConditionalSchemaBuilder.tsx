@@ -1,22 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import Autocomplete from '@mui/material/Autocomplete';
-import Chip from '@mui/material/Chip';
-import Collapse from '@mui/material/Collapse';
-import Tooltip from '@mui/material/Tooltip';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { GitBranch, ArrowRight, Check, X } from 'lucide-react';
+import { GitBranch, ArrowRight, Check, X, Plus, Trash2, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 
 export interface ConditionalRule {
   id: string;
@@ -200,101 +187,66 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
   };
 
   const renderConditionBuilder = (rule: ConditionalRule) => (
-    <Box sx={{
-      p: 2,
-      bgcolor: isDark ? '#312e81' : '#eef2ff',
-      borderRadius: 2,
-      border: `1px solid ${isDark ? '#4338ca' : '#c7d2fe'}`,
-      mb: 2
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <Box sx={{
-          px: 1.5,
-          py: 0.5,
-          bgcolor: isDark ? '#4338ca' : '#6366f1',
-          color: 'white',
-          borderRadius: 1,
-          fontSize: '0.75rem',
-          fontWeight: 600
-        }}>
+    <div className={`p-4 rounded-lg border mb-4 ${isDark ? 'bg-indigo-950/50 border-indigo-700' : 'bg-indigo-50 border-indigo-200'}`}>
+      <div className="flex items-center gap-2 mb-4">
+        <span className={`px-2 py-1 rounded text-xs font-semibold text-white ${isDark ? 'bg-indigo-700' : 'bg-indigo-500'}`}>
           IF
-        </Box>
-        <Typography variant="caption" sx={{ color: isDark ? '#c7d2fe' : '#4338ca' }}>
-          Condition to check
-        </Typography>
-      </Box>
+        </span>
+        <span className={`text-xs ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>Condition to check</span>
+      </div>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 2, alignItems: 'start' }}>
-        {/* Property selector */}
-        <Autocomplete
-          size="small"
-          options={availableProperties}
-          value={rule.ifCondition.property || null}
-          onChange={(_, newValue) => {
-            updateRule(rule.id, {
-              ifCondition: { ...rule.ifCondition, property: newValue || '' }
-            });
-          }}
-          disabled={disabled}
-          freeSolo
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Property"
-              placeholder="Select or type property name"
-              size="small"
-            />
-          )}
-        />
-
-        {/* Operator selector */}
-        <TextField
-          select
-          size="small"
-          label="Operator"
-          value={rule.ifCondition.operator}
-          onChange={(e) => {
-            updateRule(rule.id, {
-              ifCondition: { ...rule.ifCondition, operator: e.target.value as any }
-            });
-          }}
-          disabled={disabled}
-          SelectProps={{ native: true }}
-          sx={{ minWidth: 140 }}
-        >
-          {OPERATORS.map(op => (
-            <option key={op.value} value={op.value}>{op.label}</option>
-          ))}
-        </TextField>
-
-        {/* Value input (hidden for 'required' operator) */}
-        {rule.ifCondition.operator !== 'required' && (
-          <TextField
-            size="small"
-            label={rule.ifCondition.operator === 'enum' ? 'Values (comma-separated)' : 'Value'}
-            value={rule.ifCondition.value}
-            onChange={(e) => {
-              updateRule(rule.id, {
-                ifCondition: { ...rule.ifCondition, value: e.target.value }
-              });
-            }}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-start">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Property</label>
+          <input
+            list={`if-property-${rule.id}`}
+            className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+            placeholder="Select or type property name"
+            value={rule.ifCondition.property || ''}
+            onChange={(e) => updateRule(rule.id, { ifCondition: { ...rule.ifCondition, property: e.target.value } })}
             disabled={disabled}
-            placeholder={
-              rule.ifCondition.operator === 'enum' ? 'value1, value2, value3' :
-              rule.ifCondition.operator === 'type' ? 'string, number, boolean...' :
-              rule.ifCondition.operator === 'pattern' ? '^[A-Z]+$' :
-              'value'
-            }
-            helperText={OPERATORS.find(o => o.value === rule.ifCondition.operator)?.description}
           />
+          <datalist id={`if-property-${rule.id}`}>
+            {availableProperties.map((p) => <option key={p} value={p} />)}
+          </datalist>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Operator</label>
+          <select
+            className="min-w-[140px] px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+            value={rule.ifCondition.operator}
+            onChange={(e) => updateRule(rule.id, { ifCondition: { ...rule.ifCondition, operator: e.target.value as any } })}
+            disabled={disabled}
+          >
+            {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+          </select>
+        </div>
+
+        {rule.ifCondition.operator !== 'required' && (
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+              {rule.ifCondition.operator === 'enum' ? 'Values (comma-separated)' : 'Value'}
+            </label>
+            <input
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+              placeholder={
+                rule.ifCondition.operator === 'enum' ? 'value1, value2, value3' :
+                rule.ifCondition.operator === 'type' ? 'string, number, boolean...' :
+                rule.ifCondition.operator === 'pattern' ? '^[A-Z]+$' : 'value'
+              }
+              value={rule.ifCondition.value}
+              onChange={(e) => updateRule(rule.id, { ifCondition: { ...rule.ifCondition, value: e.target.value } })}
+              disabled={disabled}
+            />
+            <p className="text-xs text-slate-500 mt-1">{OPERATORS.find(o => o.value === rule.ifCondition.operator)?.description}</p>
+          </div>
         )}
         {rule.ifCondition.operator === 'required' && (
-          <Box sx={{ display: 'flex', alignItems: 'center', color: isDark ? '#94a3b8' : '#64748b' }}>
-            <Typography variant="caption">(property exists)</Typography>
-          </Box>
+          <div className="flex items-center text-slate-500 dark:text-slate-400 text-xs">(property exists)</div>
         )}
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 
   const renderSchemaBuilder = (
@@ -302,228 +254,167 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
     schemaType: 'then' | 'else',
     schema: ConditionalRule['thenSchema']
   ) => (
-    <Box sx={{
-      p: 2,
-      bgcolor: schemaType === 'then'
-        ? (isDark ? '#14532d' : '#f0fdf4')
-        : (isDark ? '#7f1d1d' : '#fef2f2'),
-      borderRadius: 2,
-      border: `1px solid ${schemaType === 'then' 
-        ? (isDark ? '#16a34a' : '#bbf7d0')
-        : (isDark ? '#dc2626' : '#fecaca')}`,
-      mb: schemaType === 'then' ? 2 : 0
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Box sx={{
-            px: 1.5,
-            py: 0.5,
-            bgcolor: schemaType === 'then'
-              ? (isDark ? '#16a34a' : '#22c55e')
-              : (isDark ? '#dc2626' : '#ef4444'),
-            color: 'white',
-            borderRadius: 1,
-            fontSize: '0.75rem',
-            fontWeight: 600
-          }}>
+    <div
+      className={`p-4 rounded-lg border mb-2 ${
+        schemaType === 'then'
+          ? (isDark ? 'bg-green-950/30 border-green-700' : 'bg-green-50 border-green-200')
+          : (isDark ? 'bg-red-950/30 border-red-700' : 'bg-red-50 border-red-200')
+      }`}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span
+            className={`px-2 py-1 rounded text-xs font-semibold text-white ${
+              schemaType === 'then' ? (isDark ? 'bg-green-700' : 'bg-green-500') : (isDark ? 'bg-red-700' : 'bg-red-500')
+            }`}
+          >
             {schemaType.toUpperCase()}
-          </Box>
-          <Typography variant="caption" sx={{
-            color: schemaType === 'then'
-              ? (isDark ? '#86efac' : '#16a34a')
-              : (isDark ? '#fca5a5' : '#dc2626')
-          }}>
+          </span>
+          <span
+            className={`text-xs ${
+              schemaType === 'then' ? (isDark ? 'text-green-300' : 'text-green-700') : (isDark ? 'text-red-300' : 'text-red-700')
+            }`}
+          >
             {schemaType === 'then' ? 'Apply when condition is TRUE' : 'Apply when condition is FALSE'}
-          </Typography>
-        </Box>
+          </span>
+        </div>
         {schemaType === 'else' && (
-          <IconButton
-            size="small"
+          <button
+            type="button"
             onClick={() => removeElseSchema(rule.id)}
             disabled={disabled}
-            sx={{ color: isDark ? '#fca5a5' : '#dc2626' }}
+            className="p-1.5 rounded text-red-500 hover:bg-red-500/10"
           >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+            <Trash2 className="w-4 h-4" />
+          </button>
         )}
-      </Box>
+      </div>
 
-      {/* Required properties */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="caption" sx={{
-          fontWeight: 600,
-          color: isDark ? '#e2e8f0' : '#334155',
-          display: 'block',
-          mb: 1
-        }}>
-          Require these properties:
-        </Typography>
-        <Autocomplete
-          multiple
-          size="small"
-          options={availableProperties}
-          value={schema.requiredProperties}
-          onChange={(_, newValue) => {
-            if (schemaType === 'then') {
-              updateRule(rule.id, {
-                thenSchema: { ...schema, requiredProperties: newValue }
-              });
-            } else {
-              updateRule(rule.id, {
-                elseSchema: { ...schema, requiredProperties: newValue }
-              });
-            }
-          }}
-          disabled={disabled}
-          freeSolo
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => (
-              <Chip
-                label={option}
-                size="small"
-                color={schemaType === 'then' ? 'success' : 'error'}
-                {...getTagProps({ index })}
-              />
-            ))
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder="Select properties to require..."
-              size="small"
-            />
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Require these properties:</label>
+        <div className="flex flex-wrap gap-2">
+          {schema.requiredProperties.map((prop, i) => (
+            <span
+              key={prop}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                schemaType === 'then' ? 'bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200' : 'bg-red-200 dark:bg-red-800/50 text-red-800 dark:text-red-200'
+              }`}
+            >
+              {prop}
+              {!disabled && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = schema.requiredProperties.filter((_, j) => j !== i);
+                    if (schemaType === 'then') updateRule(rule.id, { thenSchema: { ...schema, requiredProperties: next } });
+                    else updateRule(rule.id, { elseSchema: { ...schema, requiredProperties: next } });
+                  }}
+                  className="hover:opacity-80"
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+          {!disabled && (
+            <select
+              className="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs"
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                const next = [...schema.requiredProperties, v];
+                if (schemaType === 'then') updateRule(rule.id, { thenSchema: { ...schema, requiredProperties: next } });
+                else updateRule(rule.id, { elseSchema: { ...schema, requiredProperties: next } });
+                e.target.value = '';
+              }}
+            >
+              <option value="">Add property...</option>
+              {availableProperties.filter((p) => !schema.requiredProperties.includes(p)).map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           )}
-        />
-      </Box>
+        </div>
+      </div>
 
-      {/* Property constraints */}
-      <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Typography variant="caption" sx={{
-            fontWeight: 600,
-            color: isDark ? '#e2e8f0' : '#334155'
-          }}>
-            Additional constraints:
-          </Typography>
-          <Button
-            size="small"
-            startIcon={<AddIcon />}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Additional constraints:</span>
+          <button
+            type="button"
             onClick={() => schemaType === 'then' ? addThenConstraint(rule.id) : addElseConstraint(rule.id)}
             disabled={disabled}
-            sx={{ fontSize: '0.7rem' }}
+            className="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1"
           >
-            Add Constraint
-          </Button>
-        </Box>
+            <Plus className="w-3 h-3" /> Add Constraint
+          </button>
+        </div>
 
         {schema.propertyConstraints.length === 0 ? (
-          <Typography variant="caption" sx={{
-            color: isDark ? '#94a3b8' : '#64748b',
-            fontStyle: 'italic',
-            display: 'block',
-            textAlign: 'center',
-            py: 1
-          }}>
-            No additional constraints
-          </Typography>
+          <p className="text-xs italic text-slate-500 dark:text-slate-400 text-center py-2">No additional constraints</p>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <div className="space-y-2">
             {schema.propertyConstraints.map((constraint, idx) => (
-              <Box
+              <div
                 key={idx}
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto 1fr auto',
-                  gap: 1,
-                  alignItems: 'center',
-                  p: 1,
-                  bgcolor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.5)',
-                  borderRadius: 1
-                }}
+                className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-center p-2 rounded bg-black/10 dark:bg-white/5"
               >
-                <Autocomplete
-                  size="small"
-                  options={availableProperties}
-                  value={constraint.property || null}
-                  onChange={(_, newValue) => {
+                <input
+                  list={`constraint-prop-${rule.id}-${schemaType}-${idx}`}
+                  className="px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+                  placeholder="Property"
+                  value={constraint.property}
+                  onChange={(e) => {
                     const newConstraints = [...schema.propertyConstraints];
-                    newConstraints[idx] = { ...constraint, property: newValue || '' };
-                    if (schemaType === 'then') {
-                      updateRule(rule.id, {
-                        thenSchema: { ...schema, propertyConstraints: newConstraints }
-                      });
-                    } else {
-                      updateRule(rule.id, {
-                        elseSchema: { ...schema, propertyConstraints: newConstraints }
-                      });
-                    }
+                    newConstraints[idx] = { ...constraint, property: e.target.value };
+                    if (schemaType === 'then') updateRule(rule.id, { thenSchema: { ...schema, propertyConstraints: newConstraints } });
+                    else updateRule(rule.id, { elseSchema: { ...schema, propertyConstraints: newConstraints } });
                   }}
                   disabled={disabled}
-                  freeSolo
-                  renderInput={(params) => (
-                    <TextField {...params} placeholder="Property" size="small" />
-                  )}
                 />
-                <TextField
-                  select
-                  size="small"
+                <datalist id={`constraint-prop-${rule.id}-${schemaType}-${idx}`}>
+                  {availableProperties.map((p) => <option key={p} value={p} />)}
+                </datalist>
+                <select
+                  className="min-w-[100px] px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
                   value={constraint.constraint}
                   onChange={(e) => {
                     const newConstraints = [...schema.propertyConstraints];
                     newConstraints[idx] = { ...constraint, constraint: e.target.value as any };
-                    if (schemaType === 'then') {
-                      updateRule(rule.id, {
-                        thenSchema: { ...schema, propertyConstraints: newConstraints }
-                      });
-                    } else {
-                      updateRule(rule.id, {
-                        elseSchema: { ...schema, propertyConstraints: newConstraints }
-                      });
-                    }
+                    if (schemaType === 'then') updateRule(rule.id, { thenSchema: { ...schema, propertyConstraints: newConstraints } });
+                    else updateRule(rule.id, { elseSchema: { ...schema, propertyConstraints: newConstraints } });
                   }}
                   disabled={disabled}
-                  SelectProps={{ native: true }}
-                  sx={{ minWidth: 100 }}
                 >
-                  {CONSTRAINTS.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </TextField>
-                <TextField
-                  size="small"
+                  {CONSTRAINTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+                <input
+                  className="px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+                  placeholder="Value"
                   value={constraint.value}
                   onChange={(e) => {
                     const newConstraints = [...schema.propertyConstraints];
                     newConstraints[idx] = { ...constraint, value: e.target.value };
-                    if (schemaType === 'then') {
-                      updateRule(rule.id, {
-                        thenSchema: { ...schema, propertyConstraints: newConstraints }
-                      });
-                    } else {
-                      updateRule(rule.id, {
-                        elseSchema: { ...schema, propertyConstraints: newConstraints }
-                      });
-                    }
+                    if (schemaType === 'then') updateRule(rule.id, { thenSchema: { ...schema, propertyConstraints: newConstraints } });
+                    else updateRule(rule.id, { elseSchema: { ...schema, propertyConstraints: newConstraints } });
                   }}
                   disabled={disabled}
-                  placeholder="Value"
                 />
-                <IconButton
-                  size="small"
-                  onClick={() => schemaType === 'then'
-                    ? removeThenConstraint(rule.id, idx)
-                    : removeElseConstraint(rule.id, idx)
-                  }
+                <button
+                  type="button"
+                  onClick={() => schemaType === 'then' ? removeThenConstraint(rule.id, idx) : removeElseConstraint(rule.id, idx)}
                   disabled={disabled}
+                  className="p-1.5 rounded hover:bg-red-500/10 text-red-500"
                 >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             ))}
-          </Box>
+          </div>
         )}
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 
   const renderVisualFlow = (rule: ConditionalRule) => {
@@ -532,176 +423,128 @@ export const ConditionalSchemaBuilder: React.FC<ConditionalSchemaBuilderProps> =
     const hasElse = rule.elseSchema && (rule.elseSchema.requiredProperties.length > 0 || rule.elseSchema.propertyConstraints.length > 0);
 
     return (
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-        py: 1,
-        px: 2,
-        bgcolor: isDark ? '#0f172a' : '#f8fafc',
-        borderRadius: 1,
-        mb: 2,
-        flexWrap: 'wrap'
-      }}>
-        <Chip
-          size="small"
-          label={hasCondition ? `${rule.ifCondition.property} ${rule.ifCondition.operator} ${rule.ifCondition.value || ''}` : 'No condition'}
-          color={hasCondition ? 'primary' : 'default'}
-          icon={<GitBranch size={14} />}
-        />
-        <ArrowRight size={16} style={{ color: isDark ? '#94a3b8' : '#64748b' }} />
-        <Chip
-          size="small"
-          label={hasThen ? `Then: ${rule.thenSchema.requiredProperties.length} required` : 'No then'}
-          color={hasThen ? 'success' : 'default'}
-          icon={<Check size={14} />}
-        />
+      <div className="flex items-center gap-2 py-2 px-4 rounded bg-slate-100 dark:bg-slate-900 mb-4 flex-wrap">
+        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${hasCondition ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
+          <GitBranch size={14} />
+          {hasCondition ? `${rule.ifCondition.property} ${rule.ifCondition.operator} ${rule.ifCondition.value || ''}` : 'No condition'}
+        </span>
+        <ArrowRight size={16} className="text-slate-500" />
+        <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${hasThen ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
+          <Check size={14} />
+          {hasThen ? `Then: ${rule.thenSchema.requiredProperties.length} required` : 'No then'}
+        </span>
         {rule.elseSchema && (
           <>
-            <Typography sx={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: '0.75rem' }}>/</Typography>
-            <Chip
-              size="small"
-              label={hasElse ? `Else: ${rule.elseSchema.requiredProperties.length} required` : 'No else'}
-              color={hasElse ? 'error' : 'default'}
-              icon={<X size={14} />}
-            />
+            <span className="text-xs text-slate-500">/</span>
+            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${hasElse ? 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
+              <X size={14} />
+              {hasElse ? `Else: ${rule.elseSchema.requiredProperties.length} required` : 'No else'}
+            </span>
           </>
         )}
-      </Box>
+      </div>
     );
   };
 
   return (
-    <Box>
+    <div>
       {renderHeader ? (
-        <Box sx={{ mb: 2 }}>{renderHeader(addRule)}</Box>
+        <div className="mb-4">{renderHeader(addRule)}</div>
       ) : (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <GitBranch size={18} style={{ color: '#6366f1' }} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : 'inherit' }}>
-              Conditional Schema Rules
-            </Typography>
-            <Tooltip title="Define if/then/else conditions for complex validation. When the 'if' condition matches, the 'then' schema is applied. Optionally, an 'else' schema applies when the condition doesn't match.">
-              <HelpOutlineIcon sx={{ fontSize: 16, color: isDark ? '#94a3b8' : '#64748b', cursor: 'help' }} />
-            </Tooltip>
-          </Box>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AddIcon />}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <GitBranch size={18} className="text-indigo-500" />
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Conditional Schema Rules</span>
+            <TooltipPrimitive.Provider>
+              <TooltipPrimitive.Root>
+                <TooltipPrimitive.Trigger asChild>
+                  <span className="cursor-help text-slate-500 dark:text-slate-400 inline-flex">
+                    <HelpCircle size={16} />
+                  </span>
+                </TooltipPrimitive.Trigger>
+                <TooltipPrimitive.Content
+                    sideOffset={5}
+                    className="max-w-xs px-3 py-2 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded shadow-lg"
+                  >
+                    Define if/then/else conditions for complex validation. When the &apos;if&apos; condition matches, the &apos;then&apos; schema is applied. Optionally, an &apos;else&apos; schema applies when the condition doesn&apos;t match.
+                  </TooltipPrimitive.Content>
+              </TooltipPrimitive.Root>
+            </TooltipPrimitive.Provider>
+          </div>
+          <button
+            type="button"
             onClick={addRule}
             disabled={disabled}
+            className="text-sm px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1 disabled:opacity-50"
           >
-            Add Rule
-          </Button>
-        </Box>
+            <Plus className="w-4 h-4" /> Add Rule
+          </button>
+        </div>
       )}
 
-      {/* Rules list */}
       {rules.length === 0 ? (
-        <Box sx={{
-          p: 3,
-          textAlign: 'center',
-          bgcolor: isDark ? '#1e293b' : '#f8fafc',
-          borderRadius: 2,
-          border: `2px dashed ${isDark ? '#334155' : '#e2e8f0'}`
-        }}>
-          <GitBranch size={24} style={{ color: isDark ? '#64748b' : '#94a3b8', marginBottom: 8 }} />
-          <Typography variant="body2" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-            No conditional rules defined
-          </Typography>
-          <Typography variant="caption" sx={{ color: isDark ? '#64748b' : '#94a3b8', display: 'block', mt: 0.5 }}>
+        <div className={`p-6 text-center rounded-lg border-2 border-dashed ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+          <GitBranch size={24} className={`mx-auto mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No conditional rules defined</p>
+          <p className={`text-xs mt-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Add rules to create dynamic validation based on property values
-          </Typography>
-        </Box>
+          </p>
+        </div>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div className="flex flex-col gap-4">
           {rules.map((rule, index) => (
-            <Box
+            <div
               key={rule.id}
-              sx={{
-                border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`,
-                borderRadius: 2,
-                overflow: 'hidden',
-                bgcolor: isDark ? '#1e293b' : 'white'
-              }}
+              className={`rounded-lg border overflow-hidden ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}
             >
-              {/* Rule header */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  p: 1.5,
-                  bgcolor: isDark ? '#0f172a' : '#f8fafc',
-                  borderBottom: expandedRules.has(rule.id) ? `1px solid ${isDark ? '#334155' : '#e2e8f0'}` : 'none',
-                  cursor: 'pointer'
-                }}
+              <button
+                type="button"
                 onClick={() => toggleExpanded(rule.id)}
+                className={`w-full flex items-center justify-between p-3 text-left ${isDark ? 'bg-slate-900' : 'bg-slate-50'} border-b border-slate-200 dark:border-slate-700`}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="caption" sx={{
-                    fontWeight: 600,
-                    color: isDark ? '#94a3b8' : '#64748b',
-                    minWidth: 60
-                  }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 min-w-[60px]">
                     Rule {index + 1}
-                  </Typography>
+                  </span>
                   {!expandedRules.has(rule.id) && renderVisualFlow(rule)}
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteRule(rule.id);
-                    }}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); deleteRule(rule.id); }}
                     disabled={disabled}
-                    sx={{ color: isDark ? '#f87171' : '#ef4444' }}
+                    className="p-1.5 rounded text-red-500 hover:bg-red-500/10"
                   >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                  {expandedRules.has(rule.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </Box>
-              </Box>
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  {expandedRules.has(rule.id) ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </div>
+              </button>
 
-              {/* Rule content */}
-              <Collapse in={expandedRules.has(rule.id)}>
-                <Box sx={{ p: 2 }}>
-                  {/* Visual flow summary */}
+              {expandedRules.has(rule.id) && (
+                <div className="p-4">
                   {renderVisualFlow(rule)}
-
-                  {/* IF condition */}
                   {renderConditionBuilder(rule)}
-
-                  {/* THEN schema */}
                   {renderSchemaBuilder(rule, 'then', rule.thenSchema)}
-
-                  {/* ELSE schema (optional) */}
                   {rule.elseSchema ? (
                     renderSchemaBuilder(rule, 'else', rule.elseSchema)
                   ) : (
-                    <Button
-                      size="small"
-                      variant="text"
+                    <button
+                      type="button"
                       onClick={() => addElseSchema(rule.id)}
                       disabled={disabled}
-                      sx={{
-                        color: isDark ? '#f87171' : '#dc2626',
-                        '&:hover': { bgcolor: isDark ? 'rgba(248, 113, 113, 0.1)' : 'rgba(220, 38, 38, 0.1)' }
-                      }}
+                      className="text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10 px-2 py-1 rounded disabled:opacity-50"
                     >
                       + Add ELSE condition
-                    </Button>
+                    </button>
                   )}
-                </Box>
-              </Collapse>
-            </Box>
+                </div>
+              )}
+            </div>
           ))}
-        </Box>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 

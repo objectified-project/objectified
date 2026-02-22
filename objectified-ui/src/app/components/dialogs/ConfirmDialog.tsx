@@ -1,12 +1,7 @@
 'use client';
 
 import React from 'react';
-import Box from '@mui/material/Box';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
+import * as Dialog from '@radix-ui/react-dialog';
 import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
 
 export type ConfirmDialogVariant = 'danger' | 'warning' | 'info' | 'success';
@@ -45,75 +40,65 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     }
   };
 
-  const getButtonColor = () => {
+  const getConfirmButtonClass = () => {
+    const base = 'px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
     switch (variant) {
       case 'danger':
-        return 'error';
+        return `${base} bg-red-600 text-white hover:bg-red-700 focus:ring-red-500`;
       case 'warning':
-        return 'warning';
+        return `${base} bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500`;
       case 'info':
-        return 'primary';
+        return `${base} bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500`;
       case 'success':
-        return 'success';
+        return `${base} bg-green-600 text-white hover:bg-green-700 focus:ring-green-500`;
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onCancel}
-      maxWidth="sm"
-      fullWidth
-      slotProps={{
-        root: {
-          sx: { zIndex: 10002 },
-        },
-      }}
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-        }
-      }}
-    >
-      <DialogTitle>
-        <div className="flex items-center gap-3">
-          {getIcon()}
-          <span className="text-xl font-semibold">
-            {title || 'Confirm Action'}
-          </span>
-        </div>
-      </DialogTitle>
-      <DialogContent>
-        {typeof message === 'string' ? (
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-            {message}
-          </p>
-        ) : (
-          <div className="text-gray-700 dark:text-gray-300">
-            {message}
+    <Dialog.Root open={open} onOpenChange={(open) => !open && onCancel()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10001]" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-0 flex flex-col max-h-[90vh]"
+          onEscapeKeyDown={onCancel}
+          onPointerDownOutside={onCancel}
+        >
+          <div className="p-6 pb-2">
+            <Dialog.Title className="flex items-center gap-3 text-xl font-semibold text-gray-900 dark:text-gray-100">
+              {getIcon()}
+              <span>{title || 'Confirm Action'}</span>
+            </Dialog.Title>
           </div>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ padding: '16px 24px' }}>
-        <Button
-          onClick={onCancel}
-          variant="outlined"
-          color="inherit"
-        >
-          {cancelLabel}
-        </Button>
-        <Button
-          onClick={onConfirm}
-          variant="contained"
-          color={getButtonColor()}
-          autoFocus
-        >
-          {confirmLabel}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <div className="px-6 py-2 flex-1 overflow-auto">
+            {typeof message === 'string' ? (
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {message}
+              </p>
+            ) : (
+              <div className="text-gray-700 dark:text-gray-300">{message}</div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 p-4 pt-4">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+            >
+              {cancelLabel}
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className={getConfirmButtonClass()}
+              autoFocus
+            >
+              {confirmLabel}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 };
 
 export default ConfirmDialog;
-

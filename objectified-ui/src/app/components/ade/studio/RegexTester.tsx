@@ -1,17 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Alert from '@mui/material/Alert';
-import Typography from '@mui/material/Typography';
-import Collapse from '@mui/material/Collapse';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface RegexTesterProps {
   pattern: string;
@@ -27,7 +17,6 @@ export const RegexTester: React.FC<RegexTesterProps> = ({ pattern }) => {
       setTestResult({ matches: false, error: 'Please enter a regex pattern first' });
       return;
     }
-
     try {
       const regex = new RegExp(pattern);
       const matches = regex.test(testString);
@@ -52,88 +41,75 @@ export const RegexTester: React.FC<RegexTesterProps> = ({ pattern }) => {
   }
 
   return (
-    <Box sx={{ mb: 2, mt: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Button
-          size="small"
-          variant="outlined"
+    <div className="mb-4 mt-2">
+      <div className="flex items-center gap-2 mb-2">
+        <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
-          startIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
         >
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           Test Regex
-        </Button>
+        </button>
         {testResult && !testResult.error && (
-          <Chip
-            label={testResult.matches ? 'Match' : 'No Match'}
-            color={testResult.matches ? 'success' : 'default'}
-            size="small"
-            icon={testResult.matches ? <CheckCircleIcon /> : <CancelIcon />}
-          />
+          <span
+            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
+              testResult.matches ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            {testResult.matches ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+            {testResult.matches ? 'Match' : 'No Match'}
+          </span>
         )}
-      </Box>
+      </div>
 
-      <Collapse in={expanded}>
-        <Box sx={{
-          p: 2,
-          bgcolor: 'action.hover',
-          borderRadius: 1,
-          border: 1,
-          borderColor: 'divider'
-        }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-            Current pattern: <Box component="code" sx={{
-              bgcolor: 'action.selected',
-              px: 0.75,
-              py: 0.25,
-              borderRadius: 0.5,
-              color: 'text.primary'
-            }}>{pattern}</Box>
-          </Typography>
+      {expanded && (
+        <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+            Current pattern: <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200">{pattern}</code>
+          </p>
 
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-            <TextField
-              label="Test String"
-              size="small"
-              fullWidth
+          <div className="flex gap-2 items-start">
+            <input
+              type="text"
+              aria-label="Test String"
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+              placeholder="Enter text to test against the pattern"
               value={testString}
               onChange={(e) => setTestString(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Enter text to test against the pattern"
             />
-            <Button
-              variant="contained"
-              size="small"
+            <button
+              type="button"
               onClick={handleTest}
-              sx={{ minWidth: '80px', mt: 0.5 }}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 min-w-[80px] mt-0.5"
             >
               Test
-            </Button>
-          </Box>
+            </button>
+          </div>
 
           {testResult && (
-            <Box sx={{ mt: 2 }}>
+            <div className="mt-4">
               {testResult.error ? (
-                <Alert severity="error" sx={{ py: 0.5 }}>
+                <div className="py-2 px-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 text-sm">
                   {testResult.error}
-                </Alert>
+                </div>
               ) : (
-                <Alert
-                  severity={testResult.matches ? 'success' : 'info'}
-                  sx={{ py: 0.5 }}
-                  icon={testResult.matches ? <CheckCircleIcon /> : <CancelIcon />}
+                <div
+                  className={`py-2 px-3 rounded-lg text-sm flex items-center gap-2 ${
+                    testResult.matches
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                      : 'bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200'
+                  }`}
                 >
-                  {testResult.matches ? (
-                    <>Pattern matches the test string</>
-                  ) : (
-                    <>Pattern does not match the test string</>
-                  )}
-                </Alert>
+                  {testResult.matches ? <CheckCircle className="w-4 h-4 flex-shrink-0" /> : <XCircle className="w-4 h-4 flex-shrink-0" />}
+                  {testResult.matches ? 'Pattern matches the test string' : 'Pattern does not match the test string'}
+                </div>
               )}
-            </Box>
+            </div>
           )}
-        </Box>
-      </Collapse>
-    </Box>
+        </div>
+      )}
+    </div>
   );
 };
-

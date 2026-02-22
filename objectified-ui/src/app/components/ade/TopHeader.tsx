@@ -4,7 +4,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import Avatar from '@mui/material/Avatar';
 import { usePathname } from 'next/navigation';
 import WhatsNewDialog from './WhatsNewDialog';
 import ThemeSelector from './ThemeSelector';
@@ -197,7 +196,12 @@ const TopHeader = () => {
             cursor: "pointer",
           }}
         >
-          <Avatar sx={{ width: 28, height: 28 }} />
+          <div
+            className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-medium"
+            aria-hidden
+          >
+            {session?.user?.name ? String(session.user.name).slice(0, 1).toUpperCase() : '?'}
+          </div>
           <span style={{ display: "none" /* hidden on small, shown via CSS if desired */ }}>
             {session?.user?.name}
           </span>

@@ -19,7 +19,7 @@ import ClassTemplateBrowserDialog from '@/app/components/ade/studio/ClassTemplat
 import TagManager from '@/app/components/ade/studio/TagManager';
 import { getClassesForVersion, getTagsForProject } from '../../../../lib/db/helper';
 import { deleteClassWithSession } from '../../../../lib/api/rest-client';
-import { Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Button } from '@mui/material';
+import * as Dialog from '@radix-ui/react-dialog';
 
 // Helper function to check permissions
 const checkPermissions = async (condition: boolean, message: string, alertDialog: any) => {
@@ -501,16 +501,33 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, target: null })}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <DialogContentText>Are you sure you want to delete this {deleteDialog.target?.type}? This action cannot be undone.</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialog({ open: false, target: null })}>Cancel</Button>
-          <Button onClick={handleDeleteConfirm} color="error" variant="contained">Delete</Button>
-        </DialogActions>
-      </Dialog>
+      <Dialog.Root open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, target: null })}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10001]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6">
+            <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirm Delete</Dialog.Title>
+            <p className="mt-2 text-gray-700 dark:text-gray-300">
+              Are you sure you want to delete this {deleteDialog.target?.type}? This action cannot be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteDialog({ open: false, target: null })}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* Tag Manager Dialog */}
       <TagManager

@@ -1,43 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import Alert from '@mui/material/Alert';
+import { Plus, Trash2 } from 'lucide-react';
 
 export interface ExtensionsEditorProps {
-  /**
-   * Current extensions as a record of key-value pairs
-   */
   value: Record<string, any>;
-
-  /**
-   * Called when extensions change
-   */
   onChange: (extensions: Record<string, any>) => void;
-
-  /**
-   * Whether the editor is disabled
-   */
   disabled?: boolean;
-
-  /**
-   * Size variant
-   */
   size?: 'small' | 'medium';
 }
 
-/**
- * ExtensionsEditor - A component for managing x- prefixed extension properties
- * per OpenAPI 3.1 specification
- */
 export const ExtensionsEditor: React.FC<ExtensionsEditorProps> = ({
   value = {},
   onChange,
@@ -49,63 +21,44 @@ export const ExtensionsEditor: React.FC<ExtensionsEditorProps> = ({
   const [error, setError] = useState('');
 
   const handleAdd = () => {
-    // Validate key
     if (!keyInput.trim()) {
       setError('Key cannot be empty');
       return;
     }
-
     const trimmedKey = keyInput.trim();
-
-    // Validate x- prefix
     if (!trimmedKey.startsWith('x-')) {
       setError('Extension keys must start with "x-"');
       return;
     }
-
-    // Validate key format (alphanumeric, hyphens, underscores)
     if (!/^x-[a-zA-Z0-9_-]+$/.test(trimmedKey)) {
       setError('Extension keys can only contain letters, numbers, hyphens, and underscores after "x-"');
       return;
     }
-
-    // Check for duplicate
     if (trimmedKey in value) {
       setError('This extension key already exists');
       return;
     }
-
-    // Validate and parse value as JSON
     let parsedValue: any;
     const trimmedValue = valueInput.trim();
-
     if (!trimmedValue) {
       setError('Value cannot be empty');
       return;
     }
-
     try {
-      // Try to parse as JSON
       parsedValue = JSON.parse(trimmedValue);
-    } catch (e) {
-      // If not valid JSON, treat as string
+    } catch {
       parsedValue = trimmedValue;
     }
-
-    // Add the extension
-    const newExtensions = { ...value, [trimmedKey]: parsedValue };
-    onChange(newExtensions);
-
-    // Clear inputs
+    onChange({ ...value, [trimmedKey]: parsedValue });
     setKeyInput('');
     setValueInput('');
     setError('');
   };
 
   const handleRemove = (key: string) => {
-    const newExtensions = { ...value };
-    delete newExtensions[key];
-    onChange(newExtensions);
+    const next = { ...value };
+    delete next[key];
+    onChange(next);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -116,162 +69,92 @@ export const ExtensionsEditor: React.FC<ExtensionsEditorProps> = ({
   };
 
   const extensionEntries = Object.entries(value).sort(([a], [b]) => a.localeCompare(b));
+  const inputHeight = size === 'small' ? 'h-10' : 'h-14';
 
   return (
-    <Box>
-      <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
-        Extensions
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+    <div>
+      <p className="text-sm font-medium mb-1">Extensions</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 block mb-4">
         Add custom x- prefixed properties per OpenAPI 3.1 specification. Values can be any valid JSON.
-      </Typography>
+      </p>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+        <div
+          role="alert"
+          className="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 text-sm flex items-center justify-between"
+        >
+          <span>{error}</span>
+          <button type="button" onClick={() => setError('')} className="text-red-600 hover:text-red-800 dark:text-red-400">
+            ×
+          </button>
+        </div>
       )}
 
-      <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 1, mb: 1 }}>
-          <TextField
-            label="Key"
-            size={size}
-            fullWidth
-            value={keyInput}
-            onChange={(e) => {
-              setKeyInput(e.target.value);
-              setError('');
-            }}
-            onKeyDown={handleKeyPress}
+      <div className="mb-4">
+        <div className="grid grid-cols-[1fr_2fr_auto] gap-2 mb-2">
+          <input
+            aria-label="Key"
+            className={`w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm ${inputHeight}`}
             placeholder="x-custom-property"
-            disabled={disabled}
-            helperText="Must start with x-"
-          />
-          <TextField
-            label="Value (JSON)"
-            size={size}
-            fullWidth
-            value={valueInput}
-            onChange={(e) => {
-              setValueInput(e.target.value);
-              setError('');
-            }}
+            value={keyInput}
+            onChange={(e) => { setKeyInput(e.target.value); setError(''); }}
             onKeyDown={handleKeyPress}
-            placeholder='true, 42, "text", or {"key": "value"}'
             disabled={disabled}
-            helperText="Enter valid JSON or plain text"
           />
-          <IconButton
+          <input
+            aria-label="Value (JSON)"
+            className={`w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm ${inputHeight}`}
+            placeholder='true, 42, "text", or {"key": "value"}'
+            value={valueInput}
+            onChange={(e) => { setValueInput(e.target.value); setError(''); }}
+            onKeyDown={handleKeyPress}
+            disabled={disabled}
+          />
+          <button
+            type="button"
             onClick={handleAdd}
             disabled={!keyInput.trim() || !valueInput.trim() || disabled}
-            sx={{
-              height: size === 'small' ? 40 : 56,
-              width: size === 'small' ? 40 : 56,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              '&:hover': { bgcolor: 'primary.dark' },
-              '&.Mui-disabled': { bgcolor: 'action.disabledBackground', color: 'action.disabled' },
-            }}
+            className={`rounded-lg flex items-center justify-center bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:pointer-events-none ${inputHeight} w-14`}
           >
-            <AddIcon />
-          </IconButton>
-        </Box>
-      </Box>
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">Key must start with x-</p>
+      </div>
 
       {extensionEntries.length > 0 && (
-        <List
-          dense
-          sx={{
-            bgcolor: 'action.hover',
-            borderRadius: 1,
-            maxHeight: 300,
-            overflow: 'auto',
-            border: 1,
-            borderColor: 'divider',
-          }}
-        >
+        <ul className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 max-h-[300px] overflow-auto divide-y divide-slate-200 dark:divide-slate-700 list-none p-0 m-0">
           {extensionEntries.map(([key, val]) => (
-            <ListItem
+            <li
               key={key}
-              sx={{
-                borderBottom: 1,
-                borderColor: 'divider',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1,
-                '&:last-child': {
-                  borderBottom: 0,
-                },
-              }}
+              className="flex items-start gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 last:border-b-0"
             >
-              <ListItemText
-                primary={
-                  <Box>
-                    <Typography
-                      component="span"
-                      sx={{
-                        fontFamily: 'monospace',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        color: 'primary.main',
-                      }}
-                    >
-                      {key}
-                    </Typography>
-                  </Box>
-                }
-                secondary={
-                  <Typography
-                    component="span"
-                    sx={{
-                      fontFamily: 'monospace',
-                      fontSize: '0.813rem',
-                      color: 'text.secondary',
-                      display: 'block',
-                      mt: 0.5,
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {JSON.stringify(val)}
-                  </Typography>
-                }
-                sx={{ flex: 1, my: 0.5 }}
-              />
-              <IconButton
-                edge="end"
+              <div className="flex-1 min-w-0 my-0.5">
+                <span className="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{key}</span>
+                <p className="font-mono text-[13px] text-slate-500 dark:text-slate-400 mt-1 break-words">
+                  {JSON.stringify(val)}
+                </p>
+              </div>
+              <button
+                type="button"
                 onClick={() => handleRemove(key)}
-                size="small"
                 disabled={disabled}
-                sx={{
-                  flex: 0,
-                  mt: 0.5,
-                }}
+                className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400"
               >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </ListItem>
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </li>
           ))}
-        </List>
+        </ul>
       )}
 
       {extensionEntries.length === 0 && (
-        <Box
-          sx={{
-            p: 3,
-            bgcolor: 'action.hover',
-            borderRadius: 1,
-            border: 1,
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}
-        >
-          <Typography variant="body2" color="text.secondary">
+        <div className="p-6 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 text-center">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             No extensions defined. Extensions allow you to add custom metadata that can be used by tools and documentation generators.
-          </Typography>
-        </Box>
+          </p>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
-
