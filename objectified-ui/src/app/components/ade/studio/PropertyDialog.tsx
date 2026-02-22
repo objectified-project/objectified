@@ -108,6 +108,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
   const [propertyIsArray, setPropertyIsArray] = useState(false);
   const [propertyError, setPropertyError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [primitiveDialogOpen, setPrimitiveDialogOpen] = useState(false);
 
   // Use shared form data structure
   const [formData, setFormData] = useState<PropertyFormData>({});
@@ -1139,7 +1140,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               {/* LEFT COLUMN - Basic Configuration */}
               <div className="flex flex-col overflow-y-auto min-h-0">
                 {/* SECTION 1: Property Information */}
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
                   <div className="flex items-center gap-2 mb-4">
                     <FileText size={18} className="text-indigo-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Information</h3>
@@ -1230,7 +1231,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
 
                 {/* Apply from Primitive - Only show for applicable types */}
                 {(propertyType === 'string' || propertyType === 'number' || propertyType === 'integer' || propertyType === 'array') && !formData.tupleMode && (
-                  <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className={`p-6 border-b border-gray-200 dark:border-gray-700 transition-all duration-200 ${primitiveDialogOpen ? 'ring-2 ring-inset ring-indigo-500 dark:ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-900/20' : ''}`}>
                     <div className={`p-4 rounded-lg border ${isDark ? 'bg-indigo-900/10 border-indigo-700/30' : 'bg-indigo-50/50 border-indigo-200'}`}>
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-start gap-3">
@@ -1251,6 +1252,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                           onChange={(field, value) => setFormData(prev => ({ ...prev, [field]: value }))}
                           propertyType={propertyType}
                           size="small"
+                          onOpenChange={setPrimitiveDialogOpen}
                         />
                       </div>
                     </div>
@@ -1258,7 +1260,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 )}
 
                 {/* SECTION 2: Property Flags */}
-                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 ${isDark ? 'bg-slate-900' : 'bg-gray-50'} transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
                   <div className="flex items-center gap-2 mb-4">
                     <Settings size={18} className="text-indigo-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Property Flags</h3>
@@ -1351,7 +1353,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
                 </div>
 
                 {/* SECTION 3: Default & Constant Values */}
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className={`p-6 border-b border-gray-200 dark:border-gray-700 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
                   <div className="flex items-center gap-2 mb-4">
                     <Code size={18} className="text-indigo-500" />
                     <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Default & Constant Values</h3>
@@ -1388,7 +1390,7 @@ export const PropertyDialog: React.FC<PropertyDialogProps> = ({
               </div>
 
               {/* RIGHT COLUMN - Advanced Configuration */}
-              <div className="flex flex-col overflow-y-auto min-h-0">
+              <div className={`flex flex-col overflow-y-auto min-h-0 transition-opacity duration-200 ${primitiveDialogOpen ? 'opacity-30 pointer-events-none select-none' : 'opacity-100'}`}>
                 {/* Advanced Header */}
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                   <div className="flex items-center gap-3 mb-2">

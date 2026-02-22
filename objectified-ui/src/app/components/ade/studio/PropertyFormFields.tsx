@@ -307,8 +307,8 @@ export interface PropertyFormData {
 
 interface SortableEnumItemProps {
   id: string;
-  value: string;
-  onDelete: (value: string) => void;
+  value: string | number;
+  onDelete: (value: string | number) => void;
 }
 
 const SortableEnumItem: React.FC<SortableEnumItemProps> = ({ id, value, onDelete }) => {
@@ -637,6 +637,9 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
   // State for dependent schemas form
   const [newDepPropName, setNewDepPropName] = React.useState('');
 
+  // When "Apply from Primitive" dialog is open, dim the parent form
+  const [primitiveDialogOpen, setPrimitiveDialogOpen] = React.useState(false);
+
   // DnD sensors for enum reordering
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -793,7 +796,7 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
     setEnumError('');
   };
 
-  const handleRemoveEnum = (value: string) => {
+  const handleRemoveEnum = (value: string | number) => {
     onChange('enum', (data.enum || []).filter(v => v !== value));
   };
 
@@ -841,10 +844,12 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
       return;
     }
 
-    const oldIndex = data.enum.indexOf(active.id);
-    const newIndex = data.enum.indexOf(over.id);
+    const safeEnum = (data.enum || []).filter((v) => v != null);
+    const oldIndex = safeEnum.findIndex((v) => String(v) === active.id);
+    const newIndex = safeEnum.findIndex((v) => String(v) === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    const newEnumArray = arrayMove(data.enum, oldIndex, newIndex);
+    const newEnumArray = arrayMove(safeEnum, oldIndex, newIndex);
     onChange('enum', newEnumArray);
   };
 
@@ -881,12 +886,22 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
 
   return (
     <Box sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 0,
-      bgcolor: isDark ? '#0f172a' : '#f8fafc',
+      position: 'relative',
       minHeight: '100%',
+      width: '100%',
     }}>
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        bgcolor: isDark ? '#0f172a' : '#f8fafc',
+        minHeight: '100%',
+        opacity: primitiveDialogOpen ? 0.3 : 1,
+        pointerEvents: primitiveDialogOpen ? 'none' : 'auto',
+        transition: 'opacity 0.2s ease',
+        position: 'relative',
+        zIndex: 0,
+      }}>
       {showHint && (
         <Box sx={{
           px: 3,
@@ -1231,6 +1246,54 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
         </Box>
       )}
 
+      </Box>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════
+          APPLY FROM PRIMITIVE — sits outside faded sections so it stays prominent
+          ═══════════════════════════════════════════════════════════════════════════ */}
+      {showPrimitiveSelector && (baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'array') && !data.tupleMode && (
+        <Box sx={{
+          p: 2,
+          borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+          bgcolor: primitiveDialogOpen
+            ? (isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.08)')
+            : (isDark ? 'rgba(99, 102, 241, 0.06)' : 'rgba(99, 102, 241, 0.03)'),
+          outline: primitiveDialogOpen ? `2px solid ${isDark ? 'rgba(99,102,241,0.6)' : 'rgba(99,102,241,0.5)'}` : 'none',
+          outlineOffset: '-2px',
+          transition: 'background-color 0.2s ease, outline 0.2s ease',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2,
+        }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', mb: 0.25 }}>
+              Apply from Primitive
+            </Typography>
+            <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
+              Quickly apply format, pattern, and constraints from a predefined primitive type
+            </Typography>
+          </Box>
+          <PrimitiveSelector
+            formData={data}
+            onChange={onChange}
+            propertyType={baseType}
+            size={size}
+            onOpenChange={setPrimitiveDialogOpen}
+          />
+        </Box>
+      )}
+
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        minHeight: 0,
+        opacity: primitiveDialogOpen ? 0.3 : 1,
+        pointerEvents: primitiveDialogOpen ? 'none' : 'auto',
+        transition: 'opacity 0.2s ease',
+      }}>
+
       {/* ═══════════════════════════════════════════════════════════════════════════
           SECTION 3: Type-Specific Constraints
           ═══════════════════════════════════════════════════════════════════════════ */}
@@ -1249,37 +1312,6 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
           subtitle="Validation rules for this property"
           badge={`${baseType}${isArray ? '[]' : ''}`}
         />
-
-        {/* Apply Primitive - Quick apply constraints from predefined primitives */}
-        {showPrimitiveSelector && (baseType === 'string' || baseType === 'number' || baseType === 'integer' || baseType === 'array') && !data.tupleMode && (
-          <Box sx={{
-            mb: 2.5,
-            p: 2,
-            bgcolor: isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.04)',
-            border: '1px solid',
-            borderColor: isDark ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.15)',
-            borderRadius: 2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2,
-          }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b', mb: 0.25 }}>
-                Apply from Primitive
-              </Typography>
-              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-                Quickly apply format, pattern, and constraints from a predefined primitive type
-              </Typography>
-            </Box>
-            <PrimitiveSelector
-              formData={data}
-              onChange={onChange}
-              propertyType={baseType}
-              size={size}
-            />
-          </Box>
-        )}
 
         {/* Tuple mode message */}
         {data.tupleMode && isArray && (
@@ -3408,23 +3440,28 @@ value={data.format || ''}
                   </IconButton>
                 </Box>
 
-                {data.enum && data.enum.length > 0 && (
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleEnumDragEnd}>
-                    <List dense sx={{
-                      bgcolor: isDark ? '#1e293b' : '#f8fafc',
-                      borderRadius: 2,
-                      maxHeight: 150,
-                      overflow: 'auto',
-                      border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
-                    }}>
-                      <SortableContext items={data.enum} strategy={verticalListSortingStrategy}>
-                        {data.enum.map((value) => (
-                          <SortableEnumItem key={value} id={value} value={value} onDelete={handleRemoveEnum} />
-                        ))}
-                      </SortableContext>
-                    </List>
-                  </DndContext>
-                )}
+                {(() => {
+                  const safeEnum = Array.isArray(data.enum) ? data.enum.filter((v) => v != null) : [];
+                  if (safeEnum.length === 0) return null;
+                  const sortableIds = safeEnum.map((v) => String(v));
+                  return (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleEnumDragEnd}>
+                      <List dense sx={{
+                        bgcolor: isDark ? '#1e293b' : '#f8fafc',
+                        borderRadius: 2,
+                        maxHeight: 150,
+                        overflow: 'auto',
+                        border: isDark ? '1px solid #475569' : '1px solid #e2e8f0',
+                      }}>
+                        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                          {safeEnum.map((value) => (
+                            <SortableEnumItem key={String(value)} id={String(value)} value={value} onDelete={handleRemoveEnum} />
+                          ))}
+                        </SortableContext>
+                      </List>
+                    </DndContext>
+                  );
+                })()}
               </Box>
             )}
           </Box>
@@ -3804,6 +3841,7 @@ value={data.format || ''}
             size={size}
           />
         </Box>
+      </Box>
       </Box>
     </Box>
   );

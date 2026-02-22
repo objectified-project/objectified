@@ -24,7 +24,7 @@ import YAML from 'yaml';
 import jsf from 'json-schema-faker';
 import { generateClassOpenApiSpec } from '../../../utils/openapi';
 import { assignTagToClass, removeTagFromClass, getTagsForClass } from '../../../../../lib/db/helper';
-import { createClassWithSession, updateClassWithSession } from '../../../../../lib/api/rest-client';
+import { createClassWithSession, updateClassWithSession, getClassWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { ExtensionsEditor } from './ExtensionsEditor';
 import ConditionalSchemaBuilder, {
   ConditionalRule,
@@ -1005,15 +1005,16 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
   // Create a stable stringified version of formData for dependency tracking
   const formDataString = useMemo(() => JSON.stringify(formData), [formData]);
 
-  // Memoize the built schema to prevent unnecessary recalculations
+  // Memoize the built schema from current form so Example/JSON/YAML tabs stay in sync
   const builtSchema = useMemo(() => {
-    if (editingClassData) {
+    if (editingClassData && !formData.name) {
+      // Form not yet initialized (first frame after open) – use class schema
       return typeof editingClassData.schema === 'string'
         ? JSON.parse(editingClassData.schema)
         : editingClassData.schema || {};
     }
     return buildSchemaFromFormData();
-  }, [editingClassData, formDataString]);
+  }, [editingClassData, formDataString, formData.name]);
 
   // Memoize all classes array to prevent reference changes
   const allClasses = useMemo(() => {
@@ -1029,11 +1030,25 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
       const generateOpenApiDocAsync = async () => {
         setLoadingOpenApiDoc(true);
         try {
-          const previewClassData = editingClassData || {
-            name: formData.name || 'NewClass',
-            description: formData.description,
-            schema: builtSchema
-          };
+          // Use current form schema so Example tab reflects latest edits
+          let previewClassData = editingClassData
+            ? { ...editingClassData, schema: builtSchema }
+            : {
+                name: formData.name || 'NewClass',
+                description: formData.description,
+                schema: builtSchema
+              };
+
+          // When opened from sidebar, class data may lack properties – fetch full class for example generation
+          if (
+            previewClassData.id &&
+            (!previewClassData.properties || previewClassData.properties.length === 0)
+          ) {
+            const res = await getClassWithPropertiesAndTagsWithSession(previewClassData.id);
+            if (res.success && res.class) {
+              previewClassData = { ...res.class, schema: builtSchema };
+            }
+          }
 
           const doc = await generateClassOpenApiSpec(previewClassData, allClasses, {
             title: `${previewClassData.name} Schema`,

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Dialog,
-  DialogContent,
+  DialogPortal,
+  DialogOverlay,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -13,6 +15,7 @@ import { Input } from '../../ui/Input';
 import { Checkbox } from '../../ui/Checkbox';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 import { PropertyFormData } from './PropertyFormFields';
+import { cn } from '../../../../../lib/utils';
 import {
   Search,
   X,
@@ -51,6 +54,9 @@ export interface PrimitiveSelectorProps {
   // Optional: callback when a primitive is applied
   onPrimitiveApplied?: (primitive: Primitive) => void;
 
+  // Optional: callback when the selection dialog opens or closes (e.g. to dim parent form)
+  onOpenChange?: (open: boolean) => void;
+
   // Size variant
   size?: 'small' | 'medium';
 }
@@ -70,6 +76,7 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
   onChange,
   propertyType,
   onPrimitiveApplied,
+  onOpenChange,
   size = 'small',
 }) => {
   const isDark = useDarkMode();
@@ -254,6 +261,7 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
     setDialogOpen(false);
     setSelectedPrimitive(null);
     setSearchQuery('');
+    onOpenChange?.(false);
   };
 
   // Render schema preview
@@ -287,7 +295,10 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
         <Button
           variant="outline"
           size={size === 'small' ? 'sm' : 'default'}
-          onClick={() => setDialogOpen(true)}
+          onClick={() => {
+            setDialogOpen(true);
+            onOpenChange?.(true);
+          }}
           className="gap-2"
         >
           <Sparkles size={14} />
@@ -301,23 +312,35 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
         </span>
       </div>
 
-      {/* Selection Dialog */}
+      {/* Selection Dialog — uses z-[10000]/[10001] to sit above any parent Dialog (z-9999) */}
       <Dialog open={dialogOpen} onOpenChange={(isOpen) => {
         if (!isOpen) {
           setDialogOpen(false);
           setSelectedPrimitive(null);
           setSearchQuery('');
+          onOpenChange?.(false);
         }
       }} modal={true}>
-        <DialogContent
-          className="max-w-3xl h-[80vh] max-h-[700px] p-0 flex flex-col overflow-hidden"
-          showCloseButton={true}
-          aria-describedby={undefined}
-        >
+        <DialogPortal>
+          <DialogOverlay className="z-[10000]" />
+          <DialogPrimitive.Content
+            className={cn(
+              'fixed left-[50%] top-[50%] z-[10001] w-full translate-x-[-50%] translate-y-[-50%]',
+              'max-w-3xl h-[80vh] max-h-[700px] p-0 flex flex-col overflow-hidden',
+              'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl rounded-xl',
+            )}
+            aria-describedby={undefined}
+          >
           <DialogHeader className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
-            <div className="flex items-center gap-2">
-              <Sparkles size={20} className="text-indigo-500" />
-              <DialogTitle className="text-lg font-semibold">Apply Primitive</DialogTitle>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={20} className="text-indigo-500" />
+                <DialogTitle className="text-lg font-semibold">Apply Primitive</DialogTitle>
+              </div>
+              <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:pointer-events-none dark:ring-offset-gray-800">
+                <X className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <span className="sr-only">Close</span>
+              </DialogPrimitive.Close>
             </div>
           </DialogHeader>
 
@@ -473,6 +496,7 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
                   setDialogOpen(false);
                   setSelectedPrimitive(null);
                   setSearchQuery('');
+                  onOpenChange?.(false);
                 }}
               >
                 Cancel
@@ -485,7 +509,8 @@ export const PrimitiveSelector: React.FC<PrimitiveSelectorProps> = ({
               </Button>
             </div>
           </DialogFooter>
-        </DialogContent>
+          </DialogPrimitive.Content>
+        </DialogPortal>
       </Dialog>
     </>
   );
