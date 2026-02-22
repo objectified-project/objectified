@@ -399,6 +399,19 @@ function normalizeHex(hex: string): string {
   if (!rgb) return '#6366f1';
   return rgbToHex(rgb.r, rgb.g, rgb.b);
 }
+/** Invert a hex color (for selection highlight when node has custom color) */
+function invertHex(hex: string): string {
+  const rgb = hexToRgb(normalizeHex(hex));
+  if (!rgb) return '#6366f1';
+  return rgbToHex(255 - rgb.r, 255 - rgb.g, 255 - rgb.b);
+}
+/** Relative luminance (0–1); use to pick light vs dark text on a background */
+function luminance(hex: string): number {
+  const rgb = hexToRgb(normalizeHex(hex));
+  if (!rgb) return 0;
+  const [r, g, b] = [rgb.r, rgb.g, rgb.b].map(c => c / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
 /** Build full ClassNode theme from a single primary (header/border) color */
 function themeFromPrimaryColor(primaryHex: string): Omit<ClassNodeTheme, 'icon'> {
   const hex = normalizeHex(primaryHex);
@@ -971,21 +984,36 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
   const { topLevel, childMap } = buildPropertyHierarchy();
 
+  // When selected and node has a custom color, use inverted color so selection stands out
+  const hasThemeOverride = !!(typedData.theme?.borderColor || typedData.theme?.headerGradient);
+  const selectionAccent = selected
+    ? (hasThemeOverride && typedData.theme?.borderColor
+        ? invertHex(typedData.theme.borderColor)
+        : '#6366f1')
+    : null;
+
   // Determine header accent color based on state and custom theme
   const getHeaderGradient = () => {
+    if (selected && selectionAccent) return `linear-gradient(135deg, ${selectionAccent} 0%, ${darkenHex(selectionAccent, 0.18)} 100%)`;
     if (typedData.theme?.headerGradient) return typedData.theme.headerGradient;
     if (dragTarget === 'node') return 'linear-gradient(135deg, #059669 0%, #047857 100%)';
     if (selected) return 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)';
     return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
   };
 
-  // Get custom colors from theme or defaults
+  // Get custom colors from theme or defaults; when selected with theme override use inverted for border
+  const baseBorderColor = typedData.theme?.borderColor || (selected ? '#6366f1' : '#e2e8f0');
+  const borderColor = selected && selectionAccent ? selectionAccent : baseBorderColor;
   const backgroundColor = typedData.theme?.backgroundColor || 'white';
-  const borderColor = typedData.theme?.borderColor || (selected ? '#6366f1' : '#e2e8f0');
   const borderWidth = Math.min(5, Math.max(1, typedData.theme?.borderWidth ?? 1.5));
   const borderStyle = typedData.theme?.borderStyle ?? 'solid';
   const textColor = typedData.theme?.textColor || '#1e293b';
-  const headerTextColor = typedData.theme?.headerTextColor || 'white';
+  const themeHeaderTextColor = typedData.theme?.headerTextColor || 'white';
+  // When selected with inverted accent, ensure header text contrasts (inverted color can be light)
+  const headerTextColor =
+    selected && selectionAccent && luminance(selectionAccent) > 0.6
+      ? '#1e293b'
+      : themeHeaderTextColor;
 
   const isDropTarget = dragTarget === 'node' || dragTarget === 'property';
   const showValidDropOverlay = isDropTarget && !invalidDropReason;
@@ -996,6 +1024,12 @@ function ClassNode({ id, data, selected }: NodeProps) {
     typedData.inCircularDependency && !selected
       ? `0 0 0 2px #f59e0b, ${defaultShadow}`
       : undefined;
+
+  // Selection glow: use selection accent RGB when custom theme, else default indigo
+  const selectionGlowRgb = selectionAccent ? hexToRgb(selectionAccent) : { r: 99, g: 102, b: 241 };
+  const selectionShadow = selectionGlowRgb
+    ? `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(${selectionGlowRgb.r}, ${selectionGlowRgb.g}, ${selectionGlowRgb.b}, 0.35)`
+    : `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(99, 102, 241, 0.35)`;
 
   // #560: Heatmap overlay color (cool = low, warm = high). Value 0–1 → blue/green to orange/red.
   const heatmapOverlayStyle: React.CSSProperties | null =
@@ -1030,7 +1064,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
         minWidth: '280px',
         maxWidth: '420px',
         boxShadow: selected
-          ? `0 0 0 2px ${borderColor}, 0 8px 24px -8px rgba(99, 102, 241, 0.35)`
+          ? selectionShadow
           : invalidDropReason
           ? '0 0 0 2px #dc2626, 0 8px 24px -8px rgba(220, 38, 38, 0.3)'
           : dragTarget === 'node'

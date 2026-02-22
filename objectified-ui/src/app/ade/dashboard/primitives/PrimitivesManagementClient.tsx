@@ -411,7 +411,7 @@ export default function PrimitivesManagementClient() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 max-w-xs line-clamp-3" title={primitive.description || undefined}>
                             {primitive.description || '—'}
                           </div>
                         </td>

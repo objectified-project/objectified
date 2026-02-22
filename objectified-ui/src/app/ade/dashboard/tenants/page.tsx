@@ -3,7 +3,8 @@
 import { useSession } from 'next-auth/react';
 import { getTenantsForUser, getTenantsAdministratedByUser, getTenantUsers, addTenantAdministrator, addTenantUser, removeTenantAdministrator, removeTenantUser, updateTenant } from '../../../../../lib/db/helper';
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X, Building2, Edit2, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Users, Shield, ChevronDown, ChevronUp, X, Building2, Edit2, AlertTriangle, MoreVertical, UserCheck } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -491,23 +492,57 @@ const Tenants = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        {isCurrentUserAdmin(tenant.id) && (
-                          <button onClick={() => handleEditTenant(tenant)} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg cursor-pointer transition-all duration-200 group" title="Edit tenant">
-                            <Edit2 className="h-4 w-4 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
-                          </button>
-                        )}
-                        {tenant.id !== currentTenantId && (
-                          <Button size="sm" onClick={() => handleSelectTenant(tenant)}>Select</Button>
-                        )}
-                        {isCurrentUserAdmin(tenant.id) && (
-                          <Button variant="secondary" size="sm" onClick={() => {
-                            const expandedTenant = document.getElementById(`tenant-${tenant.id}`);
-                            if (expandedTenant) expandedTenant.classList.toggle('hidden');
-                          }}>
-                            Manage
-                          </Button>
-                        )}
+                      <div className="flex justify-end">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              type="button"
+                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                              aria-label="Tenant actions"
+                            >
+                              <MoreVertical className="h-5 w-5" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                              className="min-w-[10rem] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg py-1 z-50"
+                              sideOffset={4}
+                              align="end"
+                            >
+                              {isCurrentUserAdmin(tenant.id) && (
+                                <>
+                                  <DropdownMenu.Item
+                                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer outline-none hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 data-[highlighted]:bg-indigo-50 dark:data-[highlighted]:bg-indigo-900/30"
+                                    onSelect={() => handleEditTenant(tenant)}
+                                  >
+                                    <Edit2 className="h-4 w-4 shrink-0" />
+                                    Edit
+                                  </DropdownMenu.Item>
+                                  <DropdownMenu.Item
+                                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer outline-none hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 data-[highlighted]:bg-indigo-50 dark:data-[highlighted]:bg-indigo-900/30"
+                                    onSelect={() => {
+                                      const expandedTenant = document.getElementById(`tenant-${tenant.id}`);
+                                      if (expandedTenant) expandedTenant.classList.toggle('hidden');
+                                    }}
+                                  >
+                                    <Users className="h-4 w-4 shrink-0" />
+                                    Manage
+                                  </DropdownMenu.Item>
+                                  {tenant.id !== currentTenantId && <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />}
+                                </>
+                              )}
+                              {tenant.id !== currentTenantId && (
+                                <DropdownMenu.Item
+                                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer outline-none hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-700 dark:hover:text-indigo-300 data-[highlighted]:bg-indigo-50 dark:data-[highlighted]:bg-indigo-900/30"
+                                  onSelect={() => handleSelectTenant(tenant)}
+                                >
+                                  <UserCheck className="h-4 w-4 shrink-0" />
+                                  Select
+                                </DropdownMenu.Item>
+                              )}
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
                       </div>
                     </td>
                   </tr>
@@ -519,7 +554,18 @@ const Tenants = () => {
           {/* Admin sections for each tenant */}
           {tenants.map(tenant => (
             isCurrentUserAdmin(tenant.id) && (
-              <div key={`admin-${tenant.id}`} id={`tenant-${tenant.id}`} className="hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mt-4">
+              <div key={`admin-${tenant.id}`} id={`tenant-${tenant.id}`} className="hidden relative bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById(`tenant-${tenant.id}`);
+                    if (el) el.classList.add('hidden');
+                  }}
+                  className="absolute top-4 right-4 p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
                     <Building2 className="h-5 w-5 text-white" />
