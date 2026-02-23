@@ -42,6 +42,8 @@ def _build_property_schema(prop: Dict[str, Any], children_index: DefaultDict[Opt
 
     # Work on a shallow copy to avoid mutating input
     prop_schema: Dict[str, Any] = dict(prop_data)
+    # Exclude internal DB id from the OpenAPI property definition
+    prop_schema.pop('id', None)
 
     _clean_description(prop_schema)
 
@@ -88,6 +90,7 @@ def _build_property_schema(prop: Dict[str, Any], children_index: DefaultDict[Opt
                     child_schema.pop('required', None)
                 nested_props[child['name']] = child_schema
             merged_items = dict(items)
+            merged_items.pop('id', None)
             merged_items['type'] = 'object'
             if nested_props:
                 merged_items['properties'] = nested_props
@@ -108,10 +111,11 @@ def build_class_openapi_schema(class_data: Dict[str, Any], properties: List[Dict
     class_schema_raw = class_data.get('schema')
     class_schema_parsed = parse_json_field(class_schema_raw) or {}
 
-    # Remove properties/required from stored class schema to avoid overwriting DB-driven props
+    # Remove properties/required and internal id from stored class schema
     schema_without_props: Dict[str, Any] = dict(class_schema_parsed)
     schema_without_props.pop('properties', None)
     schema_without_props.pop('required', None)
+    schema_without_props.pop('id', None)
 
     # Base object schema
     schema: Dict[str, Any] = {
