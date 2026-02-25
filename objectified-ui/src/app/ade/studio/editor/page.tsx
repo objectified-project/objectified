@@ -6631,7 +6631,16 @@ const StudioContent = () => {
         open={editPropertyDialogOpen}
         onClose={() => setEditPropertyDialogOpen(false)}
         editingClassProperty={editingClassProperty}
-        onSaved={reloadClasses}
+        onSaved={async (applyLayout?: boolean) => {
+          if (applyLayout) {
+            await reloadClasses(true);
+          } else if (editingClassId) {
+            await updateSingleClassNode(editingClassId);
+            triggerSidebarRefresh();
+          } else {
+            await reloadClasses(false);
+          }
+        }}
         allClassProperties={
           editingClassId
             ? (nodes.find(n => n.id === editingClassId)?.data as any)?.properties || []

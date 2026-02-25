@@ -32,6 +32,7 @@ Bug Fixes:
   - Class template library form is wider to show better detail
   - Property template button now appears properly when in dark mode
   - Property template form is also now wider to show better detail
+  - Renaming a property no longer rearranges the entire canvas
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here
