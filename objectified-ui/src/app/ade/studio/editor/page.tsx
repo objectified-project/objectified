@@ -1712,7 +1712,7 @@ const StudioContent = () => {
 
       const result = await response.json();
       if (result.success) {
-        await reloadClasses();
+        await updateSingleClassNode(referenceTargetClassId);
         triggerSidebarRefresh();
         setReferenceDialogOpen(false);
       } else {
@@ -1725,7 +1725,7 @@ const StudioContent = () => {
       console.error('Error creating reference:', error);
       throw error;
     }
-  }, [referenceTargetClassId, nodes, reloadClasses, triggerSidebarRefresh]);
+  }, [referenceTargetClassId, nodes, updateSingleClassNode, triggerSidebarRefresh]);
 
   // Load project tags
   const loadProjectTags = useCallback(async (projectId: string) => {
