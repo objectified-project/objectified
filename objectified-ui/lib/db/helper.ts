@@ -648,11 +648,12 @@ export async function updateVersion(versionRecordId: string, description: string
   }
 }
 
-export async function publishVersion(versionRecordId: string, userId: string) {
+export async function publishVersion(versionRecordId: string, userId: string, visibility: 'public' | 'private' = 'private') {
   try {
+    const visibilityValue = visibility === 'public' ? 'public' : 'private';
     const result = await connectionPool.query(
       `UPDATE odb.versions v
-       SET published = true, published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       SET published = true, published_at = CURRENT_TIMESTAMP, visibility = $3, updated_at = CURRENT_TIMESTAMP
        WHERE v.id = $1
          AND v.deleted_at IS NULL
          AND (
@@ -665,7 +666,7 @@ export async function publishVersion(versionRecordId: string, userId: string) {
                AND ta.user_id = $2
            )
          )`,
-      [versionRecordId, userId]
+      [versionRecordId, userId, visibilityValue]
     );
 
     if (result.rowCount === 0) {

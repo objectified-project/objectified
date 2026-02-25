@@ -68,6 +68,9 @@ const Versions = () => {
   const [versions, setVersions] = useState<Version[]>([]);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [publishVersionId, setPublishVersionId] = useState<string | null>(null);
+  const [publishVisibility, setPublishVisibility] = useState<'private' | 'public'>('private');
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
   const [versionId, setVersionId] = useState('');
   const [autoGenerate, setAutoGenerate] = useState(true);
@@ -234,18 +237,30 @@ const Versions = () => {
     finally { setIsLoading(false); }
   };
 
-  const handlePublish = async (versionRecordId: string) => {
+  const handlePublishClick = (versionRecordId: string) => {
     const ver = versions.find(v => v.id === versionRecordId);
-    if (!ver) { await alertDialog({ message: 'Version not found', variant: 'error' }); return; }
-    if (ver.creator_id !== currentUserId && !effectiveIsAdmin) { await alertDialog({ message: 'Only owner or admin can publish', variant: 'warning' }); return; }
-    const confirmed = await confirmDialog({ title: 'Publish Version', message: 'Once published, this version will become read-only.  To make any additional edits after publishing, either create a new version, or unpublish this version.\n\nAre you sure?', variant: 'info', confirmLabel: 'Publish', cancelLabel: 'Cancel' });
-    if (!confirmed) return;
+    if (!ver) return;
+    if (ver.creator_id !== currentUserId && !effectiveIsAdmin) return;
+    setPublishVersionId(versionRecordId);
+    setPublishVisibility('private');
+    setShowPublishDialog(true);
+  };
+
+  const handlePublishConfirm = async () => {
+    if (!publishVersionId) return;
     try {
-      const result = await publishVersion(versionRecordId, currentUserId);
+      const result = await publishVersion(publishVersionId, currentUserId, publishVisibility);
       const response = JSON.parse(result);
-      if (response.success) await loadVersions();
-      else await alertDialog({ message: response.error || 'Failed to publish', variant: 'error' });
-    } catch (error: any) { await alertDialog({ message: error.message || 'An error occurred', variant: 'error' }); }
+      if (response.success) {
+        setShowPublishDialog(false);
+        setPublishVersionId(null);
+        await loadVersions();
+      } else {
+        await alertDialog({ message: response.error || 'Failed to publish', variant: 'error' });
+      }
+    } catch (error: any) {
+      await alertDialog({ message: error.message || 'An error occurred', variant: 'error' });
+    }
   };
 
   const handleUnpublish = async (versionRecordId: string) => {
@@ -390,7 +405,7 @@ const Versions = () => {
       case 'view': await handleViewOpenApi(version); break;
       case 'relationshipGraph': await handleShowRelationshipGraph(version); break;
       case 'edit': if (!isPublished) handleEditClick(version); else setErrorMessage('Cannot edit published version'); break;
-      case 'publish': if (canPub) await handlePublish(version.id); else await alertDialog({ message: 'Only owner or admin can publish', variant: 'warning' }); break;
+      case 'publish': if (canPub) handlePublishClick(version.id); else await alertDialog({ message: 'Only owner or admin can publish', variant: 'warning' }); break;
       case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else await alertDialog({ message: 'Only owner or admin can unpublish', variant: 'warning' }); break;
       case 'delete': await handleDelete(version.id); break;
     }
@@ -731,6 +746,39 @@ const Versions = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isLoading}>Cancel</Button>
             <Button onClick={handleEditSubmit} disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Publish Version Dialog */}
+      <Dialog open={showPublishDialog} onOpenChange={(open) => { setShowPublishDialog(open); if (!open) setPublishVersionId(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Publish Version</DialogTitle>
+            <DialogDescription>
+              Once published, this version will become read-only. To make any additional edits after publishing, either create a new version, or unpublish this version.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Visibility</Label>
+              <Select value={publishVisibility} onValueChange={(v) => setPublishVisibility(v as 'private' | 'public')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">Private</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {publishVisibility === 'private' ? 'Access requires an API Key.' : 'OpenAPI Specification will be public without requiring an API Key.'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowPublishDialog(false); setPublishVersionId(null); }}>Cancel</Button>
+            <Button onClick={handlePublishConfirm}>Publish</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

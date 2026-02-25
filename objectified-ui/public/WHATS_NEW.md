@@ -13,6 +13,7 @@ Bug Fixes:
 - Improved handling of light/dark system theme settings
 - Conversion of forms to use modern components
 - System-wide clean up of modern UI
+- Publishing a version can select the visibility at the time of publish
 - Improved published view page
   - Now displays the different types of object representations as a submenu (OpenAPI, Arazzo, JSON)
   - Now applies API Key when viewing private published pages
