@@ -2590,6 +2590,7 @@ This roadmap covers the data storage layer of Objectified, which enables storing
 - Data transformation during migration
 - Backwards compatibility checks
 - Schema versioning for stored data
+- **See**: [FEATURE_ROADMAP_DATA_TRANSFORM.md](FEATURE_ROADMAP_DATA_TRANSFORM.md) for full data transform and schema-version migration plan (schema comparison, translation rules, major-version safeguards, visual migration plans, MongoDB interim store, Spark parallel migration).
 
 | Ticket | Feature Description                              |
 |--------|--------------------------------------------------|
