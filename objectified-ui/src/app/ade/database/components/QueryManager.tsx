@@ -2,24 +2,95 @@
 
 import * as React from 'react';
 import { useDatabase } from '../DatabaseContext';
-import { List, Search, Sparkles, Plus, Database, Info } from 'lucide-react';
+import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import type { SnapshotQueryFilters } from './query-manager-types';
 import InsertStubModal from './InsertStubModal';
 import QueryUsingAIPanel from './QueryUsingAIPanel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/Dialog';
+import dynamic from 'next/dynamic';
+
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 const PAGE_SIZE = 20;
+const DATA_PREVIEW_MAX_LEN = 80;
+
+type SortColumn = 'record_id' | 'created_at' | 'updated_at' | 'record_sequence' | 'last_action';
+
+type SnapshotRow = {
+  record_id: string;
+  data: Record<string, unknown>;
+  updated_at: string;
+  created_at?: string;
+  record_sequence?: number;
+  last_action?: string;
+};
+
+function truncateDataPreview(data: Record<string, unknown>, maxLen: number): string {
+  const raw = JSON.stringify(data);
+  if (raw.length <= maxLen) return raw;
+  return raw.slice(0, maxLen).trim() + '…';
+}
+
+function formatDateTime(iso: string | undefined): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return iso;
+  }
+}
+
+function SortHeader({
+  label,
+  column,
+  currentSortBy,
+  currentSortDir,
+  onSort,
+}: {
+  label: string;
+  column: SortColumn;
+  currentSortBy: SortColumn;
+  currentSortDir: 'asc' | 'desc';
+  onSort: (c: SortColumn) => void;
+}) {
+  const isActive = currentSortBy === column;
+  return (
+    <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className="inline-flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+      >
+        {label}
+        {isActive ? (
+          currentSortDir === 'desc' ? (
+            <ArrowDown className="w-3.5 h-3.5 shrink-0" />
+          ) : (
+            <ArrowUp className="w-3.5 h-3.5 shrink-0" />
+          )
+        ) : (
+          <ArrowUpDown className="w-3.5 h-3.5 shrink-0 opacity-50" />
+        )}
+      </button>
+    </th>
+  );
+}
 
 export default function QueryManager() {
-  const { selectedProjectId, selectedVersionId, selectedTable, isReadOnly } = useDatabase();
+  const { selectedProjectId, selectedVersionId, selectedTable, isReadOnly, refreshTableCount } = useDatabase();
   const [viewMode, setViewMode] = React.useState<'none' | 'viewAll' | 'search' | 'ai'>('none');
   const [count, setCount] = React.useState<number | null>(null);
-  const [rows, setRows] = React.useState<Array<{ record_id: string; data: Record<string, unknown>; updated_at: string }>>([]);
+  const [rows, setRows] = React.useState<SnapshotRow[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(1);
   const [loading, setLoading] = React.useState(false);
   const [searchQ, setSearchQ] = React.useState('');
   const [insertModalOpen, setInsertModalOpen] = React.useState(false);
   const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
+  const [viewRecord, setViewRecord] = React.useState<SnapshotRow | null>(null);
+  const [sortBy, setSortBy] = React.useState<SortColumn>('updated_at');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
 
   const classSchemaId = selectedTable?.classSchemaId ?? null;
 
@@ -51,13 +122,20 @@ export default function QueryManager() {
     loadCount();
   }, [classSchemaId, loadCount]);
 
-  const runQuery = React.useCallback((filters: SnapshotQueryFilters, pageNum: number, pageSize: number, searchQuery?: string) => {
+  const runQuery = React.useCallback((filters: SnapshotQueryFilters, pageNum: number, pageSize: number, searchQuery?: string, orderBy?: string, orderDir?: string) => {
     if (!filters.classSchemaId) return;
     setLoading(true);
     const base = `/api/database/snapshot`;
+    const params = new URLSearchParams({
+      classSchemaId: filters.classSchemaId,
+      page: String(pageNum),
+      pageSize: String(pageSize),
+    });
+    if (orderBy) params.set('orderBy', orderBy);
+    if (orderDir) params.set('orderDir', orderDir);
     const url = searchQuery
-      ? `${base}/search?classSchemaId=${encodeURIComponent(filters.classSchemaId)}&q=${encodeURIComponent(searchQuery)}&page=${pageNum}&pageSize=${pageSize}`
-      : `${base}?classSchemaId=${encodeURIComponent(filters.classSchemaId)}&page=${pageNum}&pageSize=${pageSize}`;
+      ? `${base}/search?${params.toString()}&q=${encodeURIComponent(searchQuery)}`
+      : `${base}?${params.toString()}`;
     fetch(url)
       .then((r) => r.json())
       .then((data) => {
@@ -72,20 +150,32 @@ export default function QueryManager() {
 
   const handleViewAll = () => {
     setViewMode('viewAll');
-    if (classSchemaId) runQuery({ classSchemaId }, 1, PAGE_SIZE);
+    if (classSchemaId) runQuery({ classSchemaId }, 1, PAGE_SIZE, undefined, sortBy, sortDir);
   };
 
   const handleSearch = () => {
     setViewMode('search');
-    if (classSchemaId) runQuery({ classSchemaId }, 1, PAGE_SIZE, searchQ);
+    if (classSchemaId) runQuery({ classSchemaId }, 1, PAGE_SIZE, searchQ, sortBy, sortDir);
   };
 
   const handlePageChange = (newPage: number) => {
     if (!classSchemaId) return;
     if (viewMode === 'search') {
-      runQuery({ classSchemaId }, newPage, PAGE_SIZE, searchQ);
+      runQuery({ classSchemaId }, newPage, PAGE_SIZE, searchQ, sortBy, sortDir);
     } else {
-      runQuery({ classSchemaId }, newPage, PAGE_SIZE);
+      runQuery({ classSchemaId }, newPage, PAGE_SIZE, undefined, sortBy, sortDir);
+    }
+  };
+
+  const handleSort = (column: SortColumn) => {
+    const nextDir = sortBy === column && sortDir === 'desc' ? 'asc' : 'desc';
+    setSortBy(column);
+    setSortDir(nextDir);
+    if (!classSchemaId) return;
+    if (viewMode === 'search') {
+      runQuery({ classSchemaId }, page, PAGE_SIZE, searchQ, column, nextDir);
+    } else {
+      runQuery({ classSchemaId }, page, PAGE_SIZE, undefined, column, nextDir);
     }
   };
 
@@ -206,20 +296,37 @@ export default function QueryManager() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Record ID</th>
-                      <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Updated</th>
-                      <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300">Data</th>
+                      <SortHeader label="OID" column="record_id" currentSortBy={sortBy} currentSortDir={sortDir} onSort={handleSort} />
+                      <SortHeader label="Created" column="created_at" currentSortBy={sortBy} currentSortDir={sortDir} onSort={handleSort} />
+                      <SortHeader label="Updated" column="updated_at" currentSortBy={sortBy} currentSortDir={sortDir} onSort={handleSort} />
+                      <SortHeader label="Seq" column="record_sequence" currentSortBy={sortBy} currentSortDir={sortDir} onSort={handleSort} />
+                      <SortHeader label="Last action" column="last_action" currentSortBy={sortBy} currentSortDir={sortDir} onSort={handleSort} />
+                      <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 max-w-[200px]">Data</th>
+                      <th className="text-left py-2 px-2 font-medium text-gray-700 dark:text-gray-300 w-0" />
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.record_id} className="border-b border-gray-100 dark:border-gray-700">
                         <td className="py-2 px-2 font-mono text-xs text-gray-600 dark:text-gray-400">{row.record_id}</td>
-                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400">{row.updated_at}</td>
+                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDateTime(row.created_at)}</td>
+                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDateTime(row.updated_at)}</td>
+                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400">{row.record_sequence ?? '—'}</td>
+                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400">{row.last_action ?? '—'}</td>
+                        <td className="py-2 px-2 max-w-[200px]">
+                          <span className="text-xs text-gray-700 dark:text-gray-300 truncate block" title={JSON.stringify(row.data)}>
+                            {truncateDataPreview(row.data, DATA_PREVIEW_MAX_LEN)}
+                          </span>
+                        </td>
                         <td className="py-2 px-2">
-                          <pre className="text-xs overflow-x-auto max-w-md whitespace-pre-wrap break-all text-gray-700 dark:text-gray-300">
-                            {JSON.stringify(row.data)}
-                          </pre>
+                          <button
+                            type="button"
+                            onClick={() => setViewRecord(row)}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            <FileJson className="w-3.5 h-3.5" />
+                            View
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -268,8 +375,9 @@ export default function QueryManager() {
           classSchemaId={classSchemaId}
           onInserted={() => {
             loadCount();
-            if (viewMode === 'viewAll') runQuery({ classSchemaId }, 1, PAGE_SIZE);
-            if (viewMode === 'search') runQuery({ classSchemaId }, 1, PAGE_SIZE, searchQ);
+            if (viewMode === 'viewAll') runQuery({ classSchemaId }, 1, PAGE_SIZE, undefined, sortBy, sortDir);
+            if (viewMode === 'search') runQuery({ classSchemaId }, 1, PAGE_SIZE, searchQ, sortBy, sortDir);
+            if (classSchemaId) refreshTableCount(classSchemaId);
           }}
         />
       )}
@@ -280,6 +388,30 @@ export default function QueryManager() {
         tableName={selectedTable.className}
         classSchemaId={classSchemaId}
       />
+      <Dialog open={!!viewRecord} onOpenChange={(open) => !open && setViewRecord(null)}>
+        <DialogContent className="max-w-4xl w-[90vw] max-h-[85vh] flex flex-col gap-4" showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Record — {viewRecord?.record_id ?? ''}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+            {viewRecord && (
+              <MonacoEditor
+                height="min(70vh, 500px)"
+                language="json"
+                theme="vs-dark"
+                value={JSON.stringify(viewRecord.data, null, 2)}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  wordWrap: 'on',
+                }}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

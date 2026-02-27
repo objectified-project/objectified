@@ -169,6 +169,27 @@ export interface DataSnapshotRow {
   record_id: string;
   data: Record<string, unknown>;
   updated_at: string;
+  created_at?: string;
+  record_sequence?: number;
+  last_action?: string;
+}
+
+/**
+ * Allowed sort columns for snapshot list (maps to SQL expressions).
+ * Data column is intentionally excluded.
+ */
+const SNAPSHOT_SORT_COLUMNS: Record<string, string> = {
+  record_id: 'ds.record_id',
+  created_at: 'dr_first.created_at',
+  updated_at: 'ds.updated_at',
+  record_sequence: 'dr_last.record_sequence',
+  last_action: 'dr_last.action',
+};
+
+function buildSnapshotOrderBy(sortBy?: string | null, sortDir?: string | null): string {
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  const col = sortBy && SNAPSHOT_SORT_COLUMNS[sortBy] ? SNAPSHOT_SORT_COLUMNS[sortBy] : 'ds.updated_at';
+  return `ORDER BY ${col} ${dir} NULLS LAST, ds.record_id`;
 }
 
 /**
@@ -178,13 +199,16 @@ export async function getDataSnapshotPage(
   classSchemaId: string,
   tenantId: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  sortBy?: string | null,
+  sortDir?: string | null
 ): Promise<{ rows: DataSnapshotRow[]; total: number }> {
   const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
   if (!hasAccess) return { rows: [], total: 0 };
 
   const offset = Math.max(0, page - 1) * Math.max(1, pageSize);
   const limit = Math.min(100, Math.max(1, pageSize));
+  const orderBy = buildSnapshotOrderBy(sortBy, sortDir);
 
   const countResult = await connectionPool.query(
     `SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
@@ -194,18 +218,41 @@ export async function getDataSnapshotPage(
   const total = countResult.rows[0]?.cnt ?? 0;
 
   const listResult = await connectionPool.query(
-    `SELECT record_id, data, updated_at
-     FROM odb.data_snapshot
-     WHERE class_schema_id = $1 AND tenant_id = $2
-     ORDER BY updated_at DESC NULLS LAST, record_id
+    `SELECT ds.record_id, ds.data, ds.updated_at,
+            dr_first.created_at,
+            dr_last.record_sequence,
+            dr_last.action AS last_action
+     FROM odb.data_snapshot ds
+     LEFT JOIN LATERAL (
+       SELECT created_at FROM odb.data_record dr
+       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+       ORDER BY dr.record_sequence ASC LIMIT 1
+     ) dr_first ON true
+     LEFT JOIN LATERAL (
+       SELECT record_sequence, action FROM odb.data_record dr
+       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+       ORDER BY dr.record_sequence DESC LIMIT 1
+     ) dr_last ON true
+     WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2
+     ${orderBy}
      LIMIT $3 OFFSET $4`,
     [classSchemaId, tenantId, limit, offset]
   );
 
-  const rows: DataSnapshotRow[] = listResult.rows.map((row: { record_id: string; data: unknown; updated_at: string }) => ({
+  const rows: DataSnapshotRow[] = listResult.rows.map((row: {
+    record_id: string;
+    data: unknown;
+    updated_at: string;
+    created_at?: string;
+    record_sequence?: number;
+    last_action?: string;
+  }) => ({
     record_id: row.record_id,
     data: typeof row.data === 'object' && row.data !== null ? (row.data as Record<string, unknown>) : {},
     updated_at: row.updated_at,
+    created_at: row.created_at,
+    record_sequence: row.record_sequence,
+    last_action: row.last_action,
   }));
 
   return { rows, total };
@@ -220,7 +267,9 @@ export async function searchDataSnapshot(
   tenantId: string,
   q: string,
   page: number,
-  pageSize: number
+  pageSize: number,
+  sortBy?: string | null,
+  sortDir?: string | null
 ): Promise<{ rows: DataSnapshotRow[]; total: number }> {
   const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
   if (!hasAccess) return { rows: [], total: 0 };
@@ -228,6 +277,7 @@ export async function searchDataSnapshot(
   const offset = Math.max(0, page - 1) * Math.max(1, pageSize);
   const limit = Math.min(100, Math.max(1, pageSize));
   const pattern = `%${q.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+  const orderBy = buildSnapshotOrderBy(sortBy, sortDir);
 
   const countResult = await connectionPool.query(
     `SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
@@ -237,18 +287,41 @@ export async function searchDataSnapshot(
   const total = countResult.rows[0]?.cnt ?? 0;
 
   const listResult = await connectionPool.query(
-    `SELECT record_id, data, updated_at
-     FROM odb.data_snapshot
-     WHERE class_schema_id = $1 AND tenant_id = $2 AND data::text ILIKE $3
-     ORDER BY updated_at DESC NULLS LAST, record_id
+    `SELECT ds.record_id, ds.data, ds.updated_at,
+            dr_first.created_at,
+            dr_last.record_sequence,
+            dr_last.action AS last_action
+     FROM odb.data_snapshot ds
+     LEFT JOIN LATERAL (
+       SELECT created_at FROM odb.data_record dr
+       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+       ORDER BY dr.record_sequence ASC LIMIT 1
+     ) dr_first ON true
+     LEFT JOIN LATERAL (
+       SELECT record_sequence, action FROM odb.data_record dr
+       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+       ORDER BY dr.record_sequence DESC LIMIT 1
+     ) dr_last ON true
+     WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2 AND ds.data::text ILIKE $3
+     ${orderBy}
      LIMIT $4 OFFSET $5`,
     [classSchemaId, tenantId, pattern, limit, offset]
   );
 
-  const rows: DataSnapshotRow[] = listResult.rows.map((row: { record_id: string; data: unknown; updated_at: string }) => ({
+  const rows: DataSnapshotRow[] = listResult.rows.map((row: {
+    record_id: string;
+    data: unknown;
+    updated_at: string;
+    created_at?: string;
+    record_sequence?: number;
+    last_action?: string;
+  }) => ({
     record_id: row.record_id,
     data: typeof row.data === 'object' && row.data !== null ? (row.data as Record<string, unknown>) : {},
     updated_at: row.updated_at,
+    created_at: row.created_at,
+    record_sequence: row.record_sequence,
+    last_action: row.last_action,
   }));
 
   return { rows, total };

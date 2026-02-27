@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
     }
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10)));
-    const { rows, total } = await getDataSnapshotPage(classSchemaId, tenantId, page, pageSize);
+    const orderBy = searchParams.get('orderBy') ?? undefined;
+    const orderDir = searchParams.get('orderDir') ?? undefined;
+    const { rows, total } = await getDataSnapshotPage(classSchemaId, tenantId, page, pageSize, orderBy, orderDir);
     return NextResponse.json({ success: true, rows, total, page, pageSize });
   } catch (error) {
     console.error('Error fetching snapshot list:', error);

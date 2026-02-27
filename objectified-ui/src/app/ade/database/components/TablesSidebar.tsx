@@ -11,11 +11,29 @@ interface TableRow {
 }
 
 export default function TablesSidebar() {
-  const { selectedVersionId, selectedTable, setSelectedTable, isReadOnly } = useDatabase();
+  const { selectedVersionId, selectedTable, setSelectedTable, isReadOnly, refreshTableCountRef } = useDatabase();
   const [tables, setTables] = React.useState<TableRow[]>([]);
   const [counts, setCounts] = React.useState<Record<string, number>>({});
   const [loading, setLoading] = React.useState(false);
   const [countsLoading, setCountsLoading] = React.useState(false);
+
+  const refreshCountForClass = React.useCallback((classSchemaId: string) => {
+    fetch(`/api/database/snapshot/count?classSchemaId=${encodeURIComponent(classSchemaId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && typeof data.count === 'number') {
+          setCounts((prev) => ({ ...prev, [classSchemaId]: data.count }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    refreshTableCountRef.current = refreshCountForClass;
+    return () => {
+      refreshTableCountRef.current = null;
+    };
+  }, [refreshTableCountRef, refreshCountForClass]);
 
   React.useEffect(() => {
     if (!selectedVersionId) {

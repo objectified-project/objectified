@@ -1,11 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
 
 export interface SelectedTable {
   classSchemaId: string;
   className: string;
 }
+
+export type RefreshTableCountHandler = (classSchemaId: string) => void;
 
 export interface DatabaseContextType {
   selectedProjectId: string | null;
@@ -18,6 +20,10 @@ export interface DatabaseContextType {
   setIsReadOnly: (value: boolean) => void;
   selectedTable: SelectedTable | null;
   setSelectedTable: (t: SelectedTable | null) => void;
+  /** Ref for the sidebar to register its count-refresh handler. Called after insert/update/delete for a class. */
+  refreshTableCountRef: React.MutableRefObject<RefreshTableCountHandler | null>;
+  /** Call this after a successful insert/update/delete to refresh the sidebar count for that class. */
+  refreshTableCount: (classSchemaId: string) => void;
 }
 
 const DatabaseContext = createContext<DatabaseContextType | undefined>(undefined);
@@ -28,6 +34,10 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   const [latestVersionId, setLatestVersionId] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [selectedTable, setSelectedTable] = useState<SelectedTable | null>(null);
+  const refreshTableCountRef = useRef<RefreshTableCountHandler | null>(null);
+  const refreshTableCount = useCallback((classSchemaId: string) => {
+    refreshTableCountRef.current?.(classSchemaId);
+  }, []);
 
   return (
     <DatabaseContext.Provider
@@ -42,6 +52,8 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         setIsReadOnly,
         selectedTable,
         setSelectedTable,
+        refreshTableCountRef,
+        refreshTableCount,
       }}
     >
       {children}
