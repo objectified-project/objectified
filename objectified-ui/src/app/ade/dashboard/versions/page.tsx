@@ -319,7 +319,7 @@ const Versions = () => {
     const confirmed = await confirmDialog({
       title: 'Freeze schema',
       message: 'This will capture the current class schemas for this version into the database so the version can be used in the Database section. Only versions with no schema captured yet can be frozen. Continue?',
-      variant: 'default',
+      variant: 'info',
       confirmLabel: 'Freeze schema',
       cancelLabel: 'Cancel',
     });
