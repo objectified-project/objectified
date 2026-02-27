@@ -36,8 +36,18 @@ export default function QueryManager() {
     if (!classSchemaId) {
       setCount(null);
       setViewMode('none');
+      setRows([]);
+      setTotal(0);
+      setPage(1);
       return;
     }
+    // When switching to a different table, reset the right-hand view so we don't
+    // show stale data or keep "view all" active for the new table.
+    setViewMode('none');
+    setRows([]);
+    setTotal(0);
+    setPage(1);
+    setSearchQ('');
     loadCount();
   }, [classSchemaId, loadCount]);
 

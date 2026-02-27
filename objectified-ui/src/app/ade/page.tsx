@@ -78,7 +78,7 @@ const Ade = () => {
       description: 'Connect and manage data sources',
       icon: <Database className="w-8 h-8" />,
       href: '/ade/database',
-      enabled: false,
+      enabled: true,
       color: 'text-emerald-600 dark:text-emerald-400',
       gradient: 'from-emerald-500 to-teal-600',
     },
