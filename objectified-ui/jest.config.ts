@@ -25,7 +25,8 @@ const config: Config = {
     }]
   },
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@lib/(.*)$': '<rootDir>/lib/$1',
     '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx',
     '^remark-gfm$': '<rootDir>/tests/__mocks__/remark-gfm.ts',
   },

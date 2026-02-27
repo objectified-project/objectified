@@ -15,6 +15,14 @@ import {
   SelectValue,
 } from '@/app/components/ui/Select';
 import { validatePayloadAgainstSchema } from '@lib/database/validateSchema';
+import {
+  getPropertyType,
+  getEnumOptions,
+  getPattern,
+  isMoneyField,
+  getInitialFormData,
+  getOrderedPropertyEntries,
+} from '@lib/database/insert-form-schema-utils';
 
 interface InsertStubModalProps {
   open: boolean;
@@ -25,72 +33,6 @@ interface InsertStubModalProps {
 }
 
 type SchemaProperty = Record<string, unknown>;
-
-function getPropertyType(propSchema: SchemaProperty): string {
-  const t = propSchema.type;
-  if (typeof t === 'string') return t;
-  if (Array.isArray(t) && t.length > 0) {
-    const first = t.find((x) => x !== 'null');
-    return typeof first === 'string' ? first : 'string';
-  }
-  return 'string';
-}
-
-function getEnumOptions(propSchema: SchemaProperty): unknown[] {
-  const e = propSchema.enum;
-  return Array.isArray(e) ? e : [];
-}
-
-function getPattern(propSchema: SchemaProperty): string | undefined {
-  const p = propSchema.pattern;
-  return typeof p === 'string' ? p : undefined;
-}
-
-function isMoneyField(propSchema: SchemaProperty, key: string): boolean {
-  const format = (propSchema.format as string) || '';
-  const keyLower = key.toLowerCase();
-  const moneyFormats = ['currency', 'amount', 'money'];
-  const moneyKeys = ['price', 'amount', 'cost', 'money', 'currency', 'total', 'subtotal', 'fee'];
-  return (
-    moneyFormats.some((f) => format.toLowerCase().includes(f)) ||
-    moneyKeys.some((k) => keyLower.includes(k))
-  );
-}
-
-function getInitialFormData(schema: Record<string, unknown>): Record<string, unknown> {
-  const props = schema.properties as Record<string, SchemaProperty> | undefined;
-  if (!props || typeof props !== 'object') return {};
-  const out: Record<string, unknown> = {};
-  for (const [key, propSchema] of Object.entries(props)) {
-    if (typeof propSchema !== 'object' || propSchema === null) continue;
-    // Prefer default, then const (single allowed value); deep-clone objects/arrays so form state is independent
-    const def = propSchema.default !== undefined ? propSchema.default : propSchema.const;
-    if (def !== undefined) {
-      out[key] =
-        typeof def === 'object' && def !== null
-          ? JSON.parse(JSON.stringify(def))
-          : def;
-      continue;
-    }
-    const type = getPropertyType(propSchema);
-    if (type === 'string') out[key] = '';
-    else if (type === 'number' || type === 'integer') out[key] = undefined;
-    else if (type === 'boolean') out[key] = false;
-    else if (type === 'array') out[key] = [];
-    else if (type === 'object') out[key] = {};
-    else out[key] = '';
-  }
-  return out;
-}
-
-function getOrderedPropertyEntries(schema: Record<string, unknown>): [string, SchemaProperty][] {
-  const props = schema.properties as Record<string, SchemaProperty> | undefined;
-  if (!props || typeof props !== 'object') return [];
-  return Object.entries(props).filter(
-    (entry): entry is [string, SchemaProperty] =>
-      typeof entry[1] === 'object' && entry[1] !== null
-  );
-}
 
 export default function InsertStubModal({
   open,
@@ -417,17 +359,19 @@ export default function InsertStubModal({
                                 const patternError = patternErrors[key] ?? null;
 
                                 if (enumOpts.length > 0) {
+                                  const EMPTY_ENUM_VALUE = '__none__';
+                                  const selectValue = strVal === '' ? EMPTY_ENUM_VALUE : strVal;
                                   return (
                                     <Select
-                                      value={strVal}
-                                      onValueChange={(v) => updateField(key, v)}
+                                      value={selectValue}
+                                      onValueChange={(v) => updateField(key, v === EMPTY_ENUM_VALUE ? '' : v)}
                                     >
                                       <SelectTrigger id={`field-${key}`}>
                                         <SelectValue placeholder="Select…" />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {!required && (
-                                          <SelectItem value="">(none)</SelectItem>
+                                          <SelectItem value={EMPTY_ENUM_VALUE}>(none)</SelectItem>
                                         )}
                                         {enumOpts.map((opt, i) => {
                                           const optStr = String(opt);
