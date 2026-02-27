@@ -8,6 +8,9 @@ import {
   getEnumOptions,
   getPattern,
   isMoneyField,
+  isUuidField,
+  isTimestampField,
+  getTimestampDefaultKind,
   getInitialFormData,
   getOrderedPropertyEntries,
 } from '../../lib/database/insert-form-schema-utils';
@@ -94,6 +97,69 @@ describe('isMoneyField', () => {
   test('returns false for unrelated format and key', () => {
     expect(isMoneyField({ format: 'email' }, 'name')).toBe(false);
     expect(isMoneyField({}, 'title')).toBe(false);
+  });
+});
+
+describe('isUuidField', () => {
+  test('returns true for format uuid', () => {
+    expect(isUuidField({ format: 'uuid' }, 'x')).toBe(true);
+    expect(isUuidField({ format: 'UUID' }, 'x')).toBe(true);
+  });
+
+  test('returns true for key id or *_id or *_uuid', () => {
+    expect(isUuidField({}, 'id')).toBe(true);
+    expect(isUuidField({}, 'user_id')).toBe(true);
+    expect(isUuidField({}, 'parent_uuid')).toBe(true);
+    expect(isUuidField({}, 'some_uuid')).toBe(true);
+  });
+
+  test('returns false for unrelated format and key', () => {
+    expect(isUuidField({ format: 'email' }, 'name')).toBe(false);
+    expect(isUuidField({}, 'title')).toBe(false);
+  });
+});
+
+describe('isTimestampField', () => {
+  test('returns true for format date-time or date', () => {
+    expect(isTimestampField({ format: 'date-time' }, 'x')).toBe(true);
+    expect(isTimestampField({ format: 'date' }, 'x')).toBe(true);
+  });
+
+  test('returns true when default is CURRENT_TIMESTAMP or NOW()', () => {
+    expect(isTimestampField({ default: 'CURRENT_TIMESTAMP' }, 'x')).toBe(true);
+    expect(isTimestampField({ default: 'NOW()' }, 'x')).toBe(true);
+    expect(isTimestampField({ const: 'NOW()' }, 'x')).toBe(true);
+  });
+
+  test('returns true for key containing timestamp or created_at or updated_at', () => {
+    expect(isTimestampField({}, 'created_at')).toBe(true);
+    expect(isTimestampField({}, 'updated_at')).toBe(true);
+    expect(isTimestampField({}, 'timestamp')).toBe(true);
+  });
+
+  test('returns false when no format, no default, no key hint', () => {
+    expect(isTimestampField({ type: 'string' }, 'name')).toBe(false);
+  });
+});
+
+describe('getTimestampDefaultKind', () => {
+  test('returns CURRENT_TIMESTAMP for that default', () => {
+    expect(getTimestampDefaultKind({ default: 'CURRENT_TIMESTAMP' })).toBe('CURRENT_TIMESTAMP');
+    expect(getTimestampDefaultKind({ default: 'current_timestamp' })).toBe('CURRENT_TIMESTAMP');
+  });
+
+  test('returns NOW() for NOW() or NOW default', () => {
+    expect(getTimestampDefaultKind({ default: 'NOW()' })).toBe('NOW()');
+    expect(getTimestampDefaultKind({ default: 'NOW' })).toBe('NOW()');
+  });
+
+  test('returns iso for ISO-like string default', () => {
+    expect(getTimestampDefaultKind({ default: '2024-01-15T12:00:00.000Z' })).toBe('iso');
+  });
+
+  test('returns null when no default or const', () => {
+    expect(getTimestampDefaultKind({})).toBeNull();
+    expect(getTimestampDefaultKind({ type: 'string' })).toBeNull();
   });
 });
 

@@ -11,9 +11,14 @@ export interface ValidationResult {
   errors?: Array<{ path?: string; message: string }>;
 }
 
-function getDefaultAjv(): Ajv {
-  const ajv = new Ajv({ strictSchema: false });
-  addFormats(ajv);
+function getDefaultAjv(): InstanceType<typeof Ajv> {
+  const ajv = new Ajv({
+    strictSchema: false,
+    validateSchema: false, // only validate payload against schema fields, not schema meta ($id, $schema, etc.)
+    addUsedSchema: false,  // do not add schemas by $id or resolve external refs
+  } as object);
+  // ajv-formats types expect its own bundled Ajv; cast to avoid version mismatch
+  (addFormats as (ajv: unknown) => void)(ajv);
   return ajv;
 }
 
@@ -32,10 +37,13 @@ export function validatePayloadAgainstSchema(
       return { valid: true };
     }
     const errors: Array<{ path?: string; message: string }> = (validate.errors ?? []).map(
-      (err: ErrorObject) => ({
-        path: err.instancePath || (err.params?.propertyName ?? undefined),
-        message: err.message ?? 'Validation failed',
-      })
+      (err: ErrorObject) => {
+        const e = err as { instancePath?: string; message?: string; params?: { propertyName?: string } };
+        return {
+          path: e.instancePath || (e.params?.propertyName ?? undefined),
+          message: e.message ?? 'Validation failed',
+        };
+      }
     );
     return { valid: false, errors };
   } catch (err) {

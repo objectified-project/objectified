@@ -20,9 +20,14 @@ import {
   getEnumOptions,
   getPattern,
   isMoneyField,
+  isUuidField,
+  isTimestampField,
+  getTimestampDefaultKind,
   getInitialFormData,
   getOrderedPropertyEntries,
 } from '@lib/database/insert-form-schema-utils';
+import { generateUuid, generateTimestamp, type UuidVersion } from '@lib/database/generate-field-value';
+import { Button } from '@/app/components/ui/Button';
 
 interface InsertStubModalProps {
   open: boolean;
@@ -52,6 +57,7 @@ export default function InsertStubModal({
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [patternErrors, setPatternErrors] = React.useState<Record<string, string | null>>({});
+  const [uuidVersions, setUuidVersions] = React.useState<Record<string, UuidVersion>>({});
 
   React.useEffect(() => {
     if (!open || !classSchemaId) {
@@ -64,6 +70,7 @@ export default function InsertStubModal({
       setValidationErrors([]);
       setSubmitError(null);
       setPatternErrors({});
+      setUuidVersions({});
       return;
     }
     setSchemaLoading(true);
@@ -433,6 +440,69 @@ export default function InsertStubModal({
                                       onChange={handleMoneyChange}
                                       placeholder="0.00"
                                     />
+                                  );
+                                }
+
+                                if (isUuidField(propSchema, key)) {
+                                  const version = uuidVersions[key] ?? 4;
+                                  return (
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                      <Input
+                                        id={`field-${key}`}
+                                        type="text"
+                                        value={strVal}
+                                        onChange={(e) => updateField(key, e.target.value)}
+                                        className="flex-1 min-w-[200px]"
+                                        placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+                                      />
+                                      <Select
+                                        value={String(version)}
+                                        onValueChange={(v) =>
+                                          setUuidVersions((prev) => ({ ...prev, [key]: Number(v) as UuidVersion }))
+                                        }
+                                      >
+                                        <SelectTrigger className="w-[80px]">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="1">v1</SelectItem>
+                                          <SelectItem value="4">v4</SelectItem>
+                                          <SelectItem value="7">v7</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => updateField(key, generateUuid(version))}
+                                      >
+                                        Generate
+                                      </Button>
+                                    </div>
+                                  );
+                                }
+
+                                if (isTimestampField(propSchema, key)) {
+                                  const kind = getTimestampDefaultKind(propSchema);
+                                  return (
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                      <Input
+                                        id={`field-${key}`}
+                                        type="text"
+                                        value={strVal}
+                                        onChange={(e) => updateField(key, e.target.value)}
+                                        className="flex-1 min-w-[200px]"
+                                        placeholder="e.g. 2024-01-15T12:00:00.000Z"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => updateField(key, generateTimestamp(kind))}
+                                      >
+                                        Generate
+                                      </Button>
+                                    </div>
                                   );
                                 }
 

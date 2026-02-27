@@ -36,6 +36,40 @@ export function isMoneyField(propSchema: SchemaProperty, key: string): boolean {
   );
 }
 
+/** True if the property is a UUID (format or key name). */
+export function isUuidField(propSchema: SchemaProperty, key: string): boolean {
+  const format = (propSchema.format as string) || '';
+  if (format.toLowerCase() === 'uuid') return true;
+  const keyLower = key.toLowerCase();
+  return keyLower === 'id' || keyLower.endsWith('_id') || keyLower.endsWith('_uuid') || keyLower.includes('uuid');
+}
+
+/** True if the property is a timestamp (format date-time or default CURRENT_TIMESTAMP/NOW()). */
+export function isTimestampField(propSchema: SchemaProperty, key: string): boolean {
+  const format = (propSchema.format as string) || '';
+  if (format === 'date-time' || format === 'date') return true;
+  const kind = getTimestampDefaultKind(propSchema);
+  if (kind !== null) return true;
+  const keyLower = key.toLowerCase();
+  return keyLower.includes('timestamp') || keyLower.includes('created_at') || keyLower.includes('updated_at');
+}
+
+/**
+ * Parse default/const to detect timestamp semantics: CURRENT_TIMESTAMP, NOW(), or ISO.
+ * Used to decide how to generate a value when the user clicks "Generate".
+ */
+export function getTimestampDefaultKind(propSchema: SchemaProperty): 'CURRENT_TIMESTAMP' | 'NOW()' | 'iso' | null {
+  const def = propSchema.default !== undefined ? propSchema.default : propSchema.const;
+  if (def === undefined || def === null) return null;
+  const s = String(def).trim().toUpperCase();
+  if (s === 'CURRENT_TIMESTAMP') return 'CURRENT_TIMESTAMP';
+  if (s === 'NOW()') return 'NOW()';
+  if (s === 'NOW') return 'NOW()';
+  // ISO-like default (e.g. "2024-01-01T00:00:00.000Z")
+  if (typeof def === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(def)) return 'iso';
+  return null;
+}
+
 /**
  * Build initial form data from a JSON Schema (e.g. class_schema.schema).
  * Uses default or const when present; otherwise empty value by type.

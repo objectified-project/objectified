@@ -300,8 +300,8 @@ export default function PrimitiveEditorDialog({ primitive, onClose, onSave, onMe
         setSchemaError('Schema must be a valid JSON object');
         return false;
       }
-      const ajv = new Ajv({ strictSchema: false });
-      addFormats(ajv);
+      const ajv = new Ajv({ strictSchema: false } as object);
+      (addFormats as (ajv: unknown) => void)(ajv);
       try {
         ajv.compile(parsed);
         setSchemaError(null);
