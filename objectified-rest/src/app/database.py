@@ -1411,6 +1411,82 @@ class Database:
         results = self.execute_query(query, (version_record_id,))
         return len(results) > 0
 
+    def version_has_class_schema(self, version_record_id: str) -> bool:
+        """Return True if any class_schema row exists for this version (schema already frozen)."""
+        query = """
+            SELECT 1 FROM odb.class_schema WHERE version_id = %s LIMIT 1
+        """
+        results = self.execute_query(query, (version_record_id,))
+        return len(results) > 0
+
+    def freeze_version_schema(
+        self, version_record_id: str, tenant_id: str, user_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Capture class schemas into odb.class_schema for this version (same as publish capture).
+        Only allowed when the version has no class_schema rows yet.
+        Returns version dict if successful; None if permission denied or schema already frozen.
+        """
+        if self.version_has_class_schema(version_record_id):
+            return None
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT v.id, v.version_id, p.id AS project_id
+                    FROM odb.versions v
+                    JOIN odb.projects p ON v.project_id = p.id
+                    JOIN odb.tenants t ON p.tenant_id = t.id
+                    WHERE v.id = %s AND p.tenant_id = %s AND v.deleted_at IS NULL AND p.deleted_at IS NULL
+                      AND (v.creator_id = %s OR EXISTS (
+                        SELECT 1 FROM odb.tenant_administrators ta
+                        WHERE ta.tenant_id = p.tenant_id AND ta.user_id = %s
+                      ))
+                    """,
+                    (version_record_id, tenant_id, user_id, user_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                cursor.execute(
+                    """
+                    SELECT v.version_id, p.slug AS project_slug, t.slug AS tenant_slug
+                    FROM odb.versions v
+                    JOIN odb.projects p ON v.project_id = p.id
+                    JOIN odb.tenants t ON p.tenant_id = t.id
+                    WHERE v.id = %s
+                    """,
+                    (version_record_id,),
+                )
+                slug_row = cursor.fetchone()
+                if not slug_row:
+                    return None
+                classes = self.get_classes_with_properties_and_tags_for_version(version_record_id)
+                for class_data in classes:
+                    schema_dict = generate_class_jsonschema_spec(
+                        slug_row["tenant_slug"],
+                        slug_row["project_slug"],
+                        slug_row["version_id"],
+                        class_data,
+                        class_data.get("properties", []),
+                    )
+                    schema_json = json.dumps(schema_dict)
+                    cursor.execute(
+                        """
+                        INSERT INTO odb.class_schema (version_id, class_id, schema, updated_at)
+                        VALUES (%s, %s, %s::jsonb, CURRENT_TIMESTAMP)
+                        ON CONFLICT (version_id, class_id)
+                        DO UPDATE SET schema = EXCLUDED.schema, updated_at = CURRENT_TIMESTAMP
+                        """,
+                        (version_record_id, class_data["id"], schema_json),
+                    )
+                conn.commit()
+                return self.get_version_by_id(version_record_id, tenant_id)
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     def unpublish_version(self, version_record_id: str, tenant_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Unpublish a version (only owner or tenant admin can unpublish). Call version_has_data_records before this to block when data exists."""
         query = """

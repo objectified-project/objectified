@@ -463,6 +463,49 @@ async def unpublish_version(
     return VersionSchema(**version)
 
 
+@router.post("/{tenant_slug}/{project_id}/{version_record_id}/freeze-schema")
+async def freeze_version_schema(
+    tenant_slug: str,
+    project_id: str,
+    version_record_id: str,
+    auth_data: Dict[str, Any] = Depends(validate_authentication)
+) -> VersionSchema:
+    """
+    Freeze (capture) class schemas into odb.class_schema for this version.
+    Only available when the version has no class_schema rows yet (e.g. published before schema capture existed).
+    Only the version creator or a tenant administrator can freeze schema.
+    """
+    existing = db.get_version_by_id(version_record_id, auth_data["tenant_id"])
+    if not existing:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found: {version_record_id}"
+        )
+    if existing["project_id"] != project_id:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Version not found in project: {project_id}"
+        )
+    if db.version_has_class_schema(version_record_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Schema already frozen for this version. Class schemas are already captured."
+        )
+    user_id = get_authenticated_user_id(auth_data)
+    if not user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Freeze schema requires user authentication (JWT token)"
+        )
+    version = db.freeze_version_schema(version_record_id, auth_data["tenant_id"], user_id)
+    if not version:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the version creator or a tenant administrator can freeze schema for this version"
+        )
+    return VersionSchema(**version)
+
+
 @router.delete("/{tenant_slug}/{project_id}/{version_record_id}")
 async def delete_version(
     tenant_slug: str,
