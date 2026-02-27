@@ -15,11 +15,12 @@ export default function TablesSidebar() {
   const [tables, setTables] = React.useState<TableRow[]>([]);
   const [counts, setCounts] = React.useState<Record<string, number>>({});
   const [loading, setLoading] = React.useState(false);
-  const [countLoading, setCountLoading] = React.useState<string | null>(null);
+  const [countsLoading, setCountsLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (!selectedVersionId) {
       setTables([]);
+      setCounts({});
       return;
     }
     let cancelled = false;
@@ -28,36 +29,35 @@ export default function TablesSidebar() {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        if (data.success && data.tables) setTables(data.tables);
-        else setTables([]);
+        if (data.success && data.tables) {
+          setTables(data.tables);
+          const ids = (data.tables as TableRow[]).map((t) => t.class_schema_id);
+          if (ids.length > 0) {
+            setCountsLoading(true);
+            fetch(`/api/database/snapshot/counts?classSchemaIds=${ids.map(encodeURIComponent).join(',')}`)
+              .then((r2) => r2.json())
+              .then((data2) => {
+                if (cancelled) return;
+                if (data2.success && data2.counts) setCounts(data2.counts);
+              })
+              .catch(() => { if (!cancelled) setCounts({}); })
+              .finally(() => { if (!cancelled) setCountsLoading(false); });
+          } else {
+            setCounts({});
+          }
+        } else {
+          setTables([]);
+          setCounts({});
+        }
       })
-      .catch(() => { if (!cancelled) setTables([]); })
+      .catch(() => { if (!cancelled) setTables([]); setCounts({}); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [selectedVersionId]);
 
-  const loadCount = React.useCallback((classSchemaId: string) => {
-    setCountLoading(classSchemaId);
-    fetch(`/api/database/snapshot/count?classSchemaId=${encodeURIComponent(classSchemaId)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && typeof data.count === 'number') {
-          setCounts((prev) => ({ ...prev, [classSchemaId]: data.count }));
-        }
-      })
-      .finally(() => setCountLoading(null));
-  }, []);
-
   const handleTableClick = (row: TableRow) => {
     setSelectedTable({ classSchemaId: row.class_schema_id, className: row.class_name });
-    if (counts[row.class_schema_id] === undefined) loadCount(row.class_schema_id);
   };
-
-  React.useEffect(() => {
-    if (selectedTable && counts[selectedTable.classSchemaId] === undefined && !countLoading) {
-      loadCount(selectedTable.classSchemaId);
-    }
-  }, [selectedTable, counts, countLoading, loadCount]);
 
   return (
     <aside
@@ -77,7 +77,7 @@ export default function TablesSidebar() {
             {tables.map((row) => {
               const isSelected = selectedTable?.classSchemaId === row.class_schema_id;
               const count = counts[row.class_schema_id];
-              const loadingCount = countLoading === row.class_schema_id;
+              const showCount = typeof count === 'number';
               return (
                 <li key={row.class_schema_id}>
                   <button
@@ -90,8 +90,8 @@ export default function TablesSidebar() {
                     }`}
                   >
                     <span className="font-medium">{row.class_name}</span>
-                    {loadingCount && <span className="ml-2 text-xs text-gray-400">...</span>}
-                    {!loadingCount && typeof count === 'number' && (
+                    {countsLoading && !showCount && <span className="ml-2 text-xs text-gray-400">...</span>}
+                    {showCount && (
                       <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">({count})</span>
                     )}
                   </button>

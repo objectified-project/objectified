@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network } from 'lucide-react';
+import { Plus, Edit2, Trash2, Package, AlertCircle, Lock, Unlock, CheckCircle, Eye, Copy, MoreVertical, Network, Snowflake } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   Dialog,
@@ -113,6 +113,9 @@ const Versions = () => {
   const [relationshipGraphClasses, setRelationshipGraphClasses] = useState<Array<{ id: string; name: string; properties?: Array<{ id: string; name: string; data: unknown }> }> | null>(null);
   const [isLoadingRelationshipGraph, setIsLoadingRelationshipGraph] = useState(false);
 
+  const [hasClassSchemaMap, setHasClassSchemaMap] = useState<Record<string, boolean>>({});
+  const [freezingSchemaVersionId, setFreezingSchemaVersionId] = useState<string | null>(null);
+
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const isSyncingScroll = useRef(false);
@@ -140,6 +143,22 @@ const Versions = () => {
 
   useEffect(() => { if (currentTenantId) loadProjects(); }, [currentTenantId]);
   useEffect(() => { if (selectedProjectId) loadVersions(); else setVersions([]); }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!currentTenantId || versions.length === 0) {
+      setHasClassSchemaMap({});
+      return;
+    }
+    const versionIds = versions.map((v) => v.id);
+    const url = `/api/database/versions/has-class-schema?versionIds=${versionIds.join(',')}`;
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.map) setHasClassSchemaMap(data.map);
+        else setHasClassSchemaMap({});
+      })
+      .catch(() => setHasClassSchemaMap({}));
+  }, [currentTenantId, versions]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -288,6 +307,44 @@ const Versions = () => {
     } catch (error: unknown) { await alertDialog({ message: error instanceof Error ? error.message : 'An error occurred', variant: 'error' }); }
   };
 
+  const handleFreezeSchema = async (version: Version) => {
+    if (version.creator_id !== currentUserId && !effectiveIsAdmin) {
+      await alertDialog({ message: 'Only the version owner or a tenant admin can freeze schema.', variant: 'warning' });
+      return;
+    }
+    if (hasClassSchemaMap[version.id]) {
+      await alertDialog({ message: 'Schema is already frozen for this version.', variant: 'info' });
+      return;
+    }
+    const confirmed = await confirmDialog({
+      title: 'Freeze schema',
+      message: 'This will capture the current class schemas for this version into the database so the version can be used in the Database section. Only versions with no schema captured yet can be frozen. Continue?',
+      variant: 'default',
+      confirmLabel: 'Freeze schema',
+      cancelLabel: 'Cancel',
+    });
+    if (!confirmed) return;
+    setFreezingSchemaVersionId(version.id);
+    try {
+      const res = await fetch(`/api/versions/${version.id}/freeze-schema`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: version.project_id }),
+      });
+      const response = await res.json();
+      if (response.success) {
+        await loadVersions();
+        await alertDialog({ message: 'Schema frozen successfully. This version can now be used in the Database section.', variant: 'success' });
+      } else {
+        await alertDialog({ message: response.error || 'Failed to freeze schema', variant: 'error' });
+      }
+    } catch (error: unknown) {
+      await alertDialog({ message: error instanceof Error ? error.message : 'An error occurred', variant: 'error' });
+    } finally {
+      setFreezingSchemaVersionId(null);
+    }
+  };
+
   const handleDelete = async (versionRecordId: string) => {
     const confirmed = await confirmDialog({ title: 'Delete Version', message: 'This action cannot be undone.', variant: 'danger', confirmLabel: 'Delete', cancelLabel: 'Cancel' });
     if (!confirmed) return;
@@ -418,6 +475,7 @@ const Versions = () => {
       case 'edit': if (!isPublished) handleEditClick(version); else setErrorMessage('Cannot edit published version'); break;
       case 'publish': if (canPub) handlePublishClick(version.id); else await alertDialog({ message: 'Only owner or admin can publish', variant: 'warning' }); break;
       case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else await alertDialog({ message: 'Only owner or admin can unpublish', variant: 'warning' }); break;
+      case 'freezeSchema': if (canModify(version)) await handleFreezeSchema(version); else await alertDialog({ message: 'Only owner or admin can freeze schema', variant: 'warning' }); break;
       case 'delete': await handleDelete(version.id); break;
     }
   };
@@ -642,6 +700,21 @@ const Versions = () => {
                                 >
                                   <Unlock className="w-4 h-4 text-orange-500" />
                                   Unpublish
+                                </button>
+                              )}
+                              {!hasClassSchemaMap[version.id] && (version.creator_id === currentUserId || effectiveIsAdmin) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenVersionDropdown(null);
+                                    handleRowAction('freezeSchema', version);
+                                  }}
+                                  disabled={freezingSchemaVersionId === version.id}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Capture class schemas for this version so it can be used in the Database section (only when no schema is frozen yet)"
+                                >
+                                  <Snowflake className="w-4 h-4 text-cyan-500" />
+                                  {freezingSchemaVersionId === version.id ? 'Freezing...' : 'Freeze schema'}
                                 </button>
                               )}
                               <div className="border-t border-gray-200 dark:border-gray-700 my-1" />

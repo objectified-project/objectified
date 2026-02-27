@@ -35,6 +35,46 @@ export async function getClassSchemasForVersion(
 }
 
 /**
+ * Return true if the version has at least one class_schema row (schema already frozen).
+ * Only considers versions whose project belongs to the tenant.
+ */
+export async function versionHasClassSchema(versionId: string, tenantId: string): Promise<boolean> {
+  const result = await connectionPool.query(
+    `SELECT 1 FROM odb.class_schema cs
+     JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+     JOIN odb.projects p ON p.id = v.project_id AND p.tenant_id = $2 AND p.deleted_at IS NULL
+     WHERE cs.version_id = $1
+     LIMIT 1`,
+    [versionId, tenantId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Batch: for each version id, return whether it has class_schema rows (tenant-scoped).
+ */
+export async function getVersionHasClassSchemaMap(
+  versionIds: string[],
+  tenantId: string
+): Promise<Record<string, boolean>> {
+  if (versionIds.length === 0) return {};
+  const result = await connectionPool.query(
+    `SELECT cs.version_id
+     FROM odb.class_schema cs
+     JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+     JOIN odb.projects p ON p.id = v.project_id AND p.tenant_id = $2 AND p.deleted_at IS NULL
+     WHERE cs.version_id = ANY($1::uuid[])`,
+    [versionIds, tenantId]
+  );
+  const withSchema = new Set(result.rows.map((r: { version_id: string }) => r.version_id));
+  const map: Record<string, boolean> = {};
+  for (const id of versionIds) {
+    map[id] = withSchema.has(id);
+  }
+  return map;
+}
+
+/**
  * Ensure class_schema_id belongs to a version in a project under the tenant.
  */
 export async function assertClassSchemaTenantAccess(
@@ -66,6 +106,36 @@ export async function getDataSnapshotCount(
     [classSchemaId, tenantId]
   );
   return result.rows[0]?.cnt ?? 0;
+}
+
+/**
+ * Batch count rows in data_snapshot per class_schema_id for a tenant.
+ * Only includes class_schema_ids that belong to versions in the tenant's projects.
+ * Returns a map with an entry for each requested id (0 if no rows).
+ */
+export async function getDataSnapshotCounts(
+  classSchemaIds: string[],
+  tenantId: string
+): Promise<Record<string, number>> {
+  if (classSchemaIds.length === 0) return {};
+  const result = await connectionPool.query(
+    `SELECT ds.class_schema_id, COUNT(*)::int AS cnt
+     FROM odb.data_snapshot ds
+     JOIN odb.class_schema cs ON cs.id = ds.class_schema_id
+     JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+     JOIN odb.projects p ON p.id = v.project_id AND p.tenant_id = $2 AND p.deleted_at IS NULL
+     WHERE ds.class_schema_id = ANY($1::uuid[]) AND ds.tenant_id = $2
+     GROUP BY ds.class_schema_id`,
+    [classSchemaIds, tenantId]
+  );
+  const map: Record<string, number> = {};
+  for (const id of classSchemaIds) {
+    map[id] = 0;
+  }
+  for (const row of result.rows as { class_schema_id: string; cnt: number }[]) {
+    map[row.class_schema_id] = row.cnt;
+  }
+  return map;
 }
 
 export interface DataSnapshotRow {
