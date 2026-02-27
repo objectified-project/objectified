@@ -1,6 +1,7 @@
 'use server';
 
 const connectionPool = require('./db');
+const crypto = require('crypto');
 
 export interface ClassSchemaTable {
   class_schema_id: string;
@@ -89,6 +90,32 @@ export async function assertClassSchemaTenantAccess(
     [classSchemaId, tenantId]
   );
   return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Get a single class_schema row by id. Returns null if not found or tenant has no access.
+ */
+export async function getClassSchemaById(
+  classSchemaId: string,
+  tenantId: string
+): Promise<ClassSchemaTable | null> {
+  const result = await connectionPool.query(
+    `SELECT cs.id AS class_schema_id, cs.class_id, c.name AS class_name, cs.schema
+     FROM odb.class_schema cs
+     JOIN odb.classes c ON c.id = cs.class_id AND c.deleted_at IS NULL
+     JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+     JOIN odb.projects p ON p.id = v.project_id AND p.tenant_id = $2 AND p.deleted_at IS NULL
+     WHERE cs.id = $1`,
+    [classSchemaId, tenantId]
+  );
+  if (result.rowCount === 0 || !result.rows[0]) return null;
+  const row = result.rows[0] as { class_schema_id: string; class_id: string; class_name: string; schema: unknown };
+  return {
+    class_schema_id: row.class_schema_id,
+    class_id: row.class_id,
+    class_name: row.class_name,
+    schema: typeof row.schema === 'object' && row.schema !== null ? (row.schema as Record<string, unknown>) : {},
+  };
 }
 
 /**
@@ -225,4 +252,42 @@ export async function searchDataSnapshot(
   }));
 
   return { rows, total };
+}
+
+/**
+ * Insert a new record: one data_record (action 'created', record_sequence 1) and one data_snapshot row.
+ * Throws if tenant has no access to the class_schema.
+ */
+export async function insertDataRecord(
+  classSchemaId: string,
+  tenantId: string,
+  data: Record<string, unknown>,
+  createdBy?: string | null
+): Promise<{ record_id: string }> {
+  const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
+  if (!hasAccess) {
+    throw new Error('Access denied to class schema');
+  }
+  const recordId = crypto.randomUUID();
+  const client = await connectionPool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
+       VALUES ($1, $2, 'created', 1, $3::jsonb, $4, $5)`,
+      [recordId, classSchemaId, JSON.stringify(data), tenantId, createdBy ?? null]
+    );
+    await client.query(
+      `INSERT INTO odb.data_snapshot (record_id, class_schema_id, data, tenant_id)
+       VALUES ($1, $2, $3::jsonb, $4)`,
+      [recordId, classSchemaId, JSON.stringify(data), tenantId]
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+  return { record_id: recordId };
 }

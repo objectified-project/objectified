@@ -260,7 +260,17 @@ export default function QueryManager() {
         </div>
       )}
 
-      <InsertStubModal open={insertModalOpen} onClose={() => setInsertModalOpen(false)} tableName={selectedTable.className} />
+      <InsertStubModal
+        open={insertModalOpen}
+        onClose={() => setInsertModalOpen(false)}
+        tableName={selectedTable.className}
+        classSchemaId={classSchemaId}
+        onInserted={() => {
+          loadCount();
+          if (viewMode === 'viewAll') runQuery({ classSchemaId }, 1, PAGE_SIZE);
+          if (viewMode === 'search') runQuery({ classSchemaId }, 1, PAGE_SIZE, searchQ);
+        }}
+      />
       <QueryUsingAIPanel
         open={aiPanelOpen}
         onClose={() => setAiPanelOpen(false)}
