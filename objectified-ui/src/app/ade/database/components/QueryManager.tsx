@@ -3,11 +3,10 @@
 import * as React from 'react';
 import { useDatabase } from '../DatabaseContext';
 import { useDialog } from '@/app/components/providers/DialogProvider';
-import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2, RotateCcw, Pencil } from 'lucide-react';
+import { List, Search, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2, RotateCcw, Pencil } from 'lucide-react';
 import { Switch } from '@/app/components/ui/Switch';
 import type { SnapshotQueryFilters } from './query-manager-types';
 import InsertStubModal from './InsertStubModal';
-import QueryUsingAIPanel from './QueryUsingAIPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/Dialog';
 import dynamic from 'next/dynamic';
 
@@ -99,7 +98,6 @@ export default function QueryManager() {
   const [searchQ, setSearchQ] = React.useState('');
   const [insertModalOpen, setInsertModalOpen] = React.useState(false);
   const [editRecordId, setEditRecordId] = React.useState<string | null>(null);
-  const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
   const [viewRecord, setViewRecord] = React.useState<SnapshotRow | null>(null);
   const [recordViewTab, setRecordViewTab] = React.useState<'current' | 'historical'>('current');
   const [recordHistory, setRecordHistory] = React.useState<RecordHistoryEvent[]>([]);
@@ -141,7 +139,8 @@ export default function QueryManager() {
     setPage(1);
     setSearchQ('');
     loadCount();
-  }, [classSchemaId, loadCount]);
+    // Intentionally only depend on classSchemaId so toggling showDeleted doesn't reset the view
+  }, [classSchemaId]); // eslint-disable-line react-hooks/exhaustive-deps -- loadCount omitted so showDeleted toggle only refreshes via next effect
 
   React.useEffect(() => {
     if (!classSchemaId) return;
@@ -380,14 +379,6 @@ export default function QueryManager() {
               Search
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setAiPanelOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-sm text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
-          >
-            <Sparkles className="w-4 h-4" />
-            Query using AI
-          </button>
           {!isReadOnly && (
             <button
               type="button"
@@ -558,13 +549,6 @@ export default function QueryManager() {
           }}
         />
       )}
-      <QueryUsingAIPanel
-        open={aiPanelOpen}
-        onClose={() => setAiPanelOpen(false)}
-        versionId={selectedVersionId ?? ''}
-        tableName={selectedTable.className}
-        classSchemaId={classSchemaId}
-      />
       <Dialog open={!!viewRecord} onOpenChange={(open) => !open && setViewRecord(null)}>
         <DialogContent className="h-[70vh] max-h-[70vh] w-[90vw] max-w-4xl flex flex-col gap-4" showCloseButton>
           <DialogHeader>
