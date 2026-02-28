@@ -1610,6 +1610,63 @@ class Database:
             conn.rollback()
             raise e
 
+    def restore_data_record(
+        self,
+        record_id: str,
+        class_schema_id: str,
+        tenant_id: str,
+        restored_by: Optional[str] = None,
+    ) -> None:
+        """
+        Restore a deleted record: data must have action 'deleted'. Pull data from the
+        deleted data_record, insert a new data_snapshot row with that data, and append
+        a data_record with action 'restored', data '{}', record_sequence incremented by 1.
+        Raises if tenant has no access, record not found, or latest action is not 'deleted'.
+        """
+        if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+            raise ValueError("Access denied to class schema")
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT data, record_sequence, action
+                    FROM odb.data_record
+                    WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    ORDER BY record_sequence DESC
+                    LIMIT 1
+                    """,
+                    (record_id, class_schema_id, tenant_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    conn.rollback()
+                    raise ValueError("Record not found")
+                if row["action"] != "deleted":
+                    conn.rollback()
+                    raise ValueError("Record is not deleted; only deleted records can be restored")
+                data_to_restore = row["data"] or {}
+                next_seq = (row["record_sequence"] or 0) + 1
+
+                cursor.execute(
+                    """
+                    INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
+                    VALUES (%s, %s, 'restored', %s, '{}'::jsonb, %s, %s)
+                    """,
+                    (record_id, class_schema_id, next_seq, tenant_id, restored_by),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO odb.data_snapshot (record_id, class_schema_id, data, tenant_id)
+                    VALUES (%s, %s, %s::jsonb, %s)
+                    """,
+                    (record_id, class_schema_id, json.dumps(data_to_restore), tenant_id),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
     def update_data_snapshot_embedding(
         self, record_id: str, embedding: List[float], model: str
     ) -> None:

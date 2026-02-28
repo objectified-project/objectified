@@ -179,3 +179,34 @@ async def delete_data_record(
         raise HTTPException(status_code=400, detail=str(e))
 
     return {"success": True, "record_id": record_id}
+
+
+@router.post("/{tenant_slug}/records/{record_id}/restore")
+async def restore_data_record(
+    tenant_slug: str,
+    record_id: str,
+    class_schema_id: str = Query(..., description="Class schema ID"),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """Restore a deleted data record (recreate data_snapshot from deleted event, append restored event)."""
+    tenant_id = auth_data["tenant_id"]
+    user_id = get_authenticated_user_id(auth_data)
+
+    if not db.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+        raise HTTPException(status_code=404, detail="Class schema not found")
+
+    try:
+        db.restore_data_record(
+            record_id=record_id,
+            class_schema_id=class_schema_id,
+            tenant_id=tenant_id,
+            restored_by=user_id,
+        )
+    except ValueError as e:
+        if "Access denied" in str(e):
+            raise HTTPException(status_code=403, detail=str(e))
+        if "Record not found" in str(e) or "not deleted" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"success": True, "record_id": record_id}

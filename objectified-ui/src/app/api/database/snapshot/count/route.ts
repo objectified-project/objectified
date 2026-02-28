@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     if (!classSchemaId) {
       return NextResponse.json({ success: false, error: 'classSchemaId required' }, { status: 400 });
     }
-    const count = await getDataSnapshotCount(classSchemaId, tenantId);
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const count = await getDataSnapshotCount(classSchemaId, tenantId, { includeDeleted });
     return NextResponse.json({ success: true, count });
   } catch (error) {
     console.error('Error fetching snapshot count:', error);

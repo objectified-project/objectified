@@ -2,12 +2,14 @@
 Unit tests for Database Data Storage implementation.
 
 Tests version_has_data_records, unpublish guard (409 when version has data),
-and Pydantic models for class_schema / data_record / data_snapshot.
+Pydantic models for class_schema / data_record / data_snapshot,
+and delete/restore record logic.
 """
 
+import json
 import pytest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -17,6 +19,16 @@ from src.app.models import FrozenClassSchemaModel, DataRecordModel, DataSnapshot
 
 
 client = TestClient(app)
+
+
+def _make_conn_cursor_mock(fetchone_returns):
+    """Build a mock connection whose cursor returns given fetchone values in order."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.fetchone.side_effect = fetchone_returns
+    mock_conn.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
+    mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+    return mock_conn, mock_cursor
 
 
 # ---------------------------------------------------------------------------
@@ -256,3 +268,152 @@ class TestDataRecordActionMigrationScripts:
         assert "ADD VALUE 'restored'" in content
         assert "restored (undeleted)" in content or "restored" in content
         assert "COMMENT ON COLUMN data_record.action" in content
+
+
+# ---------------------------------------------------------------------------
+# Database.delete_data_record
+# ---------------------------------------------------------------------------
+
+class TestDeleteDataRecord:
+    """Unit tests for Database.delete_data_record."""
+
+    def test_raises_when_access_denied(self):
+        """delete_data_record raises ValueError when tenant has no access."""
+        db = Database()
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=False) as mock_access:
+            with pytest.raises(ValueError) as exc_info:
+                db.delete_data_record(
+                    record_id='rec-1',
+                    class_schema_id='cs-1',
+                    tenant_id='tenant-1',
+                )
+            assert "Access denied" in str(exc_info.value)
+            mock_access.assert_called_once_with('cs-1', 'tenant-1')
+
+    def test_raises_when_record_not_found(self):
+        """delete_data_record raises ValueError when no snapshot row exists."""
+        db = Database()
+        mock_conn, mock_cursor = _make_conn_cursor_mock([None])
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=True):
+            with patch.object(db, 'connect', return_value=mock_conn):
+                with pytest.raises(ValueError) as exc_info:
+                    db.delete_data_record(
+                        record_id='rec-1',
+                        class_schema_id='cs-1',
+                        tenant_id='tenant-1',
+                    )
+                assert "Record not found" in str(exc_info.value)
+        mock_conn.rollback.assert_called()
+        mock_conn.commit.assert_not_called()
+
+    def test_appends_deleted_event_and_removes_snapshot(self):
+        """delete_data_record inserts deleted data_record and deletes data_snapshot."""
+        db = Database()
+        snapshot_data = {'name': 'Test', 'value': 42}
+        mock_conn, mock_cursor = _make_conn_cursor_mock([
+            {'data': snapshot_data},
+            {'next_seq': 2},
+        ])
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=True):
+            with patch.object(db, 'connect', return_value=mock_conn):
+                db.delete_data_record(
+                    record_id='rec-1',
+                    class_schema_id='cs-1',
+                    tenant_id='tenant-1',
+                    deleted_by='user-1',
+                )
+        assert mock_cursor.execute.call_count == 4
+        calls = mock_cursor.execute.call_args_list
+        assert 'data_snapshot' in calls[0][0][0] and 'SELECT' in calls[0][0][0]
+        assert calls[0][0][1] == ('rec-1', 'cs-1', 'tenant-1')
+        assert 'INSERT' in calls[2][0][0] and 'deleted' in calls[2][0][0]
+        insert_args = calls[2][0][1]
+        assert insert_args[0] == 'rec-1' and insert_args[1] == 'cs-1'
+        assert insert_args[2] == 2
+        assert json.loads(insert_args[3]) == snapshot_data
+        assert insert_args[4] == 'tenant-1' and insert_args[5] == 'user-1'
+        assert 'DELETE' in calls[3][0][0] and 'data_snapshot' in calls[3][0][0]
+        mock_conn.commit.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Database.restore_data_record
+# ---------------------------------------------------------------------------
+
+class TestRestoreDataRecord:
+    """Unit tests for Database.restore_data_record."""
+
+    def test_raises_when_access_denied(self):
+        """restore_data_record raises ValueError when tenant has no access."""
+        db = Database()
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=False) as mock_access:
+            with pytest.raises(ValueError) as exc_info:
+                db.restore_data_record(
+                    record_id='rec-1',
+                    class_schema_id='cs-1',
+                    tenant_id='tenant-1',
+                )
+            assert "Access denied" in str(exc_info.value)
+            mock_access.assert_called_once_with('cs-1', 'tenant-1')
+
+    def test_raises_when_record_not_found(self):
+        """restore_data_record raises ValueError when no data_record exists."""
+        db = Database()
+        mock_conn, mock_cursor = _make_conn_cursor_mock([None])
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=True):
+            with patch.object(db, 'connect', return_value=mock_conn):
+                with pytest.raises(ValueError) as exc_info:
+                    db.restore_data_record(
+                        record_id='rec-1',
+                        class_schema_id='cs-1',
+                        tenant_id='tenant-1',
+                    )
+                assert "Record not found" in str(exc_info.value)
+        mock_conn.rollback.assert_called()
+        mock_conn.commit.assert_not_called()
+
+    def test_raises_when_latest_action_not_deleted(self):
+        """restore_data_record raises ValueError when latest event is not 'deleted'."""
+        db = Database()
+        mock_conn, mock_cursor = _make_conn_cursor_mock([
+            {'data': {'x': 1}, 'record_sequence': 1, 'action': 'created'},
+        ])
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=True):
+            with patch.object(db, 'connect', return_value=mock_conn):
+                with pytest.raises(ValueError) as exc_info:
+                    db.restore_data_record(
+                        record_id='rec-1',
+                        class_schema_id='cs-1',
+                        tenant_id='tenant-1',
+                    )
+                assert "not deleted" in str(exc_info.value).lower()
+        mock_conn.rollback.assert_called()
+        mock_conn.commit.assert_not_called()
+
+    def test_inserts_restored_event_and_snapshot(self):
+        """restore_data_record inserts restored data_record and new data_snapshot."""
+        db = Database()
+        data_to_restore = {'name': 'Restored', 'id': 'rec-1'}
+        mock_conn, mock_cursor = _make_conn_cursor_mock([
+            {'data': data_to_restore, 'record_sequence': 2, 'action': 'deleted'},
+        ])
+        with patch.object(db, 'assert_class_schema_tenant_access', return_value=True):
+            with patch.object(db, 'connect', return_value=mock_conn):
+                db.restore_data_record(
+                    record_id='rec-1',
+                    class_schema_id='cs-1',
+                    tenant_id='tenant-1',
+                    restored_by='user-1',
+                )
+        assert mock_cursor.execute.call_count == 3
+        calls = mock_cursor.execute.call_args_list
+        assert 'data_record' in calls[0][0][0] and 'ORDER BY record_sequence DESC' in calls[0][0][0]
+        assert 'INSERT' in calls[1][0][0] and 'restored' in calls[1][0][0]
+        insert_args = calls[1][0][1]
+        assert insert_args[0] == 'rec-1' and insert_args[1] == 'cs-1'
+        assert insert_args[2] == 3
+        assert insert_args[3] == 'tenant-1' and insert_args[4] == 'user-1'
+        assert 'INSERT' in calls[2][0][0] and 'data_snapshot' in calls[2][0][0]
+        snap_args = calls[2][0][1]
+        assert json.loads(snap_args[2]) == data_to_restore
+        mock_conn.commit.assert_called_once()

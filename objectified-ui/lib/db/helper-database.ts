@@ -119,10 +119,12 @@ export async function getClassSchemaById(
 
 /**
  * Count rows in data_snapshot for a class_schema and tenant.
+ * When includeDeleted is true, also counts records whose latest event is 'deleted' (no snapshot row).
  */
 export async function getDataSnapshotCount(
   classSchemaId: string,
-  tenantId: string
+  tenantId: string,
+  options?: { includeDeleted?: boolean }
 ): Promise<number> {
   const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
   if (!hasAccess) return 0;
@@ -131,7 +133,26 @@ export async function getDataSnapshotCount(
      WHERE class_schema_id = $1 AND tenant_id = $2`,
     [classSchemaId, tenantId]
   );
-  return result.rows[0]?.cnt ?? 0;
+  let count = result.rows[0]?.cnt ?? 0;
+  if (options?.includeDeleted) {
+    const deletedResult = await connectionPool.query(
+      `WITH dr_last AS (
+         SELECT DISTINCT ON (record_id) record_id, action
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence DESC
+       )
+       SELECT COUNT(*)::int AS cnt FROM dr_last d
+       WHERE d.action = 'deleted'
+       AND NOT EXISTS (
+         SELECT 1 FROM odb.data_snapshot ds
+         WHERE ds.record_id = d.record_id AND ds.class_schema_id = $1 AND ds.tenant_id = $2
+       )`,
+      [classSchemaId, tenantId]
+    );
+    count += deletedResult.rows[0]?.cnt ?? 0;
+  }
+  return count;
 }
 
 /**
@@ -193,6 +214,7 @@ function buildSnapshotOrderBy(sortBy?: string | null, sortDir?: string | null): 
 
 /**
  * Paginated list of data_snapshot rows for a class_schema and tenant.
+ * When includeDeleted is true, appends rows for records whose latest event is 'deleted' (no snapshot row).
  */
 export async function getDataSnapshotPage(
   classSchemaId: string,
@@ -200,7 +222,8 @@ export async function getDataSnapshotPage(
   page: number,
   pageSize: number,
   sortBy?: string | null,
-  sortDir?: string | null
+  sortDir?: string | null,
+  options?: { includeDeleted?: boolean }
 ): Promise<{ rows: DataSnapshotRow[]; total: number }> {
   const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
   if (!hasAccess) return { rows: [], total: 0 };
@@ -209,36 +232,144 @@ export async function getDataSnapshotPage(
   const limit = Math.min(100, Math.max(1, pageSize));
   const orderBy = buildSnapshotOrderBy(sortBy, sortDir);
 
-  const countResult = await connectionPool.query(
-    `SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
-     WHERE class_schema_id = $1 AND tenant_id = $2`,
-    [classSchemaId, tenantId]
-  );
-  const total = countResult.rows[0]?.cnt ?? 0;
+  if (!options?.includeDeleted) {
+    const countResult = await connectionPool.query(
+      `SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
+       WHERE class_schema_id = $1 AND tenant_id = $2`,
+      [classSchemaId, tenantId]
+    );
+    const total = countResult.rows[0]?.cnt ?? 0;
 
-  const listResult = await connectionPool.query(
-    `SELECT ds.record_id, ds.data, ds.updated_at,
-            dr_first.created_at,
-            dr_last.record_sequence,
-            dr_last.action AS last_action
-     FROM odb.data_snapshot ds
-     LEFT JOIN LATERAL (
-       SELECT created_at FROM odb.data_record dr
-       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
-       ORDER BY dr.record_sequence ASC LIMIT 1
-     ) dr_first ON true
-     LEFT JOIN LATERAL (
-       SELECT record_sequence, action FROM odb.data_record dr
-       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
-       ORDER BY dr.record_sequence DESC LIMIT 1
-     ) dr_last ON true
-     WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2
-     ${orderBy}
+    const listResult = await connectionPool.query(
+      `SELECT ds.record_id, ds.data, ds.updated_at,
+              dr_first.created_at,
+              dr_last.record_sequence,
+              dr_last.action AS last_action
+       FROM odb.data_snapshot ds
+       LEFT JOIN LATERAL (
+         SELECT created_at FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence ASC LIMIT 1
+       ) dr_first ON true
+       LEFT JOIN LATERAL (
+         SELECT record_sequence, action FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence DESC LIMIT 1
+       ) dr_last ON true
+       WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2
+       ${orderBy}
+       LIMIT $3 OFFSET $4`,
+      [classSchemaId, tenantId, limit, offset]
+    );
+
+    const rows: DataSnapshotRow[] = listResult.rows.map((row: {
+      record_id: string;
+      data: unknown;
+      updated_at: string;
+      created_at?: string;
+      record_sequence?: number;
+      last_action?: string;
+    }) => ({
+      record_id: row.record_id,
+      data: typeof row.data === 'object' && row.data !== null ? (row.data as Record<string, unknown>) : {},
+      updated_at: row.updated_at,
+      created_at: row.created_at,
+      record_sequence: row.record_sequence,
+      last_action: row.last_action,
+    }));
+
+    return { rows, total };
+  }
+
+  // includeDeleted: union snapshot rows with deleted-only rows, then sort and paginate
+  const safeSortCol = ['record_id', 'created_at', 'updated_at', 'record_sequence', 'last_action'].includes(
+    sortBy ?? ''
+  )
+    ? sortBy!
+    : 'updated_at';
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  const orderByUnified = `ORDER BY ${safeSortCol} ${dir} NULLS LAST, record_id`;
+
+  const unionResult = await connectionPool.query(
+    `WITH snapshot_rows AS (
+       SELECT ds.record_id, ds.data, dr_first.created_at, ds.updated_at,
+              dr_last.record_sequence, dr_last.action AS last_action
+       FROM odb.data_snapshot ds
+       LEFT JOIN LATERAL (
+         SELECT created_at FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence ASC LIMIT 1
+       ) dr_first ON true
+       LEFT JOIN LATERAL (
+         SELECT record_sequence, action FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence DESC LIMIT 1
+       ) dr_last ON true
+       WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2
+     ),
+     deleted_rows AS (
+       SELECT d.record_id,
+              COALESCE(d.data, '{}'::jsonb) AS data,
+              f.created_at,
+              d.created_at AS updated_at,
+              d.record_sequence,
+              d.action AS last_action
+       FROM (
+         SELECT DISTINCT ON (record_id) record_id, record_sequence, action, created_at, data
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence DESC
+       ) d
+       JOIN (
+         SELECT DISTINCT ON (record_id) record_id, created_at
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence ASC
+       ) f ON f.record_id = d.record_id
+       WHERE d.action = 'deleted'
+       AND NOT EXISTS (
+         SELECT 1 FROM odb.data_snapshot ds
+         WHERE ds.record_id = d.record_id AND ds.class_schema_id = $1 AND ds.tenant_id = $2
+       )
+     ),
+     combined AS (
+       SELECT record_id, data, created_at, updated_at, record_sequence, last_action,
+              updated_at AS sort_at FROM snapshot_rows
+       UNION ALL
+       SELECT record_id, data, created_at, updated_at, record_sequence, last_action,
+              updated_at AS sort_at FROM deleted_rows
+     )
+     SELECT record_id, data, created_at, updated_at, record_sequence, last_action FROM combined
+     ${orderByUnified}
      LIMIT $3 OFFSET $4`,
     [classSchemaId, tenantId, limit, offset]
   );
 
-  const rows: DataSnapshotRow[] = listResult.rows.map((row: {
+  const countResult = await connectionPool.query(
+    `WITH snapshot_rows AS (
+       SELECT ds.record_id FROM odb.data_snapshot ds
+       WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2
+     ),
+     deleted_rows AS (
+       SELECT d.record_id
+       FROM (
+         SELECT DISTINCT ON (record_id) record_id, action
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence DESC
+       ) d
+       WHERE d.action = 'deleted'
+       AND NOT EXISTS (
+         SELECT 1 FROM odb.data_snapshot ds
+         WHERE ds.record_id = d.record_id AND ds.class_schema_id = $1 AND ds.tenant_id = $2
+       )
+     )
+     SELECT (SELECT COUNT(*) FROM snapshot_rows) + (SELECT COUNT(*) FROM deleted_rows) AS cnt`,
+    [classSchemaId, tenantId]
+  );
+  const total = parseInt(String(countResult.rows[0]?.cnt ?? 0), 10);
+
+  const rows: DataSnapshotRow[] = unionResult.rows.map((row: {
     record_id: string;
     data: unknown;
     updated_at: string;
@@ -259,7 +390,7 @@ export async function getDataSnapshotPage(
 
 /**
  * Simple text search on data_snapshot.data::text (ILIKE).
- * Minimal implementation for scaffolding.
+ * When includeDeleted is true, also includes records whose latest event is 'deleted' (no text filter on deleted).
  */
 export async function searchDataSnapshot(
   classSchemaId: string,
@@ -268,7 +399,8 @@ export async function searchDataSnapshot(
   page: number,
   pageSize: number,
   sortBy?: string | null,
-  sortDir?: string | null
+  sortDir?: string | null,
+  options?: { includeDeleted?: boolean }
 ): Promise<{ rows: DataSnapshotRow[]; total: number }> {
   const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
   if (!hasAccess) return { rows: [], total: 0 };
@@ -278,36 +410,141 @@ export async function searchDataSnapshot(
   const pattern = `%${q.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
   const orderBy = buildSnapshotOrderBy(sortBy, sortDir);
 
-  const countResult = await connectionPool.query(
-    `SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
-     WHERE class_schema_id = $1 AND tenant_id = $2 AND data::text ILIKE $3`,
-    [classSchemaId, tenantId, pattern]
-  );
-  const total = countResult.rows[0]?.cnt ?? 0;
+  if (!options?.includeDeleted) {
+    const countResult = await connectionPool.query(
+      `SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
+       WHERE class_schema_id = $1 AND tenant_id = $2 AND data::text ILIKE $3`,
+      [classSchemaId, tenantId, pattern]
+    );
+    const total = countResult.rows[0]?.cnt ?? 0;
 
-  const listResult = await connectionPool.query(
-    `SELECT ds.record_id, ds.data, ds.updated_at,
-            dr_first.created_at,
-            dr_last.record_sequence,
-            dr_last.action AS last_action
-     FROM odb.data_snapshot ds
-     LEFT JOIN LATERAL (
-       SELECT created_at FROM odb.data_record dr
-       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
-       ORDER BY dr.record_sequence ASC LIMIT 1
-     ) dr_first ON true
-     LEFT JOIN LATERAL (
-       SELECT record_sequence, action FROM odb.data_record dr
-       WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
-       ORDER BY dr.record_sequence DESC LIMIT 1
-     ) dr_last ON true
-     WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2 AND ds.data::text ILIKE $3
-     ${orderBy}
+    const listResult = await connectionPool.query(
+      `SELECT ds.record_id, ds.data, ds.updated_at,
+              dr_first.created_at,
+              dr_last.record_sequence,
+              dr_last.action AS last_action
+       FROM odb.data_snapshot ds
+       LEFT JOIN LATERAL (
+         SELECT created_at FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence ASC LIMIT 1
+       ) dr_first ON true
+       LEFT JOIN LATERAL (
+         SELECT record_sequence, action FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence DESC LIMIT 1
+       ) dr_last ON true
+       WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2 AND ds.data::text ILIKE $3
+       ${orderBy}
+       LIMIT $4 OFFSET $5`,
+      [classSchemaId, tenantId, pattern, limit, offset]
+    );
+
+    const rows: DataSnapshotRow[] = listResult.rows.map((row: {
+      record_id: string;
+      data: unknown;
+      updated_at: string;
+      created_at?: string;
+      record_sequence?: number;
+      last_action?: string;
+    }) => ({
+      record_id: row.record_id,
+      data: typeof row.data === 'object' && row.data !== null ? (row.data as Record<string, unknown>) : {},
+      updated_at: row.updated_at,
+      created_at: row.created_at,
+      record_sequence: row.record_sequence,
+      last_action: row.last_action,
+    }));
+
+    return { rows, total };
+  }
+
+  // includeDeleted: union (snapshot rows matching q) with (all deleted rows), then sort and paginate
+  const safeSortCol = ['record_id', 'created_at', 'updated_at', 'record_sequence', 'last_action'].includes(
+    sortBy ?? ''
+  )
+    ? sortBy!
+    : 'updated_at';
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  const orderByUnified = `ORDER BY ${safeSortCol} ${dir} NULLS LAST, record_id`;
+
+  const unionResult = await connectionPool.query(
+    `WITH snapshot_rows AS (
+       SELECT ds.record_id, ds.data, dr_first.created_at, ds.updated_at,
+              dr_last.record_sequence, dr_last.action AS last_action
+       FROM odb.data_snapshot ds
+       LEFT JOIN LATERAL (
+         SELECT created_at FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence ASC LIMIT 1
+       ) dr_first ON true
+       LEFT JOIN LATERAL (
+         SELECT record_sequence, action FROM odb.data_record dr
+         WHERE dr.record_id = ds.record_id AND dr.class_schema_id = ds.class_schema_id AND dr.tenant_id = ds.tenant_id
+         ORDER BY dr.record_sequence DESC LIMIT 1
+       ) dr_last ON true
+       WHERE ds.class_schema_id = $1 AND ds.tenant_id = $2 AND ds.data::text ILIKE $3
+     ),
+     deleted_rows AS (
+       SELECT d.record_id,
+              COALESCE(d.data, '{}'::jsonb) AS data,
+              f.created_at,
+              d.created_at AS updated_at,
+              d.record_sequence,
+              d.action AS last_action
+       FROM (
+         SELECT DISTINCT ON (record_id) record_id, record_sequence, action, created_at, data
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence DESC
+       ) d
+       JOIN (
+         SELECT DISTINCT ON (record_id) record_id, created_at
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence ASC
+       ) f ON f.record_id = d.record_id
+       WHERE d.action = 'deleted'
+       AND NOT EXISTS (
+         SELECT 1 FROM odb.data_snapshot ds
+         WHERE ds.record_id = d.record_id AND ds.class_schema_id = $1 AND ds.tenant_id = $2
+       )
+     ),
+     combined AS (
+       SELECT record_id, data, created_at, updated_at, record_sequence, last_action FROM snapshot_rows
+       UNION ALL
+       SELECT record_id, data, created_at, updated_at, record_sequence, last_action FROM deleted_rows
+     )
+     SELECT record_id, data, created_at, updated_at, record_sequence, last_action FROM combined
+     ${orderByUnified}
      LIMIT $4 OFFSET $5`,
     [classSchemaId, tenantId, pattern, limit, offset]
   );
 
-  const rows: DataSnapshotRow[] = listResult.rows.map((row: {
+  const countResult = await connectionPool.query(
+    `WITH snapshot_match AS (
+       SELECT COUNT(*)::int AS cnt FROM odb.data_snapshot
+       WHERE class_schema_id = $1 AND tenant_id = $2 AND data::text ILIKE $3
+     ),
+     deleted_cnt AS (
+       SELECT COUNT(*)::int AS cnt FROM (
+         SELECT DISTINCT ON (record_id) record_id, action
+         FROM odb.data_record
+         WHERE class_schema_id = $1 AND tenant_id = $2
+         ORDER BY record_id, record_sequence DESC
+       ) d
+       WHERE d.action = 'deleted'
+       AND NOT EXISTS (
+         SELECT 1 FROM odb.data_snapshot ds
+         WHERE ds.record_id = d.record_id AND ds.class_schema_id = $1 AND ds.tenant_id = $2
+       )
+     )
+     SELECT (SELECT cnt FROM snapshot_match) + COALESCE((SELECT cnt FROM deleted_cnt), 0) AS cnt`,
+    [classSchemaId, tenantId, pattern]
+  );
+  const total = parseInt(String(countResult.rows[0]?.cnt ?? 0), 10);
+
+  const rows: DataSnapshotRow[] = unionResult.rows.map((row: {
     record_id: string;
     data: unknown;
     updated_at: string;
@@ -324,5 +561,44 @@ export async function searchDataSnapshot(
   }));
 
   return { rows, total };
+}
+
+export interface RecordHistoryEvent {
+  record_sequence: number;
+  action: string;
+  created_at: string;
+  created_by: string | null;
+  data: Record<string, unknown>;
+}
+
+/**
+ * Full event history for a single record (data_record rows ordered by record_sequence).
+ * Used by the record view dialog "Historical" tab.
+ */
+export async function getRecordHistory(
+  recordId: string,
+  classSchemaId: string,
+  tenantId: string
+): Promise<RecordHistoryEvent[]> {
+  const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
+  if (!hasAccess) return [];
+
+  const result = await connectionPool.query(
+    `SELECT record_sequence, action, created_at, created_by, data
+     FROM odb.data_record
+     WHERE record_id = $1 AND class_schema_id = $2 AND tenant_id = $3
+     ORDER BY record_sequence ASC`,
+    [recordId, classSchemaId, tenantId]
+  );
+
+  return (result.rows as { record_sequence: number; action: string; created_at: string; created_by: string | null; data: unknown }[]).map(
+    (row) => ({
+      record_sequence: row.record_sequence,
+      action: row.action,
+      created_at: row.created_at,
+      created_by: row.created_by ?? null,
+      data: typeof row.data === 'object' && row.data !== null ? (row.data as Record<string, unknown>) : {},
+    })
+  );
 }
 

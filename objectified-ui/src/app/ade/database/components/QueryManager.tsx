@@ -3,7 +3,8 @@
 import * as React from 'react';
 import { useDatabase } from '../DatabaseContext';
 import { useDialog } from '@/app/components/providers/DialogProvider';
-import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from 'lucide-react';
+import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2, RotateCcw } from 'lucide-react';
+import { Switch } from '@/app/components/ui/Switch';
 import type { SnapshotQueryFilters } from './query-manager-types';
 import InsertStubModal from './InsertStubModal';
 import QueryUsingAIPanel from './QueryUsingAIPanel';
@@ -24,6 +25,14 @@ type SnapshotRow = {
   created_at?: string;
   record_sequence?: number;
   last_action?: string;
+};
+
+type RecordHistoryEvent = {
+  record_sequence: number;
+  action: string;
+  created_at: string;
+  created_by?: string | null;
+  data: Record<string, unknown>;
 };
 
 function truncateDataPreview(data: Record<string, unknown>, maxLen: number): string {
@@ -91,20 +100,28 @@ export default function QueryManager() {
   const [insertModalOpen, setInsertModalOpen] = React.useState(false);
   const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
   const [viewRecord, setViewRecord] = React.useState<SnapshotRow | null>(null);
+  const [recordViewTab, setRecordViewTab] = React.useState<'current' | 'historical'>('current');
+  const [recordHistory, setRecordHistory] = React.useState<RecordHistoryEvent[]>([]);
+  const [recordHistoryLoading, setRecordHistoryLoading] = React.useState(false);
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = React.useState<number>(0);
   const [sortBy, setSortBy] = React.useState<SortColumn>('updated_at');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [restoringId, setRestoringId] = React.useState<string | null>(null);
+  const [showDeleted, setShowDeleted] = React.useState(false);
 
   const classSchemaId = selectedTable?.classSchemaId ?? null;
 
   const loadCount = React.useCallback(() => {
     if (!classSchemaId) return;
-    fetch(`/api/database/snapshot/count?classSchemaId=${encodeURIComponent(classSchemaId)}`)
+    const params = new URLSearchParams({ classSchemaId });
+    if (showDeleted) params.set('includeDeleted', 'true');
+    fetch(`/api/database/snapshot/count?${params.toString()}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.success && typeof data.count === 'number') setCount(data.count);
       });
-  }, [classSchemaId]);
+  }, [classSchemaId, showDeleted]);
 
   React.useEffect(() => {
     if (!classSchemaId) {
@@ -125,6 +142,34 @@ export default function QueryManager() {
     loadCount();
   }, [classSchemaId, loadCount]);
 
+  React.useEffect(() => {
+    if (!classSchemaId) return;
+    loadCount();
+    if (viewMode === 'viewAll') runQuery({ classSchemaId }, page, PAGE_SIZE, undefined, sortBy, sortDir);
+    if (viewMode === 'search') runQuery({ classSchemaId }, page, PAGE_SIZE, searchQ, sortBy, sortDir);
+  }, [showDeleted]); // eslint-disable-line react-hooks/exhaustive-deps -- only re-fetch when showDeleted toggles
+
+  React.useEffect(() => {
+    if (!viewRecord) return;
+    setRecordViewTab('current');
+    setRecordHistory([]);
+    setSelectedHistoryIndex(0);
+  }, [viewRecord?.record_id]);
+
+  React.useEffect(() => {
+    if (recordViewTab !== 'historical' || !viewRecord || !classSchemaId) return;
+    setRecordHistoryLoading(true);
+    fetch(`/api/database/snapshot/${encodeURIComponent(viewRecord.record_id)}/history?classSchemaId=${encodeURIComponent(classSchemaId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.events)) {
+          setRecordHistory(data.events);
+          setSelectedHistoryIndex(Math.max(0, data.events.length - 1));
+        }
+      })
+      .finally(() => setRecordHistoryLoading(false));
+  }, [recordViewTab, viewRecord?.record_id, classSchemaId]);
+
   const runQuery = React.useCallback((filters: SnapshotQueryFilters, pageNum: number, pageSize: number, searchQuery?: string, orderBy?: string, orderDir?: string) => {
     if (!filters.classSchemaId) return;
     setLoading(true);
@@ -134,6 +179,7 @@ export default function QueryManager() {
       page: String(pageNum),
       pageSize: String(pageSize),
     });
+    if (showDeleted) params.set('includeDeleted', 'true');
     if (orderBy) params.set('orderBy', orderBy);
     if (orderDir) params.set('orderDir', orderDir);
     const url = searchQuery
@@ -149,7 +195,7 @@ export default function QueryManager() {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [showDeleted]);
 
   const handleViewAll = () => {
     setViewMode('viewAll');
@@ -212,6 +258,36 @@ export default function QueryManager() {
       .finally(() => setDeletingId(null));
   };
 
+  const handleRestore = async (recordId: string) => {
+    if (!classSchemaId || isReadOnly) return;
+    const confirmed = await confirmDialog({
+      title: 'Restore record',
+      message: 'Restore this deleted record? The data will be recreated in the table.',
+      confirmLabel: 'Restore',
+    });
+    if (!confirmed) return;
+    setRestoringId(recordId);
+    fetch(`/api/database/snapshot/${encodeURIComponent(recordId)}/restore?classSchemaId=${encodeURIComponent(classSchemaId)}`, {
+      method: 'POST',
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          loadCount();
+          if (viewMode === 'viewAll') runQuery({ classSchemaId }, page, PAGE_SIZE, undefined, sortBy, sortDir);
+          if (viewMode === 'search') runQuery({ classSchemaId }, page, PAGE_SIZE, searchQ, sortBy, sortDir);
+          refreshTableCount(classSchemaId);
+        } else {
+          alertDialog({ message: data.error ?? 'Restore failed' });
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        alertDialog({ message: err instanceof Error ? err.message : 'Restore failed' });
+      })
+      .finally(() => setRestoringId(null));
+  };
+
   if (!selectedProjectId || !selectedVersionId) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
@@ -270,6 +346,13 @@ export default function QueryManager() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <Switch
+              checked={showDeleted}
+              onCheckedChange={(checked) => setShowDeleted(checked)}
+            />
+            <span>Show deleted</span>
+          </label>
           <button
             type="button"
             onClick={handleViewAll}
@@ -339,13 +422,25 @@ export default function QueryManager() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.record_id} className="border-b border-gray-100 dark:border-gray-700">
+                    {rows.map((row) => {
+                      const isDeleted = row.last_action === 'deleted';
+                      return (
+                      <tr
+                        key={row.record_id}
+                        className={`border-b border-gray-100 dark:border-gray-700 ${isDeleted ? 'bg-gray-50 dark:bg-gray-800/50 opacity-90' : ''}`}
+                      >
                         <td className="py-2 px-2 font-mono text-xs text-gray-600 dark:text-gray-400">{row.record_id}</td>
                         <td className="py-2 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDateTime(row.created_at)}</td>
                         <td className="py-2 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDateTime(row.updated_at)}</td>
                         <td className="py-2 px-2 text-gray-600 dark:text-gray-400">{row.record_sequence ?? '—'}</td>
-                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400">{row.last_action ?? '—'}</td>
+                        <td className="py-2 px-2 text-gray-600 dark:text-gray-400">
+                          {row.last_action ?? '—'}
+                          {isDeleted && (
+                            <span className="ml-1.5 inline-flex items-center rounded-md bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-200">
+                              Deleted
+                            </span>
+                          )}
+                        </td>
                         <td className="py-2 px-2 max-w-[200px]">
                           <span className="text-xs text-gray-700 dark:text-gray-300 truncate block" title={JSON.stringify(row.data)}>
                             {truncateDataPreview(row.data, DATA_PREVIEW_MAX_LEN)}
@@ -361,7 +456,7 @@ export default function QueryManager() {
                               <FileJson className="w-3.5 h-3.5" />
                               View
                             </button>
-                            {!isReadOnly && (
+                            {!isReadOnly && !isDeleted && (
                               <button
                                 type="button"
                                 onClick={() => handleDelete(row.record_id)}
@@ -373,10 +468,22 @@ export default function QueryManager() {
                                 Delete
                               </button>
                             )}
+                            {!isReadOnly && isDeleted && (
+                              <button
+                                type="button"
+                                onClick={() => handleRestore(row.record_id)}
+                                disabled={restoringId === row.record_id}
+                                className="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50"
+                                title="Restore deleted record"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Restore
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ); })}
                   </tbody>
                 </table>
               </div>
@@ -436,25 +543,127 @@ export default function QueryManager() {
         classSchemaId={classSchemaId}
       />
       <Dialog open={!!viewRecord} onOpenChange={(open) => !open && setViewRecord(null)}>
-        <DialogContent className="max-w-4xl w-[90vw] max-h-[85vh] flex flex-col gap-4" showCloseButton>
+        <DialogContent className="h-[70vh] max-h-[70vh] w-[90vw] max-w-4xl flex flex-col gap-4" showCloseButton>
           <DialogHeader>
             <DialogTitle>Record — {viewRecord?.record_id ?? ''}</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-            {viewRecord && (
-              <MonacoEditor
-                height="min(70vh, 500px)"
-                language="json"
-                theme="vs-dark"
-                value={JSON.stringify(viewRecord.data, null, 2)}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 13,
-                  wordWrap: 'on',
-                }}
-              />
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
+            <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</span>
+              <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-600 p-0.5 bg-gray-50 dark:bg-gray-800/50">
+                <button
+                  type="button"
+                  onClick={() => setRecordViewTab('current')}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    recordViewTab === 'current'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  Current
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecordViewTab('historical')}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    recordViewTab === 'historical'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  Historical
+                </button>
+              </div>
+            </div>
+            {recordViewTab === 'current' && viewRecord && (
+              <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" style={{ height: '55vh' }}>
+                <MonacoEditor
+                  height="100%"
+                  language="json"
+                  theme="vs-dark"
+                  value={JSON.stringify(viewRecord.data, null, 2)}
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: 13,
+                    wordWrap: 'on',
+                  }}
+                />
+              </div>
+            )}
+            {recordViewTab === 'historical' && (
+              <div className="flex-1 flex gap-3 min-h-0">
+                <div className="w-56 shrink-0 flex flex-col gap-1 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    Events
+                  </div>
+                  {recordHistoryLoading ? (
+                    <div className="p-3 text-sm text-gray-500">Loading…</div>
+                  ) : recordHistory.length === 0 ? (
+                    <div className="p-3 text-sm text-gray-500">No history</div>
+                  ) : (
+                    <div className="overflow-auto flex-1 min-h-0 p-1">
+                      {recordHistory.map((evt, idx) => (
+                        <button
+                          key={evt.record_sequence}
+                          type="button"
+                          onClick={() => setSelectedHistoryIndex(idx)}
+                          className={`w-full text-left px-2 py-1.5 rounded text-sm truncate block ${
+                            selectedHistoryIndex === idx
+                              ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                          }`}
+                          title={`#${evt.record_sequence} ${evt.action} — ${formatDateTime(evt.created_at)}`}
+                        >
+                          <span className="font-medium">#{evt.record_sequence}</span> {evt.action}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 flex flex-col gap-2 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                  {recordHistory.length > 0 && recordHistory[selectedHistoryIndex] && (
+                    <>
+                      <div className="shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 px-3 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Sequence</span>
+                          <p className="font-medium text-gray-900 dark:text-white">{recordHistory[selectedHistoryIndex].record_sequence}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Action</span>
+                          <p className="font-medium text-gray-900 dark:text-white capitalize">{recordHistory[selectedHistoryIndex].action}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Created at</span>
+                          <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatDateTime(recordHistory[selectedHistoryIndex].created_at)}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Created by</span>
+                          <p className="font-mono text-xs text-gray-900 dark:text-white truncate" title={recordHistory[selectedHistoryIndex].created_by ?? undefined}>
+                            {recordHistory[selectedHistoryIndex].created_by ?? '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-h-0 flex flex-col" style={{ height: '50vh' }}>
+                        <MonacoEditor
+                          height="100%"
+                          language="json"
+                          theme="vs-dark"
+                          value={JSON.stringify(recordHistory[selectedHistoryIndex].data, null, 2)}
+                          options={{
+                            readOnly: true,
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            fontSize: 13,
+                            wordWrap: 'on',
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </DialogContent>

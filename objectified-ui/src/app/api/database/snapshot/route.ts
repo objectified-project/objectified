@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10)));
     const orderBy = searchParams.get('orderBy') ?? undefined;
     const orderDir = searchParams.get('orderDir') ?? undefined;
-    const { rows, total } = await getDataSnapshotPage(classSchemaId, tenantId, page, pageSize, orderBy, orderDir);
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const { rows, total } = await getDataSnapshotPage(classSchemaId, tenantId, page, pageSize, orderBy, orderDir, { includeDeleted });
     return NextResponse.json({ success: true, rows, total, page, pageSize });
   } catch (error) {
     console.error('Error fetching snapshot list:', error);
