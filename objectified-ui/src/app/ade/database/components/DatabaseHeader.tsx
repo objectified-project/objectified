@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
-import { Check } from 'lucide-react';
+import { Check, Info } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import { useDatabase } from '../DatabaseContext';
 
@@ -28,6 +28,7 @@ export default function DatabaseHeader() {
     setSelectedProjectId,
     selectedVersionId,
     setSelectedVersionId,
+    latestVersionId,
     setLatestVersionId,
     setIsReadOnly,
   } = useDatabase();
@@ -119,6 +120,22 @@ export default function DatabaseHeader() {
     const isOlder = latest ? value !== latest.id : false;
     setIsReadOnly(isOlder);
   };
+
+  const newerPublishedSchemaAvailable = React.useMemo(() => {
+    if (!localVersionId || versions.length < 2) return false;
+    const sorted = [...versions].sort((a, b) => {
+      const aAt = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bAt = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bAt - aAt;
+    });
+    const currentIndex = sorted.findIndex((v) => v.id === localVersionId);
+    if (currentIndex <= 0) return false;
+    const newerVersions = sorted.slice(0, currentIndex);
+    return newerVersions.some((v) => v.published);
+  }, [versions, localVersionId]);
+
+  const isLatestVersion =
+    !!localVersionId && !!latestVersionId && localVersionId === latestVersionId;
 
   if (!currentTenantId) return null;
 
@@ -212,6 +229,25 @@ export default function DatabaseHeader() {
             </Select.Portal>
           </Select.Root>
         </div>
+        {(newerPublishedSchemaAvailable || isLatestVersion) && (
+          <div
+            className={`ml-auto flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm ${
+              newerPublishedSchemaAvailable
+                ? 'border-amber-200 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200'
+                : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300'
+            }`}
+            role="status"
+          >
+            {newerPublishedSchemaAvailable ? (
+              <>
+                <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                <span>Newer schema available: consider migrating</span>
+              </>
+            ) : (
+              <span>Latest Version</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
