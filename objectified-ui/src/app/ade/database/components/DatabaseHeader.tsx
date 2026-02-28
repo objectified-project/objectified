@@ -31,6 +31,7 @@ export default function DatabaseHeader() {
     latestVersionId,
     setLatestVersionId,
     setIsReadOnly,
+    setSelectedTable,
   } = useDatabase();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -110,6 +111,7 @@ export default function DatabaseHeader() {
   const handleVersionChange = (value: string) => {
     setLocalVersionId(value);
     setSelectedVersionId(value);
+    setSelectedTable(null);
     const latest = versions.length > 0
       ? [...versions].sort((a, b) => {
           const aAt = a.created_at ? new Date(a.created_at).getTime() : 0;
