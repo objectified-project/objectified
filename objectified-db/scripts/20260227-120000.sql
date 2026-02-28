@@ -3,11 +3,11 @@
 
 SET search_path TO odb, public;
 
--- Enum for data_record action (created, updated, deleted)
+-- Enum for data_record action (created, updated, deleted, restored)
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'data_record_action') THEN
-        CREATE TYPE data_record_action AS ENUM ('created', 'updated', 'deleted');
+        CREATE TYPE data_record_action AS ENUM ('created', 'updated', 'deleted', 'restored');
     END IF;
 END $$;
 
@@ -51,7 +51,7 @@ COMMENT ON TABLE data_record IS 'Event-sourced log: one row per created/updated/
 COMMENT ON COLUMN data_record.id IS 'Unique identifier for the event row';
 COMMENT ON COLUMN data_record.record_id IS 'Logical record id; same for all events of one instance';
 COMMENT ON COLUMN data_record.class_schema_id IS 'Frozen class schema this record follows';
-COMMENT ON COLUMN data_record.action IS 'created, updated, or deleted';
+COMMENT ON COLUMN data_record.action IS 'created, updated, deleted, or restored (undeleted)';
 COMMENT ON COLUMN data_record.record_sequence IS 'Per-record sequence (1, 2, 3, …); first event is 1 and always created';
 COMMENT ON COLUMN data_record.data IS 'Full payload for created, delta for updated, optional for deleted';
 COMMENT ON COLUMN data_record.tenant_id IS 'Tenant for RLS and filtering';

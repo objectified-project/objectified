@@ -166,7 +166,7 @@ class TestDataStorageModels:
 
     def test_data_record_model_actions(self):
         """DataRecordModel accepts all action values."""
-        for action in ('created', 'updated', 'deleted'):
+        for action in ('created', 'updated', 'deleted', 'restored'):
             m = DataRecordModel(
                 id='dr-1',
                 record_id='rec-1',

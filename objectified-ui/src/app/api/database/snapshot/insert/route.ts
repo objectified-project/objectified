@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { getClassSchemaById, insertDataRecord, updateDataSnapshotEmbedding } from '@lib/db/helper-database';
+import { getClassSchemaById } from '@lib/db/helper-database';
+import { getTenantById } from '@lib/db/helper';
 import { validatePayloadAgainstSchema } from '@lib/database/validateSchema';
-import { embedRecordData, EMBEDDING_MODEL } from '@lib/embedding';
+import { createRestAuthHeaders, REST_API_BASE_URL } from '@lib/rest-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,6 @@ export async function POST(request: NextRequest) {
     if (!tenantId) {
       return NextResponse.json({ success: false, error: 'No tenant selected' }, { status: 400 });
     }
-    const userId = (session.user as { user_id?: string }).user_id ?? null;
 
     let body: { classSchemaId?: string; data?: Record<string, unknown> };
     try {
@@ -46,16 +46,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { record_id } = await insertDataRecord(classSchemaId, tenantId, data, userId);
+    const tenant = await getTenantById(tenantId);
+    if (!tenant?.slug) {
+      return NextResponse.json({ success: false, error: 'Tenant slug not found' }, { status: 400 });
+    }
 
-    // Automatic vectorization: embed record data and store in data_snapshot (best-effort, non-blocking)
-    embedRecordData(data)
-      .then((embedding) => {
-        if (embedding) return updateDataSnapshotEmbedding(record_id, embedding, EMBEDDING_MODEL);
-      })
-      .catch((err) => console.error('[snapshot/insert] Vectorization failed:', err));
+    const headers = createRestAuthHeaders(session.user as { user_id?: string; email?: string | null; name?: string | null; current_tenant_id?: string });
+    const res = await fetch(`${REST_API_BASE_URL}/data/${encodeURIComponent(tenant.slug)}/records`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ class_schema_id: classSchemaId, data }),
+    });
 
-    return NextResponse.json({ success: true, record_id });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = typeof json.detail === 'string' ? json.detail : json.error ?? 'Insert failed';
+      return NextResponse.json({ success: false, error: message }, { status: res.status });
+    }
+
+    return NextResponse.json({ success: true, record_id: json.record_id });
   } catch (error) {
     console.error('Error inserting record:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';

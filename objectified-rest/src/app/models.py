@@ -526,11 +526,11 @@ class FrozenClassSchemaModel(BaseModel):
 
 
 class DataRecordModel(BaseModel):
-    """Pydantic model for odb.data_record (event log: created/updated/deleted per logical record)."""
+    """Pydantic model for odb.data_record (event log: created/updated/deleted/restored per logical record)."""
     id: str
     record_id: str
     class_schema_id: str
-    action: Literal["created", "updated", "deleted"]
+    action: Literal["created", "updated", "deleted", "restored"]
     record_sequence: int
     data: Optional[Dict[str, Any]] = None
     tenant_id: str

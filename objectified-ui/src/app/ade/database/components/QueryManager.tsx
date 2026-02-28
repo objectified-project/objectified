@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useDatabase } from '../DatabaseContext';
+import { useDialog } from '@/app/components/providers/DialogProvider';
 import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from 'lucide-react';
 import type { SnapshotQueryFilters } from './query-manager-types';
 import InsertStubModal from './InsertStubModal';
@@ -79,6 +80,7 @@ function SortHeader({
 
 export default function QueryManager() {
   const { selectedProjectId, selectedVersionId, selectedTable, isReadOnly, refreshTableCount } = useDatabase();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialog();
   const [viewMode, setViewMode] = React.useState<'none' | 'viewAll' | 'search' | 'ai'>('none');
   const [count, setCount] = React.useState<number | null>(null);
   const [rows, setRows] = React.useState<SnapshotRow[]>([]);
@@ -180,9 +182,14 @@ export default function QueryManager() {
     }
   };
 
-  const handleDelete = (recordId: string) => {
+  const handleDelete = async (recordId: string) => {
     if (!classSchemaId || isReadOnly) return;
-    if (!window.confirm('Delete this record? The data will be stored in the event log and can be restored later.')) return;
+    const confirmed = await confirmDialog({
+      title: 'Delete record',
+      message: 'Delete this record? The data will be stored in the event log and can be restored later.',
+      confirmLabel: 'Delete',
+    });
+    if (!confirmed) return;
     setDeletingId(recordId);
     fetch(`/api/database/snapshot/${encodeURIComponent(recordId)}?classSchemaId=${encodeURIComponent(classSchemaId)}`, {
       method: 'DELETE',
@@ -195,12 +202,12 @@ export default function QueryManager() {
           if (viewMode === 'search') runQuery({ classSchemaId }, page, PAGE_SIZE, searchQ, sortBy, sortDir);
           refreshTableCount(classSchemaId);
         } else {
-          alert(data.error ?? 'Delete failed');
+          alertDialog({ message: data.error ?? 'Delete failed' });
         }
       })
       .catch((err) => {
         console.error(err);
-        alert(err instanceof Error ? err.message : 'Delete failed');
+        alertDialog({ message: err instanceof Error ? err.message : 'Delete failed' });
       })
       .finally(() => setDeletingId(null));
   };

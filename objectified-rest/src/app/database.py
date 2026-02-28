@@ -1419,6 +1419,231 @@ class Database:
         results = self.execute_query(query, (version_record_id,))
         return len(results) > 0
 
+    # ------------------------- Data records & data_snapshot (embedding in REST) -------------------------
+
+    def assert_class_schema_tenant_access(self, class_schema_id: str, tenant_id: str) -> bool:
+        """Return True if class_schema_id belongs to a version in a project under the tenant."""
+        query = """
+            SELECT 1 FROM odb.class_schema cs
+            JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+            JOIN odb.projects p ON p.id = v.project_id AND p.tenant_id = %s AND p.deleted_at IS NULL
+            WHERE cs.id = %s
+        """
+        results = self.execute_query(query, (tenant_id, class_schema_id))
+        return len(results) > 0
+
+    def get_class_schema_tenant_info(self, class_schema_id: str) -> Optional[Dict[str, Any]]:
+        """Return class_schema row and its version's project tenant_id if it exists; None otherwise."""
+        query = """
+            SELECT cs.id, cs.version_id, p.tenant_id AS project_tenant_id
+            FROM odb.class_schema cs
+            JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+            JOIN odb.projects p ON p.id = v.project_id AND p.deleted_at IS NULL
+            WHERE cs.id = %s
+        """
+        results = self.execute_query(query, (class_schema_id,))
+        return results[0] if results else None
+
+    def get_class_schema_by_id(self, class_schema_id: str, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single class_schema row by id. Returns None if not found or tenant has no access."""
+        if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+            return None
+        query = """
+            SELECT cs.id AS class_schema_id, cs.class_id, c.name AS class_name, cs.schema
+            FROM odb.class_schema cs
+            JOIN odb.classes c ON c.id = cs.class_id AND c.deleted_at IS NULL
+            JOIN odb.versions v ON v.id = cs.version_id AND v.deleted_at IS NULL
+            JOIN odb.projects p ON p.id = v.project_id AND p.tenant_id = %s AND p.deleted_at IS NULL
+            WHERE cs.id = %s
+        """
+        results = self.execute_query(query, (tenant_id, class_schema_id))
+        if not results:
+            return None
+        row = results[0]
+        return {
+            "class_schema_id": row["class_schema_id"],
+            "class_id": row["class_id"],
+            "class_name": row["class_name"],
+            "schema": row["schema"] if isinstance(row["schema"], dict) else {},
+        }
+
+    def insert_data_record(
+        self,
+        class_schema_id: str,
+        tenant_id: str,
+        data: Dict[str, Any],
+        created_by: Optional[str] = None,
+    ) -> str:
+        """
+        Insert a new record: one data_record (action 'created', record_sequence 1) and one data_snapshot row.
+        Returns record_id. Raises if tenant has no access to the class_schema.
+        """
+        if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+            raise ValueError("Access denied to class schema")
+        import uuid
+        record_id = str(uuid.uuid4())
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
+                    VALUES (%s, %s, 'created', 1, %s::jsonb, %s, %s)
+                    """,
+                    (record_id, class_schema_id, json.dumps(data), tenant_id, created_by),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO odb.data_snapshot (record_id, class_schema_id, data, tenant_id)
+                    VALUES (%s, %s, %s::jsonb, %s)
+                    """,
+                    (record_id, class_schema_id, json.dumps(data), tenant_id),
+                )
+                conn.commit()
+            return record_id
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_data_record(
+        self,
+        record_id: str,
+        class_schema_id: str,
+        tenant_id: str,
+        data: Dict[str, Any],
+        updated_by: Optional[str] = None,
+    ) -> None:
+        """
+        Update an existing record: append data_record (action 'updated') and update data_snapshot.
+        Raises if tenant has no access or record not found.
+        """
+        if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+            raise ValueError("Access denied to class schema")
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(MAX(record_sequence), 0) + 1 AS next_seq
+                    FROM odb.data_record WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    """,
+                    (record_id, class_schema_id, tenant_id),
+                )
+                row = cursor.fetchone()
+                next_seq = row["next_seq"] if row else 1
+                cursor.execute(
+                    """
+                    UPDATE odb.data_snapshot
+                    SET data = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                    WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    """,
+                    (json.dumps(data), record_id, class_schema_id, tenant_id),
+                )
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    raise ValueError("Record not found")
+                cursor.execute(
+                    """
+                    INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
+                    VALUES (%s, %s, 'updated', %s, %s::jsonb, %s, %s)
+                    """,
+                    (record_id, class_schema_id, next_seq, json.dumps(data), tenant_id, updated_by),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def delete_data_record(
+        self,
+        record_id: str,
+        class_schema_id: str,
+        tenant_id: str,
+        deleted_by: Optional[str] = None,
+    ) -> None:
+        """
+        Delete a record: append data_record (action 'deleted') then remove data_snapshot row.
+        Raises if tenant has no access or record not found.
+        """
+        if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+            raise ValueError("Access denied to class schema")
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT data FROM odb.data_snapshot
+                    WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    """,
+                    (record_id, class_schema_id, tenant_id),
+                )
+                snapshot_row = cursor.fetchone()
+                if not snapshot_row:
+                    conn.rollback()
+                    raise ValueError("Record not found")
+                current_data = snapshot_row["data"]
+                cursor.execute(
+                    """
+                    SELECT COALESCE(MAX(record_sequence), 0) + 1 AS next_seq
+                    FROM odb.data_record WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    """,
+                    (record_id, class_schema_id, tenant_id),
+                )
+                seq_row = cursor.fetchone()
+                next_seq = seq_row["next_seq"] if seq_row else 1
+                cursor.execute(
+                    """
+                    INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
+                    VALUES (%s, %s, 'deleted', %s, %s::jsonb, %s, %s)
+                    """,
+                    (record_id, class_schema_id, next_seq, json.dumps(current_data or {}), tenant_id, deleted_by),
+                )
+                cursor.execute(
+                    """
+                    DELETE FROM odb.data_snapshot
+                    WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    """,
+                    (record_id, class_schema_id, tenant_id),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+
+    def update_data_snapshot_embedding(
+        self, record_id: str, embedding: List[float], model: str
+    ) -> None:
+        """
+        Update the embedding (and metadata) for a data_snapshot row.
+        No-op if embedding is empty. Logs and no-ops if pgvector type is not available.
+        """
+        if not embedding:
+            return
+        vector_str = "[" + ",".join(str(x) for x in embedding) + "]"
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE odb.data_snapshot
+                    SET embedding = %s::public.vector, embedding_model = %s, embedding_updated_at = CURRENT_TIMESTAMP
+                    WHERE record_id = %s
+                    """,
+                    (vector_str, model, record_id),
+                )
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            code = getattr(e, "pgcode", None) or getattr(e, "code", None)
+            msg = str(getattr(e, "message", e) or e)
+            if code == "42704" or "vector" in msg.lower() and "does not exist" in msg.lower():
+                import logging
+                logging.getLogger(__name__).warning(
+                    "pgvector not available; embedding update skipped for record_id=%s", record_id
+                )
+                return
+            raise e
+
     def freeze_version_schema(
         self, version_record_id: str, tenant_id: str, user_id: str
     ) -> Optional[Dict[str, Any]]:

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     nextauth_secret: Optional[str] = None
     jwt_algorithm: str = "HS256"
 
+    # Embedding (Ollama) for data_snapshot vectorization
+    ollama_base_url: str = "http://localhost:11434"
+
     @property
     def effective_database_url(self) -> str:
         """Get the database URL, preferring DATABASE_URL over building from components."""

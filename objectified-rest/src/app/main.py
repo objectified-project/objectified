@@ -17,6 +17,7 @@ from .projects_routes import router as projects_router
 from .versions_routes import router as versions_router
 from .properties_routes import router as properties_router
 from .paths_routes import router as paths_router
+from .data_routes import router as data_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -71,7 +72,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include routers (data_router first so /v1/data/* is matched before any generic patterns)
+app.include_router(data_router)
 app.include_router(primitives_router)
 app.include_router(classes_router)
 app.include_router(projects_router)
@@ -84,6 +86,11 @@ app.include_router(paths_router)
 async def startup_event():
     """Connect to database on startup."""
     db.connect()
+    # Log data API routes so we can confirm POST /v1/data/{tenant_slug}/records is registered
+    for route in app.routes:
+        if hasattr(route, "path") and "data" in route.path and hasattr(route, "methods"):
+            import logging
+            logging.getLogger("uvicorn.error").info("Registered data route: %s %s", list(route.methods), route.path)
 
 
 @app.on_event("shutdown")
