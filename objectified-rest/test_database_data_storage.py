@@ -6,8 +6,10 @@ and Pydantic models for class_schema / data_record / data_snapshot.
 """
 
 import pytest
+from pathlib import Path
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from src.app.main import app
 from src.app.database import Database
@@ -177,6 +179,37 @@ class TestDataStorageModels:
             )
             assert m.action == action
 
+    def test_data_record_model_accepts_restored_action(self):
+        """DataRecordModel accepts action='restored' (undelete)."""
+        m = DataRecordModel(
+            id='dr-1',
+            record_id='rec-1',
+            class_schema_id='cs-1',
+            action='restored',
+            record_sequence=2,
+            data={'name': 'Restored'},
+            tenant_id='t1',
+        )
+        assert m.action == 'restored'
+        assert m.record_sequence == 2
+        assert m.data == {'name': 'Restored'}
+
+    def test_data_record_model_rejects_invalid_action(self):
+        """DataRecordModel raises ValidationError for invalid action values."""
+        with pytest.raises(ValidationError) as exc_info:
+            DataRecordModel(
+                id='dr-1',
+                record_id='rec-1',
+                class_schema_id='cs-1',
+                action='invalid',
+                record_sequence=1,
+                tenant_id='t1',
+            )
+        err = exc_info.value
+        assert 'action' in str(err).lower() or any(
+            'action' in e.get('loc', ()) for e in err.errors()
+        )
+
     def test_data_snapshot_model(self):
         """DataSnapshotModel accepts valid fields."""
         m = DataSnapshotModel(
@@ -187,3 +220,39 @@ class TestDataStorageModels:
         )
         assert m.record_id == 'rec-1'
         assert m.data['name'] == 'Current'
+
+
+# ---------------------------------------------------------------------------
+# Migration script content (data_record_action enum)
+# ---------------------------------------------------------------------------
+
+def _scripts_dir() -> Path:
+    """Path to objectified-db/scripts (repo root is parent of objectified-rest)."""
+    this_file = Path(__file__).resolve()
+    repo_root = this_file.parent.parent  # objectified-rest -> objectified-commercial
+    return repo_root / 'objectified-db' / 'scripts'
+
+
+class TestDataRecordActionMigrationScripts:
+    """Unit tests that migration scripts contain expected data_record_action enum changes."""
+
+    def test_initial_script_includes_restored_in_enum(self):
+        """20260227-120000.sql creates data_record_action with 'restored'."""
+        path = _scripts_dir() / '20260227-120000.sql'
+        if not path.exists():
+            pytest.skip(f"Migration script not found: {path}")
+        content = path.read_text()
+        assert "data_record_action" in content
+        assert "'restored'" in content
+        assert "ENUM ('created', 'updated', 'deleted', 'restored')" in content
+
+    def test_alter_script_adds_restored_value(self):
+        """20260227-160000.sql alters enum to add 'restored'."""
+        path = _scripts_dir() / '20260227-160000.sql'
+        if not path.exists():
+            pytest.skip(f"Migration script not found: {path}")
+        content = path.read_text()
+        assert "data_record_action" in content
+        assert "ADD VALUE 'restored'" in content
+        assert "restored (undeleted)" in content or "restored" in content
+        assert "COMMENT ON COLUMN data_record.action" in content
