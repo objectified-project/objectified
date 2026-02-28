@@ -259,6 +259,8 @@ export default function InsertStubModal({
                           const requirementLabel = required
                             ? (nullable ? 'Required, Nullable' : 'Required')
                             : (nullable ? 'Optional, Nullable' : 'Optional');
+                          const requirementPillClass =
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
                           const label = (propSchema.title as string) || key;
                           const fieldSummary = (propSchema.summary as string) || (propSchema.description as string) || undefined;
                           const patternLabel = getPattern(propSchema);
@@ -273,13 +275,13 @@ export default function InsertStubModal({
                                   onCheckedChange={(checked) => updateField(key, checked === true)}
                                 />
                                 <div className="flex flex-col gap-0.5">
-                                  <Label htmlFor={`field-${key}`} className="cursor-pointer">
-                                    {label}
-                                    {required && <span className="text-red-500 ml-0.5">*</span>}
-                                  </Label>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {requirementLabel}
-                                  </span>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Label htmlFor={`field-${key}`} className="cursor-pointer">
+                                      {label}
+                                      {required && <span className="text-red-500 ml-0.5">*</span>}
+                                    </Label>
+                                    <span className={requirementPillClass}>{requirementLabel}</span>
+                                  </div>
                                   {fieldSummary && (
                                     <span className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</span>
                                   )}
@@ -293,13 +295,13 @@ export default function InsertStubModal({
                             const money = isMoneyField(propSchema, key);
                             return (
                               <div key={key} className="space-y-1.5">
-                                <Label htmlFor={`field-${key}`}>
-                                  {label}
-                                  {required && <span className="text-red-500 ml-0.5">*</span>}
-                                </Label>
-                                <span className="text-xs text-gray-500 dark:text-gray-400 block">
-                                  {requirementLabel}
-                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Label htmlFor={`field-${key}`}>
+                                    {label}
+                                    {required && <span className="text-red-500 ml-0.5">*</span>}
+                                  </Label>
+                                  <span className={requirementPillClass}>{requirementLabel}</span>
+                                </div>
                                 {fieldSummary && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</p>
                                 )}
@@ -328,13 +330,13 @@ export default function InsertStubModal({
                             })();
                             return (
                               <div key={key} className="space-y-1.5">
-                                <Label htmlFor={`field-${key}`}>
-                                  {label} ({type})
-                                  {required && <span className="text-red-500 ml-0.5">*</span>}
-                                </Label>
-                                <span className="text-xs text-gray-500 dark:text-gray-400 block">
-                                  {requirementLabel}
-                                </span>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Label htmlFor={`field-${key}`}>
+                                    {label} ({type})
+                                    {required && <span className="text-red-500 ml-0.5">*</span>}
+                                  </Label>
+                                  <span className={requirementPillClass}>{requirementLabel}</span>
+                                </div>
                                 {fieldSummary && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</p>
                                 )}
@@ -360,18 +362,18 @@ export default function InsertStubModal({
 
                           return (
                             <div key={key} className="space-y-1.5">
-                              <Label htmlFor={`field-${key}`}>
-                                {label}
-                                {patternLabel && (
-                                  <span className="text-gray-500 dark:text-gray-400 font-normal">
-                                    {' '}(regex: {patternLabel})
-                                  </span>
-                                )}
-                                {required && <span className="text-red-500 ml-0.5">*</span>}
-                              </Label>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 block">
-                                {requirementLabel}
-                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Label htmlFor={`field-${key}`}>
+                                  {label}
+                                  {patternLabel && (
+                                    <span className="text-gray-500 dark:text-gray-400 font-normal">
+                                      {' '}(regex: {patternLabel})
+                                    </span>
+                                  )}
+                                  {required && <span className="text-red-500 ml-0.5">*</span>}
+                                </Label>
+                                <span className={requirementPillClass}>{requirementLabel}</span>
+                              </div>
                               {fieldSummary && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</p>
                               )}

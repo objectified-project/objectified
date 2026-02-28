@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { FileCode } from 'lucide-react';
 import { useDatabase } from '../DatabaseContext';
+import SchemaViewModal from './SchemaViewModal';
 
 interface TableRow {
   class_schema_id: string;
@@ -16,6 +18,7 @@ export default function TablesSidebar() {
   const [counts, setCounts] = React.useState<Record<string, number>>({});
   const [loading, setLoading] = React.useState(false);
   const [countsLoading, setCountsLoading] = React.useState(false);
+  const [schemaModalRow, setSchemaModalRow] = React.useState<TableRow | null>(null);
 
   const refreshCountForClass = React.useCallback((classSchemaId: string) => {
     fetch(`/api/database/snapshot/count?classSchemaId=${encodeURIComponent(classSchemaId)}`)
@@ -77,6 +80,13 @@ export default function TablesSidebar() {
     setSelectedTable({ classSchemaId: row.class_schema_id, className: row.class_name });
   };
 
+  const openSchemaModal = (e: React.MouseEvent, row: TableRow) => {
+    e.stopPropagation();
+    setSchemaModalRow(row);
+  };
+
+  const closeSchemaModal = () => setSchemaModalRow(null);
+
   return (
     <aside
       className="border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden"
@@ -98,27 +108,46 @@ export default function TablesSidebar() {
               const showCount = typeof count === 'number';
               return (
                 <li key={row.class_schema_id}>
-                  <button
-                    type="button"
-                    onClick={() => handleTableClick(row)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  <div
+                    className={`flex items-center gap-1 w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                       isSelected
                         ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <span className="font-medium">{row.class_name}</span>
-                    {countsLoading && !showCount && <span className="ml-2 text-xs text-gray-400">...</span>}
-                    {showCount && (
-                      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">({count})</span>
-                    )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTableClick(row)}
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <span className="font-medium">{row.class_name}</span>
+                      {countsLoading && !showCount && <span className="ml-2 text-xs text-gray-400">...</span>}
+                      {showCount && (
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">({count})</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => openSchemaModal(e, row)}
+                      className="shrink-0 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                      title="View JSON Schema"
+                      aria-label={`View JSON Schema for ${row.class_name}`}
+                    >
+                      <FileCode className="w-4 h-4" />
+                    </button>
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+      <SchemaViewModal
+        open={schemaModalRow != null}
+        onClose={closeSchemaModal}
+        className={schemaModalRow?.class_name ?? ''}
+        schema={schemaModalRow?.schema ?? null}
+      />
     </aside>
   );
 }
