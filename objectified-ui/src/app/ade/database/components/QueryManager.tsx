@@ -583,8 +583,23 @@ export default function QueryManager() {
               </div>
             </div>
             {recordViewTab === 'current' && viewRecord && (
-              <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" style={{ height: '55vh' }}>
-                <MonacoEditor
+              <>
+                <div className="shrink-0 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-sm">
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Record sequence</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{viewRecord.record_sequence ?? '—'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Created</span>
+                    <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatDateTime(viewRecord.created_at)}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Updated</span>
+                    <p className="font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatDateTime(viewRecord.updated_at)}</p>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700" style={{ height: '55vh' }}>
+                  <MonacoEditor
                   height="100%"
                   language="json"
                   theme="vs-dark"
@@ -597,7 +612,8 @@ export default function QueryManager() {
                     wordWrap: 'on',
                   }}
                 />
-              </div>
+                </div>
+              </>
             )}
             {recordViewTab === 'historical' && (
               <div className="flex-1 flex gap-3 min-h-0">
