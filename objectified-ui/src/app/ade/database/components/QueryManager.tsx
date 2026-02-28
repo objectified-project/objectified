@@ -131,16 +131,16 @@ export default function QueryManager() {
       setPage(1);
       return;
     }
-    // When switching to a different table, reset the right-hand view so we don't
-    // show stale data or keep "view all" active for the new table.
-    setViewMode('none');
+    // When a table is selected, start in "View all records" and load the first page.
+    setViewMode('viewAll');
     setRows([]);
     setTotal(0);
     setPage(1);
     setSearchQ('');
     loadCount();
+    runQuery({ classSchemaId }, 1, PAGE_SIZE, undefined, sortBy, sortDir);
     // Intentionally only depend on classSchemaId so toggling showDeleted doesn't reset the view
-  }, [classSchemaId]); // eslint-disable-line react-hooks/exhaustive-deps -- loadCount omitted so showDeleted toggle only refreshes via next effect
+  }, [classSchemaId]); // eslint-disable-line react-hooks/exhaustive-deps -- loadCount, runQuery, sortBy, sortDir omitted so showDeleted toggle only refreshes via next effect
 
   React.useEffect(() => {
     if (!classSchemaId) return;
