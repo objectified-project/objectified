@@ -50,6 +50,29 @@ def _schedule_embedding_update(record_id: str, data: Dict[str, Any]) -> None:
         logger.warning("[data/records] Vectorization failed for record_id=%s: %s", record_id, e)
 
 
+@router.get("/{tenant_slug}/records/{record_id}")
+async def get_data_record(
+    tenant_slug: str,
+    record_id: str,
+    class_schema_id: str = Query(..., description="Class schema ID"),
+    auth_data: Dict[str, Any] = Depends(validate_authentication),
+) -> Dict[str, Any]:
+    """
+    Get the current snapshot data for a record (for edit form).
+    Returns 404 if record not found or deleted.
+    """
+    tenant_id = auth_data["tenant_id"]
+
+    if not db.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+        raise HTTPException(status_code=404, detail="Class schema not found")
+
+    snapshot = db.get_data_snapshot(record_id, class_schema_id, tenant_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    return {"success": True, "record_id": record_id, "data": snapshot.get("data", {})}
+
+
 @router.post("/{tenant_slug}/records")
 async def create_data_record(
     tenant_slug: str,
@@ -131,7 +154,7 @@ async def update_data_record(
         raise HTTPException(status_code=404, detail="Class schema not found")
 
     try:
-        db.update_data_record(
+        updated = db.update_data_record(
             record_id=record_id,
             class_schema_id=body.class_schema_id,
             tenant_id=tenant_id,
@@ -145,9 +168,12 @@ async def update_data_record(
             raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
+    if not updated:
+        return {"success": True, "record_id": record_id, "updated": False}
+
     _schedule_embedding_update(record_id, body.data)
 
-    return {"success": True, "record_id": record_id}
+    return {"success": True, "record_id": record_id, "updated": True}
 
 
 @router.delete("/{tenant_slug}/records/{record_id}")

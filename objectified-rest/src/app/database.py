@@ -8,6 +8,38 @@ from .config import settings
 from .jsonschema_generator import generate_class_jsonschema_spec
 
 
+def _deep_equal(a: Any, b: Any) -> bool:
+    """Recursive equality for JSON-like values."""
+    if type(a) != type(b):
+        return False
+    if a is None or isinstance(a, (str, int, float, bool)):
+        return a == b
+    if isinstance(a, dict):
+        if set(a) != set(b):
+            return False
+        return all(_deep_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list):
+        if len(a) != len(b):
+            return False
+        return all(_deep_equal(x, y) for x, y in zip(a, b))
+    return False
+
+
+def _compute_delta(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compute top-level delta: keys added, removed, or changed.
+    Removed keys appear as key: None. If nothing changed, returns {}.
+    """
+    delta = {}
+    all_keys = set(old) | set(new)
+    for k in all_keys:
+        if k not in new:
+            delta[k] = None
+        elif k not in old or not _deep_equal(old[k], new[k]):
+            delta[k] = new[k]
+    return delta
+
+
 class Database:
     """Database connection and query manager."""
 
@@ -1505,6 +1537,36 @@ class Database:
             conn.rollback()
             raise e
 
+    def get_data_snapshot(
+        self,
+        record_id: str,
+        class_schema_id: str,
+        tenant_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the current data_snapshot row for a record (data only).
+        Returns None if tenant has no access or record not found (e.g. deleted).
+        """
+        if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
+            return None
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT data FROM odb.data_snapshot
+                    WHERE record_id = %s AND class_schema_id = %s AND tenant_id = %s
+                    """,
+                    (record_id, class_schema_id, tenant_id),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                data = row["data"]
+                return {"data": data} if data is not None else {"data": {}}
+        finally:
+            conn.close()
+
     def update_data_record(
         self,
         record_id: str,
@@ -1512,13 +1574,23 @@ class Database:
         tenant_id: str,
         data: Dict[str, Any],
         updated_by: Optional[str] = None,
-    ) -> None:
+    ) -> bool:
         """
-        Update an existing record: append data_record (action 'updated') and update data_snapshot.
-        Raises if tenant has no access or record not found.
+        Update an existing record: compute delta vs current snapshot; if no changes, return False.
+        Otherwise append data_record (action 'updated', data = delta only), update data_snapshot with full data,
+        and return True. Raises if tenant has no access or record not found.
         """
         if not self.assert_class_schema_tenant_access(class_schema_id, tenant_id):
             raise ValueError("Access denied to class schema")
+        snapshot = self.get_data_snapshot(record_id, class_schema_id, tenant_id)
+        if not snapshot:
+            raise ValueError("Record not found")
+        old_data = snapshot.get("data") or {}
+        if not isinstance(old_data, dict):
+            old_data = {}
+        delta = _compute_delta(old_data, data)
+        if not delta:
+            return False
         conn = self.connect()
         try:
             with conn.cursor() as cursor:
@@ -1547,9 +1619,10 @@ class Database:
                     INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
                     VALUES (%s, %s, 'updated', %s, %s::jsonb, %s, %s)
                     """,
-                    (record_id, class_schema_id, next_seq, json.dumps(data), tenant_id, updated_by),
+                    (record_id, class_schema_id, next_seq, json.dumps(delta), tenant_id, updated_by),
                 )
                 conn.commit()
+            return True
         except Exception as e:
             conn.rollback()
             raise e

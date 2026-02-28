@@ -35,7 +35,10 @@ interface InsertStubModalProps {
   onClose: () => void;
   tableName: string;
   classSchemaId: string;
+  /** When set, modal is in edit mode: load snapshot and PATCH on save */
+  recordId?: string | null;
   onInserted?: () => void;
+  onUpdated?: () => void;
 }
 
 type SchemaProperty = Record<string, unknown>;
@@ -45,8 +48,11 @@ export default function InsertStubModal({
   onClose,
   tableName,
   classSchemaId,
+  recordId,
   onInserted,
+  onUpdated,
 }: InsertStubModalProps) {
+  const isEdit = Boolean(recordId);
   const [schema, setSchema] = React.useState<Record<string, unknown> | null>(null);
   const [schemaLoading, setSchemaLoading] = React.useState(false);
   const [schemaError, setSchemaError] = React.useState<string | null>(null);
@@ -82,6 +88,25 @@ export default function InsertStubModal({
         if (data.success && data.schema) {
           const s = data.schema as Record<string, unknown>;
           setSchema(s);
+          if (isEdit && recordId) {
+            fetch(`/api/database/snapshot/${encodeURIComponent(recordId)}?classSchemaId=${encodeURIComponent(classSchemaId)}`)
+              .then((r2) => r2.json())
+              .then((snap) => {
+                if (snap.success && snap.data != null) {
+                  const initial = typeof snap.data === 'object' && snap.data !== null ? (snap.data as Record<string, unknown>) : {};
+                  setFormData(initial);
+                  setJsonText(JSON.stringify(initial, null, 2));
+                } else {
+                  setSchemaError(snap.error ?? 'Failed to load record');
+                }
+                setSchemaLoading(false);
+              })
+              .catch((err) => {
+                setSchemaError(err?.message ?? 'Failed to load record');
+                setSchemaLoading(false);
+              });
+            return;
+          }
           const initial = getInitialFormData(s);
           setFormData(initial);
           setJsonText(JSON.stringify(initial, null, 2));
@@ -90,8 +115,10 @@ export default function InsertStubModal({
         }
       })
       .catch((err) => setSchemaError(err?.message ?? 'Failed to load schema'))
-      .finally(() => setSchemaLoading(false));
-  }, [open, classSchemaId]);
+      .finally(() => {
+        if (!isEdit || !recordId) setSchemaLoading(false);
+      });
+  }, [open, classSchemaId, isEdit, recordId]);
 
   // When switching to JSON tab, sync formData -> jsonText
   React.useEffect(() => {
@@ -187,6 +214,33 @@ export default function InsertStubModal({
     }
 
     setSubmitting(true);
+    if (isEdit && recordId) {
+      fetch(`/api/database/snapshot/${encodeURIComponent(recordId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classSchemaId, data }),
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success) {
+            onUpdated?.();
+            onClose();
+          } else {
+            setSubmitError(res.error ?? 'Update failed');
+            if (res.errors?.length) {
+              setValidationErrors(
+                res.errors.map((e: { path?: string; message?: string }) => ({
+                  path: e.path,
+                  message: e.message ?? 'Validation failed',
+                }))
+              );
+            }
+          }
+        })
+        .catch((err) => setSubmitError(err?.message ?? 'Request failed'))
+        .finally(() => setSubmitting(false));
+      return;
+    }
     fetch('/api/database/snapshot/insert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -227,10 +281,12 @@ export default function InsertStubModal({
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-2xl h-[85vh] max-h-[720px] flex flex-col rounded-lg bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
           <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white p-6 pb-2">
-            Insert record
+            {isEdit ? 'Edit record' : 'Insert record'}
           </Dialog.Title>
           <Dialog.Description className="px-6 text-sm text-gray-500 dark:text-gray-400">
-            Insert a new record into &quot;{tableName}&quot;. Data is validated against the class schema before saving.
+            {isEdit
+              ? `Edit the record in "${tableName}". Data is validated against the class schema before saving.`
+              : `Insert a new record into "${tableName}". Data is validated against the class schema before saving.`}
           </Dialog.Description>
 
           <div className="flex-1 min-h-[320px] flex flex-col p-6 gap-4 overflow-hidden">
@@ -597,7 +653,7 @@ export default function InsertStubModal({
               disabled={!schema || submitting || Object.values(patternErrors).some(Boolean)}
               className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:pointer-events-none"
             >
-              {submitting ? 'Inserting…' : 'Insert'}
+              {submitting ? (isEdit ? 'Saving…' : 'Inserting…') : isEdit ? 'Save' : 'Insert'}
             </button>
           </div>
         </Dialog.Content>

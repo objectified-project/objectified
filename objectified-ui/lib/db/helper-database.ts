@@ -118,6 +118,30 @@ export async function getClassSchemaById(
 }
 
 /**
+ * Get the current snapshot data for a single record (for edit form).
+ * Returns null if not found or tenant has no access (e.g. record deleted).
+ */
+export async function getDataSnapshotByRecordId(
+  recordId: string,
+  classSchemaId: string,
+  tenantId: string
+): Promise<{ data: Record<string, unknown> } | null> {
+  const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
+  if (!hasAccess) return null;
+
+  const result = await connectionPool.query(
+    `SELECT data FROM odb.data_snapshot
+     WHERE record_id = $1 AND class_schema_id = $2 AND tenant_id = $3`,
+    [recordId, classSchemaId, tenantId]
+  );
+  if (result.rowCount === 0 || !result.rows[0]) return null;
+  const row = result.rows[0] as { data: unknown };
+  return {
+    data: typeof row.data === 'object' && row.data !== null ? (row.data as Record<string, unknown>) : {},
+  };
+}
+
+/**
  * Count rows in data_snapshot for a class_schema and tenant.
  * When includeDeleted is true, also counts records whose latest event is 'deleted' (no snapshot row).
  */

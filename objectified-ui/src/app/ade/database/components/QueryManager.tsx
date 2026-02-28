@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useDatabase } from '../DatabaseContext';
 import { useDialog } from '@/app/components/providers/DialogProvider';
-import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2, RotateCcw } from 'lucide-react';
+import { List, Search, Sparkles, Plus, Database, Info, FileJson, ArrowUp, ArrowDown, ArrowUpDown, Trash2, RotateCcw, Pencil } from 'lucide-react';
 import { Switch } from '@/app/components/ui/Switch';
 import type { SnapshotQueryFilters } from './query-manager-types';
 import InsertStubModal from './InsertStubModal';
@@ -98,6 +98,7 @@ export default function QueryManager() {
   const [loading, setLoading] = React.useState(false);
   const [searchQ, setSearchQ] = React.useState('');
   const [insertModalOpen, setInsertModalOpen] = React.useState(false);
+  const [editRecordId, setEditRecordId] = React.useState<string | null>(null);
   const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
   const [viewRecord, setViewRecord] = React.useState<SnapshotRow | null>(null);
   const [recordViewTab, setRecordViewTab] = React.useState<'current' | 'historical'>('current');
@@ -457,9 +458,19 @@ export default function QueryManager() {
                               View
                             </button>
                             {!isReadOnly && !isDeleted && (
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(row.record_id)}
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditRecordId(row.record_id)}
+                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-xs text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
+                                  title="Edit record"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(row.record_id)}
                                 disabled={deletingId === row.record_id}
                                 className="inline-flex items-center gap-1.5 px-2 py-1 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-xs text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40 disabled:opacity-50"
                                 title="Delete record (data stored in event log for restore)"
@@ -467,6 +478,7 @@ export default function QueryManager() {
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Delete
                               </button>
+                              </>
                             )}
                             {!isReadOnly && isDeleted && (
                               <button
@@ -523,15 +535,26 @@ export default function QueryManager() {
 
       {classSchemaId && (
         <InsertStubModal
-          open={insertModalOpen}
-          onClose={() => setInsertModalOpen(false)}
+          open={insertModalOpen || Boolean(editRecordId)}
+          onClose={() => {
+            setInsertModalOpen(false);
+            setEditRecordId(null);
+          }}
           tableName={selectedTable.className}
           classSchemaId={classSchemaId}
+          recordId={editRecordId}
           onInserted={() => {
             loadCount();
             if (viewMode === 'viewAll') runQuery({ classSchemaId }, 1, PAGE_SIZE, undefined, sortBy, sortDir);
             if (viewMode === 'search') runQuery({ classSchemaId }, 1, PAGE_SIZE, searchQ, sortBy, sortDir);
             if (classSchemaId) refreshTableCount(classSchemaId);
+          }}
+          onUpdated={() => {
+            loadCount();
+            if (viewMode === 'viewAll') runQuery({ classSchemaId }, page, PAGE_SIZE, undefined, sortBy, sortDir);
+            if (viewMode === 'search') runQuery({ classSchemaId }, page, PAGE_SIZE, searchQ, sortBy, sortDir);
+            if (classSchemaId) refreshTableCount(classSchemaId);
+            setEditRecordId(null);
           }}
         />
       )}
