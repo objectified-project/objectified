@@ -364,3 +364,71 @@ export async function insertDataRecord(
   }
   return { record_id: recordId };
 }
+
+/**
+ * Update an existing record: append data_record (action 'updated') and update data_snapshot.
+ * Throws if tenant has no access or record not found.
+ */
+export async function updateDataRecord(
+  recordId: string,
+  classSchemaId: string,
+  tenantId: string,
+  data: Record<string, unknown>,
+  updatedBy?: string | null
+): Promise<void> {
+  const hasAccess = await assertClassSchemaTenantAccess(classSchemaId, tenantId);
+  if (!hasAccess) {
+    throw new Error('Access denied to class schema');
+  }
+  const client = await connectionPool.connect();
+  try {
+    await client.query('BEGIN');
+    const seqResult = await client.query(
+      `SELECT COALESCE(MAX(record_sequence), 0) + 1 AS next_seq
+       FROM odb.data_record WHERE record_id = $1 AND class_schema_id = $2 AND tenant_id = $3`,
+      [recordId, classSchemaId, tenantId]
+    );
+    const nextSeq = seqResult.rows[0]?.next_seq ?? 1;
+    const updateSnapshotResult = await client.query(
+      `UPDATE odb.data_snapshot
+       SET data = $1::jsonb, updated_at = CURRENT_TIMESTAMP
+       WHERE record_id = $2 AND class_schema_id = $3 AND tenant_id = $4`,
+      [JSON.stringify(data), recordId, classSchemaId, tenantId]
+    );
+    if (updateSnapshotResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      throw new Error('Record not found');
+    }
+    await client.query(
+      `INSERT INTO odb.data_record (record_id, class_schema_id, action, record_sequence, data, tenant_id, created_by)
+       VALUES ($1, $2, 'updated', $3, $4::jsonb, $5, $6)`,
+      [recordId, classSchemaId, nextSeq, JSON.stringify(data), tenantId, updatedBy ?? null]
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Update the embedding (and metadata) for a data_snapshot row.
+ * Used after insert/update to store vectorization from Ollama.
+ */
+export async function updateDataSnapshotEmbedding(
+  recordId: string,
+  embedding: number[],
+  model: string
+): Promise<void> {
+  if (embedding.length === 0) return;
+  // pgvector accepts string format '[x,y,z,...]'
+  const vectorStr = '[' + embedding.join(',') + ']';
+  await connectionPool.query(
+    `UPDATE odb.data_snapshot
+     SET embedding = $1::vector, embedding_model = $2, embedding_updated_at = CURRENT_TIMESTAMP
+     WHERE record_id = $3`,
+    [vectorStr, model, recordId]
+  );
+}

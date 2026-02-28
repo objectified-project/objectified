@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { getClassSchemaById, insertDataRecord, updateDataSnapshotEmbedding } from '@lib/db/helper-database';
+import { getClassSchemaById, updateDataRecord, updateDataSnapshotEmbedding } from '@lib/db/helper-database';
 import { validatePayloadAgainstSchema } from '@lib/database/validateSchema';
 import { embedRecordData, EMBEDDING_MODEL } from '@lib/embedding';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ recordId: string }> }
+) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -18,6 +21,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'No tenant selected' }, { status: 400 });
     }
     const userId = (session.user as { user_id?: string }).user_id ?? null;
+
+    const { recordId } = await params;
+    if (!recordId) {
+      return NextResponse.json({ success: false, error: 'recordId required' }, { status: 400 });
+    }
 
     let body: { classSchemaId?: string; data?: Record<string, unknown> };
     try {
@@ -46,18 +54,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { record_id } = await insertDataRecord(classSchemaId, tenantId, data, userId);
+    await updateDataRecord(recordId, classSchemaId, tenantId, data, userId);
 
-    // Automatic vectorization: embed record data and store in data_snapshot (best-effort, non-blocking)
+    // Automatic vectorization on update (best-effort, non-blocking)
     embedRecordData(data)
       .then((embedding) => {
-        if (embedding) return updateDataSnapshotEmbedding(record_id, embedding, EMBEDDING_MODEL);
+        if (embedding) return updateDataSnapshotEmbedding(recordId, embedding, EMBEDDING_MODEL);
       })
-      .catch((err) => console.error('[snapshot/insert] Vectorization failed:', err));
+      .catch((err) => console.error('[snapshot/update] Vectorization failed:', err));
 
-    return NextResponse.json({ success: true, record_id });
+    return NextResponse.json({ success: true, record_id: recordId });
   } catch (error) {
-    console.error('Error inserting record:', error);
+    console.error('Error updating record:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
