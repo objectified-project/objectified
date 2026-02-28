@@ -1,6 +1,7 @@
 import psycopg2
 import json
 import bcrypt
+import numpy as np
 from psycopg2.extras import RealDictCursor
 from psycopg2.extensions import register_adapter, AsIs, adapt
 from typing import Optional, List, Dict, Any
@@ -1747,32 +1748,45 @@ class Database:
         Update the embedding (and metadata) for a data_snapshot row.
         No-op if embedding is empty. Logs and no-ops if pgvector type is not available.
         """
-        if not embedding:
+        if not embedding or len(embedding) == 0:
             return
-        vector_str = "[" + ",".join(str(x) for x in embedding) + "]"
+
+        if not isinstance(embedding, np.ndarray):
+            embedding = np.array(embedding, dtype=np.float32)
+
         conn = self.connect()
+
+        try:
+            from pgvector.psycopg2 import register_vector
+            register_vector(conn)
+        except Exception as e:
+            print("pgvector not available; embedding update skipped for record_id=", record_id)
+            print(f"register_vector failed: {type(e).__name__}: {e}")
+            return
+
         try:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE odb.data_snapshot
-                    SET embedding = %s::public.vector, embedding_model = %s, embedding_updated_at = CURRENT_TIMESTAMP
+                    SET embedding = %s,
+                        embedding_model = %s,
+                        embedding_updated_at = CURRENT_TIMESTAMP
                     WHERE record_id = %s
                     """,
-                    (vector_str, model, record_id),
+                    (embedding, model, record_id),
                 )
-                conn.commit()
+            conn.commit()
         except Exception as e:
             conn.rollback()
             code = getattr(e, "pgcode", None) or getattr(e, "code", None)
             msg = str(getattr(e, "message", e) or e)
-            if code == "42704" or "vector" in msg.lower() and "does not exist" in msg.lower():
-                import logging
-                logging.getLogger(__name__).warning(
-                    "pgvector not available; embedding update skipped for record_id=%s", record_id
+            if code == "42704" or ("vector" in msg.lower() and "does not exist" in msg.lower()):
+                print(
+                    "pgvector not available: ", msg, "code=", code, " embedding update skipped for record_id=", record_id
                 )
                 return
-            raise e
+            raise
 
     def freeze_version_schema(
         self, version_record_id: str, tenant_id: str, user_id: str

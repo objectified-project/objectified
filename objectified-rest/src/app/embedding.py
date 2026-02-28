@@ -3,6 +3,7 @@ Embedding service for data_snapshot vectorization.
 
 Calls Ollama /api/embed to produce vectors for semantic/LLM search.
 Uses the same model and dimensions as the UI (qwen3-embedding:4b, 2000 dims).
+pgvector HNSW index max is 2000 dimensions.
 Uses stdlib urllib (no extra dependency).
 """
 
@@ -17,7 +18,7 @@ from .config import settings
 logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = "qwen3-embedding:4b"
-EMBEDDING_DIMENSIONS = 2000  # pgvector HNSW index max
+EMBEDDING_DIMENSIONS = 2000  # pgvector HNSW max; must match data_snapshot.embedding vector(2000)
 
 
 def get_embedding(text: str) -> Optional[List[float]]:
