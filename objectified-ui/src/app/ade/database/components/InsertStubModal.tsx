@@ -25,6 +25,7 @@ import {
   getTimestampDefaultKind,
   getInitialFormData,
   getOrderedPropertyEntries,
+  isNullable,
 } from '@lib/database/insert-form-schema-utils';
 import { generateUuid, generateTimestamp, type UuidVersion } from '@lib/database/generate-field-value';
 import { Button } from '@/app/components/ui/Button';
@@ -254,6 +255,10 @@ export default function InsertStubModal({
                         propertyEntries.map(([key, propSchema]) => {
                           const type = getPropertyType(propSchema);
                           const required = requiredSet.has(key);
+                          const nullable = isNullable(propSchema);
+                          const requirementLabel = required
+                            ? (nullable ? 'Required, Nullable' : 'Required')
+                            : (nullable ? 'Optional, Nullable' : 'Optional');
                           const label = (propSchema.title as string) || key;
                           const fieldSummary = (propSchema.summary as string) || (propSchema.description as string) || undefined;
                           const patternLabel = getPattern(propSchema);
@@ -272,6 +277,9 @@ export default function InsertStubModal({
                                     {label}
                                     {required && <span className="text-red-500 ml-0.5">*</span>}
                                   </Label>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {requirementLabel}
+                                  </span>
                                   {fieldSummary && (
                                     <span className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</span>
                                   )}
@@ -289,6 +297,9 @@ export default function InsertStubModal({
                                   {label}
                                   {required && <span className="text-red-500 ml-0.5">*</span>}
                                 </Label>
+                                <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                                  {requirementLabel}
+                                </span>
                                 {fieldSummary && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</p>
                                 )}
@@ -321,6 +332,9 @@ export default function InsertStubModal({
                                   {label} ({type})
                                   {required && <span className="text-red-500 ml-0.5">*</span>}
                                 </Label>
+                                <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                                  {requirementLabel}
+                                </span>
                                 {fieldSummary && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</p>
                                 )}
@@ -355,6 +369,9 @@ export default function InsertStubModal({
                                 )}
                                 {required && <span className="text-red-500 ml-0.5">*</span>}
                               </Label>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                                {requirementLabel}
+                              </span>
                               {fieldSummary && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">{fieldSummary}</p>
                               )}

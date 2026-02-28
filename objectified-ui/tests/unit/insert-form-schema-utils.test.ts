@@ -1,12 +1,13 @@
 /**
  * Unit tests for insert form schema utilities (database insert modal).
- * Covers getPropertyType, getEnumOptions, getPattern, isMoneyField, getInitialFormData, getOrderedPropertyEntries.
+ * Covers getPropertyType, getEnumOptions, getPattern, isNullable, isMoneyField, getInitialFormData, getOrderedPropertyEntries.
  */
 
 import {
   getPropertyType,
   getEnumOptions,
   getPattern,
+  isNullable,
   isMoneyField,
   isUuidField,
   isTimestampField,
@@ -75,6 +76,22 @@ describe('getPattern', () => {
     expect(getPattern({})).toBeUndefined();
     expect(getPattern({ pattern: null })).toBeUndefined();
     expect(getPattern({ pattern: /regex/ })).toBeUndefined();
+  });
+});
+
+describe('isNullable', () => {
+  test('returns true when type array includes null', () => {
+    expect(isNullable({ type: ['string', 'null'] })).toBe(true);
+    expect(isNullable({ type: ['number', 'null'] })).toBe(true);
+    expect(isNullable({ type: ['null', 'integer'] })).toBe(true);
+  });
+
+  test('returns false when type is a single string or does not include null', () => {
+    expect(isNullable({ type: 'string' })).toBe(false);
+    expect(isNullable({ type: 'number' })).toBe(false);
+    expect(isNullable({ type: ['string', 'integer'] })).toBe(false);
+    expect(isNullable({})).toBe(false);
+    expect(isNullable({ type: [] })).toBe(false);
   });
 });
 

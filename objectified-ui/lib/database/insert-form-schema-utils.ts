@@ -25,6 +25,13 @@ export function getPattern(propSchema: SchemaProperty): string | undefined {
   return typeof p === 'string' ? p : undefined;
 }
 
+/** True if the property schema allows null (e.g. type: ["string", "null"]). */
+export function isNullable(propSchema: SchemaProperty): boolean {
+  const t = propSchema.type;
+  if (Array.isArray(t)) return t.includes('null');
+  return false;
+}
+
 export function isMoneyField(propSchema: SchemaProperty, key: string): boolean {
   const format = (propSchema.format as string) || '';
   const keyLower = key.toLowerCase();
