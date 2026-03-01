@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Users,
   Store,
+  GitCompare,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
@@ -81,6 +82,16 @@ const Ade = () => {
       enabled: true,
       color: 'text-emerald-600 dark:text-emerald-400',
       gradient: 'from-emerald-500 to-teal-600',
+    },
+    {
+      id: 'migration',
+      name: 'Migration',
+      description: 'Data Migration Tools',
+      icon: <GitCompare className="w-8 h-8" />,
+      href: '/ade/migration',
+      enabled: true,
+      color: 'text-amber-600 dark:text-amber-400',
+      gradient: 'from-amber-500 to-orange-600',
     },
     {
       id: 'etl',
