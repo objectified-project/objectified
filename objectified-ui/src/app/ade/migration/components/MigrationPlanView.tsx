@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+import { Switch } from '../../../components/ui/Switch';
 
 const PAGE_SIZE = 20;
 
@@ -38,17 +39,43 @@ function formatDateTime(iso: string | undefined): string {
   }
 }
 
-/** Confidence level for data quality based on rules coverage. */
-function getConfidenceLevel(rulesAppliedCount: number, totalProperties: number): 'high' | 'medium' | 'low' {
-  if (rulesAppliedCount === 0) return 'low';
-  const coverage = totalProperties > 0 ? rulesAppliedCount / totalProperties : 0;
-  if (coverage >= 0.5 || rulesAppliedCount >= 3) return 'high';
-  if (rulesAppliedCount >= 1) return 'medium';
-  return 'low';
+/** Plan-level data quality confidence (1–100%) from rules coverage. */
+function getPlanConfidencePercent(rulesAppliedCount: number, totalProperties: number): number {
+  if (rulesAppliedCount === 0) return 1;
+  if (totalProperties === 0) return rulesAppliedCount >= 1 ? 100 : 1;
+  const coverage = rulesAppliedCount / totalProperties;
+  const raw = Math.round(coverage * 100);
+  return Math.max(1, Math.min(100, raw));
 }
 
+/** Record-level confidence (1–100%) from transformed data vs target schema: completeness of required + optional fields. */
+function getRecordConfidencePercent(
+  transformedData: Record<string, unknown>,
+  targetSchema: Record<string, unknown> | null | undefined
+): number {
+  if (!targetSchema || typeof targetSchema !== 'object') return 100;
+  const props = targetSchema.properties as Record<string, unknown> | undefined;
+  const required = targetSchema.required as string[] | undefined;
+  const expectedKeys = props && typeof props === 'object' ? Object.keys(props) : [];
+  if (expectedKeys.length === 0) return 100;
+  let filled = 0;
+  for (const key of expectedKeys) {
+    const v = transformedData[key];
+    if (v !== undefined && v !== null && v !== '') filled++;
+  }
+  const raw = Math.round((filled / expectedKeys.length) * 100);
+  return Math.max(1, Math.min(100, raw));
+}
+
+/** Result of applying rules to the current record (cleared when selection changes). */
+type TransformResult = {
+  data: Record<string, unknown>;
+  transformedAt: string;
+  rulesAppliedCount: number;
+};
+
 export default function MigrationPlanView() {
-  const { selectedClassName, fromTables, migrationRules } = useMigration();
+  const { selectedClassName, fromTables, toTables, migrationRules } = useMigration();
   const [rows, setRows] = React.useState<SnapshotRow[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(1);
@@ -56,14 +83,19 @@ export default function MigrationPlanView() {
   const [searchQ, setSearchQ] = React.useState('');
   const [viewMode, setViewMode] = React.useState<'none' | 'viewAll' | 'search'>('none');
   const [selectedRecord, setSelectedRecord] = React.useState<SnapshotRow | null>(null);
-  const [transformedData, setTransformedData] = React.useState<Record<string, unknown> | null>(null);
+  const [transformResult, setTransformResult] = React.useState<TransformResult | null>(null);
   const [evaluateLoading, setEvaluateLoading] = React.useState(false);
   const [evaluateError, setEvaluateError] = React.useState<string | null>(null);
+  const [autoApply, setAutoApply] = React.useState(false);
 
   const fromRow = selectedClassName
     ? fromTables.find((r) => r.class_name === selectedClassName)
     : null;
+  const toRow = selectedClassName
+    ? toTables.find((r) => r.class_name === selectedClassName)
+    : null;
   const classSchemaId = fromRow?.class_schema_id ?? null;
+  const transformedData = transformResult?.data ?? null;
 
   const runQuery = React.useCallback(
     (pageNum: number, searchQuery?: string) => {
@@ -100,13 +132,13 @@ export default function MigrationPlanView() {
       setPage(1);
       setViewMode('none');
       setSelectedRecord(null);
-      setTransformedData(null);
+      setTransformResult(null);
       setEvaluateError(null);
       return;
     }
     setViewMode('viewAll');
     setSelectedRecord(null);
-    setTransformedData(null);
+    setTransformResult(null);
     setEvaluateError(null);
     runQuery(1, undefined);
   }, [classSchemaId]); // eslint-disable-line react-hooks/exhaustive-deps -- only reset when class changes
@@ -130,7 +162,7 @@ export default function MigrationPlanView() {
     if (!hasPrev || currentIndex <= 0) return;
     const prev = rows[currentIndex - 1];
     setSelectedRecord(prev);
-    setTransformedData(null);
+    setTransformResult(null);
     setEvaluateError(null);
   };
 
@@ -138,7 +170,7 @@ export default function MigrationPlanView() {
     if (!hasNext || currentIndex >= rows.length - 1) return;
     const next = rows[currentIndex + 1];
     setSelectedRecord(next);
-    setTransformedData(null);
+    setTransformResult(null);
     setEvaluateError(null);
   };
 
@@ -147,30 +179,47 @@ export default function MigrationPlanView() {
     if (viewMode === 'search') runQuery(newPage, searchQ);
     else runQuery(newPage, undefined);
     setSelectedRecord(null);
-    setTransformedData(null);
+    setTransformResult(null);
     setEvaluateError(null);
   };
 
+  const runEvaluate = React.useCallback(
+    (record: SnapshotRow) => {
+      if (!migrationRules) return;
+      setEvaluateLoading(true);
+      setEvaluateError(null);
+      fetch('/api/migration-plans/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordData: record.data, rules: migrationRules }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.transformedData !== undefined) {
+            setTransformResult({
+              data: data.transformedData as Record<string, unknown>,
+              transformedAt: new Date().toISOString(),
+              rulesAppliedCount: typeof data.rulesAppliedCount === 'number' ? data.rulesAppliedCount : 0,
+            });
+          } else {
+            setEvaluateError(data.error ?? 'Evaluate failed');
+          }
+        })
+        .catch(() => setEvaluateError('Request failed'))
+        .finally(() => setEvaluateLoading(false));
+    },
+    [migrationRules]
+  );
+
   const handleEvaluate = React.useCallback(() => {
     if (!selectedRecord || !migrationRules) return;
-    setEvaluateLoading(true);
-    setEvaluateError(null);
-    fetch('/api/migration-plans/evaluate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recordData: selectedRecord.data, rules: migrationRules }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success && data.transformedData !== undefined) {
-          setTransformedData(data.transformedData as Record<string, unknown>);
-        } else {
-          setEvaluateError(data.error ?? 'Evaluate failed');
-        }
-      })
-      .catch(() => setEvaluateError('Request failed'))
-      .finally(() => setEvaluateLoading(false));
-  }, [selectedRecord, migrationRules]);
+    runEvaluate(selectedRecord);
+  }, [selectedRecord, migrationRules, runEvaluate]);
+
+  React.useEffect(() => {
+    if (!autoApply || !selectedRecord || !migrationRules) return;
+    runEvaluate(selectedRecord);
+  }, [autoApply, selectedRecord?.record_id, migrationRules]); // eslint-disable-line react-hooks/exhaustive-deps -- only run when record or autoApply changes
 
   const rulesAppliedCount = React.useMemo(() => {
     if (!migrationRules || typeof migrationRules !== 'object') return 0;
@@ -186,7 +235,13 @@ export default function MigrationPlanView() {
     return props && typeof props === 'object' ? Object.keys(props).length : 0;
   }, [fromRow]);
 
-  const confidenceLevel = getConfidenceLevel(rulesAppliedCount, totalProperties);
+  const planConfidencePercent = getPlanConfidencePercent(rulesAppliedCount, totalProperties);
+  const recordConfidencePercent = React.useMemo(() => {
+    if (!transformResult?.data || !toRow?.schema) return null;
+    return getRecordConfidencePercent(transformResult.data, toRow.schema);
+  }, [transformResult?.data, toRow?.schema]);
+  const confidencePercent = recordConfidencePercent ?? planConfidencePercent;
+  const confidenceLabel = recordConfidencePercent != null ? 'Data quality confidence (this record)' : 'Data quality confidence (plan)';
 
   if (!selectedClassName) {
     return (
@@ -225,21 +280,35 @@ export default function MigrationPlanView() {
             <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{rulesAppliedCount}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
-          <div
-            className={`p-2 rounded-md ${
-              confidenceLevel === 'high'
-                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                : confidenceLevel === 'medium'
-                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-            }`}
-          >
-            <ShieldCheck className="h-5 w-5" />
+        <div className="flex flex-col gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-2 rounded-md shrink-0 ${
+                confidencePercent >= 70
+                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                  : confidencePercent >= 40
+                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{confidenceLabel}</p>
+              <p className="text-xl font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{confidencePercent}%</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Data quality confidence</p>
-            <p className="text-xl font-semibold text-gray-900 dark:text-gray-100 capitalize">{confidenceLevel}</p>
+          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden" role="progressbar" aria-valuenow={confidencePercent} aria-valuemin={1} aria-valuemax={100} aria-label="Data quality confidence">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ease-out ${
+                confidencePercent >= 70
+                  ? 'bg-emerald-500 dark:bg-emerald-500'
+                  : confidencePercent >= 40
+                    ? 'bg-amber-500 dark:bg-amber-500'
+                    : 'bg-gray-500 dark:bg-gray-500'
+              }`}
+              style={{ width: `${confidencePercent}%` }}
+            />
           </div>
         </div>
         </div>
@@ -345,7 +414,7 @@ export default function MigrationPlanView() {
                         type="button"
                         onClick={() => {
                           setSelectedRecord(row);
-                          setTransformedData(null);
+                          setTransformResult(null);
                           setEvaluateError(null);
                         }}
                         className={`w-full text-left px-2.5 py-2 rounded-lg text-sm transition-colors border ${
@@ -369,12 +438,25 @@ export default function MigrationPlanView() {
 
         {/* Center + Right: metadata and Old | New */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Metadata for current record */}
+          {/* Metadata: transformed record when rules applied, otherwise original record */}
           <div className="shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-            {selectedRecord ? (
+            {transformResult ? (
               <>
                 <span className="text-gray-500 dark:text-gray-400">
-                  <strong className="text-gray-700 dark:text-gray-300">ID:</strong>{' '}
+                  <strong className="text-gray-700 dark:text-gray-300">Record (after transform):</strong>{' '}
+                  <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{selectedRecord?.record_id ?? '—'}</code>
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  <strong className="text-gray-700 dark:text-gray-300">Transformed at:</strong> {formatDateTime(transformResult.transformedAt)}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  <strong className="text-gray-700 dark:text-gray-300">Fields:</strong> {Object.keys(transformResult.data).length}
+                </span>
+              </>
+            ) : selectedRecord ? (
+              <>
+                <span className="text-gray-500 dark:text-gray-400">
+                  <strong className="text-gray-700 dark:text-gray-300">Record (original):</strong>{' '}
                   <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{selectedRecord.record_id}</code>
                 </span>
                 <span className="text-gray-500 dark:text-gray-400">
@@ -395,6 +477,7 @@ export default function MigrationPlanView() {
                     <strong className="text-gray-700 dark:text-gray-300">Last action:</strong> {selectedRecord.last_action}
                   </span>
                 )}
+                <span className="text-gray-400 dark:text-gray-500 italic">Apply rules to see transformed record metadata and confidence.</span>
               </>
             ) : (
               <span className="text-gray-500 dark:text-gray-400">Select a record to see metadata.</span>
@@ -405,9 +488,12 @@ export default function MigrationPlanView() {
           <div className="flex-1 min-h-0 flex overflow-hidden">
             {/* Old (left) */}
             <div className="flex-1 min-w-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
-                <FileJson className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Original record</span>
+              <div className="h-11 flex items-center justify-between gap-2 px-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileJson className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">Original record</span>
+                </div>
+                <div className="min-w-[7.5rem] shrink-0" aria-hidden />
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 {selectedRecord ? (
@@ -435,20 +521,30 @@ export default function MigrationPlanView() {
 
             {/* New (right) */}
             <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-gray-900">
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
+              <div className="h-11 flex items-center justify-between gap-2 px-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <FileJson className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">After transform</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleEvaluate}
-                  disabled={!selectedRecord || evaluateLoading}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 disabled:opacity-50 disabled:pointer-events-none text-sm font-medium"
-                >
-                  <Play className="w-4 h-4" />
-                  {evaluateLoading ? 'Applying…' : 'Apply rules'}
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                    <Switch
+                      checked={autoApply}
+                      onCheckedChange={setAutoApply}
+                      disabled={!selectedRecord}
+                    />
+                    <span>Auto-Apply</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleEvaluate}
+                    disabled={!selectedRecord || evaluateLoading || autoApply}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 disabled:opacity-50 disabled:pointer-events-none text-sm font-medium"
+                  >
+                    <Play className="w-4 h-4" />
+                    {evaluateLoading ? 'Applying…' : 'Apply rules'}
+                  </button>
+                </div>
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 {!selectedRecord ? (
