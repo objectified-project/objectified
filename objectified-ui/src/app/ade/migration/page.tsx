@@ -2,14 +2,23 @@
 
 import { useMigration } from './MigrationContext';
 import { GitCompare, Info } from 'lucide-react';
+import MigrationCanvas from './components/MigrationCanvas';
 
 export default function MigrationPage() {
   const { selectedProjectId, fromVersionId, toVersionId } = useMigration();
 
   const hasSelection = selectedProjectId && fromVersionId && toVersionId;
   const fromToSame = fromVersionId && toVersionId && fromVersionId === toVersionId;
+  const showCanvas = hasSelection && !fromToSame;
 
-  const showSelectState = !hasSelection || fromToSame;
+  if (showCanvas) {
+    return (
+      <div className="h-full flex flex-col min-h-0">
+        <MigrationCanvas />
+      </div>
+    );
+  }
+
   const title = !hasSelection
     ? 'No Project Selected'
     : fromToSame

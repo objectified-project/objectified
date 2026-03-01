@@ -2,6 +2,13 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
+export interface MigrationTableRow {
+  class_schema_id: string;
+  class_id: string;
+  class_name: string;
+  schema: Record<string, unknown>;
+}
+
 export interface MigrationContextType {
   selectedProjectId: string | null;
   setSelectedProjectId: (id: string | null) => void;
@@ -9,6 +16,12 @@ export interface MigrationContextType {
   setFromVersionId: (id: string | null) => void;
   toVersionId: string | null;
   setToVersionId: (id: string | null) => void;
+  selectedClassName: string | null;
+  setSelectedClassName: (name: string | null) => void;
+  fromTables: MigrationTableRow[];
+  toTables: MigrationTableRow[];
+  setFromTables: (tables: MigrationTableRow[]) => void;
+  setToTables: (tables: MigrationTableRow[]) => void;
 }
 
 const MigrationContext = createContext<MigrationContextType | undefined>(undefined);
@@ -17,6 +30,9 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [fromVersionId, setFromVersionId] = useState<string | null>(null);
   const [toVersionId, setToVersionId] = useState<string | null>(null);
+  const [selectedClassName, setSelectedClassName] = useState<string | null>(null);
+  const [fromTables, setFromTables] = useState<MigrationTableRow[]>([]);
+  const [toTables, setToTables] = useState<MigrationTableRow[]>([]);
 
   return (
     <MigrationContext.Provider
@@ -27,6 +43,12 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
         setFromVersionId,
         toVersionId,
         setToVersionId,
+        selectedClassName,
+        setSelectedClassName,
+        fromTables,
+        toTables,
+        setFromTables,
+        setToTables,
       }}
     >
       {children}
