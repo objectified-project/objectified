@@ -1,12 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { useMigration } from './MigrationContext';
-import { GitCompare, Info } from 'lucide-react';
+import { GitCompare, Info, Palette, ClipboardList, CalendarClock } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/Tabs';
 import MigrationCanvas from './components/MigrationCanvas';
 import DataInspectionView from './components/DataInspectionView';
+import MigrationPlanView from './components/MigrationPlanView';
+import MigrationSchedulerView from './components/MigrationSchedulerView';
 
 export default function MigrationPage() {
   const { selectedProjectId, fromVersionId, toVersionId } = useMigration();
+  const [activeTab, setActiveTab] = useState<'designer' | 'explorer' | 'scheduler'>('designer');
 
   const hasSelection = selectedProjectId && fromVersionId && toVersionId;
   const fromToSame = fromVersionId && toVersionId && fromVersionId === toVersionId;
@@ -14,14 +19,45 @@ export default function MigrationPage() {
 
   if (showCanvas) {
     return (
-      <div className="h-full flex flex-col min-h-0">
-        <div className="flex-1 min-h-0">
-          <MigrationCanvas />
-        </div>
-        <div className="flex-1 min-h-0">
-          <DataInspectionView />
-        </div>
-      </div>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'designer' | 'explorer' | 'scheduler')} className="h-full flex flex-col min-h-0">
+        <TabsList className="w-full justify-start rounded-none border-b border-gray-200 dark:border-gray-700 bg-transparent p-0 h-11 gap-0 shrink-0">
+          <TabsTrigger
+            value="designer"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5"
+          >
+            <Palette className="h-4 w-4 mr-2" />
+            Designer
+          </TabsTrigger>
+          <TabsTrigger
+            value="explorer"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5"
+          >
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Explorer
+          </TabsTrigger>
+          <TabsTrigger
+            value="scheduler"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-indigo-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2.5"
+          >
+            <CalendarClock className="h-4 w-4 mr-2" />
+            Scheduler
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="designer" className="flex-1 flex flex-col min-h-0 mt-0 data-[state=inactive]:hidden">
+          <div className="flex-1 min-h-0">
+            <MigrationCanvas />
+          </div>
+          <div className="flex-1 min-h-0">
+            <DataInspectionView />
+          </div>
+        </TabsContent>
+        <TabsContent value="explorer" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden overflow-auto">
+          <MigrationPlanView />
+        </TabsContent>
+        <TabsContent value="scheduler" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden overflow-auto">
+          <MigrationSchedulerView />
+        </TabsContent>
+      </Tabs>
     );
   }
 
