@@ -202,7 +202,7 @@ function MigrationCanvasInner() {
             ruleKey: passthroughKey,
             isConnector: false,
             onAddRule: () => {
-              openRuleDialogRef.current(passthroughKey, fromProp.name, fromProp.name);
+              openRuleDialogRef.current?.(passthroughKey, fromProp.name, fromProp.name);
             },
           },
         });
