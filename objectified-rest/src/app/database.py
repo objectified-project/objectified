@@ -2762,6 +2762,149 @@ class Database:
             'properties': inline_properties
         }
 
+    def get_migration_plan_rules(
+        self,
+        project_id: str,
+        from_version_id: str,
+        to_version_id: str,
+        class_name: str,
+        tenant_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get migration plan rules for a (project, from_version, to_version, class_name).
+        Only returns rules for plans whose project belongs to the tenant.
+        Returns dict keyed by 'migration-edge-prop-{source_property}' with rule payloads.
+        """
+        query = """
+            SELECT mpr.source_property, mpr.rule
+            FROM odb.migration_plan_rules mpr
+            JOIN odb.migration_plans mp ON mp.id = mpr.migration_plan_id
+            JOIN odb.projects p ON p.id = mp.project_id AND p.tenant_id = %s AND p.deleted_at IS NULL
+            WHERE mp.project_id = %s AND mp.from_version_id = %s AND mp.to_version_id = %s AND mpr.class_name = %s
+        """
+        rows = self.execute_query(
+            query,
+            (tenant_id, project_id, from_version_id, to_version_id, class_name)
+        )
+        rules = {}
+        prefix = "migration-edge-prop-"
+        for row in rows:
+            source_property = row.get("source_property")
+            rule = row.get("rule")
+            if not source_property or not isinstance(rule, dict):
+                continue
+            if not (isinstance(rule.get("inputProperties"), list) and isinstance(rule.get("outputProperties"), list)):
+                continue
+            key = prefix + source_property
+            rules[key] = {
+                "name": rule.get("name"),
+                "inputProperties": rule["inputProperties"],
+                "ruleType": rule.get("ruleType", "simple"),
+                "ruleContent": rule.get("ruleContent", ""),
+                "outputProperties": rule["outputProperties"],
+            }
+        return rules
+
+    def get_migration_plan_rule_counts(
+        self,
+        project_id: str,
+        from_version_id: str,
+        to_version_id: str,
+        tenant_id: str
+    ) -> Dict[str, int]:
+        """
+        Get rule counts per class_name for a migration plan.
+        Only includes plans whose project belongs to the tenant.
+        Returns dict class_name -> count (classes with no rules are not in the dict; treat as 0).
+        """
+        query = """
+            SELECT mpr.class_name, COUNT(*) AS cnt
+            FROM odb.migration_plan_rules mpr
+            JOIN odb.migration_plans mp ON mp.id = mpr.migration_plan_id
+            JOIN odb.projects p ON p.id = mp.project_id AND p.tenant_id = %s AND p.deleted_at IS NULL
+            WHERE mp.project_id = %s AND mp.from_version_id = %s AND mp.to_version_id = %s
+            GROUP BY mpr.class_name
+        """
+        rows = self.execute_query(
+            query,
+            (tenant_id, project_id, from_version_id, to_version_id)
+        )
+        return {row["class_name"]: int(row["cnt"]) for row in rows}
+
+    def save_migration_plan_rules(
+        self,
+        project_id: str,
+        from_version_id: str,
+        to_version_id: str,
+        class_name: str,
+        rules: Dict[str, Any],
+        tenant_id: str
+    ) -> Optional[str]:
+        """
+        Save migration plan rules for a (project, from_version, to_version, class_name).
+        Replaces all rules for that class in the plan. Ensures project belongs to tenant.
+        Returns None on success, or error message string on failure.
+        """
+        conn = self.connect()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT 1 FROM odb.projects WHERE id = %s AND tenant_id = %s AND deleted_at IS NULL",
+                    (project_id, tenant_id)
+                )
+                if cursor.fetchone() is None:
+                    return "Project not found or access denied"
+
+                cursor.execute(
+                    """SELECT id FROM odb.migration_plans
+                       WHERE project_id = %s AND from_version_id = %s AND to_version_id = %s""",
+                    (project_id, from_version_id, to_version_id)
+                )
+                row = cursor.fetchone()
+                if row:
+                    plan_id = row["id"]
+                    cursor.execute(
+                        "UPDATE odb.migration_plans SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (plan_id,)
+                    )
+                else:
+                    cursor.execute(
+                        """INSERT INTO odb.migration_plans (project_id, from_version_id, to_version_id)
+                           VALUES (%s, %s, %s) RETURNING id""",
+                        (project_id, from_version_id, to_version_id)
+                    )
+                    plan_id = cursor.fetchone()["id"]
+
+                cursor.execute(
+                    "DELETE FROM odb.migration_plan_rules WHERE migration_plan_id = %s AND class_name = %s",
+                    (plan_id, class_name)
+                )
+
+                prefix = "migration-edge-prop-"
+                for edge_key, rule in (rules or {}).items():
+                    if not edge_key.startswith(prefix):
+                        continue
+                    source_property = edge_key[len(prefix):]
+                    if not source_property:
+                        continue
+                    rule_json = json.dumps({
+                        "name": rule.get("name"),
+                        "inputProperties": rule.get("inputProperties", []),
+                        "ruleType": rule.get("ruleType", "simple"),
+                        "ruleContent": rule.get("ruleContent", ""),
+                        "outputProperties": rule.get("outputProperties", []),
+                    })
+                    cursor.execute(
+                        """INSERT INTO odb.migration_plan_rules (migration_plan_id, class_name, source_property, rule)
+                           VALUES (%s, %s, %s, %s::jsonb)""",
+                        (plan_id, class_name, source_property, rule_json)
+                    )
+                conn.commit()
+                return None
+        except Exception as e:
+            conn.rollback()
+            return str(e)
+
 
 # Global database instance
 db = Database()

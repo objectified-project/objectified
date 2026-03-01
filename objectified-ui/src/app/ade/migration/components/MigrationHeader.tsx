@@ -160,7 +160,6 @@ export default function MigrationHeader() {
           </Select.Root>
         </div>
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">from:</span>
           <Select.Root
             value={localFromVersionId}
             onValueChange={handleFromVersionChange}
@@ -202,7 +201,7 @@ export default function MigrationHeader() {
           </Select.Root>
         </div>
         <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 1001 }}>
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">to:</span>
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0" aria-hidden>→</span>
           <Select.Root
             value={localToVersionId}
             onValueChange={handleToVersionChange}

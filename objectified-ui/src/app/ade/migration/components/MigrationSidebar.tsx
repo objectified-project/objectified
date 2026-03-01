@@ -20,8 +20,9 @@ function schemaEquals(a: Record<string, unknown>, b: Record<string, unknown>): b
 }
 
 export default function MigrationSidebar() {
-  const { fromVersionId, toVersionId, fromTables, toTables, setFromTables, setToTables, selectedClassName, setSelectedClassName } = useMigration();
+  const { selectedProjectId, fromVersionId, toVersionId, fromTables, toTables, setFromTables, setToTables, selectedClassName, setSelectedClassName, ruleCountsVersion } = useMigration();
   const [loading, setLoading] = React.useState(false);
+  const [ruleCounts, setRuleCounts] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
     if (!fromVersionId || !toVersionId || fromVersionId === toVersionId) {
@@ -51,6 +52,32 @@ export default function MigrationSidebar() {
       });
     return () => { cancelled = true; };
   }, [fromVersionId, toVersionId, setFromTables, setToTables]);
+
+  React.useEffect(() => {
+    if (!selectedProjectId || !fromVersionId || !toVersionId || fromVersionId === toVersionId) {
+      setRuleCounts({});
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams({
+      projectId: selectedProjectId,
+      fromVersionId,
+      toVersionId,
+    });
+    fetch(`/api/migration-plans/counts?${params.toString()}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success && data.counts && typeof data.counts === 'object') {
+          setRuleCounts(data.counts as Record<string, number>);
+        } else if (!cancelled) {
+          setRuleCounts({});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRuleCounts({});
+      });
+    return () => { cancelled = true; };
+  }, [selectedProjectId, fromVersionId, toVersionId, ruleCountsVersion]);
 
   const combinedList = React.useMemo(() => {
     const byName = new Map<string, { fromSchema?: Record<string, unknown>; toSchema?: Record<string, unknown>; hasDifference: boolean }>();
@@ -98,6 +125,7 @@ export default function MigrationSidebar() {
           <ul className="space-y-1">
             {combinedList.map(({ class_name, hasDifference }) => {
               const isSelected = selectedClassName === class_name;
+              const count = ruleCounts[class_name] ?? 0;
               return (
                 <li key={class_name}>
                   <button
@@ -111,7 +139,15 @@ export default function MigrationSidebar() {
                           : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                   >
-                    <span className="font-medium truncate">{class_name}</span>
+                    <span className="font-medium truncate flex-1 min-w-0">{class_name}</span>
+                    {count > 0 && (
+                      <span
+                        className="shrink-0 ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
+                        title={`${count} rule${count === 1 ? '' : 's'} for this class`}
+                      >
+                        {count}
+                      </span>
+                    )}
                   </button>
                 </li>
               );

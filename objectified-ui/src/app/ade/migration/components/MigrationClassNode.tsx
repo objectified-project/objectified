@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 export interface MigrationClassNodeData {
   className: string;
@@ -9,7 +9,8 @@ export interface MigrationClassNodeData {
   side: 'from' | 'to';
 }
 
-function MigrationClassNode({ data }: NodeProps<MigrationClassNodeData>) {
+function MigrationClassNode(props: NodeProps) {
+  const data = props.data as unknown as MigrationClassNodeData;
   const { className, properties, side } = data;
   const isFrom = side === 'from';
 
@@ -30,19 +31,32 @@ function MigrationClassNode({ data }: NodeProps<MigrationClassNodeData>) {
       >
         {isFrom ? 'From' : 'To'}: {className}
       </div>
-      <div className="px-3 py-2 max-h-[320px] overflow-y-auto">
+      <div className="px-3 py-2 overflow-hidden">
         {properties.length === 0 ? (
           <p className="text-xs text-gray-500 dark:text-gray-400 italic">No properties</p>
         ) : (
           <ul className="space-y-2.5 text-xs text-gray-700 dark:text-gray-300">
             {properties.map((p) => (
-              <li key={p.name} className="flex items-baseline justify-between gap-3 min-h-[1.25rem]">
+              <li key={p.name} className="relative flex items-baseline justify-between gap-3 min-h-[1.25rem]">
                 <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{p.name}</span>
                 {p.type != null && p.type !== '' ? (
                   <span className="text-gray-500 dark:text-gray-400 shrink-0">{p.type}</span>
                 ) : (
                   <span className="shrink-0" />
                 )}
+                <Handle
+                  type={isFrom ? 'source' : 'target'}
+                  position={isFrom ? Position.Right : Position.Left}
+                  id={`prop-${p.name}`}
+                  className="!w-2 !h-2 !border-2 !border-white !rounded-full !min-w-0 !min-h-0"
+                  style={{
+                    background: isFrom ? 'rgb(99, 102, 241)' : 'rgb(16, 185, 129)',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    [isFrom ? 'right' : 'left']: -16,
+                  }}
+                  isConnectable={false}
+                />
               </li>
             ))}
           </ul>

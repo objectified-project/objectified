@@ -3,6 +3,7 @@
 import { useMigration } from './MigrationContext';
 import { GitCompare, Info } from 'lucide-react';
 import MigrationCanvas from './components/MigrationCanvas';
+import DataInspectionView from './components/DataInspectionView';
 
 export default function MigrationPage() {
   const { selectedProjectId, fromVersionId, toVersionId } = useMigration();
@@ -14,7 +15,12 @@ export default function MigrationPage() {
   if (showCanvas) {
     return (
       <div className="h-full flex flex-col min-h-0">
-        <MigrationCanvas />
+        <div className="flex-1 min-h-0">
+          <MigrationCanvas />
+        </div>
+        <div className="flex-1 min-h-0">
+          <DataInspectionView />
+        </div>
       </div>
     );
   }

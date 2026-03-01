@@ -626,3 +626,41 @@ export async function getRecordHistory(
   );
 }
 
+export interface MigrationRuleTemplateRow {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  rule_type: 'simple' | 'script' | 'sparkSql';
+  rule_content: string;
+  min_inputs: number;
+  min_outputs: number;
+  input_labels: string[] | null;
+  sort_order: number;
+}
+
+/**
+ * Get all migration rule templates for the migration UI (global, not tenant-scoped).
+ */
+export async function getMigrationRuleTemplates(): Promise<MigrationRuleTemplateRow[]> {
+  const result = await connectionPool.query(
+    `SELECT id, name, description, category, rule_type, rule_content, min_inputs, min_outputs, input_labels, sort_order
+     FROM odb.migration_rule_templates
+     ORDER BY sort_order ASC, name ASC`
+  );
+  return (result.rows as { id: string; name: string; description: string | null; category: string; rule_type: string; rule_content: string; min_inputs: number; min_outputs: number; input_labels: unknown; sort_order: number }[]).map(
+    (row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      rule_type: row.rule_type as 'simple' | 'script' | 'sparkSql',
+      rule_content: row.rule_content,
+      min_inputs: row.min_inputs,
+      min_outputs: row.min_outputs,
+      input_labels: Array.isArray(row.input_labels) ? (row.input_labels as string[]) : null,
+      sort_order: row.sort_order,
+    })
+  );
+}
+

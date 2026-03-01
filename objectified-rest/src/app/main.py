@@ -18,6 +18,7 @@ from .versions_routes import router as versions_router
 from .properties_routes import router as properties_router
 from .paths_routes import router as paths_router
 from .data_routes import router as data_router
+from .migration_plans_routes import router as migration_plans_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -80,6 +81,7 @@ app.include_router(projects_router)
 app.include_router(versions_router)
 app.include_router(properties_router)
 app.include_router(paths_router)
+app.include_router(migration_plans_router)
 
 
 @app.on_event("startup")
