@@ -12,9 +12,106 @@ interface EvaluateBody {
   rules: Record<string, { name?: string; inputProperties: string[]; ruleType: string; ruleContent: string; outputProperties: string[] }>;
 }
 
+type RuleEntry = { inputProperties: string[]; ruleType: string; ruleContent: string; outputProperties: string[] };
+
+/**
+ * Apply a single rule to input values (strings) and return output values.
+ * Mirrors MigrationRuleDialog tryEvaluateRule; supports 'simple' and 'script' only (no SparkSQL in Node).
+ */
+function applyRule(
+  rule: RuleEntry,
+  inputValues: Record<string, string>
+): { ok: true; outputs: unknown[] } | { ok: false; error: string } {
+  const { ruleType, ruleContent, inputProperties, outputProperties } = rule;
+  const orderedInputs = inputProperties.map((p) => inputValues[p] ?? '');
+
+  if (ruleType === 'sparkSql') {
+    return { ok: false, error: 'SparkSQL rules cannot be evaluated in this context.' };
+  }
+
+  try {
+    if (ruleType === 'simple') {
+      if (!ruleContent?.trim()) {
+        return { ok: true, outputs: outputProperties.map(() => '') };
+      }
+      const fn = new Function(...inputProperties, `return (${ruleContent});`);
+      const result = fn(...orderedInputs);
+      if (outputProperties.length === 1) {
+        const out = result === undefined ? '' : String(result);
+        return { ok: true, outputs: [out] };
+      }
+      const arr = Array.isArray(result) ? result : [result];
+      const outputs = outputProperties.map((_, i) => (arr[i] === undefined ? '' : String(arr[i])));
+      return { ok: true, outputs };
+    }
+
+    if (ruleType === 'script') {
+      if (!ruleContent?.trim()) {
+        return { ok: true, outputs: outputProperties.map(() => '') };
+      }
+      const fn = new Function(...inputProperties, ruleContent);
+      const result = fn(...orderedInputs);
+      if (outputProperties.length === 1) {
+        const out = result === undefined ? '' : String(result);
+        return { ok: true, outputs: [out] };
+      }
+      const arr = Array.isArray(result)
+        ? result
+        : result && typeof result === 'object' && outputProperties.every((p) => p in (result as object))
+          ? outputProperties.map((p) => (result as Record<string, unknown>)[p])
+          : [result];
+      const outputs = outputProperties.map((_, i) => (arr[i] === undefined ? '' : String(arr[i])));
+      return { ok: true, outputs };
+    }
+
+    return { ok: false, error: 'Unknown rule type.' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Apply all migration rules to a record. Starts from a copy of the record; each rule reads from
+ * the current state (so rules can chain) and writes to output properties.
+ */
+function applyRulesToRecord(
+  recordData: Record<string, unknown>,
+  rules: Record<string, RuleEntry>
+): { transformedData: Record<string, unknown>; rulesAppliedCount: number; error?: string } {
+  const transformedData = JSON.parse(JSON.stringify(recordData)) as Record<string, unknown>;
+  let rulesAppliedCount = 0;
+
+  const toStr = (v: unknown): string => (v === undefined || v === null ? '' : String(v));
+
+  for (const rule of Object.values(rules)) {
+    if (!rule || typeof rule !== 'object' || !rule.inputProperties || !rule.outputProperties) continue;
+    const hasContent = typeof rule.ruleContent === 'string' && rule.ruleContent.trim().length > 0;
+    const inputValues: Record<string, string> = {};
+    for (const p of rule.inputProperties) {
+      inputValues[p] = toStr(transformedData[p]);
+    }
+    if (hasContent) {
+      const result = applyRule(rule, inputValues);
+      if (!result.ok) {
+        return { transformedData, rulesAppliedCount, error: result.error };
+      }
+      result.outputs.forEach((val, i) => {
+        const key = rule.outputProperties[i];
+        if (key !== undefined) {
+          transformedData[key] = val;
+        }
+      });
+      rulesAppliedCount += 1;
+    }
+  }
+
+  return { transformedData, rulesAppliedCount };
+}
+
 /**
  * Apply migration rules to a record and return transformed data.
- * For now performs passthrough (returns copy of input); rule execution can be wired to backend later.
+ * Uses backend evaluate endpoint when available; otherwise applies rules in this route.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -63,18 +160,25 @@ export async function POST(request: NextRequest) {
     }).catch(() => null);
 
     let transformedData: Record<string, unknown>;
+    let rulesAppliedCountOut = rulesAppliedCount;
+    let applyError: string | undefined;
+
     if (res?.ok) {
       const data = await res.json().catch(() => ({}));
       transformedData = data.transformed_data ?? data.transformedData ?? recordData;
+      if (typeof data.rules_applied_count === 'number') rulesAppliedCountOut = data.rules_applied_count;
     } else {
-      // Passthrough: deep copy so UI can show before/after (identical until backend implements execution)
-      transformedData = JSON.parse(JSON.stringify(recordData));
+      const applied = applyRulesToRecord(recordData, rules);
+      transformedData = applied.transformedData;
+      rulesAppliedCountOut = applied.rulesAppliedCount;
+      applyError = applied.error;
     }
 
     return NextResponse.json({
-      success: true,
+      success: applyError ? false : true,
+      ...(applyError && { error: applyError }),
       transformedData,
-      rulesAppliedCount,
+      rulesAppliedCount: rulesAppliedCountOut,
     });
   } catch (error) {
     console.error('Error evaluating migration rules:', error);

@@ -36,7 +36,7 @@ function formatDateTime(iso: string | undefined): string {
 }
 
 export default function DataInspectionView() {
-  const { selectedClassName, fromTables } = useMigration();
+  const { selectedClassName, fromTables, migrationRules } = useMigration();
   const [rows, setRows] = React.useState<SnapshotRow[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(1);
@@ -44,8 +44,11 @@ export default function DataInspectionView() {
   const [searchQ, setSearchQ] = React.useState('');
   const [viewMode, setViewMode] = React.useState<'none' | 'viewAll' | 'search'>('none');
   const [selectedRecord, setSelectedRecord] = React.useState<SnapshotRow | null>(null);
-  /** Only show "after rules applied" content when user has clicked Evaluate for this record. */
+  /** When user has clicked Evaluate for a record: that record id and the transformed result. */
   const [evaluatedRecordId, setEvaluatedRecordId] = React.useState<string | null>(null);
+  const [evaluatedData, setEvaluatedData] = React.useState<Record<string, unknown> | null>(null);
+  const [evaluateLoading, setEvaluateLoading] = React.useState(false);
+  const [evaluateError, setEvaluateError] = React.useState<string | null>(null);
 
   const fromRow = selectedClassName
     ? fromTables.find((r) => r.class_name === selectedClassName)
@@ -80,6 +83,39 @@ export default function DataInspectionView() {
     [classSchemaId]
   );
 
+  const runEvaluate = React.useCallback(
+    (record: SnapshotRow) => {
+      if (!migrationRules || Object.keys(migrationRules).length === 0) {
+        setEvaluateError('No migration rules defined. Add rules in the migration plan.');
+        return;
+      }
+      setEvaluateLoading(true);
+      setEvaluateError(null);
+      fetch('/api/migration-plans/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordData: record.data, rules: migrationRules }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && data.transformedData !== undefined) {
+            setEvaluatedRecordId(record.record_id);
+            setEvaluatedData(data.transformedData as Record<string, unknown>);
+            setEvaluateError(null);
+          } else {
+            setEvaluateError(data.error ?? 'Evaluate failed');
+            setEvaluatedData(null);
+          }
+        })
+        .catch(() => {
+          setEvaluateError('Request failed');
+          setEvaluatedData(null);
+        })
+        .finally(() => setEvaluateLoading(false));
+    },
+    [migrationRules]
+  );
+
   React.useEffect(() => {
     if (!classSchemaId) {
       setRows([]);
@@ -88,11 +124,15 @@ export default function DataInspectionView() {
       setViewMode('none');
       setSelectedRecord(null);
       setEvaluatedRecordId(null);
+      setEvaluatedData(null);
+      setEvaluateError(null);
       return;
     }
     setViewMode('viewAll');
     setSelectedRecord(null);
     setEvaluatedRecordId(null);
+    setEvaluatedData(null);
+    setEvaluateError(null);
     runQuery(1, undefined);
   }, [classSchemaId]); // eslint-disable-line react-hooks/exhaustive-deps -- only reset when class changes
 
@@ -190,6 +230,8 @@ export default function DataInspectionView() {
                         onClick={() => {
                           setSelectedRecord(row);
                           setEvaluatedRecordId(null);
+                          setEvaluatedData(null);
+                          setEvaluateError(null);
                         }}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors border ${
                           isSelected
@@ -242,7 +284,7 @@ export default function DataInspectionView() {
         <div className="flex-1 min-w-0 flex overflow-hidden">
           {/* Before: source data (Monaco JSON) */}
           <div className="flex-1 min-w-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
+            <div className="h-11 flex items-center gap-2 px-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
               <FileJson className="w-4 h-4 text-gray-500 dark:text-gray-400" />
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Before
@@ -273,7 +315,7 @@ export default function DataInspectionView() {
           </div>
           {/* After: transformed (Monaco JSON) — only show content when Evaluate was clicked for this record */}
           <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-gray-900">
-            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
+            <div className="h-11 flex items-center justify-between gap-2 px-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <FileJson className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
@@ -282,15 +324,20 @@ export default function DataInspectionView() {
               </div>
               <button
                 type="button"
-                onClick={() => selectedRecord && setEvaluatedRecordId(selectedRecord.record_id)}
-                disabled={!selectedRecord}
+                onClick={() => selectedRecord && runEvaluate(selectedRecord)}
+                disabled={!selectedRecord || evaluateLoading}
                 className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 disabled:opacity-50 disabled:pointer-events-none text-sm font-medium"
               >
                 <Play className="w-4 h-4" />
-                Evaluate
+                {evaluateLoading ? 'Evaluating…' : 'Evaluate'}
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+              {evaluateError && (
+                <div className="shrink-0 px-3 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+                  {evaluateError}
+                </div>
+              )}
               {!selectedRecord ? (
                 <div className="h-full flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-gray-500 p-4">
                   <FileJson className="w-10 h-10" />
@@ -298,12 +345,16 @@ export default function DataInspectionView() {
                     Select a record to see the transformed object (after rules are applied).
                   </p>
                 </div>
-              ) : evaluatedRecordId === selectedRecord.record_id ? (
+              ) : evaluateLoading ? (
+                <div className="h-full flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-gray-500 p-4">
+                  <p className="text-sm">Applying rules…</p>
+                </div>
+              ) : evaluatedRecordId === selectedRecord.record_id && evaluatedData !== null ? (
                 <MonacoEditor
                   height="100%"
                   language="json"
                   theme="vs-dark"
-                  value={JSON.stringify(selectedRecord.data, null, 2)}
+                  value={JSON.stringify(evaluatedData, null, 2)}
                   options={{
                     readOnly: true,
                     minimap: { enabled: false },
