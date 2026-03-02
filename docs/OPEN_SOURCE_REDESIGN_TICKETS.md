@@ -140,7 +140,11 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #6     | UI: Remove all lib/db/helper usage; replace with REST client; fix tests and build. |
+| #42    | Add UI-Only REST services for Auditing |
+| #43    | Add REST service usage to UI |
+| #44    | Replace all calls in Dashboard with REST services calls |
+| #45    | Replace Next.JS API routes with REST service calls |
+| #46    | Clean up Canvas/Dashboard call conversions |
 
 ---
 
@@ -158,7 +162,9 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #7     | UI: Dashboard layout, side nav, theme (light/dark), routing. |
+| #47    | Create main layout and content area for UI Dashboard |
+| #48    | Establish theme provider and system preferences |
+| #49    | Establish correct routes for dashboard |
 
 ---
 
@@ -174,7 +180,11 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #8     | UI: Dashboard – Users list, Tenants list/create/edit, members, tenant-admins; REST only; permission guards. |
+| #50    | Create Users page in Dashboard |
+| #51    | Create Tenants page in Dashboard |
+| #52    | Create User-Tenant page in Dashboard |
+| #53    | Create Tenant Administrators page in Dashboard |
+| #54    | Handle Permissions to show/hide sections by role |
 
 ---
 
@@ -190,7 +200,12 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #9     | UI: Dashboard – Projects and versions list, create/edit/delete, publish, published list; REST only. |
+| #55    | Create Projects page in Dashboard |
+| #56    | Create import for versions in dashboard |
+| #57    | Create Versions page in Dashboard |
+| #58    | Create Publish page in Dashboard |
+| #59    | Create Published page in Dashboard |
+| #60    | Create additional support pages in Dashboard |
 
 ---
 
@@ -209,7 +224,11 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #10    | UI: Local version state (classes, properties, canvas_metadata, groups); load from REST; undo/redo in-memory; optional localStorage backup. |
+| #61    | Create local in-browser version and undo stack in UI |
+| #62    | Create Load functionality in browser application |
+| #63    | Create canvas mutations functionality |
+| #64    | Add undo stack to the UI |
+| #65    | Add localStorage backup |
 
 ---
 
@@ -225,7 +244,11 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #11    | UI: Commit, Push, Pull, Merge in toolbar; conflict list and resolution; dirty/unpushed indicators. |
+| #66    | Add Toolbar for Version-based actions |
+| #67    | Add Toolbar for commit |
+| #68    | Add Toolbar for Push functionality |
+| #69    | Add Toolbar for Pull functionality |
+| #70    | Add Merge UI for merging versions |
 
 ---
 
@@ -240,7 +263,11 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #12    | UI: Version history list; load revision; rollback; branch from revision; remove version. |
+| #71    | Add version history to UI |
+| #72    | Add load revision to UI version history |
+| #73    | Add rollback to UI version history |
+| #74    | Add branching to UI version history |
+| #75    | Add history removal to UI version history |
 
 ---
 
@@ -257,7 +284,9 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13a   | UI: Project/version selector; React Flow canvas shell; read-only when published. |
+| #76    | Add project/version selector in UI Canvas |
+| #77    | Configure react-flow canvas properly |
+| #78    | Add read-only behavior to the UI canvas |
 
 ---
 
@@ -271,7 +300,10 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13b   | UI: Class nodes (position, theme, expand); edges by ref type; drag/resize/selection. |
+| #79    | Class node design for the react-flow canvas |
+| #80    | Class-node properties and themes |
+| #81    | Class node edge design and behavior in the canvas |
+| #82    | Add interactivity to nodes in the react-flow canvas |
 
 ---
 
@@ -283,7 +315,8 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13c   | UI: Group nodes – create, add/remove nodes, rename/color/style; delete group or delete all classes in group. |
+| #83    | Add ability to create groups in the react-flow canvas |
+| #84    | Deletion of groups in the UI |
 
 ---
 
