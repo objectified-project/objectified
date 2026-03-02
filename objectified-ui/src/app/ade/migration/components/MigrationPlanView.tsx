@@ -235,13 +235,16 @@ export default function MigrationPlanView() {
     return props && typeof props === 'object' ? Object.keys(props).length : 0;
   }, [fromRow]);
 
-  const planConfidencePercent = getPlanConfidencePercent(rulesAppliedCount, totalProperties);
-  const recordConfidencePercent = React.useMemo(() => {
+  /** Before: source record vs source (from) schema. */
+  const beforeConfidencePercent = React.useMemo(() => {
+    if (!selectedRecord?.data || !fromRow?.schema) return null;
+    return getRecordConfidencePercent(selectedRecord.data, fromRow.schema);
+  }, [selectedRecord?.data, fromRow?.schema]);
+  /** After: transformed record vs target (to) schema; null until rules are applied. */
+  const afterConfidencePercent = React.useMemo(() => {
     if (!transformResult?.data || !toRow?.schema) return null;
     return getRecordConfidencePercent(transformResult.data, toRow.schema);
   }, [transformResult?.data, toRow?.schema]);
-  const confidencePercent = recordConfidencePercent ?? planConfidencePercent;
-  const confidenceLabel = recordConfidencePercent != null ? 'Data quality confidence (this record)' : 'Data quality confidence (plan)';
 
   if (!selectedClassName) {
     return (
@@ -268,49 +271,78 @@ export default function MigrationPlanView() {
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
-      {/* Top 30%: Stats only */}
+      {/* Top 30%: Stats when a record is selected, otherwise placeholder */}
       <div className="flex-[0_0_30%] min-h-0 flex flex-col overflow-hidden border-b border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-2 gap-4 px-6 py-4 bg-gray-50/50 dark:bg-gray-800/50">
-        <div className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
-          <div className="p-2 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Rules applied</p>
-            <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{rulesAppliedCount}</p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div
-              className={`p-2 rounded-md shrink-0 ${
-                confidencePercent >= 70
-                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                  : confidencePercent >= 40
-                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}
-            >
-              <ShieldCheck className="h-5 w-5" />
+        <div className="px-6 py-4 bg-gray-50/50 dark:bg-gray-800/50 h-full flex items-center justify-center">
+          {!selectedRecord ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+              Select a record to evaluate the currently defined ruleset.
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 w-full max-w-4xl">
+              <div className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+                <div className="p-2 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Rules applied</p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{rulesAppliedCount}</p>
+                </div>
+              </div>
+              {[
+                { label: 'Before', percent: beforeConfidencePercent },
+                { label: 'After', percent: afterConfidencePercent },
+              ].map(({ label, percent }) => {
+                const pct = percent ?? 0;
+                const colorClass =
+                  percent == null
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                    : pct >= 70
+                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                      : pct >= 40
+                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400';
+                const barClass =
+                  percent == null
+                    ? 'bg-gray-300 dark:bg-gray-600'
+                    : pct >= 70
+                      ? 'bg-emerald-500 dark:bg-emerald-500'
+                      : pct >= 40
+                        ? 'bg-amber-500 dark:bg-amber-500'
+                        : 'bg-gray-500 dark:bg-gray-500';
+                return (
+                  <div key={label} className="flex flex-col gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-md shrink-0 ${colorClass}`}>
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          Data quality ({label})
+                        </p>
+                        <p className="text-xl font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                          {percent != null ? `${percent}%` : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div
+                      className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={percent ?? 0}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`Data quality confidence ${label.toLowerCase()}`}
+                    >
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ease-out ${barClass}`}
+                        style={{ width: percent != null ? `${percent}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{confidenceLabel}</p>
-              <p className="text-xl font-semibold text-gray-900 dark:text-gray-100 tabular-nums">{confidencePercent}%</p>
-            </div>
-          </div>
-          <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden" role="progressbar" aria-valuenow={confidencePercent} aria-valuemin={1} aria-valuemax={100} aria-label="Data quality confidence">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ease-out ${
-                confidencePercent >= 70
-                  ? 'bg-emerald-500 dark:bg-emerald-500'
-                  : confidencePercent >= 40
-                    ? 'bg-amber-500 dark:bg-amber-500'
-                    : 'bg-gray-500 dark:bg-gray-500'
-              }`}
-              style={{ width: `${confidencePercent}%` }}
-            />
-          </div>
-        </div>
+          )}
         </div>
       </div>
 
