@@ -22,7 +22,7 @@
 
 > **Section Status**: Implement in objectified-rest (or equivalent OSS service). No UI in these tickets.
 
-### Users, Tenants, and Auth (Ticket 1)
+### Users, Tenants, and Auth
 
 **Core data model & authentication**
 - Implement REST routes for **users**: list (admin), get by id, create (signup), update, deactivate (no hard delete if audit needed).
@@ -30,7 +30,7 @@
 - Implement **user–tenant**: list members for a tenant, add member (by user id or email), remove member, optional role field.
 - Implement **tenant administrators**: list, add, remove; only admins can manage tenant and members.
 - **Auth**: Login (issue JWT); API key create/revoke per tenant; middleware that attaches `user_id` and `tenant_id` (when applicable) to requests. Support JWT in `Authorization: Bearer` and API key in `X-API-Key`.
-- **DB**: Tables/schema for users, tenants, user_tenants, tenant_administrators; migrations as needed.
+- [DONE] **DB**: Tables/schema for users, tenants, user_tenants, tenant_administrators; migrations as needed.
 - **Reference**: Extend `objectified-rest/src/app/auth.py` and add routes under `/v1/users`, `/v1/tenants`, `/v1/tenants/{id}/members`, `/v1/tenants/{id}/administrators`. Document in OpenAPI.
 
 | Ticket | Feature Description |
@@ -39,22 +39,29 @@
 | #15    | Create user services |
 | #16    | Create tenant services |
 | #17    | Create user-tenant services |
+| #18    | Create tenant administration services |
+| #19    | Create authentication services |
+| #20    | Create routes and document in OpenAPI Specification file |
 
 ---
 
-### Projects & Versions with History (Ticket 2)
+### Projects & Versions with History
 
 **Projects and versioned schema with historical storage**
 - **Projects**: Create, list by tenant, get, update, delete; tenant-scoped; creator tracking; slug/name uniqueness per tenant.
 - **Versions**: Create (optional `source_version_id` for branch), list by project, get by id, update metadata (description, changelog), delete. Project-scoped.
 - **Version history**: Store each committed version state (e.g. `version_snapshots` or `version_commits` table) with reference to classes/properties at that point. Support “list revisions for version” and “get version at revision”.
 - **Publish**: Publish/unpublish/freeze-schema endpoints; only published versions visible for pull by others (define policy).
-- **DB**: projects table; versions table; version_history or version_snapshots table for rollback and branch.
+- [DONE] **DB**: projects table; versions table; version_history or version_snapshots table for rollback and branch.
 - **Reference**: `objectified-rest/src/app/projects_routes.py`, `versions_routes.py`; add history tables and `/v1/versions/{id}/history`, get-by-revision.
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #2     | REST API: Projects CRUD; versions CRUD with historical storage; publish/unpublish/freeze-schema. |
+| #22    | Create projects services |
+| #23    | Create versions services |
+| #24    | Create version history services |
+| #25    | Create publish services |
+| #26    | Modify REST services endpoints to match names |
 
 ---
 
@@ -65,12 +72,16 @@
 - **Bulk**: Endpoint to get all classes for a version with properties (and tags if kept) in one response for canvas load.
 - **Properties**: Create, list by project, get, update, delete; `data` JSON holds schema (OpenAPI/JSON Schema). Project-scoped (reusable library).
 - **Class-property**: Add property to class, reorder, update overrides (e.g. required, description), remove; support `parent_id` for nested properties. Endpoints: add to class, update join row, remove from class, list by class.
-- **DB**: classes, properties, class_properties tables; indexes for version_id, project_id, class_id.
+- [DONE] **DB**: classes, properties, class_properties tables; indexes for version_id, project_id, class_id.
 - **Reference**: `objectified-rest/src/app/classes_routes.py`, `properties_routes.py`, `get_classes_with_properties_and_tags_for_version` in database layer.
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #3     | REST API: Classes and properties CRUD; class-property join; bulk “classes for version with properties”. |
+| #27    | Create class services |
+| #28    | Create bulk services |
+| #29    | Create property services |
+| #30    | Create class property services |
+| #31    | Modify REST services endpoints to match names |
 
 ---
 
@@ -85,7 +96,10 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #4     | REST API: Validate class/property schema (OpenAPI 3.2.0 + JSON Schema 2020-12); export and import. |
+| #32    | Create validation endpoint |
+| #33    | Create export endpoints |
+| #34    | Create import endpoints |
+| #35    | Modify REST services endpoints to match names |
 
 ---
 
@@ -101,7 +115,12 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #5     | REST API: Version commit, push, pull, merge and conflict detection. |
+| #40    | Review DB for version history functionality |
+| #36    | Create version commit endpoints |
+| #37    | Create version push endpoints |
+| #38    | Create version pull endpoints |
+| #39    | Create version merge endpoints |
+| #41    | Modify REST services endpoints to match names |
 
 ---
 
