@@ -329,7 +329,9 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13d   | UI: Canvas search (query, regex, filters); search history; focus mode (selection+neighbors, focus on group). |
+| #85    | Add search functionality to the canvas |
+| #86    | Add search history to the canvas search functionality |
+| #87    | Implement Focus Mode into the Canvas |
 
 ---
 
@@ -343,7 +345,10 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13e   | UI: Save/load default layout; auto-layout with preview; dependency overlay; optional schema metrics panel. |
+| #88    | Implement Layout functions to the Canvas |
+| #89    | Add layout hinting to the canvas |
+| #90    | Add dependency overlay to the Canvas |
+| #91    | Add schema metrics panel to the canvas |
 
 ---
 
@@ -356,7 +361,9 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13f   | UI: Export (formats + Export Wizard); canvas settings (grid, background, edges, search history). |
+| #92    | Add export dialog with export functions for the Canvas |
+| #93    | Create an export wizard in the export form |
+| #94    | Add canvas settings form |
 
 ---
 
@@ -372,7 +379,12 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #13g   | UI: Add/delete/copy/paste/duplicate class; create reference; sidebar (Classes, Properties, Groups); tag manager. |
+| #95    | Add the ability to create a new class from the sidebar |
+| #96    | Add ability to delete classes from the canvas |
+| #97    | Add copy/paste/duplicate for classes in the canvas |
+| #98    | Add the ability to create a reference in a class node |
+| #99    | Add sidebar updates for the Classes in the Canvas |
+| #100   | Create a tag manager that can be used in the canvas |
 
 ---
 
@@ -389,7 +401,9 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #14a   | UI: Class edit dialog – name, description, schema extensions, tags. |
+| #101   | Add Class Edit dialog, reuses the Add Edit dialog |
+| #102   | Class edit dialog needs to handle schema extensions |
+| #103   | Class node tag behavior |
 
 ---
 
@@ -405,7 +419,12 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #14b   | UI: Property dialog – name, type, $ref; string/number/array/object constraints per OpenAPI 3.2.0 / JSON Schema 2020-12. |
+| #104   | Add create property form that can be reused for editing |
+| #105   | Add $ref selector to the property dialog |
+| #106   | Add string constraints to the property form |
+| #107   | Add number/integer constraints to the property form |
+| #108   | Add array constraints to the property form |
+| #109   | Add object constraints to the property form
 
 ---
 
@@ -420,40 +439,11 @@
 
 | Ticket | Feature Description |
 |--------|---------------------|
-| #14c   | UI: Property metadata, conditionals, extensions; class-property overrides; validation (client + REST). |
-
----
-
-## UI: Paths Canvas (Optional)
-
-> **Section Status**: In scope for OSS or document as future work.
-
-### Paths Canvas (Ticket 15)
-
-**API paths canvas or future work**
-- **If in scope**: Paths list; path nodes; operation nodes (GET/POST/etc.); parameter and request/response body nodes; link to schema (class). Load/save via REST or local state. Reference: PathsCanvasView.tsx, PathsSidebar, PathParameterNode, PathRequestBodyNode, PathResponseNode.
-- **Panels**: Operation/parameter/response property panels; schema builder for request/response. Reference: OperationPropertiesPanel, ParameterPropertiesPanel, ResponsePropertiesPanel, SchemaBuilder. Servers panel; security schemes panel if in scope. Reference: ServersPanel, SecuritySchemesPanel.
-- **If out of scope**: Document Paths canvas as future work; exclude from OSS build.
-
-| Ticket | Feature Description |
-|--------|---------------------|
-| #15    | UI: Paths canvas (paths, operations, params, request/response, panels) – or document as future work. |
-
----
-
-## Docs & Community
-
-### Documentation and Release (Ticket 16)
-
-**README, CONTRIBUTING, API docs, release**
-- **README**: Project overview; how to run UI and REST service; env vars; link to API docs and schema coverage.
-- **CONTRIBUTING**: Dev setup; code style; how to run tests; PR process; architecture summary (REST-only UI, local-first versions).
-- **API docs**: OpenAPI 3.2.0 export of objectified-rest; Redoc or Swagger UI; document commit/push/pull/merge and conflict format.
-- **Changelog and release**: Versioning (e.g. semver); changelog; statement of stable surface (REST API, dashboard, canvas).
-
-| Ticket | Feature Description |
-|--------|---------------------|
-| #16    | Docs: README, CONTRIBUTING, API docs, changelog and release process. |
+| #110   | Add Metadata to property form |
+| #111   | Add Conditional schema settings to the property form |
+| #112   | Add extensions to the property form |
+| #113   | Add additional class-property editing features |
+| #114   | Add validation to client-side for properties |
 
 ---
 
@@ -479,7 +469,7 @@
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: February 28, 2026  
+**Document Version**: 1.1
+**Last Updated**: March 02, 2026  
 **Next Review**: Before OSS release  
 **Purpose**: Single-step tasks with enough detail to drive an LLM/Agent to implement each feature.
