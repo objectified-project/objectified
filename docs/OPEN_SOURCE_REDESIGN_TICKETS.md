@@ -80,16 +80,16 @@
 | #24    | Create version history services |
 | #25    | Create publish services |
 | #26    | Modify REST services endpoints to match names |
-|        | Add project soft delete/archive and restore with status (active, archived, locked) |
-|        | Add project metadata (owner, team, tags/labels) and optional project templates or blueprints |
-|        | Add per-tenant or per-project quotas (max versions, max classes) with enforcement and visibility |
-|        | Add version locking (freeze edits) with optional unlock by role |
-|        | Add version tags/labels and promotion workflow (e.g. staging, production) |
-|        | Add version comparison/diff endpoint (structural delta between two versions or revisions) |
-|        | Add revision metadata (author, commit message, optional CI/ticket id) and immutable append-only option |
-|        | Add history retention policy and export for compliance or backup |
-|        | Add publish channels/targets (e.g. dev, staging, production) and list-by-target |
-|        | Add publish artifact integrity (checksum/signed manifest) and webhook or event on publish |
+| #147   | Add project soft delete/archive and restore with status (active, archived, locked) |
+| #148   | Add project metadata (owner, team, tags/labels) and optional project templates or blueprints |
+| #149   | Add per-tenant or per-project quotas (max versions, max classes) with enforcement and visibility |
+| #150   | Add version locking (freeze edits) with optional unlock by role |
+| #151   | Add version tags/labels and promotion workflow (e.g. staging, production) |
+| #152   | Add version comparison/diff endpoint (structural delta between two versions or revisions) |
+| #153   | Add revision metadata (author, commit message, optional CI/ticket id) and immutable append-only option |
+| #154   | Add history retention policy and export for compliance or backup |
+| #155   | Add publish channels/targets (e.g. dev, staging, production) and list-by-target |
+| #156   | Add publish artifact integrity (checksum/signed manifest) and webhook or event on publish |
 
 ---
 
@@ -128,15 +128,15 @@
 | #29    | Create property services |
 | #30    | Create class property services |
 | #31    | Modify REST services endpoints to match names |
-|        | Add class soft delete/archive and restore with optional status (active, deprecated, archived) |
-|        | Add extended class metadata (owner, domain, lifecycle, tags) and optional base-class/inheritance metadata |
-|        | Add bulk class operations (copy/clone within or across versions, move, bulk canvas_metadata update) |
-|        | Add bulk read options (pagination/cursor, sparse fieldsets, filter by group/tag) and ETag/version hash |
-|        | Add shared property library at tenant/org level and list property usages across classes/versions |
-|        | Add property deprecation (mark, message, sunset date) and list deprecated properties |
-|        | Add property search (by name, type, tag) and list orphan properties |
-|        | Add class-property override audit/history and validation of overrides against property schema |
-|        | Add bulk class-property operations (bulk add/remove/reorder/update overrides) |
+| #157   | Add class soft delete/archive and restore with optional status (active, deprecated, archived) |
+| #158   | Add extended class metadata (owner, domain, lifecycle, tags) and optional base-class/inheritance metadata |
+| #159   | Add bulk class operations (copy/clone within or across versions, move, bulk canvas_metadata update) |
+| #160   | Add bulk read options (pagination/cursor, sparse fieldsets, filter by group/tag) and ETag/version hash |
+| #161   | Add shared property library at tenant/org level and list property usages across classes/versions |
+| #162   | Add property deprecation (mark, message, sunset date) and list deprecated properties |
+| #163   | Add property search (by name, type, tag) and list orphan properties |
+| #164   | Add class-property override audit/history and validation of overrides against property schema |
+| #165   | Add bulk class-property operations (bulk add/remove/reorder/update overrides) |
 
 ---
 
@@ -171,15 +171,15 @@
 | #33    | Create export endpoints |
 | #34    | Create import endpoints |
 | #35    | Modify REST services endpoints to match names |
-|        | Add configurable validation strictness, optional tenant/project rules, and batch validate entire version |
-|        | Add validation fingerprint/hash and optional result caching |
-|        | Add export options (deprecated, examples, sparse, format) and signed/checksummed artifact |
-|        | Add async export for large versions with job/poll/download and optional webhook on completion |
-|        | Add import conflict strategy (overwrite/merge/skip), dry-run preview, and post-import report |
-|        | Add import from URL with auth and async import for large documents with progress/webhook |
-|        | Add optional support for additional schema dialects (e.g. draft-07) with mapping to 2020-12 |
-|        | Add schema compliance profile and tenant-level policy; document compatibility matrix |
-|        | Add configurable schema lint rules (naming, required, descriptions) and lint/validation endpoint for CI |
+| #166   | Add configurable validation strictness, optional tenant/project rules, and batch validate entire version |
+| #167   | Add validation fingerprint/hash and optional result caching |
+| #168   | Add export options (deprecated, examples, sparse, format) and signed/checksummed artifact |
+| #169   | Add async export for large versions with job/poll/download and optional webhook on completion |
+| #170   | Add import conflict strategy (overwrite/merge/skip), dry-run preview, and post-import report |
+| #171   | Add import from URL with auth and async import for large documents with progress/webhook |
+| #172   | Add optional support for additional schema dialects (e.g. draft-07) with mapping to 2020-12 |
+| #173   | Add schema compliance profile and tenant-level policy; document compatibility matrix |
+| #174   | Add configurable schema lint rules (naming, required, descriptions) and lint/validation endpoint for CI |
 
 ---
 
@@ -221,14 +221,15 @@
 | #38    | Create version pull endpoints |
 | #39    | Create version merge endpoints |
 | #41    | Modify REST services endpoints to match names |
-|        | Add commit metadata (author, message, external id) and optional checksum/fingerprint for integrity |
-|        | Add pre-commit validation and configurable commit policy (message, payload size, tenant rules) |
-|        | Add push conflict policy, permissions, and optional branch protection |
-|        | Add webhook or event on successful push for downstream systems |
-|        | Add conditional pull (ETag/If-None-Match) and optional delta pull (changes since revision) |
-|        | Add pull options (include/exclude canvas_metadata, revision range) for headless/CI |
-|        | Add merge preview (dry-run), resolution submission API, and optional post-merge validation |
-|        | Add optimistic locking (revision id on push/merge, 409 when stale) and workflow audit log |
+| #175   | Add commit metadata (author, message, external id) and optional checksum/fingerprint for integrity |
+| #176   | Add pre-commit validation and configurable commit policy (message, payload size, tenant rules) |
+| #177   | Add push conflict policy, permissions, and optional branch protection |
+| #178   | Add webhook or event on successful push for downstream systems |
+| #179   | Add conditional pull (ETag/If-None-Match) and optional delta pull (changes since revision) |
+| #180   | Add pull options (include/exclude canvas_metadata, revision range) for headless/CI |
+| #181   | Add merge preview (dry-run), resolution submission API, and optional post-merge validation |
+| #182   | Add optimistic locking (revision id on push/merge, 409 when stale) and workflow audit log |\
+| #183   | Add audit log for compliance and debugging |
 
 ---
 
@@ -286,12 +287,12 @@
 | #47    | Create main layout and content area for UI Dashboard |
 | #48    | Establish theme provider and system preferences |
 | #49    | Establish correct routes for dashboard |
-|        | Add collapsible sidebar with persisted state, breadcrumbs, and global search (e.g. Cmd+K) |
-|        | Add role-based nav visibility and tenant switcher in header with persisted selection |
-|        | Add keyboard shortcuts, skip-to-content, focus management, and reduced-motion support |
-|        | Add user/tenant theme override and optional high-contrast theme; tenant branding (logo, color) |
-|        | Add deep linking, route guards by permission, and optional audit of dashboard page visits |
-|        | Add lazy-loaded routes, prefetch on nav hover, and loading skeletons for shell and data |
+| #184   | Add collapsible sidebar with persisted state, breadcrumbs, and global search (e.g. Cmd+K) |
+| #185   | Add role-based nav visibility and tenant switcher in header with persisted selection |
+| #186   | Add keyboard shortcuts, skip-to-content, focus management, and reduced-motion support |
+| #187   | Add user/tenant theme override and optional high-contrast theme; tenant branding (logo, color) |
+| #188   | Add deep linking, route guards by permission, and optional audit of dashboard page visits |
+| #189   | Add lazy-loaded routes, prefetch on nav hover, and loading skeletons for shell and data |
 
 ---
 
@@ -328,13 +329,13 @@
 | #52    | Create User-Tenant page in Dashboard |
 | #53    | Create Tenant Administrators page in Dashboard |
 | #54    | Handle Permissions to show/hide sections by role |
-|        | Add user search/filter, sort, bulk invite, deactivation reason, and last-activity display |
-|        | Add user detail view and optional audit trail of user record changes |
-|        | Add tenant search/filter, settings (branding, quotas), archive/restore, and activity summary |
-|        | Add member role selector, bulk add/remove, invite-by-email with pending state, and export member list |
-|        | Add tenant-admin audit and optional transfer-of-ownership flow |
-|        | Add permission-denied messaging, tenant/role in shell, and optional session timeout warning |
-|        | Add table options (pagination, column visibility, export) and confirm-dialog improvements |
+| #190   | Add user search/filter, sort, bulk invite, deactivation reason, and last-activity display |
+| #191   | Add user detail view and optional audit trail of user record changes |
+| #192   | Add tenant search/filter, settings (branding, quotas), archive/restore, and activity summary |
+| #193   | Add member role selector, bulk add/remove, invite-by-email with pending state, and export member list |
+| #194   | Add tenant-admin audit and optional transfer-of-ownership flow |
+| #195   | Add permission-denied messaging, tenant/role in shell, and optional session timeout warning |
+| #196   | Add table options (pagination, column visibility, export) and confirm-dialog improvements |
 
 ---
 
@@ -378,14 +379,14 @@
 | #58    | Create Publish page in Dashboard |
 | #59    | Create Published page in Dashboard |
 | #60    | Create additional support pages in Dashboard |
-|        | Add project search/filter/sort, status and tag display, and bulk actions (archive, tag) |
-|        | Add duplicate/clone project, archive/restore, and project settings subpage |
-|        | Add quota display and create blocking/warning when at limit |
-|        | Add import from URL with auth, import history, conflict preview, and post-import report in UI |
-|        | Add version search/filter/tags, bulk publish/archive, and version comparison/diff view |
-|        | Add version history link from list, branch/lineage display, and open-at-revision |
-|        | Add publish target/channel selector, publish history, and published list filter/export |
-|        | Add version diff view, relationship graph dialog, schema metrics on cards, and dashboard quick actions |
+| #197   | Add project search/filter/sort, status and tag display, and bulk actions (archive, tag) |
+| #198   | Add duplicate/clone project, archive/restore, and project settings subpage |
+| #199   | Add quota display and create blocking/warning when at limit |
+| #200   | Add import from URL with auth, import history, conflict preview, and post-import report in UI |
+| #201   | Add version search/filter/tags, bulk publish/archive, and version comparison/diff view |
+| #202   | Add version history link from list, branch/lineage display, and open-at-revision |
+| #203   | Add publish target/channel selector, publish history, and published list filter/export |
+| #204   | Add version diff view, relationship graph dialog, schema metrics on cards, and dashboard quick actions |
 
 ---
 
@@ -421,12 +422,12 @@
 | #63    | Create canvas mutations functionality |
 | #64    | Add undo stack to the UI |
 | #65    | Add localStorage backup |
-|        | Add state checksum, cross-tab sync or conflict warn, and version compatibility check on load |
-|        | Add loading skeleton, error recovery (retry, cached draft), and load progress |
-|        | Add debounced/batched canvas_metadata updates and optional mutation summary for commit |
-|        | Add undo/redo keyboard shortcuts, optional session persistence of undo stack, and configurable depth |
-|        | Add auto-save draft with TTL, restore-draft prompt on reload, and discard-draft option |
-|        | Add server-ahead detection and “pull first” or overwrite prompt before push |
+| #205   | Add state checksum, cross-tab sync or conflict warn, and version compatibility check on load |
+| #206   | Add loading skeleton, error recovery (retry, cached draft), and load progress |
+| #207   | Add debounced/batched canvas_metadata updates and optional mutation summary for commit |
+| #208   | Add undo/redo keyboard shortcuts, optional session persistence of undo stack, and configurable depth |
+| #209   | Add auto-save draft with TTL, restore-draft prompt on reload, and discard-draft option |
+| #210   | Add server-ahead detection and “pull first” or overwrite prompt before push |
 
 ---
 
@@ -459,12 +460,12 @@
 | #68    | Add Toolbar for Push functionality |
 | #69    | Add Toolbar for Pull functionality |
 | #70    | Add Merge UI for merging versions |
-|        | Add toolbar keyboard shortcuts, disabled states by permission, and progress indicators |
-|        | Add optional required commit message, pre-commit validation summary, and external id (CI/ticket) |
-|        | Add push retry on failure, 409 handling guidance, and optional multi-target push |
-|        | Add conditional pull (ETag), stash/discard dialog, and pull progress |
-|        | Add merge preview (dry-run), side-by-side conflict diff, and bulk resolve actions |
-|        | Add unpushed count, server-ahead banner, connection status, and revision/timestamp display |
+| #211   | Add toolbar keyboard shortcuts, disabled states by permission, and progress indicators |
+| #212   | Add optional required commit message, pre-commit validation summary, and external id (CI/ticket) |
+| #213   | Add push retry on failure, 409 handling guidance, and optional multi-target push |
+| #214   | Add conditional pull (ETag), stash/discard dialog, and pull progress |
+| #215   | Add merge preview (dry-run), side-by-side conflict diff, and bulk resolve actions |
+| #216   | Add unpushed count, server-ahead banner, connection status, and revision/timestamp display |
 
 ---
 
@@ -500,12 +501,12 @@
 | #73    | Add rollback to UI version history |
 | #74    | Add branching to UI version history |
 | #75    | Add history removal to UI version history |
-|        | Add history search/filter, pagination, revision metadata, and “Compare with current” |
-|        | Add load-as-read-only vs editable, “viewing past revision” warning, and state/undo handling |
-|        | Add rollback confirmation with summary, optional message, permission check, and locked-version handling |
-|        | Add branch dialog with prefill name and open-in-new-tab option |
-|        | Add remove confirmation with impact, optional soft delete, and cascade warning |
-|        | Add optional export history and display of retention/cleanup policy |
+| #217   | Add history search/filter, pagination, revision metadata, and “Compare with current” |
+| #218   | Add load-as-read-only vs editable, “viewing past revision” warning, and state/undo handling |
+| #219   | Add rollback confirmation with summary, optional message, permission check, and locked-version handling |
+| #220   | Add branch dialog with prefill name and open-in-new-tab option |
+| #221   | Add remove confirmation with impact, optional soft delete, and cascade warning |
+| #222   | Add optional export history and display of retention/cleanup policy |
 
 ---
 
@@ -538,12 +539,12 @@
 | #76    | Add project/version selector in UI Canvas |
 | #77    | Configure react-flow canvas properly |
 | #78    | Add read-only behavior to the UI canvas |
-|        | Add recent/favorites in selector, keyboard nav, validation/sync status, and breadcrumb (Tenant → Project → Version) |
-|        | Add switch confirmation when dirty, “Open in new tab”, and search/filter in version dropdown |
-|        | Add canvas virtualization/lazy render for large diagrams and simplified overview mode |
-|        | Add viewport save/restore per version, fit-to-content/fit-selected, and MiniMap legend |
-|        | Add full keyboard nav, ARIA, high-contrast option, reduced motion, and screen reader summary |
-|        | Add read-only banner, “Request edit”/“Branch from here” CTA, and locked/permission-aware mode |
+| #223   | Add recent/favorites in selector, keyboard nav, validation/sync status, and breadcrumb (Tenant → Project → Version) |
+| #224   | Add switch confirmation when dirty, “Open in new tab”, and search/filter in version dropdown |
+| #225   | Add canvas virtualization/lazy render for large diagrams and simplified overview mode |
+| #226   | Add viewport save/restore per version, fit-to-content/fit-selected, and MiniMap legend |
+| #227   | Add full keyboard nav, ARIA, high-contrast option, reduced motion, and screen reader summary |
+| #228   | Add read-only banner, “Request edit”/“Branch from here” CTA, and locked/permission-aware mode |
 
 ---
 
@@ -576,14 +577,14 @@
 | #80    | Class-node properties and themes |
 | #81    | Class node edge design and behavior in the canvas |
 | #82    | Add interactivity to nodes in the react-flow canvas |
-|        | Add node status indicators (deprecated, new, modified, errors), tag badges, and summary tooltip |
-|        | Add per-version/tag node theming, tenant colors, and compact/full property display options |
-|        | Add node context menu, keyboard open form, inline quick-edit, and virtual scroll for long property lists |
-|        | Add edge labels (property name, cardinality), edge legend, and broken-reference warning and fix |
-|        | Add edge click-to-detail, edit ref from edge, and ID-ref (SQL mode) visual distinction |
-|        | Add multi-select, box-select, select by group/tag, bulk actions, and selection count in toolbar |
-|        | Add snap-to-grid/alignment, resize limits, undo for position/size, and touch/gesture support |
-|        | Add keyboard and screen reader support for nodes/edges and optional accessible list view of classes |
+| #229   | Add node status indicators (deprecated, new, modified, errors), tag badges, and summary tooltip |
+| #230   | Add per-version/tag node theming, tenant colors, and compact/full property display options |
+| #231   | Add node context menu, keyboard open form, inline quick-edit, and virtual scroll for long property lists |
+| #232   | Add edge labels (property name, cardinality), edge legend, and broken-reference warning and fix |
+| #233   | Add edge click-to-detail, edit ref from edge, and ID-ref (SQL mode) visual distinction |
+| #234   | Add multi-select, box-select, select by group/tag, bulk actions, and selection count in toolbar |
+| #235   | Add snap-to-grid/alignment, resize limits, undo for position/size, and touch/gesture support |
+| #236   | Add keyboard and screen reader support for nodes/edges and optional accessible list view of classes |
 
 ---
 
@@ -610,10 +611,10 @@
 |--------|---------------------|
 | #83    | Add ability to create groups in the react-flow canvas |
 | #84    | Deletion of groups in the UI |
-|        | Add create group from selection, nested groups, group metadata (description, tag), and group templates |
-|        | Add groups sidebar tab, focus/zoom to group, reorder groups, and expand/collapse group header |
-|        | Add delete-group-only vs delete-all-classes, archive group, and ungroup with position preserve |
-|        | Add layout-by-group option, export by group or with group boundaries, and filter canvas by group |
+| #237   | Add create group from selection, nested groups, group metadata (description, tag), and group templates |
+| #238   | Add groups sidebar tab, focus/zoom to group, reorder groups, and expand/collapse group header |
+| #239   | Add delete-group-only vs delete-all-classes, archive group, and ungroup with position preserve |
+| #240   | Add layout-by-group option, export by group or with group boundaries, and filter canvas by group |
 
 ---
 
@@ -639,11 +640,11 @@
 | #85    | Add search functionality to the canvas |
 | #86    | Add search history to the canvas search functionality |
 | #87    | Implement Focus Mode into the Canvas |
-|        | Add search in description/property/tag, advanced filters (AND/OR), saved searches, and result count |
-|        | Add find next/previous, highlight all matches, zoom to matches, and search-in-focus option |
-|        | Add search history sync (account), export search results list, and clear-highlight behavior |
-|        | Add focus by path between two nodes, focus by tag/group, and saved focus views with names |
-|        | Add share focus as link, “layout to focus only”, and “Find in focus” / “Select all in focus” |
+| #241   | Add search in description/property/tag, advanced filters (AND/OR), saved searches, and result count |
+| #242   | Add find next/previous, highlight all matches, zoom to matches, and search-in-focus option |
+| #243   | Add search history sync (account), export search results list, and clear-highlight behavior |
+| #244   | Add focus by path between two nodes, focus by tag/group, and saved focus views with names |
+| #245   | Add share focus as link, “layout to focus only”, and “Find in focus” / “Select all in focus” |
 
 ---
 
@@ -680,14 +681,14 @@
 | #89    | Add layout hinting to the canvas |
 | #90    | Add dependency overlay to the Canvas |
 | #91    | Add schema metrics panel to the canvas |
-|        | Add multiple layout algorithms (dagre, ELK, Cola), layout-by-group, incremental layout, and layout preview |
-|        | Add layout presets, align selection, save/reset default, and optional layout constraints |
-|        | Add layout progress, background (worker) layout, and “layout visible only” for large schemas |
-|        | Add layout quality score, edge-crossing/overlap detection, and “Improve layout” suggestion |
-|        | Add impact analysis (affected nodes), cycle list and “break cycle” hint, and dependency depth warning |
-|        | Add critical path/root/leaf view, export dependency graph, and dependency + focus combination |
-|        | Add metrics breakdown by group/tag, click-to-focus, export metrics, and threshold alerts |
-|        | Add metrics API or export for CI (depth, circular ref, orphan thresholds) |
+| #246   | Add multiple layout algorithms (dagre, ELK, Cola), layout-by-group, incremental layout, and layout preview |
+| #247   | Add layout presets, align selection, save/reset default, and optional layout constraints |
+| #248   | Add layout progress, background (worker) layout, and “layout visible only” for large schemas |
+| #249   | Add layout quality score, edge-crossing/overlap detection, and “Improve layout” suggestion |
+| #250   | Add impact analysis (affected nodes), cycle list and “break cycle” hint, and dependency depth warning |
+| #251   | Add critical path/root/leaf view, export dependency graph, and dependency + focus combination |
+| #252   | Add metrics breakdown by group/tag, click-to-focus, export metrics, and threshold alerts |
+| #253   | Add metrics API or export for CI (depth, circular ref, orphan thresholds) |
 
 ---
 
@@ -714,13 +715,13 @@
 | #92    | Add export dialog with export functions for the Canvas |
 | #93    | Create an export wizard in the export form |
 | #94    | Add canvas settings form |
-|        | Add export scope (view/entire/selected/group), resolution/watermark, batch export, and clipboard copy |
-|        | Add export wizard with preview, optional schedule/export-to-URL, and export reason for audit |
-|        | Add export audit log and role/tenant restrictions on export formats |
-|        | Add grid/background options, import/export settings JSON, and tenant default settings |
-|        | Add edge routing and styling options, animation toggle, and per-ref-type styling (including ID-ref) |
-|        | Add high-contrast/large-handles/reduce-motion and optional simplified rendering for performance |
-|        | Add settings persistence (user/version/global), sync to account, and settings search/categories |
+| #254   | Add export scope (view/entire/selected/group), resolution/watermark, batch export, and clipboard copy |
+| #255   | Add export wizard with preview, optional schedule/export-to-URL, and export reason for audit |
+| #256   | Add export audit log and role/tenant restrictions on export formats |
+| #257   | Add grid/background options, import/export settings JSON, and tenant default settings |
+| #258   | Add edge routing and styling options, animation toggle, and per-ref-type styling (including ID-ref) |
+| #259   | Add high-contrast/large-handles/reduce-motion and optional simplified rendering for performance |
+| #260   | Add settings persistence (user/version/global), sync to account, and settings search/categories |
 
 ---
 
@@ -762,15 +763,16 @@
 | #98    | Add the ability to create a reference in a class node |
 | #99    | Add sidebar updates for the Classes in the Canvas |
 | #100   | Create a tag manager that can be used in the canvas |
-|        | Add “Add from template”, “Add from library”, quick add, and “Add and connect” flow |
-|        | Add delete impact summary, bulk delete, undo for delete, and optional soft delete/archive |
-|        | Add duplicate with refs, duplicate to group, paste from JSON/Mermaid, and cross-version paste |
-|        | Add create ref by drag, “create ref and add property”, bulk create refs, and find/fix broken refs |
-|        | Add classes tab search/sort, favorites, bulk actions from list, and class status in list |
-|        | Add properties tab “used in”/orphan filter, highlight on canvas, and bulk assign/remove |
-|        | Add sidebar persist state, compact mode, empty state, and keyboard/accessibility |
-|        | Add tag hierarchy, bulk tag, “classes without tag”, template library, and usage count |
-|        | Add “Request new class” workflow, last-modified in list, and export class list for audit |
+| #261   | Add “Add from template”, “Add from library”, quick add, and “Add and connect” flow |
+| #262   | Add delete impact summary, bulk delete, undo for delete, and optional soft delete/archive |
+| #263   | Add duplicate with refs, duplicate to group, paste from JSON/Mermaid, and cross-version paste |
+| #264   | Add create ref by drag, “create ref and add property”, bulk create refs, and find/fix broken refs |
+| #265   | Add classes tab search/sort, favorites, bulk actions from list, and class status in list |
+| #266   | Add properties tab “used in”/orphan filter, highlight on canvas, and bulk assign/remove |
+| #267   | Add groups layout improvements |
+| #268   | Add sidebar persist state, compact mode, empty state, and keyboard/accessibility |
+| #269   | Add tag hierarchy, bulk tag, “classes without tag”, template library, and usage count |
+| #270   | Add “Request new class” workflow, last-modified in list, and export class list for audit |
 
 ---
 
@@ -847,14 +849,15 @@ The class form MUST support every Schema Object keyword that applies to an objec
 | #101   | Add Class Edit dialog, reuses the Add Edit dialog |
 | #102   | Class edit dialog needs to handle schema extensions |
 | #103   | Class node tag behavior |
-|        | Add $id, $schema, $ref, $defs, $comment to class form with validation and export |
-|        | Add title, description (CommonMark), default, examples (array), deprecated, readOnly, writeOnly, enum, const to class form |
-|        | Add object keywords: required, additionalProperties, unevaluatedProperties, propertyNames, minProperties, maxProperties, patternProperties |
-|        | Add composition: allOf, oneOf, anyOf, not with $ref/inline schema per item and order preserved |
-|        | Add conditional: if/then/else, dependentRequired, dependentSchemas in class form |
-|        | Add discriminator (propertyName, mapping), externalDocs (url, description), xml (name, namespace, prefix, attribute, wrapped), example (deprecated) |
-|        | Add x-* extensions section (add/remove key-value, JSON value types) and form sections/tabs for all keyword groups |
-|        | Add class form validation (OpenAPI 3.2 / JSON Schema 2020-12), field-level errors, and schema paste/copy/round-trip |
+| #271   | Add $id, $schema, $ref, $defs, $comment to class form with validation and export |
+| #272   | Add title, description (CommonMark), default, examples (array), deprecated, readOnly, writeOnly, enum, const to class form |
+| #273   | Add object keywords: required, additionalProperties, unevaluatedProperties, propertyNames, minProperties, maxProperties, patternProperties |
+| #274   | Add composition: allOf, oneOf, anyOf, not with $ref/inline schema per item and order preserved |
+| #275   | Add conditional: if/then/else, dependentRequired, dependentSchemas in class form |
+| #276   | Add discriminator (propertyName, mapping), externalDocs (url, description), xml (name, namespace, prefix, attribute, wrapped), example (deprecated) |
+| #277   | Add x-* extensions section (add/remove key-value, JSON value types) and form sections/tabs for all keyword groups |
+| #278   | Add class form validation (OpenAPI 3.2 / JSON Schema 2020-12), field-level errors, and schema paste/copy/round-trip |
+| #279   | Add tags and cross-cutting features |
 
 ---
 
@@ -945,15 +948,15 @@ The property form MUST support every Schema Object keyword that applies to the p
 | #107   | Add number/integer constraints to the property form |
 | #108   | Add array constraints to the property form |
 | #109   | Add object constraints to the property form |
-|        | Add property name validation, type selector (single or array of types), and $ref with override summary |
-|        | Add $id, $schema, $defs, $comment, title, description, default, examples, deprecated, readOnly, writeOnly, enum, const to property form |
-|        | Add string: minLength, maxLength, pattern; all string formats (date-time, email, uri, uuid, etc.) and contentEncoding, contentMediaType, contentSchema |
-|        | Add number/integer: minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format (int32, int64, float, double) |
-|        | Add array: items, prefixItems (tuple), additionalItems, contains, minContains, maxContains, minItems, maxItems, uniqueItems, unevaluatedItems |
-|        | Add object: properties, required, additionalProperties, unevaluatedProperties, propertyNames, minProperties, maxProperties, patternProperties |
-|        | Add composition (allOf, oneOf, anyOf, not) and conditional (if/then/else, dependentRequired, dependentSchemas) to property form |
-|        | Add discriminator, externalDocs, xml, example (deprecated), and x-* extensions to property form |
-|        | Add type-driven UI (show only relevant fields), schema validation on submit, and round-trip/paste/copy for property schema |
+| #280   | Add property name validation, type selector (single or array of types), and $ref with override summary |
+| #281   | Add $id, $schema, $defs, $comment, title, description, default, examples, deprecated, readOnly, writeOnly, enum, const to property form |
+| #282   | Add string: minLength, maxLength, pattern; all string formats (date-time, email, uri, uuid, etc.) and contentEncoding, contentMediaType, contentSchema |
+| #283   | Add number/integer: minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format (int32, int64, float, double) |
+| #284   | Add array: items, prefixItems (tuple), additionalItems, contains, minContains, maxContains, minItems, maxItems, uniqueItems, unevaluatedItems |
+| #285   | Add object: properties, required, additionalProperties, unevaluatedProperties, propertyNames, minProperties, maxProperties, patternProperties |
+| #286   | Add composition (allOf, oneOf, anyOf, not) and conditional (if/then/else, dependentRequired, dependentSchemas) to property form |
+| #287   | Add discriminator, externalDocs, xml, example (deprecated), and x-* extensions to property form |
+| #288   | Add type-driven UI (show only relevant fields), schema validation on submit, and round-trip/paste/copy for property schema |
 
 ---
 
@@ -1027,13 +1030,13 @@ When a property is attached to a class, the join row carries usage-specific over
 | #112   | Add extensions to the property form |
 | #113   | Add additional class-property editing features |
 | #114   | Add validation to client-side for properties |
-|        | Add full metadata: title, description, default, examples (array), deprecated, readOnly, writeOnly; nullable via type; $comment; $anchor/$dynamicAnchor |
-|        | Add conditional: if/then/else with three schemas; dependentRequired (key → required list); dependentSchemas (key → schema) with validation and export |
-|        | Add XML Object: name, namespace, prefix, attribute, wrapped; form section and round-trip |
-|        | Add x-* extensions: key (x- prefix), value (JSON); validation and uniqueness |
-|        | Add class-property: required override, description override, order, parent_id (nested); ClassPropertyEditDialog and export sync |
-|        | Add client-side validation (full schema + default + examples), REST validate call, field-level errors, and format assertion option |
-|        | Add round-trip for metadata, conditional, xml, extensions, and class-property in export/import |
+| #289   | Add full metadata: title, description, default, examples (array), deprecated, readOnly, writeOnly; nullable via type; $comment; $anchor/$dynamicAnchor |
+| #290   | Add conditional: if/then/else with three schemas; dependentRequired (key → required list); dependentSchemas (key → schema) with validation and export |
+| #291   | Add XML Object: name, namespace, prefix, attribute, wrapped; form section and round-trip |
+| #292   | Add x-* extensions: key (x- prefix), value (JSON); validation and uniqueness |
+| #293   | Add class-property: required override, description override, order, parent_id (nested); ClassPropertyEditDialog and export sync |
+| #294   | Add client-side validation (full schema + default + examples), REST validate call, field-level errors, and format assertion option |
+| #295   | Add round-trip for metadata, conditional, xml, extensions, and class-property in export/import |
 
 ---
 
