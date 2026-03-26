@@ -444,27 +444,47 @@ function getBaseTypeFromData(data: any): string | undefined {
 }
 
 export function getDropPreviewPropertyType(property: { type?: string; data?: any } | null | undefined): string {
-  const data = property?.data && typeof property.data === 'string'
-    ? JSON.parse(property.data)
-    : (property?.data || {});
+  // Prefer schema from `property.data` (string or object), but fall back to the
+  // full `property` object so that top-level $ref/items are also supported.
+  let schemaFromData: any | undefined;
 
-  const baseType = getBaseTypeFromData(data);
+  if (property?.data) {
+    if (typeof property.data === 'string') {
+      const trimmed = property.data.trim();
+      if (trimmed) {
+        try {
+          schemaFromData = JSON.parse(trimmed);
+        } catch {
+          // Ignore parse errors and fall back to using the full property object.
+          schemaFromData = undefined;
+        }
+      }
+    } else if (typeof property.data === 'object') {
+      schemaFromData = property.data;
+    }
+  }
+
+  const schema = (schemaFromData && typeof schemaFromData === 'object')
+    ? schemaFromData
+    : (property && typeof property === 'object' ? property : {});
+
+  const baseType = getBaseTypeFromData(schema);
   if (baseType === 'array') {
-    if (data?.items?.$ref) {
-      const refName = String(data.items.$ref).split('/').pop();
+    if (schema?.items?.$ref) {
+      const refName = String(schema.items.$ref).split('/').pop();
       return `${refName || 'ref'}[]`;
     }
-    if (data?.items?.type) {
-      return `${data.items.type}[]`;
+    if (schema?.items?.type) {
+      return `${schema.items.type}[]`;
     }
     return 'array';
   }
-  if (data?.$ref) {
-    return String(data.$ref).split('/').pop() || 'ref';
+  if (schema?.$ref) {
+    return String(schema.$ref).split('/').pop() || 'ref';
   }
-  if (data?.allOf) return 'allOf';
-  if (data?.anyOf) return 'anyOf';
-  if (data?.oneOf) return 'oneOf';
+  if (schema?.allOf) return 'allOf';
+  if (schema?.anyOf) return 'anyOf';
+  if (schema?.oneOf) return 'oneOf';
   return baseType || property?.type || 'object';
 }
 
