@@ -344,6 +344,15 @@ type ClassNodeTheme = {
   labelMultiLine?: boolean;
 };
 
+type DragPayload = {
+  type?: string;
+  property?: {
+    name?: string;
+    type?: string;
+    data?: any;
+  };
+};
+
 // Border options for node style (#342) — includes 1.5 to match default
 const BORDER_WIDTH_OPTIONS = [1, 2, 3, 4, 5] as const;
 const BORDER_STYLE_OPTIONS: Array<{ name: NodeBorderStyle; label: string }> = [
@@ -427,6 +436,38 @@ function themeFromPrimaryColor(primaryHex: string): Omit<ClassNodeTheme, 'icon'>
   };
 }
 
+function getBaseTypeFromData(data: any): string | undefined {
+  if (Array.isArray(data?.type)) {
+    return data.type.find((t: string) => t !== 'null');
+  }
+  return data?.type;
+}
+
+export function getDropPreviewPropertyType(property: { type?: string; data?: any } | null | undefined): string {
+  const data = property?.data && typeof property.data === 'string'
+    ? JSON.parse(property.data)
+    : (property?.data || {});
+
+  const baseType = getBaseTypeFromData(data);
+  if (baseType === 'array') {
+    if (data?.items?.$ref) {
+      const refName = String(data.items.$ref).split('/').pop();
+      return `${refName || 'ref'}[]`;
+    }
+    if (data?.items?.type) {
+      return `${data.items.type}[]`;
+    }
+    return 'array';
+  }
+  if (data?.$ref) {
+    return String(data.$ref).split('/').pop() || 'ref';
+  }
+  if (data?.allOf) return 'allOf';
+  if (data?.anyOf) return 'anyOf';
+  if (data?.oneOf) return 'oneOf';
+  return baseType || property?.type || 'object';
+}
+
 type ClassNodeData = {
   id: string;
   name: string;
@@ -474,6 +515,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
   const [dragOverPropertyId, setDragOverPropertyId] = useState<string | null>(null);
   /** #479: Reason string when drop would be invalid (duplicate, read-only, etc.); null when valid or not dragging over */
   const [invalidDropReason, setInvalidDropReason] = useState<string | null>(null);
+  const [ghostPreview, setGhostPreview] = useState<{ name: string; typeLabel: string; parentId: string | null } | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -857,6 +899,18 @@ function ClassNode({ id, data, selected }: NodeProps) {
     return null;
   };
 
+  const setGhostPreviewFromPayload = (payload: DragPayload | null, parentId: string | null) => {
+    if (payload?.type !== 'property' || !payload.property?.name) {
+      setGhostPreview(null);
+      return;
+    }
+    setGhostPreview({
+      name: payload.property.name,
+      typeLabel: getDropPreviewPropertyType(payload.property),
+      parentId,
+    });
+  };
+
   // DnD Handlers (top-level)
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -865,12 +919,14 @@ function ClassNode({ id, data, selected }: NodeProps) {
     // #479: Validate drop (getData may be empty in some browsers until drop)
     try {
       const raw = e.dataTransfer.getData('application/json');
-      const payload = raw ? (JSON.parse(raw) as { type?: string; property?: { name?: string } }) : null;
+      const payload = raw ? (JSON.parse(raw) as DragPayload) : null;
       const reason = validateDrop(null, payload);
       setInvalidDropReason(reason);
       if (reason) e.dataTransfer.dropEffect = 'none';
+      setGhostPreviewFromPayload(payload, null);
     } catch {
       setInvalidDropReason(null);
+      setGhostPreview(null);
     }
   };
 
@@ -880,6 +936,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
+    setGhostPreview(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -888,6 +945,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
+    setGhostPreview(null);
     if (typedData.isReadOnly) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -915,24 +973,28 @@ function ClassNode({ id, data, selected }: NodeProps) {
       setDragOverPropertyId(propertyId);
       try {
         const raw = e.dataTransfer.getData('application/json');
-        const payload = raw ? (JSON.parse(raw) as { type?: string; property?: { name?: string } }) : null;
+        const payload = raw ? (JSON.parse(raw) as DragPayload) : null;
         const reason = validateDrop(propertyId, payload);
         setInvalidDropReason(reason);
         if (reason) e.dataTransfer.dropEffect = 'none';
+        setGhostPreviewFromPayload(payload, propertyId);
       } catch {
         setInvalidDropReason(null);
+        setGhostPreview(null);
       }
     } else {
       setDragTarget('node');
       setDragOverPropertyId(null);
       try {
         const raw = e.dataTransfer.getData('application/json');
-        const payload = raw ? (JSON.parse(raw) as { type?: string; property?: { name?: string } }) : null;
+        const payload = raw ? (JSON.parse(raw) as DragPayload) : null;
         const reason = validateDrop(null, payload);
         setInvalidDropReason(reason);
         if (reason) e.dataTransfer.dropEffect = 'none';
+        setGhostPreviewFromPayload(payload, null);
       } catch {
         setInvalidDropReason(null);
+        setGhostPreview(null);
       }
     }
   };
@@ -943,6 +1005,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
+    setGhostPreview(null);
   };
 
   const handlePropertyDrop = (e: React.DragEvent, parentPropertyId: string) => {
@@ -951,6 +1014,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
+    setGhostPreview(null);
     if (typedData.isReadOnly) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -1806,8 +1870,34 @@ function ClassNode({ id, data, selected }: NodeProps) {
           opacity: propertiesOpacity,
           transition: 'opacity 0.2s ease'
         }}>
-          {(topLevel.length > 0 ? topLevel : []).length > 0 ? (
-          topLevel.flatMap((prop, idx) => {
+          {(topLevel.length > 0 ? topLevel : []).length > 0 || (ghostPreview && ghostPreview.parentId === null && !invalidDropReason) ? (
+          <>
+          {ghostPreview && ghostPreview.parentId === null && !invalidDropReason && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '16px 1fr auto 36px',
+                alignItems: 'center',
+                padding: '5px 10px',
+                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                borderBottom: '1px dashed #93c5fd',
+                gap: '4px',
+                minHeight: '28px',
+                opacity: 0.95,
+              }}
+              aria-hidden
+            >
+              <div />
+              <div style={{ fontWeight: 500, color: '#1d4ed8', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ghostPreview.name}
+              </div>
+              <div style={{ fontSize: '9px', color: '#1e40af', fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace', whiteSpace: 'nowrap', background: 'rgba(147, 197, 253, 0.35)', padding: '1px 6px', borderRadius: '3px', fontWeight: 500 }}>
+                {ghostPreview.typeLabel}
+              </div>
+              <div style={{ fontSize: '9px', color: '#1d4ed8', textAlign: 'right', paddingRight: '2px', fontStyle: 'italic' }}>preview</div>
+            </div>
+          )}
+          {topLevel.flatMap((prop, idx) => {
             let rowIndex = 0;
             const totalTopLevel = topLevel.length;
             const renderProperty = (p: ClassProperty, depth: number, isLast: boolean = false): React.JSX.Element[] => {
@@ -2034,6 +2124,36 @@ function ClassNode({ id, data, selected }: NodeProps) {
                 </div>
               );
 
+              if (ghostPreview && ghostPreview.parentId === p.id && !invalidDropReason) {
+                row.push(
+                  <div
+                    key={`${p.id}-ghost-preview`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '16px 1fr auto 36px',
+                      alignItems: 'center',
+                      padding: '5px 10px',
+                      paddingLeft: `${10 + (depth + 1) * 14}px`,
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                      borderBottom: '1px dashed #93c5fd',
+                      gap: '4px',
+                      minHeight: '28px',
+                      opacity: 0.95,
+                    }}
+                    aria-hidden
+                  >
+                    <div />
+                    <div style={{ fontWeight: 500, color: '#1d4ed8', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ghostPreview.name}
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#1e40af', fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace', whiteSpace: 'nowrap', background: 'rgba(147, 197, 253, 0.35)', padding: '1px 6px', borderRadius: '3px', fontWeight: 500 }}>
+                      {ghostPreview.typeLabel}
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#1d4ed8', textAlign: 'right', paddingRight: '2px', fontStyle: 'italic' }}>preview</div>
+                  </div>
+                );
+              }
+
               if (container && isExpanded && children.length > 0) {
                 children.forEach((c, childIdx) => row.push(...renderProperty(c, depth + 1, childIdx === children.length - 1)));
               }
@@ -2042,7 +2162,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
             };
 
             return renderProperty(prop, 0, idx === totalTopLevel - 1);
-          })
+          })}
+          </>
         ) : (
           <div style={{
             padding: '10px 12px',
