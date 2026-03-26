@@ -5,7 +5,7 @@ description: Fetches the GitHub Issue for the current repo, implements it on bra
 
 # Handle ticket (`/handle-ticket <number>`)
 
-When the user invokes **handle-ticket** with an issue number (for example `/handle-ticket 124`), treat that number as the **GitHub issue** in the **current repository** (e.g. `NobuData/objectified` for this workspace). Follow this workflow end to end unless the user stops you or the environment blocks a step (auth, permissions, missing `gh`, etc.).
+When the user invokes **handle-ticket** with an issue number (for example `/handle-ticket 124`), treat that number as the **GitHub issue** in the **current repository** (e.g. `KenSuenobu/objectified` for this workspace). Follow this workflow end to end unless the user stops you or the environment blocks a step (auth, permissions, missing `gh`, etc.).
 
 ## 1. Load the issue into context
 
