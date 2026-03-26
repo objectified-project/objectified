@@ -3032,6 +3032,7 @@ export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?
        FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name IS NOT NULL
+         AND is_default = false
          AND (user_id = $2 OR user_id IS NULL)
        ORDER BY name ASC, (user_id = $2) DESC, updated_at DESC`,
       [versionId, userId || null]
