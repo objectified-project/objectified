@@ -3103,7 +3103,7 @@ export async function saveNamedCanvasLayout(
       `SELECT id FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name = $2
-         AND user_id = $3
+         AND user_id IS NOT DISTINCT FROM $3
        LIMIT 1`,
       [versionId, nameValue, userId]
     );
