@@ -444,36 +444,48 @@ function getBaseTypeFromData(data: any): string | undefined {
 }
 
 export function getDropPreviewPropertyType(property: { type?: string; data?: any } | null | undefined): string {
-  // Drag payloads may provide schema either under `data` or directly on the property object.
-  const source = property?.data ?? property;
-  let data: any = source || {};
-  if (typeof source === 'string') {
-    try {
-      data = JSON.parse(source);
-    } catch {
-      // Defensive fallback: malformed drag payload metadata should not crash hover rendering.
-      return property?.type || 'object';
+  // Prefer schema from `property.data` (string or object), but fall back to the
+  // full `property` object so that top-level $ref/items are also supported.
+  let schemaFromData: any | undefined;
+
+  if (property?.data) {
+    if (typeof property.data === 'string') {
+      const trimmed = property.data.trim();
+      if (trimmed) {
+        try {
+          schemaFromData = JSON.parse(trimmed);
+        } catch {
+          // Ignore parse errors and fall back to using the full property object.
+          schemaFromData = undefined;
+        }
+      }
+    } else if (typeof property.data === 'object') {
+      schemaFromData = property.data;
     }
   }
 
-  const baseType = getBaseTypeFromData(data);
+  const schema = (schemaFromData && typeof schemaFromData === 'object')
+    ? schemaFromData
+    : (property && typeof property === 'object' ? property : {});
+
+  const baseType = getBaseTypeFromData(schema);
   if (baseType === 'array') {
-    if (data?.items?.$ref) {
-      const refName = String(data.items.$ref).split('/').pop();
+    if (schema?.items?.$ref) {
+      const refName = String(schema.items.$ref).split('/').pop();
       return `${refName || 'ref'}[]`;
     }
-    if (data?.items?.type) {
-      const itemBaseType = getBaseTypeFromData(data.items);
-      return `${itemBaseType || data.items.type}[]`;
+    if (schema?.items?.type) {
+      const itemBaseType = getBaseTypeFromData(schema.items);
+      return `${itemBaseType || schema.items.type}[]`;
     }
     return 'array';
   }
-  if (data?.$ref) {
-    return String(data.$ref).split('/').pop() || 'ref';
+  if (schema?.$ref) {
+    return String(schema.$ref).split('/').pop() || 'ref';
   }
-  if (data?.allOf) return 'allOf';
-  if (data?.anyOf) return 'anyOf';
-  if (data?.oneOf) return 'oneOf';
+  if (schema?.allOf) return 'allOf';
+  if (schema?.anyOf) return 'anyOf';
+  if (schema?.oneOf) return 'oneOf';
   return baseType || property?.type || 'object';
 }
 
@@ -917,12 +929,20 @@ function ClassNode({ id, data, selected }: NodeProps) {
       }
       return;
     }
+    const name = String(payload.property.name).trim();
+    if (!name) {
+      if (ghostPreviewKeyRef.current !== null) {
+        ghostPreviewKeyRef.current = null;
+        setGhostPreview(null);
+      }
+      return;
+    }
     const typeLabel = getDropPreviewPropertyType(payload.property);
-    const previewKey = `${parentId ?? 'root'}|${payload.property.name}|${typeLabel}`;
+    const previewKey = `${parentId ?? 'root'}|${name}|${typeLabel}`;
     if (ghostPreviewKeyRef.current === previewKey) return;
     ghostPreviewKeyRef.current = previewKey;
     setGhostPreview({
-      name: payload.property.name,
+      name,
       typeLabel,
       parentId,
     });
