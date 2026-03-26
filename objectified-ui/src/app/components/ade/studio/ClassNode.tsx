@@ -444,9 +444,17 @@ function getBaseTypeFromData(data: any): string | undefined {
 }
 
 export function getDropPreviewPropertyType(property: { type?: string; data?: any } | null | undefined): string {
-  const data = property?.data && typeof property.data === 'string'
-    ? JSON.parse(property.data)
-    : (property?.data || {});
+  // Drag payloads may provide schema either under `data` or directly on the property object.
+  const source = property?.data ?? property;
+  let data: any = source || {};
+  if (typeof source === 'string') {
+    try {
+      data = JSON.parse(source);
+    } catch {
+      // Defensive fallback: malformed drag payload metadata should not crash hover rendering.
+      return property?.type || 'object';
+    }
+  }
 
   const baseType = getBaseTypeFromData(data);
   if (baseType === 'array') {
@@ -455,7 +463,8 @@ export function getDropPreviewPropertyType(property: { type?: string; data?: any
       return `${refName || 'ref'}[]`;
     }
     if (data?.items?.type) {
-      return `${data.items.type}[]`;
+      const itemBaseType = getBaseTypeFromData(data.items);
+      return `${itemBaseType || data.items.type}[]`;
     }
     return 'array';
   }
@@ -516,6 +525,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
   /** #479: Reason string when drop would be invalid (duplicate, read-only, etc.); null when valid or not dragging over */
   const [invalidDropReason, setInvalidDropReason] = useState<string | null>(null);
   const [ghostPreview, setGhostPreview] = useState<{ name: string; typeLabel: string; parentId: string | null } | null>(null);
+  const ghostPreviewKeyRef = useRef<string | null>(null);
   const [localExpandedProperties, setLocalExpandedProperties] = useState<Set<string>>(new Set());
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
@@ -901,14 +911,59 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
   const setGhostPreviewFromPayload = (payload: DragPayload | null, parentId: string | null) => {
     if (payload?.type !== 'property' || !payload.property?.name) {
-      setGhostPreview(null);
+      if (ghostPreviewKeyRef.current !== null) {
+        ghostPreviewKeyRef.current = null;
+        setGhostPreview(null);
+      }
       return;
     }
+    const typeLabel = getDropPreviewPropertyType(payload.property);
+    const previewKey = `${parentId ?? 'root'}|${payload.property.name}|${typeLabel}`;
+    if (ghostPreviewKeyRef.current === previewKey) return;
+    ghostPreviewKeyRef.current = previewKey;
     setGhostPreview({
       name: payload.property.name,
-      typeLabel: getDropPreviewPropertyType(payload.property),
+      typeLabel,
       parentId,
     });
+  };
+
+  const clearGhostPreview = () => {
+    if (ghostPreviewKeyRef.current !== null) {
+      ghostPreviewKeyRef.current = null;
+      setGhostPreview(null);
+    }
+  };
+
+  const renderGhostPreviewRow = (key: string, paddingLeft?: string) => {
+    if (!ghostPreview || invalidDropReason) return null;
+    return (
+      <div
+        key={key}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '16px 1fr auto 36px',
+          alignItems: 'center',
+          padding: '5px 10px',
+          ...(paddingLeft ? { paddingLeft } : {}),
+          background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+          borderBottom: '1px dashed #93c5fd',
+          gap: '4px',
+          minHeight: '28px',
+          opacity: 0.95,
+        }}
+        aria-hidden
+      >
+        <div />
+        <div style={{ fontWeight: 500, color: '#1d4ed8', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {ghostPreview.name}
+        </div>
+        <div style={{ fontSize: '9px', color: '#1e40af', fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace', whiteSpace: 'nowrap', background: 'rgba(147, 197, 253, 0.35)', padding: '1px 6px', borderRadius: '3px', fontWeight: 500 }}>
+          {ghostPreview.typeLabel}
+        </div>
+        <div style={{ fontSize: '9px', color: '#1d4ed8', textAlign: 'right', paddingRight: '2px', fontStyle: 'italic' }}>preview</div>
+      </div>
+    );
   };
 
   // DnD Handlers (top-level)
@@ -926,7 +981,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
       setGhostPreviewFromPayload(payload, null);
     } catch {
       setInvalidDropReason(null);
-      setGhostPreview(null);
+      clearGhostPreview();
     }
   };
 
@@ -936,7 +991,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
-    setGhostPreview(null);
+    clearGhostPreview();
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -945,7 +1000,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
-    setGhostPreview(null);
+    clearGhostPreview();
     if (typedData.isReadOnly) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -980,7 +1035,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
         setGhostPreviewFromPayload(payload, propertyId);
       } catch {
         setInvalidDropReason(null);
-        setGhostPreview(null);
+        clearGhostPreview();
       }
     } else {
       setDragTarget('node');
@@ -994,7 +1049,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
         setGhostPreviewFromPayload(payload, null);
       } catch {
         setInvalidDropReason(null);
-        setGhostPreview(null);
+        clearGhostPreview();
       }
     }
   };
@@ -1005,7 +1060,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
-    setGhostPreview(null);
+    clearGhostPreview();
   };
 
   const handlePropertyDrop = (e: React.DragEvent, parentPropertyId: string) => {
@@ -1014,7 +1069,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
     setDragTarget(null);
     setDragOverPropertyId(null);
     setInvalidDropReason(null);
-    setGhostPreview(null);
+    clearGhostPreview();
     if (typedData.isReadOnly) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -1872,31 +1927,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
         }}>
           {(topLevel.length > 0 ? topLevel : []).length > 0 || (ghostPreview && ghostPreview.parentId === null && !invalidDropReason) ? (
           <>
-          {ghostPreview && ghostPreview.parentId === null && !invalidDropReason && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '16px 1fr auto 36px',
-                alignItems: 'center',
-                padding: '5px 10px',
-                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                borderBottom: '1px dashed #93c5fd',
-                gap: '4px',
-                minHeight: '28px',
-                opacity: 0.95,
-              }}
-              aria-hidden
-            >
-              <div />
-              <div style={{ fontWeight: 500, color: '#1d4ed8', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {ghostPreview.name}
-              </div>
-              <div style={{ fontSize: '9px', color: '#1e40af', fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace', whiteSpace: 'nowrap', background: 'rgba(147, 197, 253, 0.35)', padding: '1px 6px', borderRadius: '3px', fontWeight: 500 }}>
-                {ghostPreview.typeLabel}
-              </div>
-              <div style={{ fontSize: '9px', color: '#1d4ed8', textAlign: 'right', paddingRight: '2px', fontStyle: 'italic' }}>preview</div>
-            </div>
-          )}
+          {ghostPreview && ghostPreview.parentId === null && renderGhostPreviewRow('root-ghost-preview')}
           {topLevel.flatMap((prop, idx) => {
             let rowIndex = 0;
             const totalTopLevel = topLevel.length;
@@ -2126,31 +2157,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
 
               if (ghostPreview && ghostPreview.parentId === p.id && !invalidDropReason) {
                 row.push(
-                  <div
-                    key={`${p.id}-ghost-preview`}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '16px 1fr auto 36px',
-                      alignItems: 'center',
-                      padding: '5px 10px',
-                      paddingLeft: `${10 + (depth + 1) * 14}px`,
-                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                      borderBottom: '1px dashed #93c5fd',
-                      gap: '4px',
-                      minHeight: '28px',
-                      opacity: 0.95,
-                    }}
-                    aria-hidden
-                  >
-                    <div />
-                    <div style={{ fontWeight: 500, color: '#1d4ed8', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ghostPreview.name}
-                    </div>
-                    <div style={{ fontSize: '9px', color: '#1e40af', fontFamily: '"SF Mono", Monaco, "Cascadia Code", monospace', whiteSpace: 'nowrap', background: 'rgba(147, 197, 253, 0.35)', padding: '1px 6px', borderRadius: '3px', fontWeight: 500 }}>
-                      {ghostPreview.typeLabel}
-                    </div>
-                    <div style={{ fontSize: '9px', color: '#1d4ed8', textAlign: 'right', paddingRight: '2px', fontStyle: 'italic' }}>preview</div>
-                  </div>
+                  renderGhostPreviewRow(`${p.id}-ghost-preview`, `${10 + (depth + 1) * 14}px`) as React.JSX.Element
                 );
               }
 
