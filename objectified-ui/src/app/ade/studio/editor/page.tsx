@@ -343,9 +343,14 @@ const StudioContent = () => {
   const [hasExistingLayout, setHasExistingLayout] = useState(false);
   const [selectedLayoutName, setSelectedLayoutName] = useState('Development Layout');
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>(BUILTIN_LAYOUT_NAMES);
+  const selectedLayoutNameRef = useRef(selectedLayoutName);
 
   // Track whether this is the first load for a given version (to apply saved layout only once)
   const initialLayoutAppliedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedLayoutNameRef.current = selectedLayoutName;
+  }, [selectedLayoutName]);
 
   // Export wizard state
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
@@ -4091,7 +4096,12 @@ const StudioContent = () => {
         if (isFirstLoad && currentUserId) {
           try {
             setLoadingMessage('Checking for saved layout...');
-            const layoutResult = await getNamedCanvasLayout(selectedVersionId, currentUserId, selectedLayoutName);
+            const layoutNameForInitialLoad = selectedLayoutNameRef.current;
+            const layoutResult = await getNamedCanvasLayout(
+              selectedVersionId,
+              currentUserId,
+              layoutNameForInitialLoad
+            );
             const layoutResponse = JSON.parse(layoutResult);
 
             if (layoutResponse.success && layoutResponse.layout) {
@@ -4162,7 +4172,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, selectedLayoutName, projectTags, isReadOnly, updateNodeInternals, setViewport]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly, updateNodeInternals, setViewport]);
 
   // Check layout availability when version or selected layout changes
   useEffect(() => {
@@ -6140,10 +6150,14 @@ const StudioContent = () => {
                           Canvas Layout
                         </h4>
                         <div className="mb-3">
-                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          <label
+                            htmlFor="layout-name-select"
+                            className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                          >
                             Layout Name
                           </label>
                           <select
+                            id="layout-name-select"
                             value={selectedLayoutName}
                             onChange={(e) => setSelectedLayoutName(e.target.value)}
                             className="w-full px-2.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"

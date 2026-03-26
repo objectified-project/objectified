@@ -3033,15 +3033,20 @@ export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?
          AND name IS NOT NULL
          AND is_default = false
          AND (user_id = $2 OR user_id IS NULL)
-       ORDER BY name ASC, (user_id = $2) DESC, updated_at DESC`,
+       ORDER BY name ASC, (user_id = $2) DESC NULLS LAST, updated_at DESC`,
       [versionId, userId || null]
     );
 
     const byName = new Map<string, any>();
     result.rows.forEach((row: any) => {
-      if (!row.name) return;
-      if (!byName.has(row.name)) {
-        byName.set(row.name, row);
+      if (!row.name || typeof row.name !== 'string') return;
+      const normalizedName = row.name.trim();
+      if (!normalizedName) return;
+      if (!byName.has(normalizedName)) {
+        byName.set(normalizedName, {
+          ...row,
+          name: normalizedName
+        });
       }
     });
 
@@ -3057,6 +3062,11 @@ export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?
  */
 export async function getNamedCanvasLayout(versionId: string, userId: string | null, name: string) {
   try {
+    const nameValue = name.trim();
+    if (!nameValue) {
+      return successResponse({ layout: null });
+    }
+
     const result = await connectionPool.query(
       `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges,
               grid_settings, minimap_settings, metadata, created_at, updated_at
@@ -3064,9 +3074,9 @@ export async function getNamedCanvasLayout(versionId: string, userId: string | n
        WHERE version_id = $1
          AND name = $2
          AND (user_id = $3 OR user_id IS NULL)
-       ORDER BY (user_id = $3) DESC, updated_at DESC
+       ORDER BY (user_id = $3) DESC NULLS LAST, updated_at DESC
        LIMIT 1`,
-      [versionId, name, userId]
+      [versionId, nameValue, userId]
     );
 
     if (result.rowCount === 0) {
@@ -3118,7 +3128,12 @@ export async function saveNamedCanvasLayout(
         });
       }
       const syncResult = await syncGroupsForVersion(versionId, groups, nodePositions);
-      try {
+      const parsedSyncResult = JSON.parse(syncResult);
+      if (!parsedSyncResult.success) {
+        return errorResponse(parsedSyncResult.error || 'Failed to sync groups for layout save');
+      }
+    }
+
     if (existingResult.rowCount > 0) {
       return updateCanvasLayout(existingResult.rows[0].id, {
         viewport,
