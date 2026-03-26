@@ -34,6 +34,7 @@ Bug Fixes:
   - Property template form is also now wider to show better detail
   - Renaming a property no longer rearranges the entire canvas
   - Adding a reference to a class no longer rearranges the entire canvas
+  - Now handles multiple saved layouts per version
 - Project form:
   - Now includes the metadata section
   - Moved AI Assistant here
