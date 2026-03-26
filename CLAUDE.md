@@ -23,6 +23,7 @@ It contains the following directory structure:
 ## General
 
 - **GitHub issues** in **KenSuenobu/objectified** are the source of truth for what to implement.
+- Use **github MCP** for GitHub access.
 - Prefer **context7 MCP** for up-to-date library documentation and examples when available.
 - **Python:** follow **PEP 8**.
 - Ask questions only when blocked; keep clarification minimal.
