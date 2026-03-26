@@ -4169,7 +4169,7 @@ const StudioContent = () => {
     const checkLayoutExists = async () => {
       if (!selectedVersionId || !currentUserId) {
         setHasExistingLayout(false);
-        setAvailableLayoutNames([]);
+        setAvailableLayoutNames(BUILTIN_LAYOUT_NAMES);
         return;
       }
 
