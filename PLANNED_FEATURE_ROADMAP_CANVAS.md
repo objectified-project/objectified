@@ -19,7 +19,7 @@
 - ✅ **Layout Controls**: Compact button with dropdown menu
 - ✅ **Database Table**: Create a database table to store layouts
 - ✅ **Auto-load Layout on First Load**: Automatically applies saved layout when canvas loads for the first time
-- 📋 [TODO] Multiple saved layouts per version:
+- ✅ Multiple saved layouts per version:
     - "Development Layout" - organized for development work
     - "Presentation Layout" - clean arrangement for stakeholder demos
     - "Logical Layout" - grouped by business domain
@@ -29,18 +29,19 @@
 - 📋 [TODO] Default layout setting per user or per team
 - 📋 [TODO] Export layout as JSON for sharing
 - 📋 [TODO] Import layouts from other versions/projects
+- 📋 [TODO] Add ability to save layouts with a custom name
 - ✅ Add simple orthagonal edge routing after auto-layout
 
-| Ticket | Feature                                       |
-|--------|-----------------------------------------------|
-| #163   | Multiple saved layouts per version            |
-| #164   | Auto-save layout changes (tuneable interval)  |
-| #165   | Version control for layouts                   |
-| #166   | Default layout setting per user or per team   |
-| #167   | Export/import layouts as JSON                 |
-| #314   | Canvas snapshots                              |
-| #315   | Canvas auto-save of layout                    |
-| #316   | Export/import canvas layouts                  |
+| Ticket | Feature                                        |
+|--------|------------------------------------------------|
+| #164   | Auto-save layout changes (tuneable interval)   |
+| #165   | Version control for layouts                    |
+| #166   | Default layout setting per user or per team    |
+| #167   | Export/import layouts as JSON                  |
+| #314   | Canvas snapshots                               |
+| #315   | Canvas auto-save of layout                     |
+| #316   | Export/import canvas layouts                   |
+| #825   | Add ability to save layouts with a custom name |
 
 #### Layout Snapshots 📋 PLANNED
 - 📋 [TODO] Take quick snapshots of current layout
