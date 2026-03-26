@@ -4174,17 +4174,24 @@ const StudioContent = () => {
       }
 
       try {
-        const [allLayoutsResult, selectedLayoutResult] = await Promise.all([
-          getNamedCanvasLayoutsForVersion(selectedVersionId, currentUserId),
-          getNamedCanvasLayout(selectedVersionId, currentUserId, selectedLayoutName)
-        ]);
+        const allLayoutsResult = await getNamedCanvasLayoutsForVersion(
+          selectedVersionId,
+          currentUserId
+        );
         const allLayoutsResponse = JSON.parse(allLayoutsResult);
-        const selectedLayoutResponse = JSON.parse(selectedLayoutResult);
         const dbLayoutNames = (allLayoutsResponse.layouts || [])
           .map((layout: any) => layout.name)
           .filter((name: string | null): name is string => Boolean(name));
-        setAvailableLayoutNames(Array.from(new Set([...BUILTIN_LAYOUT_NAMES, ...dbLayoutNames])));
-        setHasExistingLayout(selectedLayoutResponse.success && selectedLayoutResponse.layout !== null);
+        setAvailableLayoutNames(
+          Array.from(new Set([...BUILTIN_LAYOUT_NAMES, ...dbLayoutNames]))
+        );
+
+        const hasExistingLayoutForSelection =
+          !!selectedLayoutName &&
+          (allLayoutsResponse.layouts || []).some(
+            (layout: any) => layout.name === selectedLayoutName
+          );
+        setHasExistingLayout(hasExistingLayoutForSelection);
       } catch (error) {
         console.error('Error checking layout existence:', error);
         setHasExistingLayout(false);
