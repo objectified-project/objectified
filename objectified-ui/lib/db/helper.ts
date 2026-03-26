@@ -3120,19 +3120,6 @@ export async function saveNamedCanvasLayout(
       }
       const syncResult = await syncGroupsForVersion(versionId, groups, nodePositions);
       try {
-        const parsedSyncResult = JSON.parse(syncResult);
-        if (!parsedSyncResult || parsedSyncResult.success !== true) {
-          const message =
-            parsedSyncResult && typeof parsedSyncResult.error === 'string'
-              ? parsedSyncResult.error
-              : 'Failed to sync groups for canvas layout';
-          return errorResponse(message);
-        }
-      } catch (e: any) {
-        return errorResponse('Failed to sync groups for canvas layout');
-      }
-    }
-
     if (existingResult.rowCount > 0) {
       return updateCanvasLayout(existingResult.rows[0].id, {
         viewport,
