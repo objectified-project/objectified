@@ -924,8 +924,13 @@ function ClassNode({ id, data, selected }: NodeProps) {
       setGhostPreview(null);
       return;
     }
+    const name = String(payload.property.name).trim();
+    if (!name) {
+      setGhostPreview(null);
+      return;
+    }
     setGhostPreview({
-      name: payload.property.name,
+      name,
       typeLabel: getDropPreviewPropertyType(payload.property),
       parentId,
     });
