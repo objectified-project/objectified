@@ -3022,6 +3022,15 @@ const StudioContent = () => {
   const handleSaveLayout = useCallback(async () => {
     if (isReadOnly || !selectedVersionId || !currentUserId) return;
 
+    const layoutName = selectedLayoutName.trim();
+    if (!layoutName) {
+      await alertDialog({
+        message: 'Please enter a layout name.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     try {
       setLoadingMessage('Saving canvas layout...');
       setIsLoadingCanvas(true);
@@ -3058,7 +3067,7 @@ const StudioContent = () => {
       const result = await saveNamedCanvasLayout(
         selectedVersionId,
         currentUserId,
-        selectedLayoutName,
+        layoutName,
         viewport,
         nodeData,
         edgeData,
@@ -3068,12 +3077,13 @@ const StudioContent = () => {
       const response = JSON.parse(result);
 
       if (response.success) {
+        setSelectedLayoutName(layoutName);
         // Show "Saved" state temporarily
         setLayoutSaved(true);
         setHasExistingLayout(true);
         setAvailableLayoutNames(prev => {
-          if (prev.includes(selectedLayoutName)) return prev;
-          return [...prev, selectedLayoutName];
+          if (prev.includes(layoutName)) return prev;
+          return [...prev, layoutName];
         });
         setTimeout(() => {
           setLayoutSaved(false);
@@ -3100,17 +3110,26 @@ const StudioContent = () => {
   const handleLoadLayout = useCallback(async () => {
     if (!selectedVersionId || !currentUserId) return;
 
+    const layoutName = selectedLayoutName.trim();
+    if (!layoutName) {
+      await alertDialog({
+        message: 'Please enter a layout name to load.',
+        variant: 'warning',
+      });
+      return;
+    }
+
     try {
       setLoadingMessage('Loading canvas layout...');
       setIsLoadingCanvas(true);
 
       // Fetch selected named layout from database
-      const result = await getNamedCanvasLayout(selectedVersionId, currentUserId, selectedLayoutName);
+      const result = await getNamedCanvasLayout(selectedVersionId, currentUserId, layoutName);
       const response = JSON.parse(result);
 
       if (!response.success || !response.layout) {
         await alertDialog({
-          message: `No saved "${selectedLayoutName}" found for this version`,
+          message: `No saved "${layoutName}" found for this version`,
           variant: 'warning',
         });
         setIsLoadingCanvas(false);
@@ -3272,6 +3291,7 @@ const StudioContent = () => {
         setLayoutDropdownOpen(false);
       }, 500);
 
+      setSelectedLayoutName(layoutName);
     } catch (error) {
       console.error('Error loading canvas layout:', error);
       await alertDialog({
@@ -4094,54 +4114,56 @@ const StudioContent = () => {
 
         // On first load, check if selected layout exists and apply it
         if (isFirstLoad && currentUserId) {
-          try {
-            setLoadingMessage('Checking for saved layout...');
-            const layoutNameForInitialLoad = selectedLayoutNameRef.current;
-            const layoutResult = await getNamedCanvasLayout(
-              selectedVersionId,
-              currentUserId,
-              layoutNameForInitialLoad
-            );
-            const layoutResponse = JSON.parse(layoutResult);
+          setLoadingMessage('Checking for saved layout...');
+          const layoutNameForInitialLoad = selectedLayoutNameRef.current.trim();
+          if (layoutNameForInitialLoad) {
+            try {
+              const layoutResult = await getNamedCanvasLayout(
+                selectedVersionId,
+                currentUserId,
+                layoutNameForInitialLoad
+              );
+              const layoutResponse = JSON.parse(layoutResult);
 
-            if (layoutResponse.success && layoutResponse.layout) {
-              const savedLayout = layoutResponse.layout;
-              setLoadingMessage('Applying saved layout...');
+              if (layoutResponse.success && layoutResponse.layout) {
+                const savedLayout = layoutResponse.layout;
+                setLoadingMessage('Applying saved layout...');
 
-              // Apply saved viewport
-              if (savedLayout.viewport) {
-                setViewport(
-                  { x: savedLayout.viewport.x, y: savedLayout.viewport.y, zoom: savedLayout.viewport.zoom },
-                  { duration: 250 }
-                );
-              }
+                // Apply saved viewport
+                if (savedLayout.viewport) {
+                  setViewport(
+                    { x: savedLayout.viewport.x, y: savedLayout.viewport.y, zoom: savedLayout.viewport.zoom },
+                    { duration: 250 }
+                  );
+                }
 
-              // Apply saved node positions
-              if (savedLayout.nodes && Array.isArray(savedLayout.nodes)) {
-                const savedPositions = new Map<string, { x: number; y: number }>(
-                  savedLayout.nodes.map((n: any) => [n.id, n.position])
-                );
-                finalNodes = finalNodes.map(node => {
-                  // First check if position is in classPositionsInGroups (groups take priority)
-                  if (classPositionsInGroups[node.id]) {
-                    const savedPos = classPositionsInGroups[node.id];
-                    if (savedPos.x !== null && savedPos.y !== null) {
-                      return node; // Already has group position
+                // Apply saved node positions
+                if (savedLayout.nodes && Array.isArray(savedLayout.nodes)) {
+                  const savedPositions = new Map<string, { x: number; y: number }>(
+                    savedLayout.nodes.map((n: any) => [n.id, n.position])
+                  );
+                  finalNodes = finalNodes.map(node => {
+                    // First check if position is in classPositionsInGroups (groups take priority)
+                    if (classPositionsInGroups[node.id]) {
+                      const savedPos = classPositionsInGroups[node.id];
+                      if (savedPos.x !== null && savedPos.y !== null) {
+                        return node; // Already has group position
+                      }
                     }
-                  }
-                  // Otherwise apply saved layout position
-                  const savedPos = savedPositions.get(node.id);
-                  if (savedPos && typeof savedPos.x === 'number' && typeof savedPos.y === 'number') {
-                    return { ...node, position: { x: savedPos.x, y: savedPos.y } };
-                  }
-                  return node;
-                }) as Node[];
-              }
+                    // Otherwise apply saved layout position
+                    const savedPos = savedPositions.get(node.id);
+                    if (savedPos && typeof savedPos.x === 'number' && typeof savedPos.y === 'number') {
+                      return { ...node, position: { x: savedPos.x, y: savedPos.y } };
+                    }
+                    return node;
+                  }) as Node[];
+                }
 
-              setHasExistingLayout(true);
+                setHasExistingLayout(true);
+              }
+            } catch (error) {
+              console.error('Error loading saved layout on first load:', error);
             }
-          } catch (error) {
-            console.error('Error loading saved layout on first load:', error);
           }
 
           // Mark that initial layout has been applied for this version
@@ -4196,10 +4218,11 @@ const StudioContent = () => {
           Array.from(new Set([...BUILTIN_LAYOUT_NAMES, ...dbLayoutNames]))
         );
 
+        const trimmedSelection = selectedLayoutName.trim();
         const hasExistingLayoutForSelection =
-          !!selectedLayoutName &&
+          !!trimmedSelection &&
           (allLayoutsResponse.layouts || []).some(
-            (layout: any) => layout.name === selectedLayoutName
+            (layout: any) => layout.name === trimmedSelection
           );
         setHasExistingLayout(hasExistingLayoutForSelection);
       } catch (error) {
@@ -6151,23 +6174,26 @@ const StudioContent = () => {
                         </h4>
                         <div className="mb-3">
                           <label
-                            htmlFor="layout-name-select"
+                            htmlFor="layout-name-input"
                             className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
                           >
                             Layout Name
                           </label>
-                          <select
-                            id="layout-name-select"
+                          <input
+                            id="layout-name-input"
+                            type="text"
+                            list="canvas-suggested-layout-names"
                             value={selectedLayoutName}
                             onChange={(e) => setSelectedLayoutName(e.target.value)}
-                            className="w-full px-2.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          >
+                            placeholder="Built-in name or your own"
+                            autoComplete="off"
+                            className="w-full px-2.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <datalist id="canvas-suggested-layout-names">
                             {availableLayoutNames.map((layoutName) => (
-                              <option key={layoutName} value={layoutName}>
-                                {layoutName}
-                              </option>
+                              <option key={layoutName} value={layoutName} />
                             ))}
-                          </select>
+                          </datalist>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <button
@@ -6211,7 +6237,7 @@ const StudioContent = () => {
                           </button>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                          Save and load multiple named layouts per version
+                          Type a custom name or pick a suggestion. Save and load multiple layouts per version.
                         </p>
                       </div>
 
