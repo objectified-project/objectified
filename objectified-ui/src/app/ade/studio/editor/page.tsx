@@ -224,6 +224,8 @@ const StudioContent = () => {
     exportGridOverride,
     smartGuidesEnabled,
     setSmartGuidesEnabled,
+    autoSaveLayoutEnabled,
+    autoSaveLayoutIntervalSeconds,
     canvasBackground,
     groups,
     setGroups,
@@ -344,6 +346,8 @@ const StudioContent = () => {
   const [selectedLayoutName, setSelectedLayoutName] = useState('Development Layout');
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>(BUILTIN_LAYOUT_NAMES);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
+  const [autoSavePending, setAutoSavePending] = useState(false);
+  const autoSaveInFlightRef = useRef(false);
 
   // Track whether this is the first load for a given version (to apply saved layout only once)
   const initialLayoutAppliedRef = useRef<string | null>(null);
@@ -351,6 +355,10 @@ const StudioContent = () => {
   useEffect(() => {
     selectedLayoutNameRef.current = selectedLayoutName;
   }, [selectedLayoutName]);
+
+  useEffect(() => {
+    setAutoSavePending(false);
+  }, [selectedVersionId]);
 
   // Export wizard state
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
@@ -2871,6 +2879,19 @@ const StudioContent = () => {
 
   // Custom onNodesChange that syncs group positions/dimensions, moves children, and constrains grouped nodes
   const handleNodesChange = useCallback((changes: any[]) => {
+    const shouldTriggerAutoSave = changes.some((change: any) => {
+      if (!change || typeof change !== 'object') return false;
+      return (
+        change.type === 'position' ||
+        change.type === 'dimensions' ||
+        change.type === 'add' ||
+        change.type === 'remove'
+      );
+    });
+
+    if (shouldTriggerAutoSave) {
+      setAutoSavePending(true);
+    }
     // Track group position changes to move their child nodes
     const groupDeltas: Map<string, { dx: number; dy: number }> = new Map();
 
@@ -3010,6 +3031,30 @@ const StudioContent = () => {
     }
   }, [onNodesChange, nodes, groups, updateGroup, setNodes]);
 
+  const handleEdgesChange = useCallback((changes: any[]) => {
+    const hasLayoutAffectingChange = changes.some((change) => {
+      if (!change || typeof change !== 'object') return false;
+
+      if (change.type === 'add' || change.type === 'remove') {
+        return true;
+      }
+
+      if (change.type === 'update') {
+        const update = (change as any).update;
+        if (update && typeof update === 'object' && update.type === 'replace') {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    if (hasLayoutAffectingChange) {
+      setAutoSavePending(true);
+    }
+    onEdgesChange(changes);
+  }, [onEdgesChange]);
+
   // ============================================================================
   // END GROUP MANAGEMENT HANDLERS
   // ============================================================================
@@ -3105,6 +3150,84 @@ const StudioContent = () => {
       setLoadingMessage('');
     }
   }, [isReadOnly, selectedVersionId, currentUserId, selectedLayoutName, nodes, edges, groups, getViewport, alertDialog]);
+
+  const autoSaveDefaultLayout = useCallback(async () => {
+    if (
+      !autoSaveLayoutEnabled ||
+      !autoSavePending ||
+      isReadOnly ||
+      !selectedVersionId ||
+      !currentUserId ||
+      layoutPreviewNodes ||
+      autoSaveInFlightRef.current
+    ) {
+      return;
+    }
+
+    autoSaveInFlightRef.current = true;
+    try {
+      const viewport = getViewport();
+      const nodeData = nodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        position: node.position,
+        dimensions: {
+          width: node.measured?.width || node.width || node.style?.width,
+          height: node.measured?.height || node.height || node.style?.height
+        },
+        data: node.type === 'groupNode' ? {
+          name: node.data.name,
+          color: node.data.color,
+          nodeIds: node.data.nodeIds
+        } : undefined
+      }));
+      const edgeData = edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle
+      }));
+
+      const result = await saveDefaultCanvasLayout(
+        selectedVersionId,
+        currentUserId,
+        viewport,
+        nodeData,
+        edgeData,
+        groups
+      );
+      const response = JSON.parse(result);
+      if (response.success) {
+        setAutoSavePending(false);
+      }
+    } catch (error) {
+      console.error('Failed to auto-save layout:', error);
+    } finally {
+      autoSaveInFlightRef.current = false;
+    }
+  }, [
+    autoSaveLayoutEnabled,
+    autoSavePending,
+    isReadOnly,
+    selectedVersionId,
+    currentUserId,
+    layoutPreviewNodes,
+    getViewport,
+    nodes,
+    edges,
+    groups
+  ]);
+
+  useEffect(() => {
+    if (!autoSaveLayoutEnabled || autoSaveLayoutIntervalSeconds < 10) return;
+
+    const intervalId = window.setInterval(() => {
+      void autoSaveDefaultLayout();
+    }, autoSaveLayoutIntervalSeconds * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoSaveLayoutEnabled, autoSaveLayoutIntervalSeconds, autoSaveDefaultLayout]);
 
   // Load saved canvas layout
   const handleLoadLayout = useCallback(async () => {
@@ -4401,6 +4524,7 @@ const StudioContent = () => {
         }
         // Default behavior for other connections (e.g., composition edges if we enable manual linking)
         setEdges((eds) => addEdge(params, eds));
+        setAutoSavePending(true);
       } catch (e) {
         console.error('onConnect failed:', e);
       }
@@ -5184,7 +5308,7 @@ const StudioContent = () => {
               minZoom={0.1}
               maxZoom={2}
               onNodesChange={handleNodesChange}
-              onEdgesChange={onEdgesChange}
+              onEdgesChange={handleEdgesChange}
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onEdgeClick={onEdgeClick}
@@ -5196,6 +5320,7 @@ const StudioContent = () => {
               onDragOver={handleCanvasDragOver}
               onDrop={handleCanvasDrop}
               onMove={(_, viewport) => setZoomLevel(viewport.zoom)}
+              onMoveEnd={() => setAutoSavePending(true)}
               snapToGrid={snapToGrid}
               snapGrid={[gridSize, gridSize]}
               fitView

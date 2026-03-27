@@ -58,6 +58,10 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setCanvasBackground,
     smartGuidesEnabled,
     setSmartGuidesEnabled,
+    autoSaveLayoutEnabled,
+    setAutoSaveLayoutEnabled,
+    autoSaveLayoutIntervalSeconds,
+    setAutoSaveLayoutIntervalSeconds,
     edgeStyling,
     setEdgeStyling,
     edgeRouting,
@@ -88,6 +92,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     clickToFocusEnabled: boolean;
     snapToGrid: boolean;
     smartGuidesEnabled: boolean;
+    autoSaveLayoutEnabled: boolean;
+    autoSaveLayoutIntervalSeconds: number;
     showGrid: boolean;
     gridSize: number;
     gridStyle: 'dots' | 'lines' | 'cross';
@@ -104,6 +110,10 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
     setSmartGuidesEnabled(settings.smartGuidesEnabled);
     localStorage.setItem('smartGuidesEnabled', JSON.stringify(settings.smartGuidesEnabled));
+    setAutoSaveLayoutEnabled(settings.autoSaveLayoutEnabled);
+    localStorage.setItem('autoSaveLayoutEnabled', JSON.stringify(settings.autoSaveLayoutEnabled));
+    setAutoSaveLayoutIntervalSeconds(settings.autoSaveLayoutIntervalSeconds);
+    localStorage.setItem('autoSaveLayoutIntervalSeconds', String(settings.autoSaveLayoutIntervalSeconds));
 
     setShowGrid(settings.showGrid);
     localStorage.setItem('showGrid', JSON.stringify(settings.showGrid));
@@ -125,7 +135,7 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
 
     setEdgeAnimation(settings.edgeAnimation);
     localStorage.setItem('edgeAnimation', settings.edgeAnimation);
-  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setShowGrid, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
+  }, [setClickToFocusEnabled, setSnapToGrid, setSmartGuidesEnabled, setAutoSaveLayoutEnabled, setAutoSaveLayoutIntervalSeconds, setShowGrid, setGridSize, setGridStyle, setCanvasBackground, setEdgeStyling, setEdgeRouting, setEdgeAnimation]);
 
   // Sync local state with context
   React.useEffect(() => {
@@ -394,6 +404,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               clickToFocusEnabled={clickToFocusEnabled}
               snapToGrid={snapToGrid}
               smartGuidesEnabled={smartGuidesEnabled}
+              autoSaveLayoutEnabled={autoSaveLayoutEnabled}
+              autoSaveLayoutIntervalSeconds={autoSaveLayoutIntervalSeconds}
               showGrid={showGrid}
               gridSize={gridSize}
               gridStyle={gridStyle}

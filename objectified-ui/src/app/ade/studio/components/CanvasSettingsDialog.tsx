@@ -192,6 +192,8 @@ interface CanvasSettingsDialogProps {
   clickToFocusEnabled: boolean;
   snapToGrid: boolean;
   smartGuidesEnabled: boolean;
+  autoSaveLayoutEnabled: boolean;
+  autoSaveLayoutIntervalSeconds: number;
   showGrid: boolean;
   gridSize: number;
   gridStyle: 'dots' | 'lines' | 'cross';
@@ -204,6 +206,8 @@ interface CanvasSettingsDialogProps {
     clickToFocusEnabled: boolean;
     snapToGrid: boolean;
     smartGuidesEnabled: boolean;
+    autoSaveLayoutEnabled: boolean;
+    autoSaveLayoutIntervalSeconds: number;
     showGrid: boolean;
     gridSize: number;
     gridStyle: 'dots' | 'lines' | 'cross';
@@ -241,6 +245,8 @@ export default function CanvasSettingsDialog({
   clickToFocusEnabled,
   snapToGrid,
   smartGuidesEnabled,
+  autoSaveLayoutEnabled,
+  autoSaveLayoutIntervalSeconds,
   showGrid,
   gridSize,
   gridStyle,
@@ -256,6 +262,8 @@ export default function CanvasSettingsDialog({
   const [localClickToFocus, setLocalClickToFocus] = React.useState(clickToFocusEnabled);
   const [localSnapToGrid, setLocalSnapToGrid] = React.useState(snapToGrid);
   const [localSmartGuides, setLocalSmartGuides] = React.useState(smartGuidesEnabled);
+  const [localAutoSaveLayoutEnabled, setLocalAutoSaveLayoutEnabled] = React.useState(autoSaveLayoutEnabled);
+  const [localAutoSaveLayoutIntervalSeconds, setLocalAutoSaveLayoutIntervalSeconds] = React.useState(autoSaveLayoutIntervalSeconds);
   const [localShowGrid, setLocalShowGrid] = React.useState(showGrid);
   const [localGridSize, setLocalGridSize] = React.useState(gridSize);
   const [localGridStyle, setLocalGridStyle] = React.useState(gridStyle);
@@ -270,6 +278,8 @@ export default function CanvasSettingsDialog({
       setLocalClickToFocus(clickToFocusEnabled);
       setLocalSnapToGrid(snapToGrid);
       setLocalSmartGuides(smartGuidesEnabled);
+      setLocalAutoSaveLayoutEnabled(autoSaveLayoutEnabled);
+      setLocalAutoSaveLayoutIntervalSeconds(autoSaveLayoutIntervalSeconds);
       setLocalShowGrid(showGrid);
       setLocalGridSize(gridSize);
       setLocalGridStyle(gridStyle);
@@ -278,13 +288,15 @@ export default function CanvasSettingsDialog({
       setLocalEdgeRouting(edgeRouting);
       setLocalEdgeAnimation(edgeAnimation);
     }
-  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, showGrid, gridSize, gridStyle, canvasBackground, edgeStyling, edgeRouting, edgeAnimation]);
+  }, [open, clickToFocusEnabled, snapToGrid, smartGuidesEnabled, autoSaveLayoutEnabled, autoSaveLayoutIntervalSeconds, showGrid, gridSize, gridStyle, canvasBackground, edgeStyling, edgeRouting, edgeAnimation]);
 
   const handleSave = () => {
     onSave({
       clickToFocusEnabled: localClickToFocus,
       snapToGrid: localSnapToGrid,
       smartGuidesEnabled: localSmartGuides,
+      autoSaveLayoutEnabled: localAutoSaveLayoutEnabled,
+      autoSaveLayoutIntervalSeconds: localAutoSaveLayoutIntervalSeconds,
       showGrid: localShowGrid,
       gridSize: localGridSize,
       gridStyle: localGridStyle,
@@ -456,6 +468,42 @@ export default function CanvasSettingsDialog({
                       className="w-4 h-4 text-indigo-500 rounded focus:ring-indigo-500"
                     />
                   </label>
+                  <label className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Auto-save Layout</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={localAutoSaveLayoutEnabled}
+                      onChange={(e) => setLocalAutoSaveLayoutEnabled(e.target.checked)}
+                      className="w-4 h-4 text-indigo-500 rounded focus:ring-indigo-500"
+                    />
+                  </label>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Auto-save Interval</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-medium">
+                        {localAutoSaveLayoutIntervalSeconds}s
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="300"
+                      step="5"
+                      value={localAutoSaveLayoutIntervalSeconds}
+                      disabled={!localAutoSaveLayoutEnabled}
+                      onChange={(e) => setLocalAutoSaveLayoutIntervalSeconds(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span>10s</span>
+                      <span>300s</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

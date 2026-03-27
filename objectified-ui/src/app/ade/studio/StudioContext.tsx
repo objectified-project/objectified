@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -118,6 +118,11 @@ interface StudioContextType {
   // Smart guides
   smartGuidesEnabled: boolean;
   setSmartGuidesEnabled: (enabled: boolean) => void;
+  // Auto-save layout settings
+  autoSaveLayoutEnabled: boolean;
+  setAutoSaveLayoutEnabled: (enabled: boolean) => void;
+  autoSaveLayoutIntervalSeconds: number;
+  setAutoSaveLayoutIntervalSeconds: (seconds: number) => void;
   // Edge styling
   edgeStyling: EdgeStylingOptions;
   setEdgeStyling: (options: EdgeStylingOptions) => void;
@@ -217,6 +222,33 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
     return true;
   });
+  const [autoSaveLayoutEnabled, setAutoSaveLayoutEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('autoSaveLayoutEnabled');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse autoSaveLayoutEnabled from localStorage:', e);
+          return true;
+        }
+      }
+    }
+    return true;
+  });
+  const [autoSaveLayoutIntervalSeconds, setAutoSaveLayoutIntervalSecondsRaw] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('autoSaveLayoutIntervalSeconds');
+      const parsed = saved ? parseInt(saved, 10) : 30;
+      if (Number.isFinite(parsed)) {
+        return Math.min(300, Math.max(10, parsed));
+      }
+    }
+    return 30;
+  });
+  const setAutoSaveLayoutIntervalSeconds = useCallback((seconds: number) => {
+    setAutoSaveLayoutIntervalSecondsRaw(Math.min(300, Math.max(10, seconds)));
+  }, []);
 
   const [edgeStyling, setEdgeStyling] = useState<EdgeStylingOptions>(() => {
     const defaults: EdgeStylingOptions = {
@@ -345,6 +377,16 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('smartGuidesEnabled', JSON.stringify(smartGuidesEnabled));
     }
   }, [smartGuidesEnabled]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('autoSaveLayoutEnabled', JSON.stringify(autoSaveLayoutEnabled));
+    }
+  }, [autoSaveLayoutEnabled]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('autoSaveLayoutIntervalSeconds', String(autoSaveLayoutIntervalSeconds));
+    }
+  }, [autoSaveLayoutIntervalSeconds]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -446,6 +488,10 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setExportGridOverride,
       smartGuidesEnabled,
       setSmartGuidesEnabled,
+      autoSaveLayoutEnabled,
+      setAutoSaveLayoutEnabled,
+      autoSaveLayoutIntervalSeconds,
+      setAutoSaveLayoutIntervalSeconds,
       edgeStyling,
       setEdgeStyling,
       edgeRouting,
