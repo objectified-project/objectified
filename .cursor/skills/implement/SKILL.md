@@ -63,10 +63,9 @@ When the user invokes **handle-ticket** with an issue number (for example `/hand
 
 - **Request a review from GitHub Copilot** on the PR. Use the same reviewer login your org uses when typing **@Copilot** in the GitHub reviewer field (often the Copilot PR-review bot account—confirm via UI or org docs).  Use Github MCP to add **Copilot** as a reviewer and note that in a comment if needed.
 
-## 9. Return to default branch
+## 9. Remain in the branch
 
-- After the PR is created (and push is complete), switch back locally:
-  - checkout main (or the repo default branch), then optionally pull so the workspace matches upstream.
+- After the PR is created, remain in the branch that was created.
 
 ## Constraints
 
