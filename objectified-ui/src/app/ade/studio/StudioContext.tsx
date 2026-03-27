@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -225,11 +225,18 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [autoSaveLayoutEnabled, setAutoSaveLayoutEnabled] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('autoSaveLayoutEnabled');
-      return saved ? JSON.parse(saved) : true;
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse autoSaveLayoutEnabled from localStorage:', e);
+          return true;
+        }
+      }
     }
     return true;
   });
-  const [autoSaveLayoutIntervalSeconds, setAutoSaveLayoutIntervalSeconds] = useState<number>(() => {
+  const [autoSaveLayoutIntervalSeconds, setAutoSaveLayoutIntervalSecondsRaw] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('autoSaveLayoutIntervalSeconds');
       const parsed = saved ? parseInt(saved, 10) : 30;
@@ -239,6 +246,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
     return 30;
   });
+  const setAutoSaveLayoutIntervalSeconds = useCallback((seconds: number) => {
+    setAutoSaveLayoutIntervalSecondsRaw(Math.min(300, Math.max(10, seconds)));
+  }, []);
 
   const [edgeStyling, setEdgeStyling] = useState<EdgeStylingOptions>(() => {
     const defaults: EdgeStylingOptions = {

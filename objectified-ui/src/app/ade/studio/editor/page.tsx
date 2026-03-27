@@ -347,6 +347,7 @@ const StudioContent = () => {
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>(BUILTIN_LAYOUT_NAMES);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
   const [autoSavePending, setAutoSavePending] = useState(false);
+  const autoSaveInFlightRef = useRef(false);
 
   // Track whether this is the first load for a given version (to apply saved layout only once)
   const initialLayoutAppliedRef = useRef<string | null>(null);
@@ -2878,7 +2879,14 @@ const StudioContent = () => {
 
   // Custom onNodesChange that syncs group positions/dimensions, moves children, and constrains grouped nodes
   const handleNodesChange = useCallback((changes: any[]) => {
-    if (changes.length > 0) {
+    const shouldTriggerAutoSave = changes.some((change: any) =>
+      change.type === 'position' ||
+      change.type === 'dimensions' ||
+      change.type === 'add' ||
+      change.type === 'remove'
+    );
+
+    if (shouldTriggerAutoSave) {
       setAutoSavePending(true);
     }
     // Track group position changes to move their child nodes
@@ -3021,7 +3029,24 @@ const StudioContent = () => {
   }, [onNodesChange, nodes, groups, updateGroup, setNodes]);
 
   const handleEdgesChange = useCallback((changes: any[]) => {
-    if (changes.length > 0) {
+    const hasLayoutAffectingChange = changes.some((change) => {
+      if (!change || typeof change !== 'object') return false;
+
+      if (change.type === 'add' || change.type === 'remove') {
+        return true;
+      }
+
+      if (change.type === 'update') {
+        const update = (change as any).update;
+        if (update && typeof update === 'object' && update.type === 'replace') {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    if (hasLayoutAffectingChange) {
       setAutoSavePending(true);
     }
     onEdgesChange(changes);
@@ -3130,11 +3155,13 @@ const StudioContent = () => {
       isReadOnly ||
       !selectedVersionId ||
       !currentUserId ||
-      layoutPreviewNodes
+      layoutPreviewNodes ||
+      autoSaveInFlightRef.current
     ) {
       return;
     }
 
+    autoSaveInFlightRef.current = true;
     try {
       const viewport = getViewport();
       const nodeData = nodes.map(node => ({
@@ -3173,6 +3200,8 @@ const StudioContent = () => {
       }
     } catch (error) {
       console.error('Failed to auto-save layout:', error);
+    } finally {
+      autoSaveInFlightRef.current = false;
     }
   }, [
     autoSaveLayoutEnabled,
