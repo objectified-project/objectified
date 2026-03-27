@@ -2879,12 +2879,15 @@ const StudioContent = () => {
 
   // Custom onNodesChange that syncs group positions/dimensions, moves children, and constrains grouped nodes
   const handleNodesChange = useCallback((changes: any[]) => {
-    const shouldTriggerAutoSave = changes.some((change: any) =>
-      change.type === 'position' ||
-      change.type === 'dimensions' ||
-      change.type === 'add' ||
-      change.type === 'remove'
-    );
+    const shouldTriggerAutoSave = changes.some((change: any) => {
+      if (!change || typeof change !== 'object') return false;
+      return (
+        change.type === 'position' ||
+        change.type === 'dimensions' ||
+        change.type === 'add' ||
+        change.type === 'remove'
+      );
+    });
 
     if (shouldTriggerAutoSave) {
       setAutoSavePending(true);
