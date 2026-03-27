@@ -24,7 +24,7 @@
     - "Presentation Layout" - clean arrangement for stakeholder demos
     - "Logical Layout" - grouped by business domain
     - "Dependency Layout" - organized by relationships
-- 📋 [TODO] Auto-save layout changes every 30 seconds (configurable)
+- ✅ Auto-save layout changes every 30 seconds (configurable)
 - 📋 [TODO] Version control for layouts (track layout history)
 - 📋 [TODO] Default layout setting per user or per team
 - 📋 [TODO] Export layout as JSON for sharing
@@ -34,7 +34,6 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #164   | Auto-save layout changes (tuneable interval)   |
 | #165   | Version control for layouts                    |
 | #166   | Default layout setting per user or per team    |
 | #167   | Export/import layouts as JSON                  |
