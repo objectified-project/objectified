@@ -113,7 +113,23 @@ describe('Database Helper - Named Canvas Layouts', () => {
 
     mockQuery
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-1' }] }) // existing lookup
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ version_id: 'version-1', user_id: 'user-1' }] }) // update lookup
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            version_id: 'version-1',
+            user_id: 'user-1',
+            viewport: { x: 0, y: 0, zoom: 1 },
+            nodes: [],
+            edges: [],
+            grid_settings: {},
+            minimap_settings: {}
+          }
+        ]
+      }) // full row for revision snapshot
+      .mockResolvedValueOnce({ rows: [{ n: 0 }] }) // max revision
+      .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
+      .mockResolvedValueOnce({ rowCount: 0 }) // prune old revisions
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-1', name: 'Dependency Layout' }] }); // update return
 
     const result = await saveNamedCanvasLayout(
@@ -206,7 +222,23 @@ describe('Database Helper - Named Canvas Layouts', () => {
 
     mockQuery
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1' }] }) // existing lookup
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ version_id: 'version-1', user_id: null }] }) // update lookup
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            version_id: 'version-1',
+            user_id: null,
+            viewport: { x: 0, y: 0, zoom: 1 },
+            nodes: [],
+            edges: [],
+            grid_settings: {},
+            minimap_settings: {}
+          }
+        ]
+      }) // full row for revision snapshot
+      .mockResolvedValueOnce({ rows: [{ n: 2 }] }) // max revision
+      .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
+      .mockResolvedValueOnce({ rowCount: 0 }) // prune
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1', name: 'Shared Layout' }] }); // update return
 
     const result = await saveNamedCanvasLayout(
