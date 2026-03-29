@@ -55,7 +55,8 @@ import {
   BoxSelect,
   Braces,
   Ban,
-  Ghost
+  Ghost,
+  Undo2
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -117,6 +118,7 @@ import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { getVisibleNodeIdsForIsolateSelection } from '@/app/utils/canvas-node-visibility';
 import {
+  hasActiveCanvasVisibilityRestrictions,
   computeClassIdsPassingHideCriteria,
   groupNodeIdIsVisible,
 } from '@/app/utils/canvas-display-visibility';
@@ -339,6 +341,30 @@ const StudioContent = () => {
 
   // #482: Hide all class nodes except the current selection (and group frames that contain them)
   const [isolateSelectionEnabled, setIsolateSelectionEnabled] = useState(false);
+
+  const canvasVisibilityRestricted = useMemo(
+    () =>
+      hasActiveCanvasVisibilityRestrictions({
+        manualHiddenNodeCount: hiddenNodeIds.size,
+        hideEmptyClasses,
+        hideUnconnectedClasses: showOnlyConnectedNodes,
+        hideDeprecatedClasses,
+        hiddenGroupIdsCount: hiddenCanvasGroupIds.size,
+        nodeGhostsModeEnabled,
+        isolateSelectionEnabled,
+        focusModeEnabled,
+      }),
+    [
+      hiddenNodeIds,
+      hideEmptyClasses,
+      showOnlyConnectedNodes,
+      hideDeprecatedClasses,
+      hiddenCanvasGroupIds,
+      nodeGhostsModeEnabled,
+      isolateSelectionEnabled,
+      focusModeEnabled,
+    ]
+  );
 
   // Spacing indicators state
   const [spacingIndicators, setSpacingIndicators] = useState<{
@@ -1431,6 +1457,20 @@ const StudioContent = () => {
       }
       return next;
     });
+  }, []);
+
+  /** #485: One action to clear manual hides, hide filters, ghosts, isolate, and focus mode. */
+  const restoreCanvasVisibility = useCallback(() => {
+    setHiddenNodeIdsState(new Set());
+    setHideEmptyClasses(false);
+    setHideDeprecatedClasses(false);
+    setShowOnlyConnectedNodes(false);
+    setHiddenCanvasGroupIds(new Set());
+    setNodeGhostsModeEnabled(false);
+    setIsolateSelectionEnabled(false);
+    setFocusModeEnabled(false);
+    setFocusModeGroupId(null);
+    setFocusModeDegree(1);
   }, []);
 
   // Register zoomToClass function in context on mount
@@ -6128,13 +6168,7 @@ const StudioContent = () => {
                   <DropdownMenu.Trigger asChild>
                     <button
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
-                        focusModeEnabled ||
-                        showOnlyConnectedNodes ||
-                        isolateSelectionEnabled ||
-                        hideEmptyClasses ||
-                        hideDeprecatedClasses ||
-                        hiddenCanvasGroupIds.size > 0 ||
-                        nodeGhostsModeEnabled
+                        canvasVisibilityRestricted
                           ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
                           : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
                       }`}
@@ -6314,6 +6348,16 @@ const StudioContent = () => {
                         <BoxSelect className="h-4 w-4 shrink-0" />
                         <span>Selected only</span>
                       </DropdownMenu.CheckboxItem>
+                      <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                      <DropdownMenu.Item
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[disabled]:opacity-40 data-[disabled]:pointer-events-none"
+                        disabled={!canvasVisibilityRestricted}
+                        title="Show every class again: clear manual hides, hide filters, node ghosts, isolate selection, and focus mode"
+                        onSelect={() => restoreCanvasVisibility()}
+                      >
+                        <Undo2 className="h-4 w-4 shrink-0" />
+                        <span>Show all nodes</span>
+                      </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>

@@ -87,11 +87,7 @@
   - Hide deprecated classes
   - Hide by group membership
 - ✅ "Ghosts mode": Show hidden nodes as semi-transparent
-- 📋 [TODO] Quick restore hidden nodes
-
-| Ticket | Feature Description            |
-|--------|--------------------------------|
-| #485   | Quick restore hidden nodes     |
+- ✅ Quick restore: **Show all nodes** in View Mode clears manual hides, filters, ghosts, isolate, and focus
 
 ---
 
