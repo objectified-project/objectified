@@ -5139,8 +5139,7 @@ const StudioContent = () => {
           /* #484 Node ghosts — hidden-by-filter nodes still drawn */
           .react-flow__node.canvas-node-ghost {
             opacity: 0.38 !important;
-            filter: grayscale(35%) !important;
-            transition: opacity 0.2s ease, filter 0.2s ease !important;
+            transition: opacity 0.2s ease !important;
           }
           .react-flow__edge.canvas-edge-ghost path {
             opacity: 0.35 !important;

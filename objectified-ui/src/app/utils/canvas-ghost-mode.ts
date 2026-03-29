@@ -5,7 +5,11 @@
 import type { CanvasGroupForVisibility } from '@/app/utils/canvas-node-visibility';
 import { groupNodeIdIsVisible } from '@/app/utils/canvas-display-visibility';
 
-/** Edge is drawn when both endpoints are class nodes present in the base graph. */
+/**
+ * When ghosts mode is ON: an edge is drawn if both endpoints are class nodes present
+ * in the full base graph (including hidden ones), so ghost-edges span hidden nodes.
+ * When ghosts mode is OFF: an edge is drawn only if both endpoints are in visibleClassIds.
+ */
 export function edgeBelongsOnCanvas(
   source: string,
   target: string,
