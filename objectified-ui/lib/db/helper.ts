@@ -3221,8 +3221,10 @@ export async function createCanvasLayout(
 const CANVAS_LAYOUT_REVISION_RETAIN = 50;
 
 /**
- * Update an existing canvas layout
- * @param options.recordRevision When true and layout fields change, stores the previous row in canvas_layout_revisions (named layout saves).
+ * Update an existing canvas layout.
+ * @param options.recordRevision When true, stores the previous row snapshot in canvas_layout_revisions
+ *   (used for named layout saves). A revision is recorded whenever spatial layout fields are provided,
+ *   regardless of whether the values have actually changed.
  */
 export async function updateCanvasLayout(
   layoutId: string,
@@ -3241,6 +3243,7 @@ export async function updateCanvasLayout(
     revisionUserId?: string | null;
   }
 ) {
+  const client = await connectionPool.connect();
   try {
     const recordRevision = options?.recordRevision === true;
     const revisionUserId = options?.revisionUserId ?? null;
@@ -3253,27 +3256,32 @@ export async function updateCanvasLayout(
         updates.gridSettings !== undefined ||
         updates.minimapSettings !== undefined);
 
-    const currentResult = shouldSnapshotPriorLayout
-      ? await connectionPool.query(`SELECT * FROM odb.canvas_layouts WHERE id = $1`, [layoutId])
-      : await connectionPool.query(
-          `SELECT version_id, user_id FROM odb.canvas_layouts WHERE id = $1`,
-          [layoutId]
-        );
+    await client.query('BEGIN');
+
+    // Lock the layout row for the duration of the transaction so concurrent saves
+    // for the same layout cannot race on the revision counter.
+    const currentResult = await client.query(
+      `SELECT * FROM odb.canvas_layouts WHERE id = $1 FOR UPDATE`,
+      [layoutId]
+    );
 
     if (currentResult.rowCount === 0) {
+      await client.query('ROLLBACK');
       return errorResponse('Layout not found');
     }
 
     const currentRow = currentResult.rows[0];
 
     if (shouldSnapshotPriorLayout) {
-      const maxRevResult = await connectionPool.query(
+      // MAX(revision) is safe here because the canvas_layouts row is locked above,
+      // preventing any concurrent transaction from inserting a revision for this layout.
+      const maxRevResult = await client.query(
         `SELECT COALESCE(MAX(revision), 0) AS n FROM odb.canvas_layout_revisions WHERE canvas_layout_id = $1`,
         [layoutId]
       );
       const nextRevision = Number(maxRevResult.rows[0].n) + 1;
 
-      await connectionPool.query(
+      await client.query(
         `INSERT INTO odb.canvas_layout_revisions
          (canvas_layout_id, revision, viewport, nodes, edges, grid_settings, minimap_settings, created_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -3289,7 +3297,7 @@ export async function updateCanvasLayout(
         ]
       );
 
-      await connectionPool.query(
+      await client.query(
         `DELETE FROM odb.canvas_layout_revisions
          WHERE canvas_layout_id = $1
            AND revision < (
@@ -3306,13 +3314,13 @@ export async function updateCanvasLayout(
     // If setting as default, unset other defaults
     if (updates.isDefault) {
       if (user_id) {
-        await connectionPool.query(
+        await client.query(
           `UPDATE odb.canvas_layouts SET is_default = false 
            WHERE version_id = $1 AND user_id = $2 AND is_default = true AND id != $3`,
           [version_id, user_id, layoutId]
         );
       } else {
-        await connectionPool.query(
+        await client.query(
           `UPDATE odb.canvas_layouts SET is_default = false 
            WHERE version_id = $1 AND user_id IS NULL AND is_default = true AND id != $2`,
           [version_id, layoutId]
@@ -3359,12 +3367,13 @@ export async function updateCanvasLayout(
     }
 
     if (setClauses.length === 0) {
+      await client.query('ROLLBACK');
       return errorResponse('No updates provided');
     }
 
     values.push(layoutId);
 
-    const result = await connectionPool.query(
+    const result = await client.query(
       `UPDATE odb.canvas_layouts 
        SET ${setClauses.join(', ')}
        WHERE id = $${paramIndex}
@@ -3373,26 +3382,40 @@ export async function updateCanvasLayout(
       values
     );
 
+    await client.query('COMMIT');
     return successResponse({ layout: result.rows[0] });
   } catch (error: any) {
+    try { await client.query('ROLLBACK'); } catch {}
     console.error('Error updating canvas layout:', error);
     return errorResponse(error.message);
+  } finally {
+    client.release();
   }
 }
 
 /**
  * List prior snapshots for a named layout (newest first).
+ * Access is restricted to layouts that belong to `versionId` and are owned by
+ * `userId` or are shared (user_id IS NULL).
  */
-export async function listCanvasLayoutRevisions(layoutId: string, limit: number = 50) {
+export async function listCanvasLayoutRevisions(
+  layoutId: string,
+  versionId: string,
+  userId: string | null,
+  limit: number = 50
+) {
   try {
     const cap = Math.min(Math.max(1, limit), 100);
     const result = await connectionPool.query(
-      `SELECT id, canvas_layout_id, revision, created_at, created_by
-       FROM odb.canvas_layout_revisions
-       WHERE canvas_layout_id = $1
-       ORDER BY revision DESC
-       LIMIT $2`,
-      [layoutId, cap]
+      `SELECT r.id, r.canvas_layout_id, r.revision, r.created_at, r.created_by
+       FROM odb.canvas_layout_revisions r
+       JOIN odb.canvas_layouts cl ON cl.id = r.canvas_layout_id
+       WHERE r.canvas_layout_id = $1
+         AND cl.version_id = $2
+         AND (cl.user_id = $3 OR cl.user_id IS NULL)
+       ORDER BY r.revision DESC
+       LIMIT $4`,
+      [layoutId, versionId, userId, cap]
     );
     return successResponse({ revisions: result.rows });
   } catch (error: any) {
@@ -3403,18 +3426,25 @@ export async function listCanvasLayoutRevisions(layoutId: string, limit: number 
 
 /**
  * Restore a canvas layout from a stored revision (records current state as a new revision first).
+ * Access is restricted to layouts that belong to `versionId` and are owned by
+ * `userId` or are shared (user_id IS NULL).
  */
 export async function restoreCanvasLayoutFromRevision(
   layoutId: string,
   revisionId: string,
+  versionId: string,
   userId: string | null
 ) {
   try {
     const revResult = await connectionPool.query(
       `SELECT r.viewport, r.nodes, r.edges, r.grid_settings, r.minimap_settings
        FROM odb.canvas_layout_revisions r
-       WHERE r.id = $1 AND r.canvas_layout_id = $2`,
-      [revisionId, layoutId]
+       JOIN odb.canvas_layouts cl ON cl.id = r.canvas_layout_id
+       WHERE r.id = $1
+         AND r.canvas_layout_id = $2
+         AND cl.version_id = $3
+         AND (cl.user_id = $4 OR cl.user_id IS NULL)`,
+      [revisionId, layoutId, versionId, userId]
     );
 
     if (revResult.rowCount === 0) {

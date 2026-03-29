@@ -3762,6 +3762,7 @@ const StudioContent = () => {
         const restoreRes = await restoreCanvasLayoutFromRevision(
           layoutParsed.layout.id,
           revisionId,
+          selectedVersionId,
           currentUserId
         );
         const restoreParsed = JSON.parse(restoreRes);
@@ -3819,7 +3820,7 @@ const StudioContent = () => {
           }
           return;
         }
-        const revRes = await listCanvasLayoutRevisions(parsed.layout.id);
+        const revRes = await listCanvasLayoutRevisions(parsed.layout.id, selectedVersionId, currentUserId);
         const revParsed = JSON.parse(revRes);
         if (!cancelled && revParsed.success) {
           setLayoutHistoryRevisions(revParsed.revisions || []);
@@ -6913,6 +6914,8 @@ const StudioContent = () => {
                           <button
                             type="button"
                             onClick={() => setLayoutHistoryOpen((open) => !open)}
+                            aria-expanded={layoutHistoryOpen}
+                            aria-controls="layout-history-panel"
                             className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                           >
                             <span className="flex items-center gap-1.5">
@@ -6926,7 +6929,7 @@ const StudioContent = () => {
                             )}
                           </button>
                           {layoutHistoryOpen && (
-                            <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                            <div id="layout-history-panel" className="mt-2 max-h-40 space-y-1 overflow-y-auto">
                               {layoutHistoryLoading && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Loading history…</p>
                               )}
