@@ -39,6 +39,7 @@ Bug Fixes:
   - Adds auto-save layout changes every 30 seconds (configurable)
   - Adds the ability to save custom layout names per version
   - Adds view mode to show and hide all nodes except selected
+    - Adds hiding by criteria
   - Introduces the ability to hide/show individual nodes
 - Project form:
   - Now includes the metadata section
