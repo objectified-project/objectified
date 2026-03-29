@@ -4,6 +4,10 @@
 # Change to the script directory
 cd "$(dirname "$0")"
 
+if [ -f .venv/bin/activate ]; then
+    source .venv/bin/activate
+fi
+
 # Run the app using uv
 uv run -m app
 
