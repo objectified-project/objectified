@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../lib/db/db', () => ({
-  query: jest.fn(),
-}));
+jest.mock('../lib/db/db', () => {
+  const query = jest.fn();
+  return {
+    query,
+    connect: jest.fn(async () => ({
+      query,
+      release: jest.fn(),
+    })),
+  };
+});
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -32,14 +39,14 @@ describe('Database Helper - Canvas layout revisions', () => {
       ],
     });
 
-    const result = await listCanvasLayoutRevisions('layout-1', 50);
+    const result = await listCanvasLayoutRevisions('layout-1', 'version-1', 'user-1', 50);
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(true);
     expect(parsed.revisions).toHaveLength(2);
     expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('ORDER BY revision DESC'),
-      ['layout-1', 50]
+      expect.stringContaining('ORDER BY r.revision DESC'),
+      ['layout-1', 'version-1', 'user-1', 50]
     );
   });
 
@@ -58,7 +65,8 @@ describe('Database Helper - Canvas layout revisions', () => {
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [priorSnapshot],
-      }) // revision row
+      }) // revision row (pool)
+      .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [
@@ -72,23 +80,24 @@ describe('Database Helper - Canvas layout revisions', () => {
             minimap_settings: {},
           },
         ],
-      }) // SELECT * before update
+      }) // SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [{ n: 3 }] })
       .mockResolvedValueOnce({ rowCount: 1 })
       .mockResolvedValueOnce({ rowCount: 0 })
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [{ id: 'layout-1', viewport: priorSnapshot.viewport, nodes: priorSnapshot.nodes }],
-      });
+      })
+      .mockResolvedValueOnce({ rowCount: 0 }); // COMMIT
 
-    const result = await restoreCanvasLayoutFromRevision('layout-1', 'rev-uuid', 'user-1');
+    const result = await restoreCanvasLayoutFromRevision('layout-1', 'rev-uuid', 'version-1', 'user-1');
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(true);
     expect(mockQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('FROM odb.canvas_layout_revisions r'),
-      ['rev-uuid', 'layout-1']
+      ['rev-uuid', 'layout-1', 'version-1', 'user-1']
     );
   });
 });
