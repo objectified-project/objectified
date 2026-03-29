@@ -86,12 +86,11 @@
   - Hide all classes without relationships
   - Hide deprecated classes
   - Hide by group membership
-- 📋 [TODO] "Ghosts mode": Show hidden nodes as semi-transparent
+- ✅ "Ghosts mode": Show hidden nodes as semi-transparent
 - 📋 [TODO] Quick restore hidden nodes
 
 | Ticket | Feature Description            |
 |--------|--------------------------------|
-| #484   | "Ghosts mode" for hidden nodes |
 | #485   | Quick restore hidden nodes     |
 
 ---

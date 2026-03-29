@@ -54,7 +54,8 @@ import {
   Route,
   BoxSelect,
   Braces,
-  Ban
+  Ban,
+  Ghost
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -119,6 +120,11 @@ import {
   computeClassIdsPassingHideCriteria,
   groupNodeIdIsVisible,
 } from '@/app/utils/canvas-display-visibility';
+import {
+  edgeBelongsOnCanvas,
+  ghostEdgeClassName,
+  ghostNodeClassName,
+} from '@/app/utils/canvas-ghost-mode';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
@@ -314,6 +320,8 @@ const StudioContent = () => {
   const [hideEmptyClasses, setHideEmptyClasses] = useState(false);
   const [hideDeprecatedClasses, setHideDeprecatedClasses] = useState(false);
   const [hiddenCanvasGroupIds, setHiddenCanvasGroupIds] = useState<Set<string>>(new Set());
+  /** #484: Draw nodes hidden by filters/manual hide as semi-transparent instead of removing them. */
+  const [nodeGhostsModeEnabled, setNodeGhostsModeEnabled] = useState(false);
 
   const getHideCriteriaStorageKey = useCallback((versionId: string) => `studio:canvasHideCriteria:${versionId}`, []);
 
@@ -908,6 +916,12 @@ const StudioContent = () => {
     return set;
   }, [edges]);
 
+  /** All class node IDs in the current graph (for #484 edge inclusion when ghosts mode is on). */
+  const allBaseClassNodeIds = useMemo(() => {
+    const baseNodes = layoutPreviewNodes ?? nodes;
+    return new Set(baseNodes.filter((n) => n.type !== 'groupNode').map((n) => n.id));
+  }, [layoutPreviewNodes, nodes]);
+
   // #483: Class IDs visible after manual per-node hide and hide criteria
   const visibleClassIdsAfterHideCriteria = useMemo(() => {
     const baseNodes = layoutPreviewNodes ?? nodes;
@@ -1041,14 +1055,38 @@ const StudioContent = () => {
     let result = layoutPreviewNodes ?? nodes;
 
     // #481 + #483: Manual hide, empty/unconnected/deprecated/group criteria — group frame if any member visible
+    // #484: Optional ghosts mode — keep hidden nodes on canvas with semi-transparent styling
     const groupMap = new Map(groups.map((g) => [g.id, g]));
-    result = result.filter((node) => {
-      if (node.type === 'groupNode') {
-        const g = groupMap.get(node.id);
-        return g ? groupNodeIdIsVisible(g, visibleClassIdsAfterHideCriteria) : false;
-      }
-      return visibleClassIdsAfterHideCriteria.has(node.id);
-    });
+    if (nodeGhostsModeEnabled) {
+      result = result.filter((node) => {
+        if (node.type === 'groupNode') {
+          const g = groupMap.get(node.id);
+          return g ? groupNodeIdIsVisible(g, allBaseClassNodeIds) : false;
+        }
+        return true;
+      });
+      result = result.map((node) => {
+        const g = node.type === 'groupNode' ? groupMap.get(node.id) : undefined;
+        const ghost = ghostNodeClassName(
+          node.id,
+          node.type,
+          g,
+          visibleClassIdsAfterHideCriteria,
+          nodeGhostsModeEnabled
+        );
+        if (!ghost) return node;
+        const existingClassName = node.className || '';
+        return { ...node, className: `${existingClassName} ${ghost}`.trim() };
+      });
+    } else {
+      result = result.filter((node) => {
+        if (node.type === 'groupNode') {
+          const g = groupMap.get(node.id);
+          return g ? groupNodeIdIsVisible(g, visibleClassIdsAfterHideCriteria) : false;
+        }
+        return visibleClassIdsAfterHideCriteria.has(node.id);
+      });
+    }
 
     // #482: Show only selected classes and group containers that include them
     if (isolateSelectionEnabled && selectedNodeIds.length > 0) {
@@ -1203,17 +1241,21 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, isolateSelectionEnabled, selectedNodeIds, groups, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
     let result = edges;
 
-    // #483 / #488: Only edges between class nodes that remain visible after hide criteria
-    result = result.filter(
-      (edge) =>
-        visibleClassIdsAfterHideCriteria.has(edge.source) &&
-        visibleClassIdsAfterHideCriteria.has(edge.target)
+    // #483 / #488: Edges between class nodes on canvas; #484 extends to hidden nodes when ghosts mode is on
+    result = result.filter((edge) =>
+      edgeBelongsOnCanvas(
+        edge.source,
+        edge.target,
+        visibleClassIdsAfterHideCriteria,
+        allBaseClassNodeIds,
+        nodeGhostsModeEnabled
+      )
     );
 
     if (isolateSelectionEnabled && selectedNodeIds.length > 0) {
@@ -1221,6 +1263,21 @@ const StudioContent = () => {
       result = result.filter(
         (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target)
       );
+    }
+
+    // #484: Edges that touch a hidden (ghost) class are drawn semi-transparent
+    if (nodeGhostsModeEnabled) {
+      result = result.map((edge) => {
+        const ghost = ghostEdgeClassName(
+          edge.source,
+          edge.target,
+          visibleClassIdsAfterHideCriteria,
+          nodeGhostsModeEnabled
+        );
+        if (!ghost) return edge;
+        const existingClassName = edge.className || '';
+        return { ...edge, className: `${existingClassName} ${ghost}`.trim() };
+      });
     }
 
     // Dim edges that don't connect to matching nodes when search is active
@@ -1308,7 +1365,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, visibleClassIdsAfterHideCriteria, isolateSelectionEnabled, selectedNodeIds, groups, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -1420,6 +1477,7 @@ const StudioContent = () => {
       setHideDeprecatedClasses(false);
       setShowOnlyConnectedNodes(false);
       setHiddenCanvasGroupIds(new Set());
+      setNodeGhostsModeEnabled(false);
       skipNextHideCriteriaPersistRef.current = false;
       return;
     }
@@ -1437,17 +1495,20 @@ const StudioContent = () => {
             ? new Set(gids.filter((x): x is string => typeof x === 'string'))
             : new Set()
         );
+        setNodeGhostsModeEnabled(!!(parsed as { nodeGhosts?: boolean }).nodeGhosts);
       } else {
         setHideEmptyClasses(false);
         setHideDeprecatedClasses(false);
         setShowOnlyConnectedNodes(false);
         setHiddenCanvasGroupIds(new Set());
+        setNodeGhostsModeEnabled(false);
       }
     } catch {
       setHideEmptyClasses(false);
       setHideDeprecatedClasses(false);
       setShowOnlyConnectedNodes(false);
       setHiddenCanvasGroupIds(new Set());
+      setNodeGhostsModeEnabled(false);
       // Remove corrupt or unparsable hide-criteria from storage so it doesn't cause repeated parse failures
       localStorage.removeItem(key);
     }
@@ -1468,6 +1529,7 @@ const StudioContent = () => {
         hideDeprecated: hideDeprecatedClasses,
         hideUnconnected: showOnlyConnectedNodes,
         hiddenGroupIds: Array.from(hiddenCanvasGroupIds),
+        nodeGhosts: nodeGhostsModeEnabled,
       })
     );
   }, [
@@ -1475,6 +1537,7 @@ const StudioContent = () => {
     hideDeprecatedClasses,
     showOnlyConnectedNodes,
     hiddenCanvasGroupIds,
+    nodeGhostsModeEnabled,
     selectedVersionId,
     getHideCriteriaStorageKey,
   ]);
@@ -5073,6 +5136,17 @@ const StudioContent = () => {
             transition: opacity 0.2s ease !important;
           }
 
+          /* #484 Node ghosts — hidden-by-filter nodes still drawn */
+          .react-flow__node.canvas-node-ghost {
+            opacity: 0.38 !important;
+            filter: grayscale(35%) !important;
+            transition: opacity 0.2s ease, filter 0.2s ease !important;
+          }
+          .react-flow__edge.canvas-edge-ghost path {
+            opacity: 0.35 !important;
+            transition: opacity 0.2s ease !important;
+          }
+
           /* #547 Dependency graph overlay */
           .react-flow__node.dependency-dimmed {
             opacity: 0.2 !important;
@@ -6060,7 +6134,8 @@ const StudioContent = () => {
                         isolateSelectionEnabled ||
                         hideEmptyClasses ||
                         hideDeprecatedClasses ||
-                        hiddenCanvasGroupIds.size > 0
+                        hiddenCanvasGroupIds.size > 0 ||
+                        nodeGhostsModeEnabled
                           ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
                           : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
                       }`}
@@ -6208,6 +6283,19 @@ const StudioContent = () => {
                           )}
                         </DropdownMenu.SubContent>
                       </DropdownMenu.Sub>
+                      <DropdownMenu.CheckboxItem
+                        checked={nodeGhostsModeEnabled}
+                        onCheckedChange={(checked) => setNodeGhostsModeEnabled(!!checked)}
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700"
+                        onSelect={(e) => e.preventDefault()}
+                        title="Show nodes hidden by filters or manual hide as semi-transparent instead of removing them"
+                      >
+                        <DropdownMenu.ItemIndicator className="inline-flex w-5 items-center justify-center">
+                          <Check className="h-4 w-4" />
+                        </DropdownMenu.ItemIndicator>
+                        <Ghost className="h-4 w-4 shrink-0" />
+                        <span>Node ghosts</span>
+                      </DropdownMenu.CheckboxItem>
                       <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                       <DropdownMenu.CheckboxItem
                         checked={isolateSelectionEnabled}

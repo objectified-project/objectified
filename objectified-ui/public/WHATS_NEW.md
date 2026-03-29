@@ -40,6 +40,7 @@ Bug Fixes:
   - Adds the ability to save custom layout names per version
   - Adds view mode to show and hide all nodes except selected
     - Adds hiding by criteria
+  - View Mode can show hidden nodes as semi-transparent (node ghosts) instead of removing them
   - Introduces the ability to hide/show individual nodes
 - Project form:
   - Now includes the metadata section
