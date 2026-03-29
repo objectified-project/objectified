@@ -51,7 +51,8 @@ import {
   SlidersHorizontal,
   ArrowUp,
   ArrowDown,
-  Route
+  Route,
+  BoxSelect
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -111,6 +112,7 @@ import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
+import { getVisibleNodeIdsForIsolateSelection } from '@/app/utils/canvas-node-visibility';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
@@ -302,6 +304,9 @@ const StudioContent = () => {
 
   // #488: Show only connected nodes (hide nodes with no edges)
   const [showOnlyConnectedNodes, setShowOnlyConnectedNodes] = useState(false);
+
+  // #482: Hide all class nodes except the current selection (and group frames that contain them)
+  const [isolateSelectionEnabled, setIsolateSelectionEnabled] = useState(false);
 
   // Spacing indicators state
   const [spacingIndicators, setSpacingIndicators] = useState<{
@@ -954,10 +959,13 @@ const StudioContent = () => {
         openCanvasSearch();
       }
 
-      // Escape: exit focus mode first, then close search
+      // Escape: exit focus mode, then isolate selection, then close search
       if (e.key === 'Escape') {
         if (focusModeEnabled) {
           exitFocusMode();
+          e.preventDefault();
+        } else if (isolateSelectionEnabled) {
+          setIsolateSelectionEnabled(false);
           e.preventDefault();
         } else if (canvasSearchOpen) {
           closeCanvasSearch();
@@ -967,7 +975,14 @@ const StudioContent = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, canvasSearchOpen, openCanvasSearch, closeCanvasSearch, focusModeEnabled, exitFocusMode]);
+  }, [viewMode, canvasSearchOpen, openCanvasSearch, closeCanvasSearch, focusModeEnabled, exitFocusMode, isolateSelectionEnabled]);
+
+  // #482: Turn off isolate when the class selection is cleared
+  useEffect(() => {
+    if (isolateSelectionEnabled && selectedNodeIds.length === 0) {
+      setIsolateSelectionEnabled(false);
+    }
+  }, [isolateSelectionEnabled, selectedNodeIds.length]);
 
   // Compute nodes with search and/or focus mode styling applied (#471: use preview nodes when in layout preview)
   const displayNodes = useMemo(() => {
@@ -986,6 +1001,12 @@ const StudioContent = () => {
           ? visibleGroupIds.has(node.id)
           : connectedNodeIds.has(node.id)
       );
+    }
+
+    // #482: Show only selected classes and group containers that include them
+    if (isolateSelectionEnabled && selectedNodeIds.length > 0) {
+      const visibleIds = getVisibleNodeIdsForIsolateSelection(groups, new Set(selectedNodeIds));
+      result = result.filter((node) => visibleIds.has(node.id));
     }
 
     // Apply search classes when search is active
@@ -1135,7 +1156,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [nodes, layoutPreviewNodes, hiddenNodeIds, showOnlyConnectedNodes, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, hiddenNodeIds, showOnlyConnectedNodes, isolateSelectionEnabled, selectedNodeIds, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1145,6 +1166,13 @@ const StudioContent = () => {
     if (showOnlyConnectedNodes) {
       result = result.filter(
         edge => connectedNodeIds.has(edge.source) && connectedNodeIds.has(edge.target)
+      );
+    }
+
+    if (isolateSelectionEnabled && selectedNodeIds.length > 0) {
+      const visibleIds = getVisibleNodeIdsForIsolateSelection(groups, new Set(selectedNodeIds));
+      result = result.filter(
+        (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target)
       );
     }
 
@@ -1233,7 +1261,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, showOnlyConnectedNodes, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, showOnlyConnectedNodes, isolateSelectionEnabled, selectedNodeIds, groups, connectedNodeIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -5916,7 +5944,7 @@ const StudioContent = () => {
                   <DropdownMenu.Trigger asChild>
                     <button
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 border ${
-                        focusModeEnabled || showOnlyConnectedNodes
+                        focusModeEnabled || showOnlyConnectedNodes || isolateSelectionEnabled
                           ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700'
                           : 'bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400'
                       }`}
@@ -5996,6 +6024,24 @@ const StudioContent = () => {
                         </DropdownMenu.ItemIndicator>
                         <Network className="h-4 w-4 shrink-0" />
                         <span>Connected</span>
+                      </DropdownMenu.CheckboxItem>
+                      <DropdownMenu.CheckboxItem
+                        checked={isolateSelectionEnabled}
+                        disabled={selectedNodeIds.length === 0}
+                        onCheckedChange={(checked) => setIsolateSelectionEnabled(!!checked)}
+                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 rounded-md outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700 data-[disabled]:opacity-50 data-[disabled]:pointer-events-none"
+                        onSelect={(e) => e.preventDefault()}
+                        title={
+                          selectedNodeIds.length === 0
+                            ? 'Select one or more class nodes on the canvas first'
+                            : 'Show only selected classes (Esc to clear)'
+                        }
+                      >
+                        <DropdownMenu.ItemIndicator className="inline-flex w-5 items-center justify-center">
+                          <Check className="h-4 w-4" />
+                        </DropdownMenu.ItemIndicator>
+                        <BoxSelect className="h-4 w-4 shrink-0" />
+                        <span>Selected only</span>
                       </DropdownMenu.CheckboxItem>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
