@@ -37,6 +37,7 @@ Bug Fixes:
   - Renaming a property no longer rearranges the entire canvas
   - Adding a reference to a class no longer rearranges the entire canvas
   - Now handles multiple saved layouts per version
+  - Named layout saves keep version history with restore (up to 50 prior states per layout)
   - Adds auto-save layout changes every 30 seconds (configurable)
   - Adds the ability to save custom layout names per version
   - Adds view mode to show and hide all nodes except selected

@@ -98,6 +98,8 @@ import {
   getNamedCanvasLayout,
   getNamedCanvasLayoutsForVersion,
   saveNamedCanvasLayout,
+  listCanvasLayoutRevisions,
+  restoreCanvasLayoutFromRevision,
   getGroupsForVersion,
   addClassToGroup,
   updateClassPositionInGroup
@@ -431,6 +433,11 @@ const StudioContent = () => {
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
+  const [layoutHistoryOpen, setLayoutHistoryOpen] = useState(false);
+  const [layoutHistoryRevisions, setLayoutHistoryRevisions] = useState<
+    Array<{ id: string; revision: number; created_at: string }>
+  >([]);
+  const [layoutHistoryLoading, setLayoutHistoryLoading] = useState(false);
 
   // #471: Preview layout suggestions before applying
   const [layoutPreviewNodes, setLayoutPreviewNodes] = useState<Node[] | null>(null);
@@ -3721,6 +3728,124 @@ const StudioContent = () => {
     }
   }, [selectedVersionId, currentUserId, selectedLayoutName, reloadClasses, setNodes, setGroups, setViewport, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh, updateNodeInternals]);
 
+  const handleRestoreLayoutRevision = useCallback(
+    async (revisionId: string) => {
+      if (!selectedVersionId || !currentUserId || isReadOnly) return;
+      const layoutName = selectedLayoutName.trim();
+      if (!layoutName) {
+        await alertDialog({
+          message: 'Please enter a layout name that matches a saved layout.',
+          variant: 'warning',
+        });
+        return;
+      }
+      const ok = await confirmDialog({
+        title: 'Restore layout version',
+        message:
+          'Replace the current canvas with this saved version? Your current layout is stored in history first.',
+      });
+      if (!ok) return;
+      try {
+        setLoadingMessage('Restoring layout...');
+        setIsLoadingCanvas(true);
+        const layoutRes = await getNamedCanvasLayout(selectedVersionId, currentUserId, layoutName);
+        const layoutParsed = JSON.parse(layoutRes);
+        if (!layoutParsed.success || !layoutParsed.layout) {
+          await alertDialog({
+            message: `No saved "${layoutName}" found for this version`,
+            variant: 'warning',
+          });
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
+          return;
+        }
+        const restoreRes = await restoreCanvasLayoutFromRevision(
+          layoutParsed.layout.id,
+          revisionId,
+          currentUserId
+        );
+        const restoreParsed = JSON.parse(restoreRes);
+        if (!restoreParsed.success) {
+          await alertDialog({
+            message: restoreParsed.error || 'Could not restore this version',
+            variant: 'error',
+          });
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
+          return;
+        }
+        await handleLoadLayout();
+      } catch (error) {
+        console.error('Error restoring layout revision:', error);
+        await alertDialog({
+          message: 'An error occurred while restoring the layout',
+          variant: 'error',
+        });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+      }
+    },
+    [
+      selectedVersionId,
+      currentUserId,
+      isReadOnly,
+      selectedLayoutName,
+      confirmDialog,
+      alertDialog,
+      handleLoadLayout,
+    ]
+  );
+
+  useEffect(() => {
+    if (!layoutHistoryOpen || !layoutDropdownOpen || !selectedVersionId || !currentUserId) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLayoutHistoryLoading(true);
+      try {
+        const name = selectedLayoutName.trim();
+        if (!name) {
+          if (!cancelled) {
+            setLayoutHistoryRevisions([]);
+          }
+          return;
+        }
+        const layoutRes = await getNamedCanvasLayout(selectedVersionId, currentUserId, name);
+        const parsed = JSON.parse(layoutRes);
+        if (!parsed.success || !parsed.layout) {
+          if (!cancelled) {
+            setLayoutHistoryRevisions([]);
+          }
+          return;
+        }
+        const revRes = await listCanvasLayoutRevisions(parsed.layout.id);
+        const revParsed = JSON.parse(revRes);
+        if (!cancelled && revParsed.success) {
+          setLayoutHistoryRevisions(revParsed.revisions || []);
+        }
+      } catch (error) {
+        console.error('Error loading layout history:', error);
+        if (!cancelled) {
+          setLayoutHistoryRevisions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLayoutHistoryLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    layoutHistoryOpen,
+    layoutDropdownOpen,
+    selectedVersionId,
+    currentUserId,
+    selectedLayoutName,
+  ]);
+
   // #471: Preview layout before applying — compute layout and show preview (do not commit)
   const handlePreviewLayout = useCallback((direction: 'TB' | 'LR') => {
     if (nodes.length === 0) return;
@@ -4343,6 +4468,12 @@ const StudioContent = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [layoutDropdownOpen]);
+
+  useEffect(() => {
+    if (!layoutDropdownOpen) {
+      setLayoutHistoryOpen(false);
+    }
   }, [layoutDropdownOpen]);
 
   // Load versions when project is selected
@@ -6778,6 +6909,57 @@ const StudioContent = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Type a custom name or pick a suggestion. Save and load multiple layouts per version.
                         </p>
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                          <button
+                            type="button"
+                            onClick={() => setLayoutHistoryOpen((open) => !open)}
+                            className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <History className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              Layout history
+                            </span>
+                            {layoutHistoryOpen ? (
+                              <ChevronUp className="h-4 w-4 shrink-0" aria-hidden />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+                            )}
+                          </button>
+                          {layoutHistoryOpen && (
+                            <div className="mt-2 max-h-40 space-y-1 overflow-y-auto">
+                              {layoutHistoryLoading && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Loading history…</p>
+                              )}
+                              {!layoutHistoryLoading && layoutHistoryRevisions.length === 0 && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  No prior versions yet. Each named save stores the previous state (up to 50).
+                                </p>
+                              )}
+                              {!layoutHistoryLoading &&
+                                layoutHistoryRevisions.map((rev) => (
+                                  <div
+                                    key={rev.id}
+                                    className="flex items-center justify-between gap-2 rounded-md py-1 text-xs"
+                                  >
+                                    <span className="min-w-0 truncate text-gray-600 dark:text-gray-300">
+                                      Rev {rev.revision} ·{' '}
+                                      {typeof rev.created_at === 'string'
+                                        ? new Date(rev.created_at).toLocaleString()
+                                        : ''}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={isReadOnly}
+                                      onClick={() => void handleRestoreLayoutRevision(rev.id)}
+                                      className="shrink-0 rounded border border-indigo-200 px-2 py-0.5 text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                                    >
+                                      Restore
+                                    </button>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Divider */}

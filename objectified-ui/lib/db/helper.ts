@@ -3135,11 +3135,15 @@ export async function saveNamedCanvasLayout(
     }
 
     if (existingResult.rowCount > 0) {
-      return updateCanvasLayout(existingResult.rows[0].id, {
-        viewport,
-        nodes,
-        edges: edges || []
-      });
+      return updateCanvasLayout(
+        existingResult.rows[0].id,
+        {
+          viewport,
+          nodes,
+          edges: edges || []
+        },
+        { recordRevision: true, revisionUserId: userId }
+      );
     }
 
     return createCanvasLayout(
@@ -3213,8 +3217,12 @@ export async function createCanvasLayout(
   }
 }
 
+/** Max prior snapshots kept per layout row (named saves only; default auto-save does not record). */
+const CANVAS_LAYOUT_REVISION_RETAIN = 50;
+
 /**
  * Update an existing canvas layout
+ * @param options.recordRevision When true and layout fields change, stores the previous row in canvas_layout_revisions (named layout saves).
  */
 export async function updateCanvasLayout(
   layoutId: string,
@@ -3227,20 +3235,73 @@ export async function updateCanvasLayout(
     gridSettings?: any;
     minimapSettings?: any;
     metadata?: any;
+  },
+  options?: {
+    recordRevision?: boolean;
+    revisionUserId?: string | null;
   }
 ) {
   try {
-    // Get current layout to check version_id and user_id
-    const currentResult = await connectionPool.query(
-      `SELECT version_id, user_id FROM odb.canvas_layouts WHERE id = $1`,
-      [layoutId]
-    );
+    const recordRevision = options?.recordRevision === true;
+    const revisionUserId = options?.revisionUserId ?? null;
+
+    const shouldSnapshotPriorLayout =
+      recordRevision &&
+      (updates.viewport !== undefined ||
+        updates.nodes !== undefined ||
+        updates.edges !== undefined ||
+        updates.gridSettings !== undefined ||
+        updates.minimapSettings !== undefined);
+
+    const currentResult = shouldSnapshotPriorLayout
+      ? await connectionPool.query(`SELECT * FROM odb.canvas_layouts WHERE id = $1`, [layoutId])
+      : await connectionPool.query(
+          `SELECT version_id, user_id FROM odb.canvas_layouts WHERE id = $1`,
+          [layoutId]
+        );
 
     if (currentResult.rowCount === 0) {
       return errorResponse('Layout not found');
     }
 
-    const { version_id, user_id } = currentResult.rows[0];
+    const currentRow = currentResult.rows[0];
+
+    if (shouldSnapshotPriorLayout) {
+      const maxRevResult = await connectionPool.query(
+        `SELECT COALESCE(MAX(revision), 0) AS n FROM odb.canvas_layout_revisions WHERE canvas_layout_id = $1`,
+        [layoutId]
+      );
+      const nextRevision = Number(maxRevResult.rows[0].n) + 1;
+
+      await connectionPool.query(
+        `INSERT INTO odb.canvas_layout_revisions
+         (canvas_layout_id, revision, viewport, nodes, edges, grid_settings, minimap_settings, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          layoutId,
+          nextRevision,
+          currentRow.viewport,
+          currentRow.nodes,
+          currentRow.edges,
+          currentRow.grid_settings,
+          currentRow.minimap_settings,
+          revisionUserId
+        ]
+      );
+
+      await connectionPool.query(
+        `DELETE FROM odb.canvas_layout_revisions
+         WHERE canvas_layout_id = $1
+           AND revision < (
+             SELECT COALESCE(MAX(revision), 0) - $2
+             FROM odb.canvas_layout_revisions
+             WHERE canvas_layout_id = $1
+           )`,
+        [layoutId, CANVAS_LAYOUT_REVISION_RETAIN - 1]
+      );
+    }
+
+    const { version_id, user_id } = currentRow;
 
     // If setting as default, unset other defaults
     if (updates.isDefault) {
@@ -3315,6 +3376,65 @@ export async function updateCanvasLayout(
     return successResponse({ layout: result.rows[0] });
   } catch (error: any) {
     console.error('Error updating canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * List prior snapshots for a named layout (newest first).
+ */
+export async function listCanvasLayoutRevisions(layoutId: string, limit: number = 50) {
+  try {
+    const cap = Math.min(Math.max(1, limit), 100);
+    const result = await connectionPool.query(
+      `SELECT id, canvas_layout_id, revision, created_at, created_by
+       FROM odb.canvas_layout_revisions
+       WHERE canvas_layout_id = $1
+       ORDER BY revision DESC
+       LIMIT $2`,
+      [layoutId, cap]
+    );
+    return successResponse({ revisions: result.rows });
+  } catch (error: any) {
+    console.error('Error listing canvas layout revisions:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Restore a canvas layout from a stored revision (records current state as a new revision first).
+ */
+export async function restoreCanvasLayoutFromRevision(
+  layoutId: string,
+  revisionId: string,
+  userId: string | null
+) {
+  try {
+    const revResult = await connectionPool.query(
+      `SELECT r.viewport, r.nodes, r.edges, r.grid_settings, r.minimap_settings
+       FROM odb.canvas_layout_revisions r
+       WHERE r.id = $1 AND r.canvas_layout_id = $2`,
+      [revisionId, layoutId]
+    );
+
+    if (revResult.rowCount === 0) {
+      return errorResponse('Revision not found');
+    }
+
+    const row = revResult.rows[0];
+    return updateCanvasLayout(
+      layoutId,
+      {
+        viewport: row.viewport,
+        nodes: row.nodes,
+        edges: row.edges,
+        gridSettings: row.grid_settings,
+        minimapSettings: row.minimap_settings
+      },
+      { recordRevision: true, revisionUserId: userId }
+    );
+  } catch (error: any) {
+    console.error('Error restoring canvas layout revision:', error);
     return errorResponse(error.message);
   }
 }
