@@ -314,7 +314,6 @@ const StudioContent = () => {
   const [hideEmptyClasses, setHideEmptyClasses] = useState(false);
   const [hideDeprecatedClasses, setHideDeprecatedClasses] = useState(false);
   const [hiddenCanvasGroupIds, setHiddenCanvasGroupIds] = useState<Set<string>>(new Set());
-  const [hideGroupMembersFlyoutHovered, setHideGroupMembersFlyoutHovered] = useState(false);
 
   const getHideCriteriaStorageKey = useCallback((versionId: string) => `studio:canvasHideCriteria:${versionId}`, []);
 
@@ -1042,9 +1041,10 @@ const StudioContent = () => {
     let result = layoutPreviewNodes ?? nodes;
 
     // #481 + #483: Manual hide, empty/unconnected/deprecated/group criteria — group frame if any member visible
+    const groupMap = new Map(groups.map((g) => [g.id, g]));
     result = result.filter((node) => {
       if (node.type === 'groupNode') {
-        const g = groups.find((gr) => gr.id === node.id);
+        const g = groupMap.get(node.id);
         return g ? groupNodeIdIsVisible(g, visibleClassIdsAfterHideCriteria) : false;
       }
       return visibleClassIdsAfterHideCriteria.has(node.id);
@@ -1448,6 +1448,8 @@ const StudioContent = () => {
       setHideDeprecatedClasses(false);
       setShowOnlyConnectedNodes(false);
       setHiddenCanvasGroupIds(new Set());
+      // Remove corrupt or unparsable hide-criteria from storage so it doesn't cause repeated parse failures
+      localStorage.removeItem(key);
     }
     skipNextHideCriteriaPersistRef.current = true;
   }, [selectedVersionId, getHideCriteriaStorageKey]);
@@ -6170,44 +6172,42 @@ const StudioContent = () => {
                         <Ban className="h-4 w-4 shrink-0" />
                         <span>Deprecated classes</span>
                       </DropdownMenu.CheckboxItem>
-                      <div
-                        className="relative rounded-md"
-                        onMouseEnter={() => setHideGroupMembersFlyoutHovered(true)}
-                        onMouseLeave={() => setHideGroupMembersFlyoutHovered(false)}
-                      >
-                        <div className="flex items-center gap-3 px-3 py-2 text-sm rounded-md outline-none cursor-pointer text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                      <DropdownMenu.Sub>
+                        <DropdownMenu.SubTrigger className="flex items-center gap-3 px-3 py-2 text-sm rounded-md outline-none cursor-pointer text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 data-[state=open]:bg-gray-100 dark:data-[state=open]:bg-gray-700">
                           <Folder className="h-4 w-4 shrink-0" />
                           <span>Hide group members</span>
                           <ChevronRight className="h-4 w-4 ml-auto shrink-0" />
-                        </div>
-                        {hideGroupMembersFlyoutHovered && (
-                          <div className="absolute left-full top-0 ml-0.5 min-w-[200px] max-w-[260px] rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 z-10 overflow-x-hidden">
-                            {groups.length === 0 ? (
-                              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No groups</div>
-                            ) : (
-                              <div className="max-h-[240px] overflow-y-auto overflow-x-hidden">
-                                {groups.map((g) => (
-                                  <button
-                                    key={g.id}
-                                    type="button"
-                                    className="w-full min-w-0 flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 outline-none mx-0.5"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      toggleHiddenCanvasGroup(g.id);
-                                    }}
-                                  >
-                                    <span className="inline-flex w-5 shrink-0 items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                      {hiddenCanvasGroupIds.has(g.id) ? <Check className="h-4 w-4" /> : null}
-                                    </span>
-                                    <span className="truncate min-w-0">{g.name}</span>
-                                    <span className="text-xs text-gray-400 tabular-nums shrink-0">({g.nodeIds.length})</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                        </DropdownMenu.SubTrigger>
+                        <DropdownMenu.SubContent
+                          className="min-w-[200px] max-w-[260px] rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 z-50 overflow-x-hidden"
+                          sideOffset={4}
+                          alignOffset={-4}
+                        >
+                          {groups.length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No groups</div>
+                          ) : (
+                            <div className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+                              {groups.map((g) => (
+                                <button
+                                  key={g.id}
+                                  type="button"
+                                  className="w-full min-w-0 flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 outline-none mx-0.5"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    toggleHiddenCanvasGroup(g.id);
+                                  }}
+                                >
+                                  <span className="inline-flex w-5 shrink-0 items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    {hiddenCanvasGroupIds.has(g.id) ? <Check className="h-4 w-4" /> : null}
+                                  </span>
+                                  <span className="truncate min-w-0">{g.name}</span>
+                                  <span className="text-xs text-gray-400 tabular-nums shrink-0">({g.nodeIds.length})</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </DropdownMenu.SubContent>
+                      </DropdownMenu.Sub>
                       <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                       <DropdownMenu.CheckboxItem
                         checked={isolateSelectionEnabled}
