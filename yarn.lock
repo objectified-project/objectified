@@ -10749,6 +10749,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"objectified-rest@workspace:objectified-rest":
+  version: 0.0.0-use.local
+  resolution: "objectified-rest@workspace:objectified-rest"
+  languageName: unknown
+  linkType: soft
+
 "objectified-ui@workspace:objectified-ui":
   version: 0.0.0-use.local
   resolution: "objectified-ui@workspace:objectified-ui"
