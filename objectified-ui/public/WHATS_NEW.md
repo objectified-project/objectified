@@ -21,6 +21,7 @@ Bug Fixes:
 - Improved layout of the linked accounts page
   - Linked accounts page is slightly wider matching those of other dashboard layouts
   - Provider cards now show PAT hints so users can match the PATs that were assigned
+- Canvas **View mode** menu includes **Show all nodes** to restore full visibility after manual hides, filters, ghosts, isolate selection, or focus mode
 - Improvements in the canvas
   - Class node customization form is slightly more compact
   - Class and Properties forms now have tabs instead of button groupings

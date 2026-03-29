@@ -1,6 +1,7 @@
 import {
   computeClassIdsPassingHideCriteria,
   groupNodeIdIsVisible,
+  hasActiveCanvasVisibilityRestrictions,
 } from '@/app/utils/canvas-display-visibility';
 
 describe('canvas-display-visibility (#483)', () => {
@@ -88,5 +89,33 @@ describe('canvas-display-visibility (#483)', () => {
     expect(groupNodeIdIsVisible(groups[0], new Set(['a']))).toBe(true);
     expect(groupNodeIdIsVisible(groups[0], new Set(['c']))).toBe(false);
     expect(groupNodeIdIsVisible(groups[1], new Set(['c']))).toBe(true);
+  });
+});
+
+const allOff = {
+  manualHiddenNodeCount: 0,
+  hideEmptyClasses: false,
+  hideUnconnectedClasses: false,
+  hideDeprecatedClasses: false,
+  hiddenGroupIdsCount: 0,
+  nodeGhostsModeEnabled: false,
+  isolateSelectionEnabled: false,
+  focusModeEnabled: false,
+};
+
+describe('hasActiveCanvasVisibilityRestrictions (#485)', () => {
+  it('is false when nothing restricts visibility', () => {
+    expect(hasActiveCanvasVisibilityRestrictions(allOff)).toBe(false);
+  });
+
+  it('is true when any restriction is on', () => {
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, manualHiddenNodeCount: 1 })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, hideEmptyClasses: true })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, hideUnconnectedClasses: true })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, hideDeprecatedClasses: true })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, hiddenGroupIdsCount: 1 })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, nodeGhostsModeEnabled: true })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, isolateSelectionEnabled: true })).toBe(true);
+    expect(hasActiveCanvasVisibilityRestrictions({ ...allOff, focusModeEnabled: true })).toBe(true);
   });
 });

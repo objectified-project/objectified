@@ -59,3 +59,29 @@ export function groupNodeIdIsVisible(
 ): boolean {
   return group.nodeIds.some((id) => visibleClassIds.has(id));
 }
+
+/**
+ * True when any canvas visibility control is active (#485).
+ * Used to enable “show all nodes” / highlight View Mode when something is restricting visibility.
+ */
+export function hasActiveCanvasVisibilityRestrictions(params: {
+  manualHiddenNodeCount: number;
+  hideEmptyClasses: boolean;
+  hideUnconnectedClasses: boolean;
+  hideDeprecatedClasses: boolean;
+  hiddenGroupIdsCount: number;
+  nodeGhostsModeEnabled: boolean;
+  isolateSelectionEnabled: boolean;
+  focusModeEnabled: boolean;
+}): boolean {
+  return (
+    params.manualHiddenNodeCount > 0 ||
+    params.hideEmptyClasses ||
+    params.hideUnconnectedClasses ||
+    params.hideDeprecatedClasses ||
+    params.hiddenGroupIdsCount > 0 ||
+    params.nodeGhostsModeEnabled ||
+    params.isolateSelectionEnabled ||
+    params.focusModeEnabled
+  );
+}
