@@ -2,7 +2,9 @@
   "name": "objectified",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "yarn workspace objectified-ui test && yarn workspace objectified-web test"
   },
   "workspaces": [
     "objectified-ui",
@@ -12,6 +14,6 @@
   ],
   "packageManager": "yarn@4.12.0",
   "devDependencies": {
-    "turbo": "^2.8.20"
+    "turbo": "^2.8.21"
   }
 }
