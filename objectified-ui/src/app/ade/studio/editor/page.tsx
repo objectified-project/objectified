@@ -110,7 +110,7 @@ import {
   getGroupsForVersion,
   addClassToGroup,
   updateClassPositionInGroup,
-  getTenantsAdministratedByUser
+  isTenantAdmin
 } from '../../../../../lib/db/helper';
 import {
   deleteClassWithSession,
@@ -308,14 +308,13 @@ const StudioContent = () => {
           if (!cancelled) setEffectiveIsTenantAdmin(true);
           return;
         }
-        if (!currentUserId || !currentTenantId) {
+        if (!currentTenantId) {
           if (!cancelled) setEffectiveIsTenantAdmin(false);
           return;
         }
-        const res = await getTenantsAdministratedByUser(currentUserId);
-        const rows = JSON.parse(res) as Array<{ tenant_id: string }>;
-        const ok = rows.some((r) => r.tenant_id === currentTenantId);
-        if (!cancelled) setEffectiveIsTenantAdmin(ok);
+        const res = await isTenantAdmin(currentTenantId);
+        const response = JSON.parse(res);
+        if (!cancelled) setEffectiveIsTenantAdmin(response.success && response.isAdmin);
       } catch {
         if (!cancelled) setEffectiveIsTenantAdmin(false);
       }
@@ -324,7 +323,7 @@ const StudioContent = () => {
     return () => {
       cancelled = true;
     };
-  }, [sessionIsTenantAdmin, currentUserId, currentTenantId]);
+  }, [sessionIsTenantAdmin, currentTenantId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -3496,7 +3495,7 @@ const StudioContent = () => {
       return;
     }
     try {
-      const result = await setUserCanvasLayoutDefaultName(selectedVersionId, currentUserId, layoutName);
+      const result = await setUserCanvasLayoutDefaultName(selectedVersionId, layoutName);
       const response = JSON.parse(result);
       if (response.success) {
         await alertDialog({
@@ -3514,7 +3513,7 @@ const StudioContent = () => {
   const handleClearMyDefaultLayoutName = useCallback(async () => {
     if (isReadOnly || !selectedVersionId || !currentUserId) return;
     try {
-      const result = await clearUserCanvasLayoutDefaultName(selectedVersionId, currentUserId);
+      const result = await clearUserCanvasLayoutDefaultName(selectedVersionId);
       const response = JSON.parse(result);
       if (response.success) {
         await alertDialog({
@@ -3540,7 +3539,6 @@ const StudioContent = () => {
       const result = await setTenantCanvasLayoutDefaultName(
         selectedVersionId,
         currentTenantId,
-        currentUserId,
         layoutName
       );
       const response = JSON.parse(result);
@@ -3573,7 +3571,7 @@ const StudioContent = () => {
     });
     if (!ok) return;
     try {
-      const result = await clearTenantCanvasLayoutDefaultName(selectedVersionId, currentTenantId, currentUserId);
+      const result = await clearTenantCanvasLayoutDefaultName(selectedVersionId, currentTenantId);
       const response = JSON.parse(result);
       if (response.success) {
         await alertDialog({ message: 'Team default cleared.', variant: 'success' });

@@ -1,5 +1,7 @@
 'use server';
 
+import { getAuthSession } from '../auth/server-session';
+
 const connectionPool = require('./db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -3062,7 +3064,30 @@ export async function getEffectiveDefaultLayoutName(
   }
 }
 
-export async function setUserCanvasLayoutDefaultName(versionId: string, userId: string, layoutName: string) {
+export async function isTenantAdmin(tenantId: string) {
+  try {
+    const session = await getAuthSession();
+    const userId = (session?.user as any)?.user_id;
+    if (!userId) {
+      return successResponse({ isAdmin: false });
+    }
+    const result = await connectionPool.query(
+      `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, userId]
+    );
+    return successResponse({ isAdmin: Boolean(result.rowCount) });
+  } catch (error: any) {
+    console.error('Error checking tenant admin status:', error);
+    return errorResponse(error.message);
+  }
+}
+
+export async function setUserCanvasLayoutDefaultName(versionId: string, layoutName: string) {
+  const session = await getAuthSession();
+  const userId = (session?.user as any)?.user_id;
+  if (!userId) {
+    return errorResponse('Unauthorized');
+  }
   const name = layoutName.trim();
   if (!name) {
     return errorResponse('Layout name is required');
@@ -3082,7 +3107,12 @@ export async function setUserCanvasLayoutDefaultName(versionId: string, userId: 
   }
 }
 
-export async function clearUserCanvasLayoutDefaultName(versionId: string, userId: string) {
+export async function clearUserCanvasLayoutDefaultName(versionId: string) {
+  const session = await getAuthSession();
+  const userId = (session?.user as any)?.user_id;
+  if (!userId) {
+    return errorResponse('Unauthorized');
+  }
   try {
     await connectionPool.query(
       `DELETE FROM odb.user_canvas_layout_defaults WHERE user_id = $1 AND version_id = $2`,
@@ -3098,9 +3128,13 @@ export async function clearUserCanvasLayoutDefaultName(versionId: string, userId
 export async function setTenantCanvasLayoutDefaultName(
   versionId: string,
   tenantId: string,
-  actingUserId: string,
   layoutName: string
 ) {
+  const session = await getAuthSession();
+  const actingUserId = (session?.user as any)?.user_id;
+  if (!actingUserId) {
+    return errorResponse('Unauthorized');
+  }
   const name = layoutName.trim();
   if (!name) {
     return errorResponse('Layout name is required');
@@ -3138,9 +3172,13 @@ export async function setTenantCanvasLayoutDefaultName(
 
 export async function clearTenantCanvasLayoutDefaultName(
   versionId: string,
-  tenantId: string,
-  actingUserId: string
+  tenantId: string
 ) {
+  const session = await getAuthSession();
+  const actingUserId = (session?.user as any)?.user_id;
+  if (!actingUserId) {
+    return errorResponse('Unauthorized');
+  }
   try {
     const adminCheck = await connectionPool.query(
       `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,

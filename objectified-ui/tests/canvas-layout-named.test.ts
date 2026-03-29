@@ -274,11 +274,20 @@ describe('Database Helper - Named Canvas Layouts', () => {
 
 describe('Database Helper - default named canvas layout preference', () => {
   let mockQuery: jest.Mock<any>;
+  let mockGetAuthSession: jest.Mock<any>;
 
   beforeEach(() => {
     const db = require('../lib/db/db');
     mockQuery = db.query as jest.Mock;
     mockQuery.mockReset();
+
+    // Default session for this describe block: authenticated as user-1
+    const serverSession = require('../lib/auth/server-session');
+    mockGetAuthSession = serverSession.getAuthSession as jest.Mock<any>;
+    mockGetAuthSession.mockReset();
+    mockGetAuthSession.mockResolvedValue({
+      user: { user_id: 'user-1', current_tenant_id: 'tenant-1' },
+    });
   });
 
   test('getEffectiveDefaultLayoutName returns user default when present', async () => {
@@ -333,7 +342,6 @@ describe('Database Helper - default named canvas layout preference', () => {
     const result = await setTenantCanvasLayoutDefaultName(
       'version-1',
       'tenant-1',
-      'user-1',
       'Presentation Layout'
     );
     const parsed = JSON.parse(result);
@@ -353,12 +361,108 @@ describe('Database Helper - default named canvas layout preference', () => {
     const result = await setTenantCanvasLayoutDefaultName(
       'version-1',
       'tenant-1',
-      'admin-1',
       'Dependency Layout'
     );
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(true);
     expect(mockQuery).toHaveBeenCalledTimes(3);
+  });
+
+  test('setUserCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { setUserCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await setUserCanvasLayoutDefaultName('version-1', 'Presentation Layout');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('setUserCanvasLayoutDefaultName saves default for authenticated user', async () => {
+    const { setUserCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 });
+
+    const result = await setUserCanvasLayoutDefaultName('version-1', 'My Layout');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layoutName).toBe('My Layout');
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('user_canvas_layout_defaults'),
+      ['user-1', 'version-1', 'My Layout']
+    );
+  });
+
+  test('clearUserCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { clearUserCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await clearUserCanvasLayoutDefaultName('version-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('setTenantCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { setTenantCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await setTenantCanvasLayoutDefaultName('version-1', 'tenant-1', 'Some Layout');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('clearTenantCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { clearTenantCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await clearTenantCanvasLayoutDefaultName('version-1', 'tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('isTenantAdmin returns false when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { isTenantAdmin } = await import('../lib/db/helper');
+
+    const result = await isTenantAdmin('tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.isAdmin).toBe(false);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('isTenantAdmin returns true for authenticated admin', async () => {
+    const { isTenantAdmin } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] });
+
+    const result = await isTenantAdmin('tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.isAdmin).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('tenant_administrators'),
+      ['tenant-1', 'user-1']
+    );
   });
 });
