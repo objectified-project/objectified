@@ -47,6 +47,8 @@ import {
   Activity,
   History,
   Trash2,
+  Bookmark,
+  Users,
   Filter,
   SlidersHorizontal,
   ArrowUp,
@@ -97,12 +99,18 @@ import {
   saveDefaultCanvasLayout,
   getNamedCanvasLayout,
   getNamedCanvasLayoutsForVersion,
+  getEffectiveDefaultLayoutName,
+  setUserCanvasLayoutDefaultName,
+  clearUserCanvasLayoutDefaultName,
+  setTenantCanvasLayoutDefaultName,
+  clearTenantCanvasLayoutDefaultName,
   saveNamedCanvasLayout,
   listCanvasLayoutRevisions,
   restoreCanvasLayoutFromRevision,
   getGroupsForVersion,
   addClassToGroup,
-  updateClassPositionInGroup
+  updateClassPositionInGroup,
+  isTenantAdmin
 } from '../../../../../lib/db/helper';
 import {
   deleteClassWithSession,
@@ -289,6 +297,33 @@ const StudioContent = () => {
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
+  const sessionIsTenantAdmin = Boolean((session?.user as any)?.is_tenant_admin);
+  const [effectiveIsTenantAdmin, setEffectiveIsTenantAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (sessionIsTenantAdmin) {
+          if (!cancelled) setEffectiveIsTenantAdmin(true);
+          return;
+        }
+        if (!currentTenantId) {
+          if (!cancelled) setEffectiveIsTenantAdmin(false);
+          return;
+        }
+        const res = await isTenantAdmin(currentTenantId);
+        const response = JSON.parse(res);
+        if (!cancelled) setEffectiveIsTenantAdmin(response.success && response.isAdmin);
+      } catch {
+        if (!cancelled) setEffectiveIsTenantAdmin(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionIsTenantAdmin, currentTenantId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -3452,6 +3487,110 @@ const StudioContent = () => {
     }
   }, [isReadOnly, selectedVersionId, currentUserId, selectedLayoutName, nodes, edges, groups, getViewport, alertDialog]);
 
+  const handleSetMyDefaultLayoutName = useCallback(async () => {
+    if (isReadOnly || !selectedVersionId || !currentUserId) return;
+    const layoutName = selectedLayoutName.trim();
+    if (!layoutName) {
+      await alertDialog({ message: 'Please enter a layout name.', variant: 'warning' });
+      return;
+    }
+    try {
+      const result = await setUserCanvasLayoutDefaultName(selectedVersionId, layoutName);
+      const response = JSON.parse(result);
+      if (response.success) {
+        await alertDialog({
+          message: `This layout name is now your default when you open this version.`,
+          variant: 'success',
+        });
+      } else {
+        await alertDialog({ message: response.error || 'Could not save preference', variant: 'error' });
+      }
+    } catch {
+      await alertDialog({ message: 'Could not save preference', variant: 'error' });
+    }
+  }, [isReadOnly, selectedVersionId, currentUserId, selectedLayoutName, alertDialog]);
+
+  const handleClearMyDefaultLayoutName = useCallback(async () => {
+    if (isReadOnly || !selectedVersionId || !currentUserId) return;
+    try {
+      const result = await clearUserCanvasLayoutDefaultName(selectedVersionId);
+      const response = JSON.parse(result);
+      if (response.success) {
+        await alertDialog({
+          message: 'Your personal default was cleared. The team or built-in default will apply on next open.',
+          variant: 'success',
+        });
+      } else {
+        await alertDialog({ message: response.error || 'Could not clear preference', variant: 'error' });
+      }
+    } catch {
+      await alertDialog({ message: 'Could not clear preference', variant: 'error' });
+    }
+  }, [isReadOnly, selectedVersionId, currentUserId, alertDialog]);
+
+  const handleSetTeamDefaultLayoutName = useCallback(async () => {
+    if (isReadOnly || !selectedVersionId || !currentUserId || !currentTenantId || !effectiveIsTenantAdmin) return;
+    const layoutName = selectedLayoutName.trim();
+    if (!layoutName) {
+      await alertDialog({ message: 'Please enter a layout name.', variant: 'warning' });
+      return;
+    }
+    try {
+      const result = await setTenantCanvasLayoutDefaultName(
+        selectedVersionId,
+        currentTenantId,
+        layoutName
+      );
+      const response = JSON.parse(result);
+      if (response.success) {
+        await alertDialog({
+          message: `Team default layout name for this version is now "${layoutName}".`,
+          variant: 'success',
+        });
+      } else {
+        await alertDialog({ message: response.error || 'Could not save team default', variant: 'error' });
+      }
+    } catch {
+      await alertDialog({ message: 'Could not save team default', variant: 'error' });
+    }
+  }, [
+    isReadOnly,
+    selectedVersionId,
+    currentUserId,
+    currentTenantId,
+    effectiveIsTenantAdmin,
+    selectedLayoutName,
+    alertDialog,
+  ]);
+
+  const handleClearTeamDefaultLayoutName = useCallback(async () => {
+    if (isReadOnly || !selectedVersionId || !currentUserId || !currentTenantId || !effectiveIsTenantAdmin) return;
+    const ok = await confirmDialog({
+      title: 'Clear team default',
+      message: 'Remove the team default layout name for this version? Members without a personal default will use the built-in fallback on next open.',
+    });
+    if (!ok) return;
+    try {
+      const result = await clearTenantCanvasLayoutDefaultName(selectedVersionId, currentTenantId);
+      const response = JSON.parse(result);
+      if (response.success) {
+        await alertDialog({ message: 'Team default cleared.', variant: 'success' });
+      } else {
+        await alertDialog({ message: response.error || 'Could not clear team default', variant: 'error' });
+      }
+    } catch {
+      await alertDialog({ message: 'Could not clear team default', variant: 'error' });
+    }
+  }, [
+    isReadOnly,
+    selectedVersionId,
+    currentUserId,
+    currentTenantId,
+    effectiveIsTenantAdmin,
+    confirmDialog,
+    alertDialog,
+  ]);
+
   const autoSaveDefaultLayout = useCallback(async () => {
     if (
       !autoSaveLayoutEnabled ||
@@ -4662,10 +4801,27 @@ const StudioContent = () => {
           return node;
         });
 
-        // On first load, check if selected layout exists and apply it
+        // On first load, resolve default layout name (user → tenant → built-in), then load that named layout if present
         if (isFirstLoad && currentUserId) {
           setLoadingMessage('Checking for saved layout...');
-          const layoutNameForInitialLoad = selectedLayoutNameRef.current.trim();
+          let layoutNameForInitialLoad = selectedLayoutNameRef.current.trim();
+          try {
+            const prefResult = await getEffectiveDefaultLayoutName(
+              selectedVersionId,
+              currentUserId,
+              currentTenantId || undefined
+            );
+            const prefParsed = JSON.parse(prefResult);
+            if (prefParsed.success && prefParsed.layoutName && typeof prefParsed.layoutName === 'string') {
+              layoutNameForInitialLoad = prefParsed.layoutName.trim();
+              if (layoutNameForInitialLoad) {
+                setSelectedLayoutName(layoutNameForInitialLoad);
+                selectedLayoutNameRef.current = layoutNameForInitialLoad;
+              }
+            }
+          } catch {
+            // keep ref/default name
+          }
           if (layoutNameForInitialLoad) {
             try {
               const layoutResult = await getNamedCanvasLayout(
@@ -4744,7 +4900,7 @@ const StudioContent = () => {
     };
 
     loadClasses();
-  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, projectTags, isReadOnly, updateNodeInternals, setViewport]);
+  }, [selectedVersionId, selectedProjectId, canvasRefreshKey, projects, versions, currentUserId, currentTenantId, projectTags, isReadOnly, updateNodeInternals, setViewport]);
 
   // Check layout availability when version or selected layout changes
   useEffect(() => {
@@ -6910,6 +7066,72 @@ const StudioContent = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Type a custom name or pick a suggestion. Save and load multiple layouts per version.
                         </p>
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Default on open
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Choose which named layout loads first for this version. Your preference overrides the team default.
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleSetMyDefaultLayoutName()}
+                              disabled={isReadOnly || !selectedLayoutName.trim()}
+                              className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                                isReadOnly || !selectedLayoutName.trim()
+                                  ? 'border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+                              }`}
+                              title="Use the current layout name as your personal default when opening this version"
+                            >
+                              <Bookmark className="h-4 w-4 shrink-0" aria-hidden />
+                              Set as my default
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleClearMyDefaultLayoutName()}
+                              disabled={isReadOnly}
+                              className={`text-xs text-left px-1 py-0.5 rounded ${
+                                isReadOnly
+                                  ? 'text-gray-400 cursor-not-allowed'
+                                  : 'text-indigo-600 dark:text-indigo-400 hover:underline'
+                              }`}
+                            >
+                              Clear my default
+                            </button>
+                            {effectiveIsTenantAdmin && currentTenantId ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSetTeamDefaultLayoutName()}
+                                  disabled={isReadOnly || !selectedLayoutName.trim()}
+                                  className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                                    isReadOnly || !selectedLayoutName.trim()
+                                      ? 'border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                  }`}
+                                  title="Team default for members who have not set a personal default"
+                                >
+                                  <Users className="h-4 w-4 shrink-0" aria-hidden />
+                                  Set as team default
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleClearTeamDefaultLayoutName()}
+                                  disabled={isReadOnly}
+                                  className={`text-xs text-left px-1 py-0.5 rounded ${
+                                    isReadOnly
+                                      ? 'text-gray-400 cursor-not-allowed'
+                                      : 'text-indigo-600 dark:text-indigo-400 hover:underline'
+                                  }`}
+                                >
+                                  Clear team default
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
                         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                           <button
                             type="button"

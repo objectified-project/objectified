@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-jest.mock('../lib/db/db', () => ({
-  query: jest.fn(),
-}));
+jest.mock('../lib/db/db', () => {
+  const query = jest.fn();
+  return {
+    query,
+    connect: jest.fn(async () => ({
+      query,
+      release: jest.fn(),
+    })),
+  };
+});
 
 jest.mock('bcrypt', () => ({
   compare: jest.fn(),
@@ -112,7 +119,8 @@ describe('Database Helper - Named Canvas Layouts', () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 
     mockQuery
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-1' }] }) // existing lookup
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-1' }] }) // existing lookup (pool)
+      .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [
@@ -126,11 +134,12 @@ describe('Database Helper - Named Canvas Layouts', () => {
             minimap_settings: {}
           }
         ]
-      }) // full row for revision snapshot
+      }) // SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [{ n: 0 }] }) // max revision
       .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
       .mockResolvedValueOnce({ rowCount: 0 }) // prune old revisions
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-1', name: 'Dependency Layout' }] }); // update return
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-1', name: 'Dependency Layout' }] }) // UPDATE RETURNING
+      .mockResolvedValueOnce({ rowCount: 0 }); // COMMIT
 
     const result = await saveNamedCanvasLayout(
       'version-1',
@@ -221,7 +230,8 @@ describe('Database Helper - Named Canvas Layouts', () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 
     mockQuery
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1' }] }) // existing lookup
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1' }] }) // existing lookup (pool)
+      .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [
@@ -235,11 +245,12 @@ describe('Database Helper - Named Canvas Layouts', () => {
             minimap_settings: {}
           }
         ]
-      }) // full row for revision snapshot
+      }) // SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [{ n: 2 }] }) // max revision
       .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
       .mockResolvedValueOnce({ rowCount: 0 }) // prune
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1', name: 'Shared Layout' }] }); // update return
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1', name: 'Shared Layout' }] }) // UPDATE RETURNING
+      .mockResolvedValueOnce({ rowCount: 0 }); // COMMIT
 
     const result = await saveNamedCanvasLayout(
       'version-1',
@@ -257,6 +268,201 @@ describe('Database Helper - Named Canvas Layouts', () => {
       1,
       expect.stringContaining('user_id IS NOT DISTINCT FROM $3'),
       ['version-1', 'Shared Layout', null]
+    );
+  });
+});
+
+describe('Database Helper - default named canvas layout preference', () => {
+  let mockQuery: jest.Mock<any>;
+  let mockGetAuthSession: jest.Mock<any>;
+
+  beforeEach(() => {
+    const db = require('../lib/db/db');
+    mockQuery = db.query as jest.Mock;
+    mockQuery.mockReset();
+
+    // Default session for this describe block: authenticated as user-1
+    const serverSession = require('../lib/auth/server-session');
+    mockGetAuthSession = serverSession.getAuthSession as jest.Mock<any>;
+    mockGetAuthSession.mockReset();
+    mockGetAuthSession.mockResolvedValue({
+      user: { user_id: 'user-1', current_tenant_id: 'tenant-1' },
+    });
+  });
+
+  test('getEffectiveDefaultLayoutName returns user default when present', async () => {
+    const { getEffectiveDefaultLayoutName } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ layout_name: '  Presentation Layout  ' }]
+    });
+
+    const result = await getEffectiveDefaultLayoutName('version-1', 'user-1', 'tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layoutName).toBe('Presentation Layout');
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  test('getEffectiveDefaultLayoutName falls back to tenant when user has no row', async () => {
+    const { getEffectiveDefaultLayoutName } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ layout_name: 'Logical Layout' }] });
+
+    const result = await getEffectiveDefaultLayoutName('version-1', 'user-1', 'tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layoutName).toBe('Logical Layout');
+  });
+
+  test('getEffectiveDefaultLayoutName uses built-in fallback when no preferences', async () => {
+    const { getEffectiveDefaultLayoutName } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    const result = await getEffectiveDefaultLayoutName('version-1', 'user-1', 'tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layoutName).toBe('Development Layout');
+  });
+
+  test('setTenantCanvasLayoutDefaultName rejects when user is not tenant admin', async () => {
+    const { setTenantCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    const result = await setTenantCanvasLayoutDefaultName(
+      'version-1',
+      'tenant-1',
+      'Presentation Layout'
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toContain('administrators');
+  });
+
+  test('setTenantCanvasLayoutDefaultName inserts when admin and version belongs to tenant', async () => {
+    const { setTenantCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] });
+
+    const result = await setTenantCanvasLayoutDefaultName(
+      'version-1',
+      'tenant-1',
+      'Dependency Layout'
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenCalledTimes(3);
+  });
+
+  test('setUserCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { setUserCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await setUserCanvasLayoutDefaultName('version-1', 'Presentation Layout');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('setUserCanvasLayoutDefaultName saves default for authenticated user', async () => {
+    const { setUserCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 });
+
+    const result = await setUserCanvasLayoutDefaultName('version-1', 'My Layout');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layoutName).toBe('My Layout');
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('user_canvas_layout_defaults'),
+      ['user-1', 'version-1', 'My Layout']
+    );
+  });
+
+  test('clearUserCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { clearUserCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await clearUserCanvasLayoutDefaultName('version-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('setTenantCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { setTenantCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await setTenantCanvasLayoutDefaultName('version-1', 'tenant-1', 'Some Layout');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('clearTenantCanvasLayoutDefaultName rejects when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { clearTenantCanvasLayoutDefaultName } = await import('../lib/db/helper');
+
+    const result = await clearTenantCanvasLayoutDefaultName('version-1', 'tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('isTenantAdmin returns false when unauthenticated', async () => {
+    mockGetAuthSession.mockResolvedValueOnce(null);
+
+    const { isTenantAdmin } = await import('../lib/db/helper');
+
+    const result = await isTenantAdmin('tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.isAdmin).toBe(false);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('isTenantAdmin returns true for authenticated admin', async () => {
+    const { isTenantAdmin } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] });
+
+    const result = await isTenantAdmin('tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.isAdmin).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('tenant_administrators'),
+      ['tenant-1', 'user-1']
     );
   });
 });

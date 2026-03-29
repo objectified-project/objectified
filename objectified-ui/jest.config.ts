@@ -29,6 +29,7 @@ const config: Config = {
     '^@lib/(.*)$': '<rootDir>/lib/$1',
     '^react-markdown$': '<rootDir>/tests/__mocks__/react-markdown.tsx',
     '^remark-gfm$': '<rootDir>/tests/__mocks__/remark-gfm.ts',
+    '^.*auth/server-session$': '<rootDir>/tests/__mocks__/server-session.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(react-markdown|remark-gfm|unified|bail|is-plain-obj|trough|vfile|unist-.*|unified|remark-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|pretty-bytes)/)',

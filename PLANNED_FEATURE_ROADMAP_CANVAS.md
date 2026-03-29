@@ -26,7 +26,7 @@
     - "Dependency Layout" - organized by relationships
 - ✅ Auto-save layout changes every 30 seconds (configurable)
 - ✅ Version control for layouts (track layout history) — #165
-- 📋 [TODO] Default layout setting per user or per team
+- ✅ Default layout setting per user or per team — #166
 - 📋 [TODO] Export layout as JSON for sharing
 - 📋 [TODO] Import layouts from other versions/projects
 - 📋 [TODO] Add ability to save layouts with a custom name
@@ -34,7 +34,6 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #166   | Default layout setting per user or per team    |
 | #167   | Export/import layouts as JSON                  |
 | #314   | Canvas snapshots                               |
 | #315   | Canvas auto-save of layout                     |

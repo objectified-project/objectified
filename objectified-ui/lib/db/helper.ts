@@ -1,5 +1,7 @@
 'use server';
 
+import { getAuthSession } from '../auth/server-session';
+
 const connectionPool = require('./db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -3016,6 +3018,182 @@ export async function getDefaultCanvasLayout(versionId: string, userId?: string)
     return successResponse({ layout: null });
   } catch (error: any) {
     console.error('Error fetching default canvas layout:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
+ * Resolve which named layout to prefer on first open: user → tenant → built-in "Development Layout".
+ */
+export async function getEffectiveDefaultLayoutName(
+  versionId: string,
+  userId: string | undefined,
+  tenantId: string | undefined
+) {
+  try {
+    if (userId) {
+      const userRow = await connectionPool.query(
+        `SELECT layout_name FROM odb.user_canvas_layout_defaults
+         WHERE user_id = $1 AND version_id = $2`,
+        [userId, versionId]
+      );
+      if (userRow.rowCount && userRow.rows[0].layout_name) {
+        const n = String(userRow.rows[0].layout_name).trim();
+        if (n) {
+          return successResponse({ layoutName: n });
+        }
+      }
+    }
+    if (tenantId) {
+      const tenantRow = await connectionPool.query(
+        `SELECT layout_name FROM odb.tenant_canvas_layout_defaults
+         WHERE tenant_id = $1 AND version_id = $2`,
+        [tenantId, versionId]
+      );
+      if (tenantRow.rowCount && tenantRow.rows[0].layout_name) {
+        const n = String(tenantRow.rows[0].layout_name).trim();
+        if (n) {
+          return successResponse({ layoutName: n });
+        }
+      }
+    }
+    return successResponse({ layoutName: 'Development Layout' });
+  } catch (error: any) {
+    console.error('Error resolving default layout name:', error);
+    return errorResponse(error.message);
+  }
+}
+
+export async function isTenantAdmin(tenantId: string) {
+  try {
+    const session = await getAuthSession();
+    const userId = (session?.user as any)?.user_id;
+    if (!userId) {
+      return successResponse({ isAdmin: false });
+    }
+    const result = await connectionPool.query(
+      `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, userId]
+    );
+    return successResponse({ isAdmin: Boolean(result.rowCount) });
+  } catch (error: any) {
+    console.error('Error checking tenant admin status:', error);
+    return errorResponse(error.message);
+  }
+}
+
+export async function setUserCanvasLayoutDefaultName(versionId: string, layoutName: string) {
+  const session = await getAuthSession();
+  const userId = (session?.user as any)?.user_id;
+  if (!userId) {
+    return errorResponse('Unauthorized');
+  }
+  const name = layoutName.trim();
+  if (!name) {
+    return errorResponse('Layout name is required');
+  }
+  try {
+    await connectionPool.query(
+      `INSERT INTO odb.user_canvas_layout_defaults (user_id, version_id, layout_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, version_id) DO UPDATE
+       SET layout_name = EXCLUDED.layout_name, updated_at = CURRENT_TIMESTAMP`,
+      [userId, versionId, name]
+    );
+    return successResponse({ layoutName: name });
+  } catch (error: any) {
+    console.error('Error saving user default layout name:', error);
+    return errorResponse(error.message);
+  }
+}
+
+export async function clearUserCanvasLayoutDefaultName(versionId: string) {
+  const session = await getAuthSession();
+  const userId = (session?.user as any)?.user_id;
+  if (!userId) {
+    return errorResponse('Unauthorized');
+  }
+  try {
+    await connectionPool.query(
+      `DELETE FROM odb.user_canvas_layout_defaults WHERE user_id = $1 AND version_id = $2`,
+      [userId, versionId]
+    );
+    return successResponse();
+  } catch (error: any) {
+    console.error('Error clearing user default layout name:', error);
+    return errorResponse(error.message);
+  }
+}
+
+export async function setTenantCanvasLayoutDefaultName(
+  versionId: string,
+  tenantId: string,
+  layoutName: string
+) {
+  const session = await getAuthSession();
+  const actingUserId = (session?.user as any)?.user_id;
+  if (!actingUserId) {
+    return errorResponse('Unauthorized');
+  }
+  const name = layoutName.trim();
+  if (!name) {
+    return errorResponse('Layout name is required');
+  }
+  try {
+    const adminCheck = await connectionPool.query(
+      `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, actingUserId]
+    );
+    if (!adminCheck.rowCount) {
+      return errorResponse('Only tenant administrators can set the team default layout name');
+    }
+    const verCheck = await connectionPool.query(
+      `SELECT 1 FROM odb.versions v
+       INNER JOIN odb.projects p ON v.project_id = p.id
+       WHERE v.id = $1 AND p.tenant_id = $2 AND v.deleted_at IS NULL AND p.deleted_at IS NULL`,
+      [versionId, tenantId]
+    );
+    if (!verCheck.rowCount) {
+      return errorResponse('Version not found for this tenant');
+    }
+    await connectionPool.query(
+      `INSERT INTO odb.tenant_canvas_layout_defaults (tenant_id, version_id, layout_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (tenant_id, version_id) DO UPDATE
+       SET layout_name = EXCLUDED.layout_name, updated_at = CURRENT_TIMESTAMP`,
+      [tenantId, versionId, name]
+    );
+    return successResponse({ layoutName: name });
+  } catch (error: any) {
+    console.error('Error saving tenant default layout name:', error);
+    return errorResponse(error.message);
+  }
+}
+
+export async function clearTenantCanvasLayoutDefaultName(
+  versionId: string,
+  tenantId: string
+) {
+  const session = await getAuthSession();
+  const actingUserId = (session?.user as any)?.user_id;
+  if (!actingUserId) {
+    return errorResponse('Unauthorized');
+  }
+  try {
+    const adminCheck = await connectionPool.query(
+      `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, actingUserId]
+    );
+    if (!adminCheck.rowCount) {
+      return errorResponse('Only tenant administrators can clear the team default layout name');
+    }
+    await connectionPool.query(
+      `DELETE FROM odb.tenant_canvas_layout_defaults WHERE tenant_id = $1 AND version_id = $2`,
+      [tenantId, versionId]
+    );
+    return successResponse();
+  } catch (error: any) {
+    console.error('Error clearing tenant default layout name:', error);
     return errorResponse(error.message);
   }
 }
