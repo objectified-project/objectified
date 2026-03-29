@@ -80,7 +80,7 @@
 
 #### Node Visibility Controls 📋 PLANNED
 - ✅ Hide/show individual nodes
-- 📋 [TODO] Hide all nodes except selected
+- ✅ Hide all nodes except selected
 - 📋 [TODO] Hide by criteria:
   - [TODO] Hide all empty classes (no properties)
   - [TODO] Hide all classes without relationships
@@ -91,7 +91,6 @@
 
 | Ticket | Feature Description            |
 |--------|--------------------------------|
-| #482   | Hide all nodes except selected |
 | #483   | Hide by criteria               |
 | #484   | "Ghosts mode" for hidden nodes |
 | #485   | Quick restore hidden nodes     |
