@@ -10,6 +10,57 @@ const crypto = require('crypto');
 const errorResponse = (error: string) => JSON.stringify({ success: false, error });
 const successResponse = (data: any = {}) => JSON.stringify({ success: true, ...data });
 
+/** Max PNG size for canvas layout snapshots (~512 KiB). */
+const MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES = 512 * 1024;
+/** Max base64-encoded length corresponding to MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES. */
+const MAX_CANVAS_LAYOUT_SNAPSHOT_BASE64_CHARS = Math.ceil(MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES / 3) * 4;
+/** Full 8-byte PNG file signature. */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+/** 4-byte ASCII chunk type for the required IHDR chunk (first chunk in every PNG). */
+const PNG_IHDR_TYPE = Buffer.from([0x49, 0x48, 0x44, 0x52]);
+
+function parseLayoutSnapshotBase64(
+  snapshotPngBase64: string
+): { ok: true; buffer: Buffer } | { ok: false; error: string } {
+  let raw = snapshotPngBase64.trim();
+  if (raw.startsWith('data:image')) {
+    const comma = raw.indexOf(',');
+    if (comma !== -1) raw = raw.slice(comma + 1);
+  }
+  // Reject oversized payloads before decoding to avoid large allocations.
+  if (raw.length > MAX_CANVAS_LAYOUT_SNAPSHOT_BASE64_CHARS) {
+    return { ok: false, error: 'Layout snapshot exceeds maximum size' };
+  }
+  let buf: Buffer;
+  try {
+    buf = Buffer.from(raw, 'base64');
+  } catch {
+    return { ok: false, error: 'Invalid layout snapshot encoding' };
+  }
+  if (buf.length === 0) {
+    return { ok: false, error: 'Layout snapshot is empty' };
+  }
+  if (buf.length > MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES) {
+    return { ok: false, error: 'Layout snapshot exceeds maximum size' };
+  }
+  // Validate full 8-byte PNG signature: \x89PNG\r\n\x1A\n
+  if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return { ok: false, error: 'Layout snapshot must be a PNG image' };
+  }
+  // Basic PNG structure check: first chunk (at offset 12) must be IHDR
+  if (buf.length < 24 || !buf.subarray(12, 16).equals(PNG_IHDR_TYPE)) {
+    return { ok: false, error: 'Layout snapshot must be a PNG image' };
+  }
+  return { ok: true, buffer: buf };
+}
+
+/** Strip BYTEA from layout rows before JSON serialization (Buffers are not JSON-safe). */
+function layoutRowWithoutBinarySnapshot(row: any) {
+  if (!row) return row;
+  const { snapshot_image: _s, ...rest } = row;
+  return rest;
+}
+
 export const getUserByEmail = async (emailAddress: string) =>
   connectionPool.query('SELECT * FROM odb.users WHERE email = $1', [emailAddress]);
 
@@ -3219,7 +3270,7 @@ export async function clearTenantCanvasLayoutDefaultName(
 export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?: string) {
   try {
     const result = await connectionPool.query(
-      `SELECT id, version_id, user_id, name, is_default, created_at, updated_at
+      `SELECT id, version_id, user_id, name, is_default, snapshot_image, created_at, updated_at
        FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name IS NOT NULL
@@ -3235,9 +3286,14 @@ export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?
       const normalizedName = row.name.trim();
       if (!normalizedName) return;
       if (!byName.has(normalizedName)) {
+        const snapshotImageBase64 =
+          row.snapshot_image && Buffer.isBuffer(row.snapshot_image)
+            ? row.snapshot_image.toString('base64')
+            : undefined;
         byName.set(normalizedName, {
-          ...row,
-          name: normalizedName
+          ...layoutRowWithoutBinarySnapshot(row),
+          name: normalizedName,
+          ...(snapshotImageBase64 ? { snapshotImageBase64 } : {})
         });
       }
     });
@@ -3261,7 +3317,7 @@ export async function getNamedCanvasLayout(versionId: string, userId: string | n
 
     const result = await connectionPool.query(
       `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges,
-              grid_settings, minimap_settings, metadata, created_at, updated_at
+              grid_settings, minimap_settings, metadata, snapshot_image, created_at, updated_at
        FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name = $2
@@ -3275,7 +3331,17 @@ export async function getNamedCanvasLayout(versionId: string, userId: string | n
       return successResponse({ layout: null });
     }
 
-    return successResponse({ layout: result.rows[0] });
+    const raw = result.rows[0];
+    const snapshotImageBase64 =
+      raw.snapshot_image && Buffer.isBuffer(raw.snapshot_image)
+        ? raw.snapshot_image.toString('base64')
+        : undefined;
+    return successResponse({
+      layout: {
+        ...layoutRowWithoutBinarySnapshot(raw),
+        ...(snapshotImageBase64 ? { snapshotImageBase64 } : {})
+      }
+    });
   } catch (error: any) {
     console.error('Error fetching named canvas layout:', error);
     return errorResponse(error.message);
@@ -3292,12 +3358,22 @@ export async function saveNamedCanvasLayout(
   viewport: any,
   nodes: any,
   edges?: any,
-  groups?: any
+  groups?: any,
+  snapshotPngBase64?: string
 ) {
   try {
     const nameValue = name.trim();
     if (!nameValue) {
       return errorResponse('Layout name is required');
+    }
+
+    let snapshotBuffer: Buffer | undefined;
+    if (snapshotPngBase64 !== undefined && snapshotPngBase64.trim() !== '') {
+      const parsed = parseLayoutSnapshotBase64(snapshotPngBase64);
+      if (!parsed.ok) {
+        return errorResponse(parsed.error);
+      }
+      snapshotBuffer = parsed.buffer;
     }
 
     const existingResult = await connectionPool.query(
@@ -3327,13 +3403,22 @@ export async function saveNamedCanvasLayout(
     }
 
     if (existingResult.rowCount > 0) {
+      const updates: {
+        viewport: any;
+        nodes: any;
+        edges: any;
+        snapshotImage?: Buffer;
+      } = {
+        viewport,
+        nodes,
+        edges: edges || []
+      };
+      if (snapshotBuffer !== undefined) {
+        updates.snapshotImage = snapshotBuffer;
+      }
       return updateCanvasLayout(
         existingResult.rows[0].id,
-        {
-          viewport,
-          nodes,
-          edges: edges || []
-        },
+        updates,
         { recordRevision: true, revisionUserId: userId }
       );
     }
@@ -3349,7 +3434,8 @@ export async function saveNamedCanvasLayout(
       null,
       { enabled: true, size: 20, snapToGrid: true, showGrid: true },
       { enabled: true, position: 'bottom-right', size: 'medium' },
-      {}
+      {},
+      snapshotBuffer ?? null
     );
   } catch (error: any) {
     console.error('Error saving named canvas layout:', error);
@@ -3371,7 +3457,8 @@ export async function createCanvasLayout(
   groups: any,
   gridSettings: any,
   minimapSettings: any,
-  metadata: any
+  metadata: any,
+  snapshotImage?: Buffer | null
 ) {
   try {
     // If setting as default, unset other defaults for this version/user combination
@@ -3393,16 +3480,17 @@ export async function createCanvasLayout(
 
     const result = await connectionPool.query(
       `INSERT INTO odb.canvas_layouts 
-       (version_id, user_id, name, is_default, viewport, nodes, edges, grid_settings, minimap_settings, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       (version_id, user_id, name, is_default, viewport, nodes, edges, grid_settings, minimap_settings, metadata, snapshot_image)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id, version_id, user_id, name, is_default, viewport, nodes, edges,
                  grid_settings, minimap_settings, metadata, created_at, updated_at`,
       [versionId, userId, name, isDefault,
        JSON.stringify(viewport), JSON.stringify(nodes), JSON.stringify(edges),
-       JSON.stringify(gridSettings), JSON.stringify(minimapSettings), JSON.stringify(metadata)]
+       JSON.stringify(gridSettings), JSON.stringify(minimapSettings), JSON.stringify(metadata),
+       snapshotImage ?? null]
     );
 
-    return successResponse({ layout: result.rows[0] });
+    return successResponse({ layout: layoutRowWithoutBinarySnapshot(result.rows[0]) });
   } catch (error: any) {
     console.error('Error creating canvas layout:', error);
     return errorResponse(error.message);
@@ -3429,6 +3517,7 @@ export async function updateCanvasLayout(
     gridSettings?: any;
     minimapSettings?: any;
     metadata?: any;
+    snapshotImage?: Buffer;
   },
   options?: {
     recordRevision?: boolean;
@@ -3557,6 +3646,10 @@ export async function updateCanvasLayout(
       setClauses.push(`metadata = $${paramIndex++}`);
       values.push(JSON.stringify(updates.metadata));
     }
+    if (updates.snapshotImage !== undefined) {
+      setClauses.push(`snapshot_image = $${paramIndex++}`);
+      values.push(updates.snapshotImage);
+    }
 
     if (setClauses.length === 0) {
       await client.query('ROLLBACK');
@@ -3575,7 +3668,7 @@ export async function updateCanvasLayout(
     );
 
     await client.query('COMMIT');
-    return successResponse({ layout: result.rows[0] });
+    return successResponse({ layout: layoutRowWithoutBinarySnapshot(result.rows[0]) });
   } catch (error: any) {
     try { await client.query('ROLLBACK'); } catch {}
     console.error('Error updating canvas layout:', error);

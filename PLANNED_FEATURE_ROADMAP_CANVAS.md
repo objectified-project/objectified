@@ -33,11 +33,11 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #314   | Canvas snapshots                               |
 | #315   | Canvas auto-save of layout                     |
 | #316   | Export/import canvas layouts                   |
 
-#### Layout Snapshots 📋 PLANNED
+#### Layout Snapshots ✅ BASIC (named layouts)
+- ✅ PNG snapshot stored with each named layout save; thumbnail preview when picking a layout name (#314)
 - 📋 [TODO] Take quick snapshots of current layout
 - 📋 [TODO] Thumbnail preview of each snapshot
 - 📋 [TODO] Restore any snapshot with one click
