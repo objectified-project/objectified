@@ -116,6 +116,7 @@ import {
   updateClassPositionInGroup,
   isTenantAdmin
 } from '../../../../../lib/db/helper';
+import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
 import {
   deleteClassWithSession,
   updateClassCanvasMetadataWithSession,
@@ -492,6 +493,21 @@ const StudioContent = () => {
   // #471: Preview layout suggestions before applying
   const [layoutPreviewNodes, setLayoutPreviewNodes] = useState<Node[] | null>(null);
   const [layoutPreviewLabel, setLayoutPreviewLabel] = useState<string>('');
+
+  /** Latest canvas state for auto-save; avoids resetting the interval on every node/edge update (#315). */
+  const nodesForAutoSaveRef = useRef(nodes);
+  const edgesForAutoSaveRef = useRef(edges);
+  const groupsForAutoSaveRef = useRef(groups);
+  const autoSavePendingRef = useRef(autoSavePending);
+  const layoutPreviewNodesForAutoSaveRef = useRef(layoutPreviewNodes);
+
+  useEffect(() => {
+    nodesForAutoSaveRef.current = nodes;
+    edgesForAutoSaveRef.current = edges;
+    groupsForAutoSaveRef.current = groups;
+    autoSavePendingRef.current = autoSavePending;
+    layoutPreviewNodesForAutoSaveRef.current = layoutPreviewNodes;
+  }, [nodes, edges, groups, autoSavePending, layoutPreviewNodes]);
 
   // Canvas search state
   const [canvasSearchQuery, setCanvasSearchQuery] = useState('');
@@ -3456,30 +3472,8 @@ const StudioContent = () => {
       // Get current viewport
       const viewport = getViewport();
 
-      // Extract node positions and dimensions
-      const nodeData = nodes.map(node => ({
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        dimensions: {
-          width: node.measured?.width || node.width || node.style?.width,
-          height: node.measured?.height || node.height || node.style?.height
-        },
-        data: node.type === 'groupNode' ? {
-          name: node.data.name,
-          color: node.data.color,
-          nodeIds: node.data.nodeIds
-        } : undefined
-      }));
-
-      // Extract edge data
-      const edgeData = edges.map(edge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle
-      }));
+      const nodeData = mapNodesForLayoutSave(nodes);
+      const edgeData = mapEdgesForLayoutSave(edges);
 
       // Save selected named layout to database
       const result = await saveNamedCanvasLayout(
@@ -3635,11 +3629,11 @@ const StudioContent = () => {
   const autoSaveDefaultLayout = useCallback(async () => {
     if (
       !autoSaveLayoutEnabled ||
-      !autoSavePending ||
+      !autoSavePendingRef.current ||
       isReadOnly ||
       !selectedVersionId ||
       !currentUserId ||
-      layoutPreviewNodes ||
+      layoutPreviewNodesForAutoSaveRef.current ||
       autoSaveInFlightRef.current
     ) {
       return;
@@ -3648,27 +3642,8 @@ const StudioContent = () => {
     autoSaveInFlightRef.current = true;
     try {
       const viewport = getViewport();
-      const nodeData = nodes.map(node => ({
-        id: node.id,
-        type: node.type,
-        position: node.position,
-        dimensions: {
-          width: node.measured?.width || node.width || node.style?.width,
-          height: node.measured?.height || node.height || node.style?.height
-        },
-        data: node.type === 'groupNode' ? {
-          name: node.data.name,
-          color: node.data.color,
-          nodeIds: node.data.nodeIds
-        } : undefined
-      }));
-      const edgeData = edges.map(edge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle
-      }));
+      const nodeData = mapNodesForLayoutSave(nodesForAutoSaveRef.current);
+      const edgeData = mapEdgesForLayoutSave(edgesForAutoSaveRef.current);
 
       const result = await saveDefaultCanvasLayout(
         selectedVersionId,
@@ -3676,7 +3651,7 @@ const StudioContent = () => {
         viewport,
         nodeData,
         edgeData,
-        groups
+        groupsForAutoSaveRef.current
       );
       const response = JSON.parse(result);
       if (response.success) {
@@ -3689,15 +3664,10 @@ const StudioContent = () => {
     }
   }, [
     autoSaveLayoutEnabled,
-    autoSavePending,
     isReadOnly,
     selectedVersionId,
     currentUserId,
-    layoutPreviewNodes,
     getViewport,
-    nodes,
-    edges,
-    groups
   ]);
 
   useEffect(() => {

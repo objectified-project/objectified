@@ -33,7 +33,6 @@
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #315   | Canvas auto-save of layout                     |
 | #316   | Export/import canvas layouts                   |
 
 #### Layout Snapshots ✅ BASIC (named layouts)
