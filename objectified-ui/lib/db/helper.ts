@@ -611,6 +611,261 @@ export async function copyClassesFromVersion(sourceVersionId: string, targetVers
   }
 }
 
+/** Rewrite `#/components/schemas/{Name}` refs when duplicating a set of classes with new names (#156). */
+function rewriteOpenApiRefsInValue(value: unknown, oldNameToNewName: Map<string, string>): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => rewriteOpenApiRefsInValue(item, oldNameToNewName));
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const out: Record<string, unknown> = { ...obj };
+    if (typeof out['$ref'] === 'string') {
+      const ref = out['$ref'] as string;
+      const prefix = '#/components/schemas/';
+      if (ref.startsWith(prefix)) {
+        const oldName = ref.slice(prefix.length);
+        const newName = oldNameToNewName.get(oldName);
+        if (newName) {
+          out['$ref'] = `${prefix}${newName}`;
+        }
+      }
+    }
+    for (const key of Object.keys(out)) {
+      if (key === '$ref') continue;
+      out[key] = rewriteOpenApiRefsInValue(out[key], oldNameToNewName);
+    }
+    return out;
+  }
+  return value;
+}
+
+function makeUniqueCopyName(stem: string, taken: Set<string>): string {
+  const base = stem.trim() || 'Class';
+  let candidate = `${base} Copy`;
+  let n = 2;
+  while (taken.has(candidate)) {
+    candidate = `${base} Copy ${n}`;
+    n += 1;
+  }
+  taken.add(candidate);
+  return candidate;
+}
+
+/**
+ * Deep-duplicate classes in the same version (new rows, new names, refs between them rewritten).
+ * Used for "duplicate group" on the canvas (#156).
+ */
+export async function duplicateClassesInGroup(versionId: string, sourceClassIds: string[]) {
+  try {
+    const uniqueIds = [...new Set((sourceClassIds || []).filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      return JSON.stringify({ success: true, idMap: {} });
+    }
+
+    const classesResult = await connectionPool.query(
+      `SELECT id, name, description, schema, enabled
+       FROM odb.classes
+       WHERE version_id = $1 AND deleted_at IS NULL AND id = ANY($2::uuid[])`,
+      [versionId, uniqueIds]
+    );
+
+    if (classesResult.rowCount !== uniqueIds.length) {
+      return JSON.stringify({
+        success: false,
+        error: 'One or more classes were not found in this version.',
+      });
+    }
+
+    const existingNamesResult = await connectionPool.query(
+      `SELECT name FROM odb.classes WHERE version_id = $1 AND deleted_at IS NULL`,
+      [versionId]
+    );
+    const takenNames = new Set<string>(
+      existingNamesResult.rows.map((r: { name: string }) => r.name)
+    );
+
+    const rows = classesResult.rows as Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      schema: unknown;
+      enabled: boolean;
+    }>;
+
+    const oldNameToNewName = new Map<string, string>();
+    for (const row of rows) {
+      const newName = makeUniqueCopyName(row.name, takenNames);
+      oldNameToNewName.set(row.name, newName);
+    }
+
+    const idMap: Record<string, string> = {};
+
+    for (const row of rows) {
+      const newName = oldNameToNewName.get(row.name)!;
+      let schemaObj =
+        typeof row.schema === 'string' ? JSON.parse(row.schema) : row.schema || {};
+      schemaObj = rewriteOpenApiRefsInValue(schemaObj, oldNameToNewName) as Record<string, unknown>;
+
+      const insertResult = await connectionPool.query(
+        `INSERT INTO odb.classes (version_id, name, description, schema, enabled, canvas_metadata)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [
+          versionId,
+          newName,
+          row.description,
+          JSON.stringify(schemaObj),
+          row.enabled ?? true,
+          null,
+        ]
+      );
+
+      const newId = insertResult.rows[0].id as string;
+      idMap[row.id] = newId;
+
+      const originalPropertiesResult = await connectionPool.query(
+        `SELECT id, property_id, name, description, data, parent_id
+         FROM odb.class_properties
+         WHERE class_id = $1
+         ORDER BY parent_id NULLS FIRST, name ASC`,
+        [row.id]
+      );
+
+      const allProperties = originalPropertiesResult.rows;
+      const oldToNewIdMap = new Map<string, string>();
+      const processedIds = new Set<string>();
+
+      const copyPropertiesRecursively = async (parentId: string | null) => {
+        const propsAtThisLevel = allProperties.filter(
+          (p: any) =>
+            (p.parent_id === parentId || (p.parent_id === null && parentId === null)) &&
+            !processedIds.has(p.id)
+        );
+
+        for (const prop of propsAtThisLevel) {
+          const newParentId = prop.parent_id ? oldToNewIdMap.get(prop.parent_id) || null : null;
+          let dataVal: unknown = prop.data;
+          if (typeof dataVal === 'string') {
+            try {
+              dataVal = JSON.parse(dataVal);
+            } catch {
+              /* keep primitive string data as-is */
+            }
+          }
+          if (dataVal !== null && typeof dataVal === 'object') {
+            dataVal = rewriteOpenApiRefsInValue(dataVal, oldNameToNewName);
+          }
+
+          const dataForInsert =
+            typeof dataVal === 'string' ? dataVal : JSON.stringify(dataVal ?? {});
+
+          const insertProp = await connectionPool.query(
+            `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id`,
+            [newId, prop.property_id, prop.name, prop.description, dataForInsert, newParentId]
+          );
+
+          const newPropId = insertProp.rows[0].id as string;
+          oldToNewIdMap.set(prop.id, newPropId);
+          processedIds.add(prop.id);
+          await copyPropertiesRecursively(prop.id);
+        }
+      };
+
+      await copyPropertiesRecursively(null);
+
+      await connectionPool.query(
+        `INSERT INTO odb.class_tags (class_id, tag_id)
+         SELECT $1, tag_id FROM odb.class_tags WHERE class_id = $2
+         ON CONFLICT (class_id, tag_id) DO NOTHING`,
+        [newId, row.id]
+      );
+    }
+
+    return JSON.stringify({ success: true, idMap });
+  } catch (error: any) {
+    console.error('duplicateClassesInGroup:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
+/**
+ * Apply bulk metadata / tag / top-level property flag changes to many classes (#156).
+ */
+export async function bulkApplyEditsToGroupClasses(
+  classIds: string[],
+  options: {
+    descriptionPrefix?: string;
+    descriptionSuffix?: string;
+    tagId?: string;
+    topLevelPropertyReadOnly?: boolean;
+  }
+) {
+  try {
+    const uniqueIds = [...new Set((classIds || []).filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      return JSON.stringify({ success: true });
+    }
+
+    const prefix = options.descriptionPrefix ?? '';
+    const suffix = options.descriptionSuffix ?? '';
+
+    if (prefix !== '' || suffix !== '') {
+      for (const classId of uniqueIds) {
+        const r = await connectionPool.query(
+          `SELECT id, name, description, schema FROM odb.classes WHERE id = $1 AND deleted_at IS NULL`,
+          [classId]
+        );
+        if (r.rowCount === 0) continue;
+        const row = r.rows[0];
+        const desc = `${prefix}${row.description || ''}${suffix}`;
+        const schema = typeof row.schema === 'string' ? JSON.parse(row.schema) : row.schema;
+        await updateClass(row.id, row.name, desc.trim() === '' ? null : desc, schema);
+      }
+    }
+
+    if (options.tagId) {
+      for (const classId of uniqueIds) {
+        await assignTagToClass(classId, options.tagId);
+      }
+    }
+
+    if (typeof options.topLevelPropertyReadOnly === 'boolean') {
+      const ro = options.topLevelPropertyReadOnly;
+      for (const classId of uniqueIds) {
+        const props = await connectionPool.query(
+          `SELECT id, data FROM odb.class_properties WHERE class_id = $1 AND parent_id IS NULL`,
+          [classId]
+        );
+        for (const p of props.rows) {
+          let data: Record<string, unknown>;
+          try {
+            data =
+              typeof p.data === 'string'
+                ? JSON.parse(p.data || '{}')
+                : { ...(p.data as object) };
+          } catch {
+            data = {};
+          }
+          if (ro) data.readOnly = true;
+          else delete data.readOnly;
+          await connectionPool.query(`UPDATE odb.class_properties SET data = $1 WHERE id = $2`, [
+            JSON.stringify(data),
+            p.id,
+          ]);
+        }
+      }
+    }
+
+    return JSON.stringify({ success: true });
+  } catch (error: any) {
+    console.error('bulkApplyEditsToGroupClasses:', error);
+    return JSON.stringify({ success: false, error: error.message });
+  }
+}
+
 export async function createVersion(projectId: string, creatorId: string, versionId: string | null, description: string, changeLog: string, sourceVersionId?: string | null, bumpStrategy?: 'patch' | 'minor') {
   try {
     let finalVersionId = versionId;

@@ -115,8 +115,11 @@ import {
   syncGroupsForVersion,
   addClassToGroup,
   updateClassPositionInGroup,
-  isTenantAdmin
+  isTenantAdmin,
+  duplicateClassesInGroup,
+  bulkApplyEditsToGroupClasses,
 } from '../../../../../lib/db/helper';
+import { expandClassesForGroupExport, downloadTextFile } from '@/app/utils/group-schema-export';
 import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
 import {
   deleteClassWithSession,
@@ -358,7 +361,7 @@ const StudioContent = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
-  const { fitView, setCenter, getViewport, setViewport, getNodes } = useReactFlow();
+  const { fitView, setCenter, getViewport, setViewport, getNodes, getEdges } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Zoom level state for level-of-detail rendering
@@ -793,6 +796,25 @@ const StudioContent = () => {
   const handleGroupRenameRef = useRef<any>(null);
   const handleGroupDeleteRef = useRef<any>(null);
   const handleDeleteAllClassesInGroupRef = useRef<any>(null);
+  const handleExportGroupSchemaRef = useRef<
+    ((groupId: string, nodeIds: string[], groupName: string, format: 'json' | 'yaml') => Promise<void>) | null
+  >(null);
+  const handleDuplicateGroupRef = useRef<
+    ((groupId: string, nodeIds: string[], groupName: string) => Promise<void>) | null
+  >(null);
+  const handleBulkEditGroupClassesRef = useRef<
+    ((
+      groupId: string,
+      nodeIds: string[],
+      groupName: string,
+      options: {
+        descriptionPrefix?: string;
+        descriptionSuffix?: string;
+        tagId?: string;
+        topLevelPropertyReadOnly?: boolean;
+      }
+    ) => Promise<void>) | null
+  >(null);
   const handleGroupColorChangeRef = useRef<any>(null);
   const handleGroupStyleChangeRef = useRef<any>(null);
   const handleGroupTagsChangeRef = useRef<any>(null);
@@ -2041,11 +2063,13 @@ const StudioContent = () => {
 
       setLoadingMessage('Updating nodes and edges...');
 
-      // Get existing positions using functional setState
+      // Preserve group frame nodes across refresh; merge class nodes by position (#156).
       let existingPositions = new Map<string, { x: number; y: number }>();
+      let savedGroupNodes: Node[] = [];
       setNodes((currentNodes) => {
+        savedGroupNodes = currentNodes.filter((n) => n.type === 'groupNode');
         existingPositions = new Map(currentNodes.map(n => [n.id, n.position]));
-        return currentNodes; // No change yet
+        return currentNodes;
       });
 
       const newNodes = await classesToNodes(classesWithProperties);
@@ -2056,7 +2080,7 @@ const StudioContent = () => {
           node.position = existingPos;
         }
       });
-      const finalNodes = newNodes;
+      const finalNodes = [...savedGroupNodes, ...newNodes];
       const newEdges = createAllEdges(classesWithProperties);
       setEdges(newEdges);
       setNodes(finalNodes);
@@ -2752,6 +2776,303 @@ const StudioContent = () => {
     triggerSidebarRefresh();
   }, [isReadOnly, groups, confirmDialog, alertDialog, deleteClassWithSession, reloadClasses, triggerSidebarRefresh]);
 
+  const handleExportGroupSchema = useCallback(
+    async (groupId: string, nodeIds: string[], groupName: string, format: 'json' | 'yaml') => {
+      void groupId;
+      if (!selectedVersionId || nodeIds.length === 0) return;
+      const res = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
+      if (!res.success || !res.classes) {
+        await alertDialog({
+          message: res.error || 'Failed to load classes for export.',
+          variant: 'error',
+        });
+        return;
+      }
+      const expanded = expandClassesForGroupExport(nodeIds, res.classes);
+      if (expanded.length === 0) {
+        await alertDialog({ message: 'No classes in this group to export.', variant: 'warning' });
+        return;
+      }
+      const project = projects.find((p) => p.id === selectedProjectId);
+      const ver = versions.find((v) => v.id === selectedVersionId);
+      const specJson = await generateOpenApiSpec(expanded, {
+        projectName: project?.name ? `${project.name} — ${groupName}` : groupName,
+        version: ver?.version_id ?? '1.0.0',
+        description: `OpenAPI components for canvas group "${groupName}" (Objectified export).`,
+      });
+      const safe = groupName.replace(/[^\w\-]+/g, '-').toLowerCase().slice(0, 80) || 'group';
+      if (format === 'yaml') {
+        const doc = JSON.parse(specJson);
+        const yaml = YAML.stringify(doc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
+        downloadTextFile(`${safe}-openapi.yaml`, yaml, 'text/yaml');
+      } else {
+        downloadTextFile(`${safe}-openapi.json`, specJson, 'application/json');
+      }
+    },
+    [selectedVersionId, selectedProjectId, projects, versions, alertDialog]
+  );
+
+  const handleBulkEditGroupClasses = useCallback(
+    async (
+      groupId: string,
+      nodeIds: string[],
+      groupName: string,
+      options: {
+        descriptionPrefix?: string;
+        descriptionSuffix?: string;
+        tagId?: string;
+        topLevelPropertyReadOnly?: boolean;
+      }
+    ) => {
+      void groupId;
+      if (isReadOnly || nodeIds.length === 0) return;
+      const hasText =
+        (options.descriptionPrefix && options.descriptionPrefix.trim().length > 0) ||
+        (options.descriptionSuffix && options.descriptionSuffix.trim().length > 0);
+      const hasTag = Boolean(options.tagId && options.tagId.trim().length > 0);
+      const hasReadOnly = typeof options.topLevelPropertyReadOnly === 'boolean';
+      if (!hasText && !hasTag && !hasReadOnly) {
+        await alertDialog({
+          message: 'Choose at least one change: description prefix/suffix, tag, or read-only.',
+          variant: 'warning',
+        });
+        throw new Error('No bulk changes selected.');
+      }
+      const ok = await confirmDialog({
+        title: 'Apply to all classes in group',
+        message: `Update ${nodeIds.length} class(es) in "${groupName}"?`,
+        confirmLabel: 'Apply',
+        cancelLabel: 'Cancel',
+      });
+      if (!ok) throw new Error('cancelled');
+
+      const raw = await bulkApplyEditsToGroupClasses(nodeIds, {
+        descriptionPrefix:
+          options.descriptionPrefix && options.descriptionPrefix.trim().length > 0
+            ? options.descriptionPrefix
+            : undefined,
+        descriptionSuffix:
+          options.descriptionSuffix && options.descriptionSuffix.trim().length > 0
+            ? options.descriptionSuffix
+            : undefined,
+        tagId: hasTag ? options.tagId : undefined,
+        topLevelPropertyReadOnly: hasReadOnly ? options.topLevelPropertyReadOnly : undefined,
+      });
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!parsed.success) {
+        await alertDialog({
+          message: parsed.error || 'Bulk update failed.',
+          variant: 'error',
+        });
+        throw new Error(parsed.error || 'Bulk update failed.');
+      }
+      await reloadClasses(true);
+      triggerSidebarRefresh();
+      await alertDialog({ message: 'Bulk changes applied to all classes in this group.', variant: 'success' });
+    },
+    [isReadOnly, confirmDialog, alertDialog, reloadClasses, triggerSidebarRefresh]
+  );
+
+  const handleDuplicateGroup = useCallback(
+    async (sourceGroupId: string, nodeIds: string[], sourceGroupName: string) => {
+      if (isReadOnly || !selectedVersionId || nodeIds.length === 0) return;
+
+      const ok = await confirmDialog({
+        title: 'Duplicate group',
+        message: `Create copies of all ${nodeIds.length} class(es) in "${sourceGroupName}" in a new group? References between these classes will target the duplicated types.`,
+        confirmLabel: 'Duplicate',
+        cancelLabel: 'Cancel',
+      });
+      if (!ok) return;
+
+      const sourceGroup = groups.find((g) => g.id === sourceGroupId);
+      const idSet = new Set(nodeIds);
+      const oldPositions = new Map<string, { x: number; y: number }>();
+      getNodes().forEach((n) => {
+        if (idSet.has(n.id)) oldPositions.set(n.id, { ...n.position });
+      });
+
+      const dupRaw = await duplicateClassesInGroup(selectedVersionId, nodeIds);
+      const dup = typeof dupRaw === 'string' ? JSON.parse(dupRaw) : dupRaw;
+      if (!dup.success) {
+        await alertDialog({
+          message: dup.error || 'Could not duplicate classes.',
+          variant: 'error',
+        });
+        return;
+      }
+      const idMap: Record<string, string> = dup.idMap || {};
+      const OFFSET = 56;
+
+      let newGroupName = `${sourceGroupName} Copy`;
+      let suffix = 2;
+      while (groups.some((g) => g.name === newGroupName)) {
+        newGroupName = `${sourceGroupName} Copy ${suffix++}`;
+      }
+
+      const newGroupId = generateGroupId();
+      const basePos = sourceGroup?.position || { x: 120, y: 120 };
+      const newGroup = {
+        id: newGroupId,
+        name: newGroupName,
+        color: sourceGroup?.color || GROUP_COLORS[0].name,
+        nodeIds: nodeIds.map((oid) => idMap[oid]).filter(Boolean) as string[],
+        position: { x: basePos.x + OFFSET, y: basePos.y + OFFSET },
+        dimensions: sourceGroup?.dimensions || { width: 400, height: 300 },
+        styleOptions:
+          sourceGroup?.styleOptions ||
+          ({
+            borderStyle: 'dashed' as const,
+            opacity: 1,
+            shadow: 'none' as const,
+            icon: 'folder',
+          } as const),
+        description: sourceGroup?.description,
+        tags: sourceGroup?.tags,
+      };
+
+      const nextGroups = [...groups, newGroup];
+      addGroup(newGroup);
+      groupPositionsRef.current.set(newGroupId, { ...newGroup.position });
+
+      const availableTags = projectTags.map((t) => ({
+        id: t.id,
+        name: t.tag_name,
+        color: t.tag_color,
+      }));
+
+      const newGroupFlowNode: Node = {
+        id: newGroupId,
+        type: 'groupNode',
+        position: newGroup.position,
+        width: newGroup.dimensions.width,
+        height: newGroup.dimensions.height,
+        style: {
+          width: newGroup.dimensions.width,
+          height: newGroup.dimensions.height,
+          zIndex: -1,
+        },
+        data: {
+          id: newGroupId,
+          name: newGroup.name,
+          color: newGroup.color,
+          nodeIds: newGroup.nodeIds,
+          tags: newGroup.tags,
+          styleOptions: newGroup.styleOptions,
+          availableTags,
+          onRename: (gid: string, name: string) => handleGroupRenameRef.current?.(gid, name),
+          onDelete: (gid: string) => handleGroupDeleteRef.current?.(gid),
+          onDeleteAllClassesInGroup: (gid: string, cids?: string[], gn?: string) =>
+            handleDeleteAllClassesInGroupRef.current?.(gid, cids, gn),
+          onExportGroupSchema: (gid: string, cids: string[], gn: string, fmt: 'json' | 'yaml') =>
+            handleExportGroupSchemaRef.current?.(gid, cids, gn, fmt),
+          onDuplicateGroup: (gid: string, cids: string[], gn: string) =>
+            handleDuplicateGroupRef.current?.(gid, cids, gn),
+          onBulkEditGroupClasses: (
+            gid: string,
+            cids: string[],
+            gn: string,
+            opts: {
+              descriptionPrefix?: string;
+              descriptionSuffix?: string;
+              tagId?: string;
+              topLevelPropertyReadOnly?: boolean;
+            }
+          ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
+          onColorChange: (gid: string, color: string) => handleGroupColorChangeRef.current?.(gid, color),
+          onStyleChange: (gid: string, style: any) => handleGroupStyleChangeRef.current?.(gid, style),
+          onTagsChange: (gid: string, t: any[]) => handleGroupTagsChangeRef.current?.(gid, t),
+          isReadOnly,
+        },
+      };
+
+      setNodes((prev) => [newGroupFlowNode, ...prev]);
+
+      await reloadClasses(true);
+
+      setNodes((prev) =>
+        prev.map((node) => {
+          if (node.type === 'groupNode') return node;
+          for (const oid of nodeIds) {
+            if (node.id === idMap[oid] && oldPositions.has(oid)) {
+              const op = oldPositions.get(oid)!;
+              return {
+                ...node,
+                position: { x: op.x + OFFSET, y: op.y + OFFSET },
+              };
+            }
+          }
+          return node;
+        })
+      );
+
+      for (const oid of nodeIds) {
+        const nid = idMap[oid];
+        const op = oldPositions.get(oid);
+        if (nid && op) {
+          void updateClassCanvasMetadataWithSession(nid, {
+            position: { x: op.x + OFFSET, y: op.y + OFFSET },
+          });
+        }
+      }
+
+      if (selectedVersionId && currentUserId) {
+        try {
+          const viewport = getViewport();
+          const flowNodes = getNodes();
+          const flowEdges = getEdges();
+          const nodeData = flowNodes.map((node) => ({
+            id: node.id,
+            type: node.type,
+            position: node.position,
+            dimensions: {
+              width: (node as any).measured?.width || (node as any).width || (node.style as any)?.width,
+              height: (node as any).measured?.height || (node as any).height || (node.style as any)?.height,
+            },
+          }));
+          const edgeData = flowEdges.map((edge) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+          }));
+          await saveDefaultCanvasLayout(
+            selectedVersionId,
+            currentUserId,
+            viewport,
+            nodeData,
+            edgeData,
+            nextGroups
+          );
+        } catch (e) {
+          console.error('Failed to save layout after duplicate group:', e);
+        }
+      }
+
+      await alertDialog({
+        message: `Duplicated ${nodeIds.length} class(es) into "${newGroupName}".`,
+        variant: 'success',
+      });
+      triggerSidebarRefresh();
+    },
+    [
+      isReadOnly,
+      selectedVersionId,
+      groups,
+      confirmDialog,
+      alertDialog,
+      getNodes,
+      getEdges,
+      getViewport,
+      addGroup,
+      generateGroupId,
+      reloadClasses,
+      setNodes,
+      projectTags,
+      currentUserId,
+      triggerSidebarRefresh,
+    ]
+  );
+
   // Handle group color change
   const handleGroupColorChange = useCallback(async (groupId: string, newColor: string) => {
     if (isReadOnly) return;
@@ -2919,6 +3240,9 @@ const StudioContent = () => {
   handleGroupRenameRef.current = handleGroupRename;
   handleGroupDeleteRef.current = handleGroupDelete;
   handleDeleteAllClassesInGroupRef.current = handleDeleteAllClassesInGroup;
+  handleExportGroupSchemaRef.current = handleExportGroupSchema;
+  handleDuplicateGroupRef.current = handleDuplicateGroup;
+  handleBulkEditGroupClassesRef.current = handleBulkEditGroupClasses;
   handleGroupColorChangeRef.current = handleGroupColorChange;
   handleGroupStyleChangeRef.current = handleGroupStyleChange;
 
@@ -3377,6 +3701,12 @@ const StudioContent = () => {
       }
     };
 
+    const createGroupAvailableTags = projectTags.map((t) => ({
+      id: t.id,
+      name: t.tag_name,
+      color: t.tag_color,
+    }));
+
     // Add group to context
     addGroup(newGroup);
 
@@ -3401,9 +3731,25 @@ const StudioContent = () => {
         color: newGroup.color,
         nodeIds: newGroup.nodeIds,
         styleOptions: newGroup.styleOptions,
+        availableTags: createGroupAvailableTags,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
         onDeleteAllClassesInGroup: handleDeleteAllClassesInGroup,
+        onExportGroupSchema: (gid: string, cids: string[], gn: string, fmt: 'json' | 'yaml') =>
+          handleExportGroupSchemaRef.current?.(gid, cids, gn, fmt),
+        onDuplicateGroup: (gid: string, cids: string[], gn: string) =>
+          handleDuplicateGroupRef.current?.(gid, cids, gn),
+        onBulkEditGroupClasses: (
+          gid: string,
+          cids: string[],
+          gn: string,
+          opts: {
+            descriptionPrefix?: string;
+            descriptionSuffix?: string;
+            tagId?: string;
+            topLevelPropertyReadOnly?: boolean;
+          }
+        ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
         isReadOnly: isReadOnly
@@ -3448,7 +3794,7 @@ const StudioContent = () => {
       }
     }
 
-  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleDeleteAllClassesInGroup, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleDeleteAllClassesInGroup, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges, projectTags]);
 
   // Register handleCreateGroup function in context for sidebar access
   useEffect(() => {
@@ -3498,6 +3844,12 @@ const StudioContent = () => {
       }
     };
 
+    const createGroupAtDropAvailableTags = projectTags.map((t) => ({
+      id: t.id,
+      name: t.tag_name,
+      color: t.tag_color,
+    }));
+
     // Add group to context
     addGroup(newGroup);
 
@@ -3522,9 +3874,25 @@ const StudioContent = () => {
         color: newGroup.color,
         nodeIds: newGroup.nodeIds,
         styleOptions: newGroup.styleOptions,
+        availableTags: createGroupAtDropAvailableTags,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
         onDeleteAllClassesInGroup: handleDeleteAllClassesInGroup,
+        onExportGroupSchema: (gid: string, cids: string[], gn: string, fmt: 'json' | 'yaml') =>
+          handleExportGroupSchemaRef.current?.(gid, cids, gn, fmt),
+        onDuplicateGroup: (gid: string, cids: string[], gn: string) =>
+          handleDuplicateGroupRef.current?.(gid, cids, gn),
+        onBulkEditGroupClasses: (
+          gid: string,
+          cids: string[],
+          gn: string,
+          opts: {
+            descriptionPrefix?: string;
+            descriptionSuffix?: string;
+            tagId?: string;
+            topLevelPropertyReadOnly?: boolean;
+          }
+        ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
         isReadOnly: isReadOnly
@@ -3568,7 +3936,7 @@ const StudioContent = () => {
       }
     }
 
-  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleDeleteAllClassesInGroup, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges]);
+  }, [groups, isReadOnly, addGroup, generateGroupId, setNodes, getViewport, handleGroupRename, handleGroupDelete, handleDeleteAllClassesInGroup, handleGroupColorChange, handleGroupStyleChange, selectedVersionId, currentUserId, nodes, edges, projectTags]);
 
   // Register handleCreateGroupAtPosition function in context for drag-and-drop access
   useEffect(() => {
@@ -4148,8 +4516,23 @@ const StudioContent = () => {
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
                 onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
-                onDeleteAllClassesInGroup: (groupId: string) =>
-                  handleDeleteAllClassesInGroupRef.current?.(groupId),
+                onDeleteAllClassesInGroup: (gid: string, cids?: string[], gn?: string) =>
+                  handleDeleteAllClassesInGroupRef.current?.(gid, cids, gn),
+                onExportGroupSchema: (gid: string, cids: string[], gn: string, fmt: 'json' | 'yaml') =>
+                  handleExportGroupSchemaRef.current?.(gid, cids, gn, fmt),
+                onDuplicateGroup: (gid: string, cids: string[], gn: string) =>
+                  handleDuplicateGroupRef.current?.(gid, cids, gn),
+                onBulkEditGroupClasses: (
+                  gid: string,
+                  cids: string[],
+                  gn: string,
+                  opts: {
+                    descriptionPrefix?: string;
+                    descriptionSuffix?: string;
+                    tagId?: string;
+                    topLevelPropertyReadOnly?: boolean;
+                  }
+                ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
                 onColorChange: (groupId: string, color: string) =>
                   handleGroupColorChangeRef.current?.(groupId, color),
                 onStyleChange: (groupId: string, style: any) =>
@@ -5345,7 +5728,23 @@ const StudioContent = () => {
                   availableTags,
                   onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
                   onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
-                  onDeleteAllClassesInGroup: (groupId: string) => handleDeleteAllClassesInGroupRef.current?.(groupId),
+                  onDeleteAllClassesInGroup: (gid: string, cids?: string[], gn?: string) =>
+                    handleDeleteAllClassesInGroupRef.current?.(gid, cids, gn),
+                  onExportGroupSchema: (gid: string, cids: string[], gn: string, fmt: 'json' | 'yaml') =>
+                    handleExportGroupSchemaRef.current?.(gid, cids, gn, fmt),
+                  onDuplicateGroup: (gid: string, cids: string[], gn: string) =>
+                    handleDuplicateGroupRef.current?.(gid, cids, gn),
+                  onBulkEditGroupClasses: (
+                    gid: string,
+                    cids: string[],
+                    gn: string,
+                    opts: {
+                      descriptionPrefix?: string;
+                      descriptionSuffix?: string;
+                      tagId?: string;
+                      topLevelPropertyReadOnly?: boolean;
+                    }
+                  ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
                   onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
                   onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
                   onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
