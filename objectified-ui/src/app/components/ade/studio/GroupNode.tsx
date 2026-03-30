@@ -6,7 +6,7 @@ import {
   Folder, Edit2, Trash2, X, Check, Palette, Settings,
   Box, Layers, Database, Shield, Users, Zap, Globe, Lock,
   FileText, Tag, Star, Heart, Flag, Bookmark, Archive, Package,
-  FileX
+  FileX, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 
@@ -104,6 +104,9 @@ export interface GroupNodeData {
   onColorChange?: (groupId: string, newColor: string) => void;
   onStyleChange?: (groupId: string, styleOptions: GroupStyleOptions) => void;
   isReadOnly?: boolean;
+  /** Canvas frame is collapsed to title + count only (#154). */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const GroupNode = memo(({ id, data, selected }: NodeProps) => {
@@ -194,6 +197,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
 
   // Count nodes in this group
   const nodeCount = groupData.nodeIds?.length || 0;
+  const isCollapsed = Boolean(groupData.collapsed);
 
   return (
     <>
@@ -201,7 +205,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
       <NodeResizer
         minWidth={200}
         minHeight={150}
-        isVisible={selected && !groupData.isReadOnly}
+        isVisible={selected && !groupData.isReadOnly && !isCollapsed}
         lineClassName="!border-indigo-400"
         handleClassName="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white !rounded"
       />
@@ -214,8 +218,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           ${groupData.isHighlighted ? 'ring-4 ring-green-500 ring-offset-4 dark:ring-offset-gray-900 scale-[1.02] border-green-500 dark:border-green-400' : ''}
         `}
         style={{
-          minWidth: 200,
-          minHeight: 150,
+          minWidth: isCollapsed ? 120 : 200,
+          minHeight: isCollapsed ? 40 : 150,
           backgroundColor: `${colorConfig.hex}${Math.round(styleOptions.opacity * 25.5).toString(16).padStart(2, '0')}`
         }}
       >
@@ -230,6 +234,25 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
             backgroundColor: `${colorConfig.hex}${Math.round(Math.min(styleOptions.opacity + 0.3, 1) * 255).toString(16).padStart(2, '0')}`
           }}
         >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              groupData.onToggleCollapse?.();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`p-0.5 rounded shrink-0 -ml-0.5 transition-colors ${useLightText ? 'hover:bg-white/25' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+            title={isCollapsed ? 'Expand group (show classes)' : 'Collapse group (hide classes)'}
+            aria-expanded={!isCollapsed}
+            aria-label={isCollapsed ? 'Expand group' : 'Collapse group'}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
           <IconComponent className="h-4 w-4" />
 
           {isEditing ? (
@@ -471,7 +494,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
         </div>
 
         {/* Description (if any) */}
-        {groupData.description && (
+        {groupData.description && !isCollapsed && (
           <div className={`absolute bottom-2 left-4 right-4 text-xs ${textColorClass} opacity-70 truncate`}>
             {groupData.description}
           </div>

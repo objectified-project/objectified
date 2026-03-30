@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 Improvements:
+- Canvas: groups can collapse to a compact title bar (chevron); Alt+Shift+[ / ] collapse or expand all; your choices are remembered per version (#154)
 - Canvas: presentation mode — save viewport slides, present in fullscreen with speaker notes, timer, and keyboard controls (#517)
 - Canvas: layout auto-save uses a steady timer while edits are pending so saves occur every 30 seconds (or your chosen interval) without resetting on each move (#315)
 - Canvas: schema timeline panel shows class count, relationships, and complexity across project versions (#323)
