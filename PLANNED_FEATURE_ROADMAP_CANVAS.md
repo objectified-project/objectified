@@ -183,17 +183,17 @@
 
 ### 5. Annotations & Documentation
 
-#### Presentation Mode 📋 PLANNED
-- 📋 [TODO] Full-screen canvas mode with hidden UI
-  - 📋 [TODO] Hide all toolbars and UI
-  - 📋 [TODO] Slide-show of bookmarked areas
-  - 📋 [TODO] Presentation notes (speaker view)
-  - 📋 [TODO] Timer and slide counter
-  - 📋 [TODO] Presenter controls (keyboard shortcuts)
+#### Presentation Mode ✅ IMPLEMENTED (#517)
+- ✅ Full-screen canvas mode (browser fullscreen on canvas area) with studio chrome hidden
+- ✅ Hide toolbars, side panels, minimap, and canvas controls while presenting
+- ✅ Slide show of saved viewport bookmarks (slides) per version, persisted locally
+- ✅ Speaker notes panel (optional split view) with per-slide notes
+- ✅ Timer and slide counter on presenter HUD
+- ✅ Presenter keyboard shortcuts (← → Space Home End N T Esc)
 
 | Ticket | Feature Description                  |
 |--------|--------------------------------------|
-| #517   | Full-screen presentation mode        |
+| ~~#517~~ | ~~Full-screen presentation mode~~ — done |
 
 ---
 
@@ -256,6 +256,7 @@
 | `Cmd/Ctrl + H`         | Toggle history panel | [TODO] |
 | `M`                    | Toggle minimap       | [TODO] |
 | `Cmd/Ctrl + 1-9`       | Jump to bookmark     | [TODO] |
+| Presentation mode      | See Layout → Presentation (#517) | ✅ |
 | `Space + Drag`         | Pan canvas           | ✅     |
 | `Scroll`               | Zoom in/out          | ✅     |
 | `Esc`                  | Exit focus mode / close search | ✅ |

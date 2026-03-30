@@ -155,6 +155,9 @@ interface StudioContextType {
   setSearchHistoryCount: (count: number) => void;
   clearSearchHistoryFn: (() => void) | null;
   setClearSearchHistoryFn: (fn: (() => void) | null) => void;
+  /** When true, studio chrome (sidebar, studio header) is hidden for canvas presentation mode (#517). */
+  canvasPresentationMode: boolean;
+  setCanvasPresentationMode: (value: boolean) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -353,6 +356,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [searchHistoryCount, setSearchHistoryCount] = useState<number>(0);
   const [clearSearchHistoryFn, setClearSearchHistoryFn] = useState<(() => void) | null>(null);
 
+  const [canvasPresentationMode, setCanvasPresentationMode] = useState(false);
+
   // Persist grid settings to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -522,7 +527,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       searchHistoryCount,
       setSearchHistoryCount,
       clearSearchHistoryFn,
-      setClearSearchHistoryFn
+      setClearSearchHistoryFn,
+      canvasPresentationMode,
+      setCanvasPresentationMode
     }}>
       {children}
     </StudioContext.Provider>
