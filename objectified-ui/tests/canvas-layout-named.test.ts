@@ -204,6 +204,7 @@ describe('Database Helper - Named Canvas Layouts', () => {
       { x: 0, y: 0, zoom: 1 },
       [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
       [],
+      undefined,
       'YQ=='
     );
     const parsed = JSON.parse(result);
