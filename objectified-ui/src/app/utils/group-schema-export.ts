@@ -1,4 +1,4 @@
-import { findReferencedClasses } from '@/app/utils/openapi';
+import { findReferencedClasses } from '@/app/utils/openapi-schema-refs';
 
 /**
  * Collect every class in `allClasses` that is in `rootClassIds` or referenced from them

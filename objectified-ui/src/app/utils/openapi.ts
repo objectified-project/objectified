@@ -8,41 +8,9 @@
 
 import { renderTemplate } from './template-loader';
 import { getOpenAPIVersionConfig, DEFAULT_OPENAPI_VERSION } from './openapi-versions';
+import { extractClassNameFromRef, findReferencedClasses } from './openapi-schema-refs';
 
-/**
- * Extracts class name from a JSON Schema $ref string
- * @param ref - The $ref string (e.g., "#/components/schemas/Person")
- * @returns The class name or null if not found
- */
-export function extractClassNameFromRef(ref: string): string | null {
-  if (!ref) return null;
-
-  if (ref.includes('/')) {
-    const parts = ref.split('/');
-    return parts[parts.length - 1] || null;
-  }
-  return ref;
-}
-
-/**
- * Recursively finds all class names referenced in a schema object via $ref
- * @param obj - The schema object to search
- * @param refs - Set to accumulate found class names
- */
-export function findReferencedClasses(obj: any, refs: Set<string>): void {
-  if (!obj || typeof obj !== 'object') return;
-
-  if (obj.$ref && typeof obj.$ref === 'string') {
-    const className = extractClassNameFromRef(obj.$ref);
-    if (className) refs.add(className);
-  }
-
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      findReferencedClasses(obj[key], refs);
-    }
-  }
-}
+export { extractClassNameFromRef, findReferencedClasses };
 
 /**
  * Builds property schema with nested children for object types
