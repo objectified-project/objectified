@@ -11,26 +11,6 @@
 
 ### 1. Canvas Layout & Organization
 
-#### Save & Load Layouts ✅ IMPLEMENTED (Basic), 📋 PLANNED (Advanced)
-- ✅ **Auto Layout Algorithms**: Top-to-Bottom (TB) and Left-to-Right (LR) hierarchical layouts implemented
-- ✅ Top-to-Bottom and Left-to-Right auto-layout algorithms
-- ✅ Save current canvas arrangement
-- ✅ Save and load groups with layouts
-- ✅ **Layout Controls**: Compact button with dropdown menu
-- ✅ **Database Table**: Create a database table to store layouts
-- ✅ **Auto-load Layout on First Load**: Automatically applies saved layout when canvas loads for the first time
-- ✅ Multiple saved layouts per version:
-    - "Development Layout" - organized for development work
-    - "Presentation Layout" - clean arrangement for stakeholder demos
-    - "Logical Layout" - grouped by business domain
-    - "Dependency Layout" - organized by relationships
-- ✅ Auto-save layout changes every 30 seconds (configurable)
-- ✅ Version control for layouts (track layout history) — #165
-- ✅ Default layout setting per user or per team — #166
-- ✅ Export / import layout as versioned JSON — #167
-- 📋 [TODO] Add ability to save layouts with a custom name
-- ✅ Add simple orthagonal edge routing after auto-layout
-
 #### Layout Snapshots ✅ BASIC (named layouts)
 - ✅ PNG snapshot stored with each named layout save; thumbnail preview when picking a layout name (#314)
 - 📋 [TODO] Take quick snapshots of current layout
@@ -182,22 +162,6 @@
 
 ---
 
-### 5. Annotations & Documentation
-
-#### Presentation Mode ✅ IMPLEMENTED (#517)
-- ✅ Full-screen canvas mode (browser fullscreen on canvas area) with studio chrome hidden
-- ✅ Hide toolbars, side panels, minimap, and canvas controls while presenting
-- ✅ Slide show of saved viewport bookmarks (slides) per version, persisted locally
-- ✅ Speaker notes panel (optional split view) with per-slide notes
-- ✅ Timer and slide counter on presenter HUD
-- ✅ Presenter keyboard shortcuts (← → Space Home End N T Esc)
-
-| Ticket | Feature Description                  |
-|--------|--------------------------------------|
-| ~~#517~~ | ~~Full-screen presentation mode~~ — done |
-
----
-
 ### 8. Canvas Export
 
 #### Export Options ✅ PARTIALLY IMPLEMENTED
@@ -271,6 +235,42 @@
 | `Cmd/Ctrl + E`         | Open export wizard   | [TODO] |
 | `Cmd/Ctrl + S`         | Save layout          | [TODO] |
 | `Cmd/Ctrl + K`         | Command palette      | [TODO] |
+
+---
+
+### 1. Canvas Layout & Organization
+
+#### Save & Load Layouts ✅ IMPLEMENTED (Basic), 📋 PLANNED (Advanced)
+- ✅ **Auto Layout Algorithms**: Top-to-Bottom (TB) and Left-to-Right (LR) hierarchical layouts implemented
+- ✅ Top-to-Bottom and Left-to-Right auto-layout algorithms
+- ✅ Save current canvas arrangement
+- ✅ Save and load groups with layouts
+- ✅ **Layout Controls**: Compact button with dropdown menu
+- ✅ **Database Table**: Create a database table to store layouts
+- ✅ **Auto-load Layout on First Load**: Automatically applies saved layout when canvas loads for the first time
+- ✅ Multiple saved layouts per version:
+    - "Development Layout" - organized for development work
+    - "Presentation Layout" - clean arrangement for stakeholder demos
+    - "Logical Layout" - grouped by business domain
+    - "Dependency Layout" - organized by relationships
+- ✅ Auto-save layout changes every 30 seconds (configurable)
+- ✅ Version control for layouts (track layout history) — #165
+- ✅ Default layout setting per user or per team — #166
+- ✅ Export / import layout as versioned JSON — #167
+- ✅ Add ability to save layouts with a custom name
+- ✅ Add simple orthagonal edge routing after auto-layout
+
+---
+
+### 5. Annotations & Documentation
+
+#### Presentation Mode ✅ IMPLEMENTED (#517)
+- ✅ Full-screen canvas mode (browser fullscreen on canvas area) with studio chrome hidden
+- ✅ Hide toolbars, side panels, minimap, and canvas controls while presenting
+- ✅ Slide show of saved viewport bookmarks (slides) per version, persisted locally
+- ✅ Speaker notes panel (optional split view) with per-slide notes
+- ✅ Timer and slide counter on presenter HUD
+- ✅ Presenter keyboard shortcuts (← → Space Home End N T Esc)
 
 ---
 
