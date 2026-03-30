@@ -200,12 +200,6 @@
 |--------|--------------------------------------|
 | #517   | Full-screen presentation mode        |
 
-#### Charts & Metrics ✅ PARTIALLY COMPLETE
-- ✅ **Quality score gauge**: Visual score indicator (0-100)
-- ✅ **Complexity charts**: Schema complexity visualization
-- ✅ **Relationship graphs**: Visual dependency maps
-- ✅ **Timeline views**: Schema evolution over time (#323 — studio canvas schema timeline panel)
-
 ---
 
 ### 8. Canvas Export
@@ -295,6 +289,12 @@
   - Hide by group membership
 - ✅ "Ghosts mode": Show hidden nodes as semi-transparent
 - ✅ Quick restore: **Show all nodes** in View Mode clears manual hides, filters, ghosts, isolate, and focus
+
+#### Charts & Metrics ✅ COMPLETE
+- ✅ **Quality score gauge**: Visual score indicator (0-100)
+- ✅ **Complexity charts**: Schema complexity visualization
+- ✅ **Relationship graphs**: Visual dependency maps
+- ✅ **Timeline views**: Schema evolution over time (#323 — studio canvas schema timeline panel)
 
 ---
 
