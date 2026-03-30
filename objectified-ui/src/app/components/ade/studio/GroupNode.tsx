@@ -9,6 +9,7 @@ import {
   FileX, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
+import { COLLAPSED_GROUP_FRAME_WIDTH, COLLAPSED_GROUP_FRAME_HEIGHT } from '@/app/utils/canvas-group-collapse';
 
 // Available group icons
 export const GROUP_ICONS = [
@@ -218,8 +219,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           ${groupData.isHighlighted ? 'ring-4 ring-green-500 ring-offset-4 dark:ring-offset-gray-900 scale-[1.02] border-green-500 dark:border-green-400' : ''}
         `}
         style={{
-          minWidth: isCollapsed ? 120 : 200,
-          minHeight: isCollapsed ? 40 : 150,
+          minWidth: isCollapsed ? COLLAPSED_GROUP_FRAME_WIDTH : 200,
+          minHeight: isCollapsed ? COLLAPSED_GROUP_FRAME_HEIGHT : 150,
           backgroundColor: `${colorConfig.hex}${Math.round(styleOptions.opacity * 25.5).toString(16).padStart(2, '0')}`
         }}
       >

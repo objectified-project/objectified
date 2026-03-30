@@ -1461,10 +1461,15 @@ const StudioContent = () => {
     }
   }, [isolateSelectionEnabled, selectedNodeIds.length]);
 
+  // #154: Class node IDs hidden because they belong to a collapsed group — shared between displayNodes and displayEdges
+  const classIdsHiddenByCollapse = useMemo(
+    () => getClassIdsInCollapsedGroups(groups, collapsedGroupIds),
+    [groups, collapsedGroupIds],
+  );
+
   // Compute nodes with search and/or focus mode styling applied (#471: use preview nodes when in layout preview)
   const displayNodes = useMemo(() => {
     let result = layoutPreviewNodes ?? nodes;
-    const classIdsHiddenByCollapse = getClassIdsInCollapsedGroups(groups, collapsedGroupIds);
 
     // #481 + #483: Manual hide, empty/unconnected/deprecated/group criteria — group frame if any member visible
     // #484: Optional ghosts mode — keep hidden nodes on canvas with semi-transparent styling
@@ -1660,34 +1665,43 @@ const StudioContent = () => {
       });
     }
 
-    // #154: Compact group node frame and wire collapse toggle into group UI
-    if (collapsedGroupIds.size > 0) {
-      result = result.map((node) => {
-        if (node.type !== 'groupNode' || !collapsedGroupIds.has(node.id)) return node;
-        const z = node.style?.zIndex ?? -1;
-        return {
-          ...node,
-          width: COLLAPSED_GROUP_FRAME_WIDTH,
-          height: COLLAPSED_GROUP_FRAME_HEIGHT,
-          style: {
-            ...node.style,
-            width: COLLAPSED_GROUP_FRAME_WIDTH,
-            height: COLLAPSED_GROUP_FRAME_HEIGHT,
-            zIndex: z,
+    // #154: Wire collapse toggle and collapsed state into all group nodes; compact frame for collapsed ones
+    result = result.map((node) => {
+      if (node.type !== 'groupNode') return node;
+
+      const isCollapsed = collapsedGroupIds.has(node.id);
+      const z = node.style?.zIndex ?? -1;
+
+      return {
+        ...node,
+        ...(isCollapsed
+          ? {
+              width: COLLAPSED_GROUP_FRAME_WIDTH,
+              height: COLLAPSED_GROUP_FRAME_HEIGHT,
+            }
+          : {}),
+        style: {
+          ...node.style,
+          ...(isCollapsed
+            ? {
+                width: COLLAPSED_GROUP_FRAME_WIDTH,
+                height: COLLAPSED_GROUP_FRAME_HEIGHT,
+              }
+            : {}),
+          zIndex: z,
+        },
+        data: {
+          ...(node.data as object),
+          collapsed: isCollapsed,
+          onToggleCollapse: () => {
+            toggleGroupCollapsedRef.current(node.id);
           },
-          data: {
-            ...(node.data as object),
-            collapsed: true,
-            onToggleCollapse: () => {
-              toggleGroupCollapsedRef.current(node.id);
-            },
-          },
-        };
-      });
-    }
+        },
+      };
+    });
 
     return result;
-  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, collapsedGroupIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, collapsedGroupIds, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1711,7 +1725,6 @@ const StudioContent = () => {
       );
     }
 
-    const classIdsHiddenByCollapse = getClassIdsInCollapsedGroups(groups, collapsedGroupIds);
     if (classIdsHiddenByCollapse.size > 0) {
       result = result.filter(
         (edge) =>
@@ -1819,7 +1832,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, collapsedGroupIds, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
