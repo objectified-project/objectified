@@ -170,6 +170,7 @@ import {
 } from 'lucide-react';
 import { useDialog } from '../../providers/DialogProvider';
 import * as Popover from '@radix-ui/react-popover';
+import { cn } from '../../../../../lib/utils';
 
 // Icon options for class nodes - curated list organized by category
 const NODE_ICON_OPTIONS: Array<{ name: string; icon: LucideIcon; category: string }> = [
@@ -546,7 +547,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
   /** #854: Property row shows type by default; edit/delete replace type on hover (editable canvas only). */
   const [hoveredPropertyRowId, setHoveredPropertyRowId] = useState<string | null>(null);
   /** #853: Hover on class node shows editing actions outside the card (popover open keeps toolbar visible). */
-  const [classNodeHovered, setClassNodeHovered] = useState(false);
+
   const nodeRef = useRef<HTMLDivElement>(null);
 
   // Use ResizeObserver to detect when the node's actual DOM size changes
@@ -1194,19 +1195,26 @@ function ClassNode({ id, data, selected }: NodeProps) {
         })()
       : null;
 
-  const showClassNodeEditingActions =
-    !typedData.isReadOnly && (classNodeHovered || colorPickerOpen || iconPickerOpen);
-
   return (
     <div
-      className="relative"
-      onMouseEnter={() => setClassNodeHovered(true)}
-      onMouseLeave={() => setClassNodeHovered(false)}
+      className="relative group"
     >
-      {showClassNodeEditingActions && (
+      {!typedData.isReadOnly && (
         <div
-          className="absolute -right-1.5 -top-1.5 z-[35] flex items-center gap-0.5 rounded-lg border border-slate-200/90 bg-white/95 py-0.5 pl-0.5 pr-0.5 shadow-lg backdrop-blur-sm dark:border-slate-600/90 dark:bg-slate-900/95"
+          className={cn(
+            'absolute -right-1.5 -top-1.5 z-[35]',
+            'flex items-center gap-0.5',
+            'rounded-lg border border-slate-200/90',
+            'bg-white/95 py-0.5 pl-0.5 pr-0.5',
+            'shadow-lg backdrop-blur-sm',
+            'dark:border-slate-600/90 dark:bg-slate-900/95',
+            'transition-opacity pointer-events-none opacity-0',
+            'group-hover:pointer-events-auto group-hover:opacity-100',
+            'focus-within:pointer-events-auto focus-within:opacity-100',
+            (colorPickerOpen || iconPickerOpen) && '!opacity-100 !pointer-events-auto',
+          )}
           onMouseDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="relative z-[1] flex items-center gap-0.5">
             {/* Color picker button using Popover */}
