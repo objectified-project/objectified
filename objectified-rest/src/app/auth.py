@@ -6,7 +6,6 @@ Supports both JWT tokens (from NextAuth) and API keys for authentication.
 
 import logging
 import jwt
-from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Header
 
@@ -14,6 +13,16 @@ from .config import settings
 from .database import db
 
 logger = logging.getLogger(__name__)
+
+# PyJWT exposes these on the main `jwt` package; avoid `import jwt.exceptions` (fails for some
+# vendor/layout installs and for the obsolete PyPI `jwt` package which is not PyJWT).
+_ExpiredSignatureError = getattr(jwt, "ExpiredSignatureError", None)
+_InvalidTokenError = getattr(jwt, "InvalidTokenError", None)
+if _ExpiredSignatureError is None or _InvalidTokenError is None:
+    raise ImportError(
+        'Install PyJWT for objectified-rest (e.g. pip install "PyJWT>=2.8"). '
+        "If the unrelated `jwt` package is installed, remove it: pip uninstall jwt"
+    )
 
 
 def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
@@ -39,10 +48,10 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
         )
 
         return payload
-    except ExpiredSignatureError:
+    except _ExpiredSignatureError:
         logger.warning("decode_jwt: Token expired")
         return None
-    except InvalidTokenError as e:
+    except _InvalidTokenError as e:
         logger.warning(f"decode_jwt: Invalid token - {e}")
         return None
     except Exception as e:
