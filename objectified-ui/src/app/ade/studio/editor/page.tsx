@@ -147,6 +147,7 @@ import {
   filterCanvasLayoutForTargetClasses,
 } from '@/app/utils/canvas-layout-json';
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
+import { toPng } from 'html-to-image';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -457,6 +458,9 @@ const StudioContent = () => {
   const [hasExistingLayout, setHasExistingLayout] = useState(false);
   const [selectedLayoutName, setSelectedLayoutName] = useState('Development Layout');
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>(BUILTIN_LAYOUT_NAMES);
+  /** Data URLs for saved layout snapshots keyed by trimmed layout name */
+  const [namedLayoutSnapshotDataUrls, setNamedLayoutSnapshotDataUrls] = useState<Record<string, string>>({});
+  const canvasCaptureAreaRef = useRef<HTMLDivElement>(null);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
   const [autoSavePending, setAutoSavePending] = useState(false);
   const autoSaveInFlightRef = useRef(false);
@@ -3425,6 +3429,26 @@ const StudioContent = () => {
       setLoadingMessage('Saving canvas layout...');
       setIsLoadingCanvas(true);
 
+      let snapshotDataUrl: string | undefined;
+      let snapshotBase64ForServer: string | undefined;
+      const captureEl = canvasCaptureAreaRef.current;
+      if (captureEl) {
+        try {
+          const dataUrl = await toPng(captureEl, {
+            pixelRatio: 0.45,
+            cacheBust: true,
+            backgroundColor: isDark ? '#111827' : '#f8fafc',
+          });
+          const comma = dataUrl.indexOf(',');
+          if (comma !== -1 && dataUrl.slice(0, comma).includes('image/png')) {
+            snapshotDataUrl = dataUrl;
+            snapshotBase64ForServer = dataUrl.slice(comma + 1);
+          }
+        } catch (snapErr) {
+          console.warn('Canvas snapshot capture failed:', snapErr);
+        }
+      }
+
       // Get current viewport
       const viewport = getViewport();
 
@@ -3461,13 +3485,17 @@ const StudioContent = () => {
         viewport,
         nodeData,
         edgeData,
-        groups
+        groups,
+        snapshotBase64ForServer
       );
 
       const response = JSON.parse(result);
 
       if (response.success) {
         setSelectedLayoutName(layoutName);
+        if (snapshotDataUrl) {
+          setNamedLayoutSnapshotDataUrls((prev) => ({ ...prev, [layoutName]: snapshotDataUrl }));
+        }
         // Show "Saved" state temporarily
         setLayoutSaved(true);
         setHasExistingLayout(true);
@@ -3494,7 +3522,7 @@ const StudioContent = () => {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
     }
-  }, [isReadOnly, selectedVersionId, currentUserId, selectedLayoutName, nodes, edges, groups, getViewport, alertDialog]);
+  }, [isReadOnly, selectedVersionId, currentUserId, selectedLayoutName, nodes, edges, groups, getViewport, alertDialog, isDark]);
 
   const handleSetMyDefaultLayoutName = useCallback(async () => {
     if (isReadOnly || !selectedVersionId || !currentUserId) return;
@@ -5131,6 +5159,7 @@ const StudioContent = () => {
       if (!selectedVersionId || !currentUserId) {
         setHasExistingLayout(false);
         setAvailableLayoutNames(BUILTIN_LAYOUT_NAMES);
+        setNamedLayoutSnapshotDataUrls({});
         return;
       }
 
@@ -5147,6 +5176,15 @@ const StudioContent = () => {
           Array.from(new Set([...BUILTIN_LAYOUT_NAMES, ...dbLayoutNames]))
         );
 
+        const snapMap: Record<string, string> = {};
+        for (const layout of allLayoutsResponse.layouts || []) {
+          const n = typeof layout.name === 'string' ? layout.name.trim() : '';
+          if (n && layout.snapshotImageBase64) {
+            snapMap[n] = `data:image/png;base64,${layout.snapshotImageBase64}`;
+          }
+        }
+        setNamedLayoutSnapshotDataUrls(snapMap);
+
         const trimmedSelection = selectedLayoutName.trim();
         const hasExistingLayoutForSelection =
           !!trimmedSelection &&
@@ -5158,6 +5196,7 @@ const StudioContent = () => {
         console.error('Error checking layout existence:', error);
         setHasExistingLayout(false);
         setAvailableLayoutNames(BUILTIN_LAYOUT_NAMES);
+        setNamedLayoutSnapshotDataUrls({});
       }
     };
 
@@ -6115,7 +6154,8 @@ const StudioContent = () => {
               </Panel>
             )}
 
-            <ReactFlow
+            <div ref={canvasCaptureAreaRef} className="absolute inset-0 w-full h-full min-h-0">
+              <ReactFlow
               nodes={displayNodes}
               edges={edgesWithHover}
               nodeTypes={nodeTypes}
@@ -7252,6 +7292,18 @@ const StudioContent = () => {
                               <option key={layoutName} value={layoutName} />
                             ))}
                           </datalist>
+                          {namedLayoutSnapshotDataUrls[selectedLayoutName.trim()] ? (
+                            <div className="mt-2 flex items-start gap-2">
+                              <img
+                                src={namedLayoutSnapshotDataUrls[selectedLayoutName.trim()]}
+                                alt=""
+                                className="h-16 w-28 shrink-0 rounded-md border border-gray-200 dark:border-gray-600 object-cover bg-gray-100 dark:bg-gray-800"
+                              />
+                              <span className="text-xs text-gray-500 dark:text-gray-400 leading-snug pt-0.5">
+                                Saved canvas preview for this layout name
+                              </span>
+                            </div>
+                          ) : null}
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <button
@@ -7610,7 +7662,8 @@ const StudioContent = () => {
               )}
             </Panel>
 
-          </ReactFlow>
+              </ReactFlow>
+            </div>
 
           {/* Draggable panels (outside ReactFlow so position:fixed is viewport-relative) */}
           {schemaMetricsOpen && (

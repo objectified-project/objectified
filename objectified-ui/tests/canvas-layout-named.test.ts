@@ -194,6 +194,25 @@ describe('Database Helper - Named Canvas Layouts', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  test('saveNamedCanvasLayout rejects invalid layout snapshot bytes', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'My Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [],
+      'YQ=='
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Layout snapshot must be a PNG image');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   test('saveNamedCanvasLayout creates shared layout when userId is null and trims name', async () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 
