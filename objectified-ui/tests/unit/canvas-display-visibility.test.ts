@@ -74,6 +74,21 @@ describe('canvas-display-visibility (#483)', () => {
     ).toEqual(new Set(['c', 'd']));
   });
 
+  it('hiddenGroupIds on ancestor removes members of nested groups (#155)', () => {
+    const nested = [
+      { id: 'g1', nodeIds: ['a'], parentId: null as string | null },
+      { id: 'g2', nodeIds: ['c'], parentId: 'g1' },
+    ];
+    expect(
+      computeClassIdsPassingHideCriteria(nodes, nested, connected, {
+        hideEmptyClasses: false,
+        hideUnconnectedClasses: false,
+        hideDeprecatedClasses: false,
+        hiddenGroupIds: new Set(['g1']),
+      })
+    ).toEqual(new Set(['d']));
+  });
+
   it('combines criteria as AND across rules', () => {
     expect(
       computeClassIdsPassingHideCriteria(nodes, groups, connected, {
@@ -89,6 +104,15 @@ describe('canvas-display-visibility (#483)', () => {
     expect(groupNodeIdIsVisible(groups[0], new Set(['a']))).toBe(true);
     expect(groupNodeIdIsVisible(groups[0], new Set(['c']))).toBe(false);
     expect(groupNodeIdIsVisible(groups[1], new Set(['c']))).toBe(true);
+  });
+
+  it('groupNodeIdIsVisible considers visible members in nested child groups (#155)', () => {
+    const nested = [
+      { id: 'g1', nodeIds: [], parentId: null },
+      { id: 'g2', nodeIds: ['c'], parentId: 'g1' },
+    ];
+    expect(groupNodeIdIsVisible(nested[0], new Set(['c']), nested)).toBe(true);
+    expect(groupNodeIdIsVisible(nested[0], new Set(['a']), nested)).toBe(false);
   });
 });
 

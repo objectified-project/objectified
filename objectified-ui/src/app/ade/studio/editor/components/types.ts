@@ -34,6 +34,7 @@ export interface CanvasGroup {
   position: { x: number; y: number };
   dimensions: { width: number; height: number };
   nodeIds: string[];
+  parentId?: string | null;
   tags?: any[];
   styleOptions?: GroupStyleOptions;
 }

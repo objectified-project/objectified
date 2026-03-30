@@ -24,6 +24,8 @@ export interface CanvasGroup {
   description?: string;
   color: string;
   nodeIds: string[];
+  /** Parent canvas group for nesting (#155); omit or null = top-level. */
+  parentId?: string | null;
   tags?: GroupTag[];
   position: { x: number; y: number };
   dimensions: { width: number; height: number };

@@ -7,6 +7,7 @@ import {
   Box, Layers, Database, Shield, Users, Zap, Globe, Lock,
   FileText, Tag, Star, Heart, Flag, Bookmark, Archive, Package,
   FileX, ChevronRight, ChevronDown, Download, FileJson, FileCode2, Copy, SlidersHorizontal,
+  ListTree,
 } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 import { COLLAPSED_GROUP_FRAME_WIDTH, COLLAPSED_GROUP_FRAME_HEIGHT } from '@/app/utils/canvas-group-collapse';
@@ -132,6 +133,10 @@ export interface GroupNodeData {
   /** Canvas frame is collapsed to title + count only (#154). */
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** #155: Parent group id if nested */
+  parentId?: string | null;
+  /** #155: Drill into group (breadcrumb navigation) */
+  onDrillInto?: (groupId: string) => void;
 }
 
 const GroupNode = memo(({ id, data, selected }: NodeProps) => {
@@ -316,6 +321,22 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
               <ChevronDown className="h-4 w-4" />
             )}
           </button>
+          {groupData.onDrillInto && !groupData.isReadOnly && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                groupData.onDrillInto?.(groupData.id);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={`p-0.5 rounded shrink-0 transition-colors ${useLightText ? 'hover:bg-white/25' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+              title="Nested view — focus breadcrumb on this group"
+              aria-label="Drill into nested group"
+            >
+              <ListTree className="h-4 w-4" />
+            </button>
+          )}
           <IconComponent className="h-4 w-4" />
 
           {isEditing ? (

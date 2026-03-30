@@ -148,6 +148,18 @@ import {
   COLLAPSED_GROUP_FRAME_HEIGHT,
 } from '@/app/utils/canvas-group-collapse';
 import {
+  MAX_CANVAS_GROUP_DEPTH,
+  collectAllNodeIdsInGroupSubtree,
+  collectDescendantGroupIds,
+  collectSubtreeGroupIds,
+  findInnermostGroupAtPosition,
+  getGroupDepth,
+  groupById,
+  isStrictDescendantGroup,
+  wouldNestExceedMaxDepth,
+  type FlowLikeGroupNode,
+} from '@/app/utils/canvas-nested-groups';
+import {
   edgeBelongsOnCanvas,
   ghostEdgeClassName,
   ghostNodeClassName,
@@ -408,6 +420,28 @@ const StudioContent = () => {
 
   // #154: Collapsed canvas groups — member classes hidden, compact frame; prefs per user + version
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
+  /** #155: Breadcrumb / drill path — innermost group id is last; empty = full canvas */
+  const [nestedGroupDrillPath, setNestedGroupDrillPath] = useState<string[]>([]);
+
+  useEffect(() => {
+    setNestedGroupDrillPath([]);
+  }, [selectedVersionId]);
+
+  useEffect(() => {
+    setNestedGroupDrillPath((prev) => {
+      if (prev.length === 0) return prev;
+      const idSet = new Set(groups.map((g) => g.id));
+      let cut = prev.length;
+      for (let i = 0; i < prev.length; i++) {
+        if (!idSet.has(prev[i])) {
+          cut = i;
+          break;
+        }
+      }
+      const next = prev.slice(0, cut);
+      return next.length === prev.length ? prev : next;
+    });
+  }, [groups]);
 
   useEffect(() => {
     if (!currentUserId || !selectedVersionId) {
@@ -818,6 +852,7 @@ const StudioContent = () => {
   const handleGroupColorChangeRef = useRef<any>(null);
   const handleGroupStyleChangeRef = useRef<any>(null);
   const handleGroupTagsChangeRef = useRef<any>(null);
+  const handleDrillIntoNestedGroupRef = useRef<(groupId: string) => void>(() => {});
 
   // Handle toggling property expansion
   const handleTogglePropertyExpansion = useCallback((propertyId: string) => {
@@ -1170,8 +1205,7 @@ const StudioContent = () => {
     if (!focusModeEnabled) return new Set<string>();
     // #490: Focus on group – only show this group's members
     if (focusModeGroupId) {
-      const group = groups.find(g => g.id === focusModeGroupId);
-      return group ? new Set<string>(group.nodeIds) : new Set<string>();
+      return new Set<string>(collectAllNodeIdsInGroupSubtree(focusModeGroupId, groups));
     }
     const classNodeIds = selectedNodeIds.filter(id => {
       const node = nodes.find(n => n.id === id);
@@ -1493,6 +1527,16 @@ const StudioContent = () => {
   const displayNodes = useMemo(() => {
     let result = layoutPreviewNodes ?? nodes;
 
+    if (nestedGroupDrillPath.length > 0) {
+      const focusId = nestedGroupDrillPath[nestedGroupDrillPath.length - 1]!;
+      const visibleGroupIds = collectSubtreeGroupIds(focusId, groups);
+      const visibleClassIds = new Set(collectAllNodeIdsInGroupSubtree(focusId, groups));
+      result = result.filter((node) => {
+        if (node.type === 'groupNode') return visibleGroupIds.has(node.id);
+        return visibleClassIds.has(node.id);
+      });
+    }
+
     // #481 + #483: Manual hide, empty/unconnected/deprecated/group criteria — group frame if any member visible
     // #484: Optional ghosts mode — keep hidden nodes on canvas with semi-transparent styling
     const groupMap = new Map(groups.map((g) => [g.id, g]));
@@ -1500,7 +1544,7 @@ const StudioContent = () => {
       result = result.filter((node) => {
         if (node.type === 'groupNode') {
           const g = groupMap.get(node.id);
-          return g ? groupNodeIdIsVisible(g, allBaseClassNodeIds) : false;
+          return g ? groupNodeIdIsVisible(g, allBaseClassNodeIds, groups) : false;
         }
         return true;
       });
@@ -1511,7 +1555,8 @@ const StudioContent = () => {
           node.type,
           g,
           visibleClassIdsAfterHideCriteria,
-          nodeGhostsModeEnabled
+          nodeGhostsModeEnabled,
+          groups
         );
         if (!ghost) return node;
         const existingClassName = node.className || '';
@@ -1521,7 +1566,7 @@ const StudioContent = () => {
       result = result.filter((node) => {
         if (node.type === 'groupNode') {
           const g = groupMap.get(node.id);
-          return g ? groupNodeIdIsVisible(g, visibleClassIdsAfterHideCriteria) : false;
+          return g ? groupNodeIdIsVisible(g, visibleClassIdsAfterHideCriteria, groups) : false;
         }
         return visibleClassIdsAfterHideCriteria.has(node.id);
       });
@@ -1718,12 +1763,13 @@ const StudioContent = () => {
           onToggleCollapse: () => {
             toggleGroupCollapsedRef.current(node.id);
           },
+          onDrillInto: () => handleDrillIntoNestedGroupRef.current(node.id),
         },
       };
     });
 
     return result;
-  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, collapsedGroupIds, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, nestedGroupDrillPath, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, collapsedGroupIds, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1751,6 +1797,14 @@ const StudioContent = () => {
       result = result.filter(
         (edge) =>
           !classIdsHiddenByCollapse.has(edge.source) && !classIdsHiddenByCollapse.has(edge.target)
+      );
+    }
+
+    if (nestedGroupDrillPath.length > 0) {
+      const focusId = nestedGroupDrillPath[nestedGroupDrillPath.length - 1]!;
+      const visibleClassIds = new Set(collectAllNodeIdsInGroupSubtree(focusId, groups));
+      result = result.filter(
+        (edge) => visibleClassIds.has(edge.source) && visibleClassIds.has(edge.target)
       );
     }
 
@@ -1854,7 +1908,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, classIdsHiddenByCollapse, nestedGroupDrillPath, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
@@ -2676,10 +2730,15 @@ const StudioContent = () => {
   const handleGroupDelete = useCallback(async (groupId: string) => {
     if (isReadOnly) return;
 
-    const group = groups.find(g => g.id === groupId);
+    const group = groups.find((g) => g.id === groupId);
+    const subtree = collectSubtreeGroupIds(groupId, groups);
+    const subtreeCount = subtree.size;
     const confirmed = await confirmDialog({
       title: 'Delete Group',
-      message: `Are you sure you want to delete the group "${group?.name || 'this group'}"? The classes inside will not be deleted.`,
+      message:
+        subtreeCount > 1
+          ? `Delete "${group?.name || 'this group'}" and ${subtreeCount - 1} nested group frame(s)? Classes on the canvas are not deleted.`
+          : `Are you sure you want to delete the group "${group?.name || 'this group'}"? The classes inside will not be deleted.`,
       variant: 'warning',
       confirmLabel: 'Delete Group',
       cancelLabel: 'Cancel',
@@ -2687,20 +2746,26 @@ const StudioContent = () => {
 
     if (!confirmed) return;
 
-    // Remove from context
-    deleteGroupFromContext(groupId);
+    const byIdDel = groupById(groups);
+    const sortedToRemove = Array.from(subtree).sort(
+      (a, b) => getGroupDepth(b, byIdDel) - getGroupDepth(a, byIdDel)
+    );
+    for (const id of sortedToRemove) {
+      deleteGroupFromContext(id);
+      groupPositionsRef.current.delete(id);
+    }
 
-    // Clean up group position tracking
-    groupPositionsRef.current.delete(groupId);
+    setNodes((prevNodes) =>
+      prevNodes.filter((node) => !(node.type === 'groupNode' && subtree.has(node.id)))
+    );
 
-    // Remove group node from canvas
-    setNodes(prevNodes => prevNodes.filter(node => node.id !== groupId));
+    setNestedGroupDrillPath((prev) => prev.filter((id) => !subtree.has(id)));
 
     // Auto-save to database
     if (selectedVersionId && currentUserId) {
       try {
         const viewport = getViewport();
-        const nodeData = nodes.filter(n => n.id !== groupId && n.type !== 'groupNode').map(node => ({
+        const nodeData = nodes.filter((n) => !subtree.has(n.id) && n.type !== 'groupNode').map((node) => ({
           id: node.id,
           position: node.position,
           dimensions: node.style ? { width: node.style.width, height: node.style.height } : undefined
@@ -2711,8 +2776,7 @@ const StudioContent = () => {
           target: edge.target
         }));
 
-        // Exclude the deleted group
-        const updatedGroups = groups.filter(g => g.id !== groupId);
+        const updatedGroups = groups.filter((g) => !subtree.has(g.id));
 
         await saveDefaultCanvasLayout(
           selectedVersionId,
@@ -2732,13 +2796,14 @@ const StudioContent = () => {
   // Optional classIdsFromNode/groupNameFromNode come from the group node so we don't rely on groups state being in sync
   const handleDeleteAllClassesInGroup = useCallback(async (
     groupId: string,
-    classIdsFromNode?: string[],
+    _classIdsFromNode?: string[],
     groupNameFromNode?: string
   ) => {
     if (isReadOnly) return;
 
-    const group = groups.find(g => g.id === groupId);
-    const classIds = (classIdsFromNode?.length ? classIdsFromNode : group?.nodeIds) || [];
+    const group = groups.find((g) => g.id === groupId);
+    const classIds = collectAllNodeIdsInGroupSubtree(groupId, groups);
+    const directCount = group?.nodeIds?.length ?? 0;
     const groupName = groupNameFromNode ?? group?.name ?? 'this group';
 
     if (classIds.length === 0) {
@@ -2747,7 +2812,9 @@ const StudioContent = () => {
 
     const confirmed = await confirmDialog({
       title: 'Delete All Classes in Group',
-      message: `Are you sure you want to delete all ${classIds.length} class${classIds.length === 1 ? '' : 'es'} in "${groupName}"? This action cannot be undone.`,
+      message: `Are you sure you want to delete all ${classIds.length} class${classIds.length === 1 ? '' : 'es'} in "${groupName}"${
+        classIds.length > directCount ? ' (including classes in nested group frames)' : ''
+      }? This action cannot be undone.`,
       variant: 'danger',
       confirmLabel: 'Delete All',
       cancelLabel: 'Cancel',
@@ -2776,8 +2843,10 @@ const StudioContent = () => {
 
   const handleExportGroupSchema = useCallback(
     async (groupId: string, nodeIds: string[], groupName: string, format: 'json' | 'yaml') => {
-      void groupId;
-      if (!selectedVersionId || nodeIds.length === 0) return;
+      if (!selectedVersionId) return;
+      const rootIds = collectAllNodeIdsInGroupSubtree(groupId, groups);
+      const exportIds = rootIds.length > 0 ? rootIds : nodeIds;
+      if (exportIds.length === 0) return;
       try {
         const res = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
         if (!res.success || !res.classes) {
@@ -2787,7 +2856,7 @@ const StudioContent = () => {
           });
           return;
         }
-        const expanded = expandClassesForGroupExport(nodeIds, res.classes);
+        const expanded = expandClassesForGroupExport(exportIds, res.classes);
         if (expanded.length === 0) {
           await alertDialog({ message: 'No classes in this group to export.', variant: 'warning' });
           return;
@@ -2816,7 +2885,7 @@ const StudioContent = () => {
         await alertDialog({ message, variant: 'error' });
       }
     },
-    [selectedVersionId, selectedProjectId, projects, versions, alertDialog]
+    [selectedVersionId, selectedProjectId, projects, versions, alertDialog, groups]
   );
 
   const handleBulkEditGroupClasses = useCallback(
@@ -2831,8 +2900,10 @@ const StudioContent = () => {
         topLevelPropertyReadOnly?: boolean;
       }
     ) => {
-      void groupId;
-      if (isReadOnly || nodeIds.length === 0) return;
+      if (isReadOnly) return;
+      const bulkIds = collectAllNodeIdsInGroupSubtree(groupId, groups);
+      const targetIds = bulkIds.length > 0 ? bulkIds : nodeIds;
+      if (targetIds.length === 0) return;
       const hasText =
         (options.descriptionPrefix && options.descriptionPrefix.trim().length > 0) ||
         (options.descriptionSuffix && options.descriptionSuffix.trim().length > 0);
@@ -2847,13 +2918,13 @@ const StudioContent = () => {
       }
       const ok = await confirmDialog({
         title: 'Apply to all classes in group',
-        message: `Update ${nodeIds.length} class(es) in "${groupName}"?`,
+        message: `Update ${targetIds.length} class(es) in "${groupName}"${bulkIds.length > nodeIds.length ? ' (includes nested groups)' : ''}?`,
         confirmLabel: 'Apply',
         cancelLabel: 'Cancel',
       });
       if (!ok) throw new Error('cancelled');
 
-      const raw = await bulkApplyEditsToGroupClasses(selectedVersionId!, nodeIds, {
+      const raw = await bulkApplyEditsToGroupClasses(selectedVersionId!, targetIds, {
         descriptionPrefix:
           options.descriptionPrefix && options.descriptionPrefix.trim().length > 0
             ? options.descriptionPrefix
@@ -2877,7 +2948,7 @@ const StudioContent = () => {
       triggerSidebarRefresh();
       await alertDialog({ message: 'Bulk changes applied to all classes in this group.', variant: 'success' });
     },
-    [isReadOnly, selectedVersionId, confirmDialog, alertDialog, reloadClasses, triggerSidebarRefresh]
+    [isReadOnly, selectedVersionId, confirmDialog, alertDialog, reloadClasses, triggerSidebarRefresh, groups]
   );
 
   const handleDuplicateGroup = useCallback(
@@ -2923,6 +2994,7 @@ const StudioContent = () => {
         id: newGroupId,
         name: newGroupName,
         color: sourceGroup?.color || GROUP_COLORS[0].name,
+        parentId: null as string | null,
         nodeIds: nodeIds.map((oid) => idMap[oid]).filter(Boolean) as string[],
         position: { x: basePos.x + OFFSET, y: basePos.y + OFFSET },
         dimensions: sourceGroup?.dimensions || { width: 400, height: 300 },
@@ -2989,6 +3061,8 @@ const StudioContent = () => {
           onColorChange: (gid: string, color: string) => handleGroupColorChangeRef.current?.(gid, color),
           onStyleChange: (gid: string, style: any) => handleGroupStyleChangeRef.current?.(gid, style),
           onTagsChange: (gid: string, t: any[]) => handleGroupTagsChangeRef.current?.(gid, t),
+          parentId: null,
+          onDrillInto: () => handleDrillIntoNestedGroupRef.current(newGroupId),
           isReadOnly,
         },
       };
@@ -3242,6 +3316,10 @@ const StudioContent = () => {
     }
   }, [isReadOnly, updateGroup, setNodes, selectedVersionId, currentUserId, getViewport, nodes, edges, groups]);
 
+  const handleDrillIntoNestedGroup = useCallback((groupId: string) => {
+    setNestedGroupDrillPath((prev) => [...prev, groupId]);
+  }, []);
+
   // Assign current handlers to refs for use in effects
   handleGroupTagsChangeRef.current = handleGroupTagsChange;
   handleGroupRenameRef.current = handleGroupRename;
@@ -3252,6 +3330,7 @@ const StudioContent = () => {
   handleBulkEditGroupClassesRef.current = handleBulkEditGroupClasses;
   handleGroupColorChangeRef.current = handleGroupColorChange;
   handleGroupStyleChangeRef.current = handleGroupStyleChange;
+  handleDrillIntoNestedGroupRef.current = handleDrillIntoNestedGroup;
 
   // State for drag-over highlighting
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
@@ -3359,22 +3438,12 @@ const StudioContent = () => {
     return true;
   }, [isReadOnly, groups, confirmDialog, updateGroup, setNodes]);
 
-  // Find which group a position is inside of
+  // Innermost group frame containing (x,y) — #155 nesting uses smallest overlapping frame
   const findGroupAtPosition = useCallback((x: number, y: number, excludeGroupId?: string): string | null => {
-    const groupNodes = nodes.filter(n => n.type === 'groupNode' && n.id !== excludeGroupId);
-
-    for (const groupNode of groupNodes) {
-      const groupX = groupNode.position.x;
-      const groupY = groupNode.position.y;
-      // Use measured dimensions first (updated after resize), then style, then default
-      const groupWidth = (groupNode.measured?.width as number) || (groupNode.style?.width as number) || 400;
-      const groupHeight = (groupNode.measured?.height as number) || (groupNode.style?.height as number) || 300;
-
-      if (x >= groupX && x <= groupX + groupWidth && y >= groupY && y <= groupY + groupHeight) {
-        return groupNode.id;
-      }
-    }
-    return null;
+    const groupFlowNodes = nodes.filter((n) => n.type === 'groupNode') as FlowLikeGroupNode[];
+    const exclude = new Set<string>();
+    if (excludeGroupId) exclude.add(excludeGroupId);
+    return findInnermostGroupAtPosition(x, y, groupFlowNodes, exclude);
   }, [nodes]);
 
   // Find which group a node currently belongs to
@@ -3389,9 +3458,34 @@ const StudioContent = () => {
 
   // Handle node drag - check if over a group for visual feedback and calculate smart guides
   const handleNodeDrag = useCallback((event: React.MouseEvent, node: Node) => {
-    if (isReadOnly || node.type === 'groupNode') {
+    if (isReadOnly) {
       setDragOverGroupId(null);
       setGuides({ horizontal: [], vertical: [] });
+      return;
+    }
+
+    if (node.type === 'groupNode') {
+      setGuides({ horizontal: [], vertical: [] });
+      const desc = collectDescendantGroupIds(node.id, groups);
+      const exclude = new Set<string>([node.id, ...desc]);
+      const groupFlowNodes = nodes.filter((n) => n.type === 'groupNode') as FlowLikeGroupNode[];
+      const nodeWidth = (node.measured?.width as number) || (node.width as number) || 400;
+      const nodeHeight = (node.measured?.height as number) || (node.height as number) || 300;
+      const cx = node.position.x + nodeWidth / 2;
+      const cy = node.position.y + nodeHeight / 2;
+      const target = findInnermostGroupAtPosition(cx, cy, groupFlowNodes, exclude);
+      const byId = groupById(groups);
+      const currentParent = groups.find((g) => g.id === node.id)?.parentId ?? null;
+      let showTarget: string | null = null;
+      if (target) {
+        if (
+          !isStrictDescendantGroup(node.id, target, byId) &&
+          !wouldNestExceedMaxDepth(node.id, target, groups)
+        ) {
+          if (target !== currentParent) showTarget = target;
+        }
+      }
+      setDragOverGroupId(showTarget);
       return;
     }
 
@@ -3487,7 +3581,7 @@ const StudioContent = () => {
     });
 
     setGuides({ horizontal: newHorizontalGuides, vertical: newVerticalGuides });
-  }, [isReadOnly, findGroupAtPosition, nodes, smartGuidesEnabled]);
+  }, [isReadOnly, findGroupAtPosition, nodes, smartGuidesEnabled, groups]);
 
   // Check if a node is completely outside a group's bounds
   const isNodeCompletelyOutsideGroup = useCallback((node: Node, groupId: string): boolean => {
@@ -3523,7 +3617,83 @@ const StudioContent = () => {
     setDragOverGroupId(null);
     setGuides({ horizontal: [], vertical: [] }); // Clear smart guides
 
-    if (isReadOnly || node.type === 'groupNode') return;
+    if (isReadOnly) return;
+
+    // #155: Nest or unnest group frames by dropping inside another group or on empty canvas
+    if (node.type === 'groupNode') {
+      const movingId = node.id;
+      const desc = collectDescendantGroupIds(movingId, groups);
+      const exclude = new Set<string>([movingId, ...desc]);
+      const groupFlowNodes = nodes.filter((n) => n.type === 'groupNode') as FlowLikeGroupNode[];
+      const nodeWidth = (node.measured?.width as number) || (node.width as number) || 400;
+      const nodeHeight = (node.measured?.height as number) || (node.height as number) || 300;
+      const cx = node.position.x + nodeWidth / 2;
+      const cy = node.position.y + nodeHeight / 2;
+      const targetParentId = findInnermostGroupAtPosition(cx, cy, groupFlowNodes, exclude);
+      const currentParent = groups.find((g) => g.id === movingId)?.parentId ?? null;
+      const newParent = targetParentId ?? null;
+      const byId = groupById(groups);
+
+      if (
+        newParent &&
+        (isStrictDescendantGroup(movingId, newParent, byId) ||
+          wouldNestExceedMaxDepth(movingId, newParent, groups))
+      ) {
+        await alertDialog({
+          message: isStrictDescendantGroup(movingId, newParent, byId)
+            ? 'A group cannot be placed inside its own descendant.'
+            : `Groups can nest at most ${MAX_CANVAS_GROUP_DEPTH} levels deep.`,
+          variant: 'warning',
+        });
+        return;
+      }
+
+      if (newParent === currentParent) return;
+
+      updateGroup(movingId, { parentId: newParent });
+      setNodes((prev) =>
+        prev.map((n) => {
+          if (n.id === movingId && n.type === 'groupNode') {
+            return { ...n, data: { ...(n.data as object), parentId: newParent } };
+          }
+          return n;
+        })
+      );
+
+      if (selectedVersionId && currentUserId) {
+        try {
+          const viewport = getViewport();
+          const nodeData = nodes.map((nd) => ({
+            id: nd.id,
+            type: nd.type,
+            position: nd.position,
+            dimensions: {
+              width: (nd as any).measured?.width || (nd as any).width || (nd.style as any)?.width,
+              height: (nd as any).measured?.height || (nd as any).height || (nd.style as any)?.height,
+            },
+          }));
+          const edgeData = edges.map((edge) => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+          }));
+          const updatedGroups = groups.map((g) =>
+            g.id === movingId ? { ...g, parentId: newParent } : g
+          );
+          await saveDefaultCanvasLayout(
+            selectedVersionId,
+            currentUserId,
+            viewport,
+            nodeData,
+            edgeData,
+            updatedGroups
+          );
+        } catch (error) {
+          console.error('Failed to save after nesting change:', error);
+        }
+      }
+      return;
+    }
 
     // Get node dimensions and center
     const nodeWidth = (node.measured?.width as number) || (node.width as number) || 260;
@@ -3644,7 +3814,25 @@ const StudioContent = () => {
         console.error('Error updating class position in group:', error);
       }
     }
-  }, [isReadOnly, findNodeGroup, findGroupAtPosition, handleAddNodeToGroup, handleRemoveNodeFromGroup, groups, confirmDialog, updateGroup, setNodes, nodes, isNodeCompletelyOutsideGroup]);
+  }, [
+    isReadOnly,
+    findNodeGroup,
+    findGroupAtPosition,
+    handleAddNodeToGroup,
+    handleRemoveNodeFromGroup,
+    groups,
+    confirmDialog,
+    alertDialog,
+    updateGroup,
+    setNodes,
+    nodes,
+    edges,
+    isNodeCompletelyOutsideGroup,
+    selectedVersionId,
+    currentUserId,
+    getViewport,
+    saveDefaultCanvasLayout,
+  ]);
 
   // Handle canvas drag over - allow dropping groups; show dropzone when dragging new-group
   const handleCanvasDragOver = useCallback((event: React.DragEvent) => {
@@ -3738,6 +3926,7 @@ const StudioContent = () => {
         color: newGroup.color,
         nodeIds: newGroup.nodeIds,
         styleOptions: newGroup.styleOptions,
+        parentId: null,
         availableTags: createGroupAvailableTags,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
@@ -3759,6 +3948,7 @@ const StudioContent = () => {
         ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
+        onDrillInto: () => handleDrillIntoNestedGroupRef.current(groupId),
         isReadOnly: isReadOnly
       }
     };
@@ -3881,6 +4071,7 @@ const StudioContent = () => {
         color: newGroup.color,
         nodeIds: newGroup.nodeIds,
         styleOptions: newGroup.styleOptions,
+        parentId: null,
         availableTags: createGroupAtDropAvailableTags,
         onRename: handleGroupRename,
         onDelete: handleGroupDelete,
@@ -3902,6 +4093,7 @@ const StudioContent = () => {
         ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
+        onDrillInto: () => handleDrillIntoNestedGroupRef.current(groupId),
         isReadOnly: isReadOnly
       }
     };
@@ -4056,8 +4248,49 @@ const StudioContent = () => {
       if (change.type === 'position' && change.position) {
         const node = nodes.find(n => n.id === change.id);
 
-        // Skip group nodes - they can move freely
-        if (node?.type === 'groupNode') return change;
+        // #155: Nested group frames stay within parent bounds (same rules as class nodes)
+        if (node?.type === 'groupNode') {
+          const selfGroup = groups.find((g) => g.id === change.id);
+          const pgId = selfGroup?.parentId;
+          if (!pgId) return change;
+          const parentGn = nodes.find((n) => n.id === pgId && n.type === 'groupNode');
+          if (!parentGn) return change;
+          const nodeWidth = (node?.measured?.width as number) || (node?.width as number) || 400;
+          const nodeHeight = (node?.measured?.height as number) || (node?.height as number) || 300;
+          const groupX = parentGn.position.x;
+          const groupY = parentGn.position.y;
+          const groupWidth =
+            (parentGn.measured?.width as number) || (parentGn.style?.width as number) || 400;
+          const groupHeight =
+            (parentGn.measured?.height as number) || (parentGn.style?.height as number) || 300;
+          const nodeLeft = change.position.x;
+          const nodeRight = change.position.x + nodeWidth;
+          const nodeTop = change.position.y;
+          const nodeBottom = change.position.y + nodeHeight;
+          const groupLeft = groupX;
+          const groupRight = groupX + groupWidth;
+          const groupTop = groupY;
+          const groupBottom = groupY + groupHeight;
+          const isCompletelyOutside =
+            nodeRight < groupLeft ||
+            nodeLeft > groupRight ||
+            nodeBottom < groupTop ||
+            nodeTop > groupBottom;
+          if (isCompletelyOutside && change.dragging) return change;
+          if (isCompletelyOutside && !change.dragging) return change;
+          const constrainedX = Math.max(
+            groupX,
+            Math.min(change.position.x, groupX + groupWidth - nodeWidth)
+          );
+          const constrainedY = Math.max(
+            groupY,
+            Math.min(change.position.y, groupY + groupHeight - nodeHeight)
+          );
+          return {
+            ...change,
+            position: { x: constrainedX, y: constrainedY },
+          };
+        }
 
         // Check if this node belongs to a group
         const parentGroup = groups.find(g => g.nodeIds.includes(change.id));
@@ -4116,15 +4349,29 @@ const StudioContent = () => {
     // Apply the constrained changes
     onNodesChange(constrainedChanges);
 
-    // Move child nodes when their parent group moves
+    // Move child class nodes and nested group frames when a parent group moves (#155)
     if (groupDeltas.size > 0) {
+      const byId = groupById(groups);
       setNodes((prevNodes) => {
         return prevNodes.map((node) => {
-          if (node.type === 'groupNode') return node;
+          if (node.type === 'groupNode') {
+            for (const [movedGid, delta] of groupDeltas) {
+              if (node.id === movedGid) continue;
+              if (isStrictDescendantGroup(movedGid, node.id, byId)) {
+                return {
+                  ...node,
+                  position: {
+                    x: node.position.x + delta.dx,
+                    y: node.position.y + delta.dy,
+                  },
+                };
+              }
+            }
+            return node;
+          }
 
-          // Check if this node is in any moved group
           for (const [groupId, delta] of groupDeltas) {
-            const group = groups.find(g => g.id === groupId);
+            const group = groups.find((g) => g.id === groupId);
             if (group && group.nodeIds.includes(node.id)) {
               return {
                 ...node,
@@ -4471,6 +4718,7 @@ const StudioContent = () => {
             position: g.position,
             dimensions: g.dimensions,
             nodeIds: g.nodeIds || [],
+            parentId: g.parentId ?? null,
             tags: g.metadata?.tags || [],
             styleOptions: {
               borderStyle: g.borderStyle || 'dashed',
@@ -4518,6 +4766,7 @@ const StudioContent = () => {
                 name: group.name,
                 color: group.color,
                 nodeIds: group.nodeIds || [],
+                parentId: group.parentId ?? null,
                 tags: group.metadata?.tags || [],
                 styleOptions: group.styleOptions,
                 availableTags,
@@ -4546,6 +4795,7 @@ const StudioContent = () => {
                   handleGroupStyleChangeRef.current?.(groupId, style),
                 onTagsChange: (groupId: string, tags: any[]) =>
                   handleGroupTagsChangeRef.current?.(groupId, tags),
+                onDrillInto: () => handleDrillIntoNestedGroupRef.current(group.id),
                 isReadOnly,
               },
             };
@@ -5691,6 +5941,7 @@ const StudioContent = () => {
               position: g.position,
               dimensions: g.dimensions,
               nodeIds: g.nodeIds || [],
+              parentId: g.parentId ?? null,
               tags: g.metadata?.tags || [],
               styleOptions: {
                 borderStyle: g.borderStyle || 'dashed',
@@ -5725,6 +5976,7 @@ const StudioContent = () => {
                   name: group.name,
                   color: group.color,
                   nodeIds: group.nodeIds || [],
+                  parentId: group.parentId ?? null,
                   tags: group.metadata?.tags || [],
                   styleOptions: {
                     borderStyle: group.borderStyle || 'dashed',
@@ -5755,6 +6007,7 @@ const StudioContent = () => {
                   onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
                   onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
                   onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
+                  onDrillInto: () => handleDrillIntoNestedGroupRef.current(group.id),
                   isReadOnly
                 }
               };
@@ -6989,6 +7242,41 @@ const StudioContent = () => {
                 })}
               </defs>
             </svg>
+            {nestedGroupDrillPath.length > 0 && (
+              <Panel
+                position="top-left"
+                className="!mt-12 ml-2 z-[1002] max-w-[min(100vw-2rem,28rem)]"
+              >
+                <nav
+                  aria-label="Nested groups"
+                  className="flex flex-wrap items-center gap-1 rounded-lg border border-gray-200/80 dark:border-gray-600 bg-white/95 dark:bg-gray-800/95 px-2 py-1.5 text-xs shadow-md backdrop-blur-sm"
+                >
+                  <button
+                    type="button"
+                    className="rounded px-1.5 py-0.5 font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/40"
+                    onClick={() => setNestedGroupDrillPath([])}
+                  >
+                    Canvas
+                  </button>
+                  {nestedGroupDrillPath.map((gid, idx) => {
+                    const g = groups.find((x) => x.id === gid);
+                    const label = g?.name ?? gid;
+                    return (
+                      <span key={`${gid}-${idx}`} className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                        <button
+                          type="button"
+                          className="max-w-[10rem] truncate rounded px-1.5 py-0.5 text-left text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          onClick={() => setNestedGroupDrillPath((p) => p.slice(0, idx + 1))}
+                        >
+                          {label}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </nav>
+              </Panel>
+            )}
             {/* #349: Edge hover tooltip */}
             {hoveredEdgeId && edgeTooltipPosition && (() => {
               const hoveredEdge = displayEdges.find((e) => e.id === hoveredEdgeId);

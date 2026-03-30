@@ -4148,6 +4148,7 @@ export async function getGroupsForVersion(versionId: string) {
       `SELECT g.id, g.version_id, g.name, g.description, g.color,
               g.position_x, g.position_y, g.width, g.height, g.z_index,
               g.is_collapsed, g.is_locked, g.opacity, g.border_style, g.metadata,
+              g.parent_group_id,
               g.created_at, g.updated_at
        FROM odb.groups g
        WHERE g.version_id = $1
@@ -4185,6 +4186,7 @@ export async function getGroupsForVersion(versionId: string) {
         opacity: group.opacity,
         borderStyle: group.border_style,
         metadata: group.metadata,
+        parentId: group.parent_group_id ?? null,
         nodeIds: classesResult.rows.map((c: any) => c.class_id),
         classPositions: classPositions,
         createdAt: group.created_at,
@@ -4282,6 +4284,8 @@ export async function updateGroup(
     opacity?: number;
     borderStyle?: string;
     metadata?: any;
+    /** Set null to make the group top-level (#155). */
+    parentGroupId?: string | null;
   }
 ) {
   try {
@@ -4336,6 +4340,10 @@ export async function updateGroup(
     if (updates.metadata !== undefined) {
       setClauses.push(`metadata = $${paramIndex++}`);
       values.push(JSON.stringify(updates.metadata));
+    }
+    if (updates.parentGroupId !== undefined) {
+      setClauses.push(`parent_group_id = $${paramIndex++}`);
+      values.push(updates.parentGroupId);
     }
 
     if (setClauses.length === 0) {
@@ -4467,6 +4475,23 @@ export async function updateClassPositionInGroup(
  */
 export async function syncGroupsForVersion(versionId: string, groups: any[], nodePositions?: Record<string, { x: number; y: number }>) {
   try {
+    const sortGroupsParentsBeforeChildren = (list: any[]): any[] => {
+      const byId = new Map(list.map((g: any) => [g.id, g]));
+      const memo = new Map<string, number>();
+      const depthKey = (gid: string): number => {
+        if (memo.has(gid)) return memo.get(gid)!;
+        const g = byId.get(gid);
+        if (!g || !g.parentId || !byId.has(g.parentId)) {
+          memo.set(gid, 0);
+          return 0;
+        }
+        const d = 1 + depthKey(g.parentId);
+        memo.set(gid, d);
+        return d;
+      };
+      return [...list].sort((a, b) => depthKey(a.id) - depthKey(b.id));
+    };
+
     // Start a transaction
     await connectionPool.query('BEGIN');
 
@@ -4479,17 +4504,33 @@ export async function syncGroupsForVersion(versionId: string, groups: any[], nod
     // Track mapping from client ID to database ID for returning
     const idMapping: Record<string, string> = {};
 
-    // Insert new groups
-    for (const group of groups) {
+    const sortedGroups = sortGroupsParentsBeforeChildren(groups);
+
+    // Insert new groups (parents before children so parent_group_id resolves)
+    for (const group of sortedGroups) {
       const position = group.position || { x: 0, y: 0 };
       const dimensions = group.dimensions || { width: 200, height: 200 };
+
+      const parentClientId = group.parentId || null;
+      let parentDbId: string | null = null;
+      if (parentClientId) {
+        parentDbId = idMapping[parentClientId] || null;
+        if (!parentDbId) {
+          await connectionPool.query('ROLLBACK');
+          return errorResponse(
+            `Sync: parent group id ${parentClientId} not found or out of order for child ${group.id || group.name}`
+          );
+        }
+      }
+
+      const isCollapsed = group.isCollapsed === true;
 
       // Let database generate UUID - don't use client-side ID
       const groupResult = await connectionPool.query(
         `INSERT INTO odb.groups 
          (version_id, name, description, color, position_x, position_y, width, height, 
-          z_index, opacity, border_style, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          z_index, opacity, border_style, metadata, parent_group_id, is_collapsed)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING id`,
         [
           versionId,
@@ -4503,7 +4544,9 @@ export async function syncGroupsForVersion(versionId: string, groups: any[], nod
           group.zIndex || 0,
           group.opacity ?? 1.0,
           group.borderStyle || group.styleOptions?.borderStyle || 'dashed',
-          JSON.stringify(group.metadata || group.styleOptions || {})
+          JSON.stringify(group.metadata || group.styleOptions || {}),
+          parentDbId,
+          isCollapsed
         ]
       );
 

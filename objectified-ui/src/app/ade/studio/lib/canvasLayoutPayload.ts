@@ -19,6 +19,7 @@ export function mapNodesForLayoutSave(nodes: Node[]) {
             name: node.data.name,
             color: node.data.color,
             nodeIds: node.data.nodeIds,
+            parentId: (node.data as { parentId?: string | null }).parentId ?? null,
           }
         : undefined,
   }));

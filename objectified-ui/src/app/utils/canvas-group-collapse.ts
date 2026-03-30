@@ -9,14 +9,24 @@ export function collapsePrefsStorageKey(userId: string, versionId: string): stri
   return `ade.canvasGroupCollapsed:v1:${userId}:${versionId}`;
 }
 
-/** Class node IDs that belong to at least one collapsed group. */
+/** Class node IDs that belong to a collapsed group or a descendant group under a collapsed ancestor (#155). */
 export function getClassIdsInCollapsedGroups(
-  groups: { id: string; nodeIds: string[] }[],
+  groups: { id: string; nodeIds: string[]; parentId?: string | null }[],
   collapsedGroupIds: Set<string>
 ): Set<string> {
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const hasCollapsedAncestor = (groupId: string): boolean => {
+    let cur = byId.get(groupId);
+    while (cur) {
+      if (collapsedGroupIds.has(cur.id)) return true;
+      if (!cur.parentId) break;
+      cur = byId.get(cur.parentId);
+    }
+    return false;
+  };
   const ids = new Set<string>();
   for (const g of groups) {
-    if (!collapsedGroupIds.has(g.id)) continue;
+    if (!hasCollapsedAncestor(g.id)) continue;
     for (const id of g.nodeIds) {
       ids.add(id);
     }

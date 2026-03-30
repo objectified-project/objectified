@@ -29,9 +29,19 @@ export function computeClassIdsPassingHideCriteria(
   connectedNodeIds: Set<string>,
   criteria: CanvasHideCriteriaInput
 ): Set<string> {
+  const byId = new Map(groups.map((g) => [g.id, g]));
   const inHiddenGroups = new Set<string>();
+  const underHiddenBranch = (groupId: string): boolean => {
+    let cur = byId.get(groupId);
+    while (cur) {
+      if (criteria.hiddenGroupIds.has(cur.id)) return true;
+      if (!cur.parentId) break;
+      cur = byId.get(cur.parentId);
+    }
+    return false;
+  };
   for (const g of groups) {
-    if (criteria.hiddenGroupIds.has(g.id)) {
+    if (underHiddenBranch(g.id)) {
       for (const id of g.nodeIds) {
         inHiddenGroups.add(id);
       }
@@ -52,12 +62,21 @@ export function computeClassIdsPassingHideCriteria(
   return visible;
 }
 
-/** Group frame is visible if at least one member class passes criteria. */
+/** Group frame is visible if any member class passes criteria or a visible nested child group does (#155). */
 export function groupNodeIdIsVisible(
   group: CanvasGroupForVisibility,
-  visibleClassIds: Set<string>
+  visibleClassIds: Set<string>,
+  allGroups?: CanvasGroupForVisibility[]
 ): boolean {
-  return group.nodeIds.some((id) => visibleClassIds.has(id));
+  if (group.nodeIds.some((id) => visibleClassIds.has(id))) return true;
+  if (allGroups) {
+    for (const cg of allGroups) {
+      if (cg.parentId === group.id && groupNodeIdIsVisible(cg, visibleClassIds, allGroups)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
