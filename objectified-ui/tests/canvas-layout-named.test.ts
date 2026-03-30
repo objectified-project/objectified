@@ -214,6 +214,67 @@ describe('Database Helper - Named Canvas Layouts', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
+  test('saveNamedCanvasLayout rejects oversized layout snapshot', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    // Construct a base64 string that exceeds the snapshot size cap when decoded (~1 MiB).
+    const largeBase64 = Buffer.alloc(1024 * 1024).toString('base64');
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'My Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [],
+      undefined,
+      largeBase64
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Layout snapshot exceeds maximum size');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  test('saveNamedCanvasLayout accepts minimal valid PNG layout snapshot', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    // 1x1 transparent PNG (well-known minimal valid PNG)
+    const minimalPngBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9VZwAAAABJRU5ErkJggg==';
+
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // existing layout lookup
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-with-snapshot-1', name: 'My Layout' }] }); // INSERT RETURNING
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'My Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [],
+      undefined,
+      minimalPngBase64
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layout.id).toBe('layout-with-snapshot-1');
+
+    // Ensure the INSERT query was called and included a snapshot image argument.
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO odb.canvas_layouts'),
+      expect.arrayContaining([
+        'version-1',
+        'user-1',
+        'My Layout',
+        expect.any(Buffer), // snapshot_image
+      ])
+    );
+  });
+
   test('saveNamedCanvasLayout creates shared layout when userId is null and trims name', async () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 

@@ -12,6 +12,12 @@ const successResponse = (data: any = {}) => JSON.stringify({ success: true, ...d
 
 /** Max PNG size for canvas layout snapshots (~512 KiB). */
 const MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES = 512 * 1024;
+/** Max base64-encoded length corresponding to MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES. */
+const MAX_CANVAS_LAYOUT_SNAPSHOT_BASE64_CHARS = Math.ceil(MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES / 3) * 4;
+/** Full 8-byte PNG file signature. */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+/** 4-byte ASCII chunk type for the required IHDR chunk (first chunk in every PNG). */
+const PNG_IHDR_TYPE = Buffer.from([0x49, 0x48, 0x44, 0x52]);
 
 function parseLayoutSnapshotBase64(
   snapshotPngBase64: string
@@ -20,6 +26,10 @@ function parseLayoutSnapshotBase64(
   if (raw.startsWith('data:image')) {
     const comma = raw.indexOf(',');
     if (comma !== -1) raw = raw.slice(comma + 1);
+  }
+  // Reject oversized payloads before decoding to avoid large allocations.
+  if (raw.length > MAX_CANVAS_LAYOUT_SNAPSHOT_BASE64_CHARS) {
+    return { ok: false, error: 'Layout snapshot exceeds maximum size' };
   }
   let buf: Buffer;
   try {
@@ -33,7 +43,12 @@ function parseLayoutSnapshotBase64(
   if (buf.length > MAX_CANVAS_LAYOUT_SNAPSHOT_BYTES) {
     return { ok: false, error: 'Layout snapshot exceeds maximum size' };
   }
-  if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) {
+  // Validate full 8-byte PNG signature: \x89PNG\r\n\x1A\n
+  if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return { ok: false, error: 'Layout snapshot must be a PNG image' };
+  }
+  // Basic PNG structure check: first chunk (at offset 12) must be IHDR
+  if (buf.length < 24 || !buf.subarray(12, 16).equals(PNG_IHDR_TYPE)) {
     return { ok: false, error: 'Layout snapshot must be a PNG image' };
   }
   return { ok: true, buffer: buf };
