@@ -167,6 +167,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   // Get shadow class
   const shadowClass = SHADOW_OPTIONS.find(s => s.name === styleOptions.shadow)?.class || '';
 
+  const nodeCount = groupData.nodeIds?.length || 0;
+
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (groupData.isReadOnly) return;
@@ -263,8 +265,6 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
     groupData.onStyleChange?.(groupData.id, newOptions);
   }, [groupData, styleOptions]);
 
-  // Count nodes in this group
-  const nodeCount = groupData.nodeIds?.length || 0;
   const isCollapsed = Boolean(groupData.collapsed);
 
   return (
