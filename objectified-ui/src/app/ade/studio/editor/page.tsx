@@ -3693,12 +3693,15 @@ const StudioContent = () => {
       const { layout, layoutNameToSet, clearGroupsWhenEmpty } = options;
 
       if (layout.viewport) {
+        const viewport = layout.viewport;
+        const x =
+          typeof viewport.x === 'number' && Number.isFinite(viewport.x) ? viewport.x : 0;
+        const y =
+          typeof viewport.y === 'number' && Number.isFinite(viewport.y) ? viewport.y : 0;
+        const zoom =
+          typeof viewport.zoom === 'number' && Number.isFinite(viewport.zoom) ? viewport.zoom : 1;
         setViewport(
-          {
-            x: layout.viewport.x ?? 0,
-            y: layout.viewport.y ?? 0,
-            zoom: layout.viewport.zoom ?? 1,
-          },
+          { x, y, zoom },
           { duration: 250 }
         );
       }
@@ -3792,6 +3795,9 @@ const StudioContent = () => {
         }
 
         if (layoutNodes.length > 0) {
+          const layoutNodeMap = new Map<string, any>(
+            layoutNodes.map((n: any) => [n.id, n])
+          );
           setNodes((prevNodes) => {
             const updatedNodes = prevNodes.map((node) => {
               const { measured, width, height, ...restNode } = node as any;
@@ -3806,7 +3812,7 @@ const StudioContent = () => {
                 }
               }
 
-              const savedNode = layoutNodes.find((n: any) => n.id === node.id);
+              const savedNode = layoutNodeMap.get(node.id);
               if (savedNode) {
                 return {
                   ...restNode,
@@ -4053,7 +4059,7 @@ const StudioContent = () => {
         }
 
         const layoutPayload = {
-          viewport: filtered.viewport as { x?: number; y?: number; zoom?: number },
+          viewport: filtered.viewport,
           nodes: filtered.nodes,
         };
 

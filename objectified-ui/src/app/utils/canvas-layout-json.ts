@@ -9,7 +9,7 @@ export type CanvasLayoutJsonDocument = {
   /** ISO 8601 timestamp */
   exportedAt: string;
   layoutName?: string;
-  viewport: unknown;
+  viewport: { x: number; y: number; zoom: number };
   nodes: unknown[];
   edges: unknown[];
   groups?: unknown[];
@@ -21,7 +21,7 @@ export type CanvasLayoutJsonDocument = {
 
 export function buildCanvasLayoutJsonDocument(params: {
   layoutName?: string;
-  viewport: unknown;
+  viewport: { x: number; y: number; zoom: number };
   nodes: unknown[];
   edges: unknown[];
   groups?: unknown[];
@@ -65,6 +65,10 @@ export function parseCanvasLayoutJson(
   if (o.viewport === null || typeof o.viewport !== 'object' || Array.isArray(o.viewport)) {
     return { ok: false, error: 'Missing or invalid viewport.' };
   }
+  const vp = o.viewport as Record<string, unknown>;
+  const vpX = typeof vp.x === 'number' && Number.isFinite(vp.x) ? vp.x : 0;
+  const vpY = typeof vp.y === 'number' && Number.isFinite(vp.y) ? vp.y : 0;
+  const vpZoom = typeof vp.zoom === 'number' && Number.isFinite(vp.zoom) ? vp.zoom : 1;
 
   if (!Array.isArray(o.nodes)) {
     return { ok: false, error: 'Missing or invalid nodes array.' };
@@ -81,7 +85,7 @@ export function parseCanvasLayoutJson(
   const doc: CanvasLayoutJsonDocument = {
     formatVersion: CANVAS_LAYOUT_JSON_FORMAT_VERSION,
     exportedAt: o.exportedAt,
-    viewport: o.viewport,
+    viewport: { x: vpX, y: vpY, zoom: vpZoom },
     nodes: o.nodes,
     edges: o.edges,
     ...(Array.isArray(o.groups) ? { groups: o.groups } : {}),
@@ -101,9 +105,9 @@ export function parseCanvasLayoutJson(
 }
 
 export type FilteredCanvasLayoutForImport = {
-  viewport: unknown;
-  /** Class nodes only (group nodes stripped); positions applied to matching classes */
-  nodes: unknown[];
+  viewport: { x: number; y: number; zoom: number };
+  /** Class nodes only (group nodes stripped); sanitized to {id, position} */
+  nodes: { id: string; position: { x: number; y: number } }[];
   edges: unknown[];
   /** Groups with nodeIds restricted to classes present in this version */
   groups: unknown[];
@@ -145,10 +149,13 @@ export function filterCanvasLayoutForTargetClasses(
     const n = item as { id: string; position?: { x?: unknown; y?: unknown } };
     const x = n.position?.x;
     const y = n.position?.y;
-    if (typeof x === 'number' && typeof y === 'number') {
+    if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
       nodePositions[n.id] = { x, y };
     }
   });
+
+  /** Sanitized class nodes: only id + validated position; nodes with invalid positions are dropped. */
+  const sanitizedNodes = Object.entries(nodePositions).map(([id, position]) => ({ id, position }));
 
   const rawEdges = Array.isArray(doc.edges) ? doc.edges : [];
   const filteredEdges = rawEdges.filter((e) => {
@@ -175,7 +182,7 @@ export function filterCanvasLayoutForTargetClasses(
 
   return {
     viewport: doc.viewport,
-    nodes: filteredNodes,
+    nodes: sanitizedNodes,
     edges: filteredEdges,
     groups: filteredGroups,
     nodePositions,
