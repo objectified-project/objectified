@@ -84,9 +84,12 @@
   - ✅ Alt+Shift+[ / Alt+Shift+] — collapse all / expand all groups
   - ✅ Collapsed state persisted per user per version (localStorage)
 - 📋 [TODO] Nested groups for hierarchical organization (max 3 levels)
-- ✅ Group-level operations:
+- ✅ Group-level operations (#156):
   - ✅ Move entire group with one drag
   - ✅ Delete all classes in a group
+  - ✅ Export group as OpenAPI JSON/YAML (includes transitive `components.schemas` refs)
+  - ✅ Duplicate group (copies classes, rewrites refs within the group, new group frame)
+  - ✅ Bulk edits: description prefix/suffix, assign tag, set/clear read-only on top-level properties
 - ✅ Named groups with descriptions and metadata
 - ✅ Visual styling options:
   - ✅ Rounded rectangle containers with subtle shadows
@@ -95,10 +98,9 @@
   - ✅ Optional group icons from icon library
 - ✅ Group object is drag-and-drop to the canvas
 
-| Ticket | Feature                                                             |
-|--------|---------------------------------------------------------------------|
-| #155   | Nested groups for hierarchical organization                         |
-| #156   | Group-level operations: move, delete, export, duplicate, bulk edit  |
+| Ticket | Feature                                                                   |
+|--------|-------------------------------------------------------------------------------|
+| #155   | Nested groups for hierarchical organization                                  |
 
 ---
 

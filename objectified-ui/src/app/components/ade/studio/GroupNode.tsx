@@ -1,15 +1,16 @@
 'use client';
 
 import React, { memo, useState, useCallback } from 'react';
-import { NodeProps, NodeResizer, useReactFlow } from '@xyflow/react';
+import { NodeProps, NodeResizer } from '@xyflow/react';
 import {
   Folder, Edit2, Trash2, X, Check, Palette, Settings,
   Box, Layers, Database, Shield, Users, Zap, Globe, Lock,
   FileText, Tag, Star, Heart, Flag, Bookmark, Archive, Package,
-  FileX, ChevronRight, ChevronDown,
+  FileX, ChevronRight, ChevronDown, Download, FileJson, FileCode2, Copy, SlidersHorizontal,
 } from 'lucide-react';
 import * as Popover from '@radix-ui/react-popover';
 import { COLLAPSED_GROUP_FRAME_WIDTH, COLLAPSED_GROUP_FRAME_HEIGHT } from '@/app/utils/canvas-group-collapse';
+import GroupBulkEditDialog, { type GroupBulkEditTagOption } from './GroupBulkEditDialog';
 
 // Available group icons
 export const GROUP_ICONS = [
@@ -102,6 +103,29 @@ export interface GroupNodeData {
   onRename?: (groupId: string, newName: string) => void;
   onDelete?: (groupId: string) => void;
   onDeleteAllClassesInGroup?: (groupId: string, classIds?: string[], groupName?: string) => void;
+  /** Export OpenAPI schema for group members + transitive refs (#156). */
+  onExportGroupSchema?: (
+    groupId: string,
+    nodeIds: string[],
+    groupName: string,
+    format: 'json' | 'yaml'
+  ) => void | Promise<void>;
+  /** Duplicate all classes in the group into a new group (#156). */
+  onDuplicateGroup?: (groupId: string, nodeIds: string[], groupName: string) => void | Promise<void>;
+  /** Bulk metadata / tags / top-level readOnly (#156). */
+  onBulkEditGroupClasses?: (
+    groupId: string,
+    nodeIds: string[],
+    groupName: string,
+    options: {
+      descriptionPrefix?: string;
+      descriptionSuffix?: string;
+      tagId?: string;
+      topLevelPropertyReadOnly?: boolean;
+    }
+  ) => void | Promise<void>;
+  /** Project tags for bulk assign */
+  availableTags?: GroupBulkEditTagOption[];
   onColorChange?: (groupId: string, newColor: string) => void;
   onStyleChange?: (groupId: string, styleOptions: GroupStyleOptions) => void;
   isReadOnly?: boolean;
@@ -116,7 +140,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   const [editName, setEditName] = useState(groupData.name);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { getNodes } = useReactFlow();
+  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   // Get color configuration
   const colorConfig = GROUP_COLORS.find(c => c.name === groupData.color) || GROUP_COLORS[0];
@@ -182,6 +207,43 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
     if (groupData.isReadOnly) return;
     groupData.onDeleteAllClassesInGroup?.(groupData.id, groupData.nodeIds, groupData.name);
   }, [groupData]);
+
+  const runExportSchema = useCallback(
+    async (format: 'json' | 'yaml', e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (groupData.isReadOnly || nodeCount === 0) return;
+      setExportPopoverOpen(false);
+      await groupData.onExportGroupSchema?.(groupData.id, groupData.nodeIds, groupData.name, format);
+    },
+    [groupData, nodeCount]
+  );
+
+  const handleDuplicateGroupClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (groupData.isReadOnly || nodeCount === 0) return;
+      void groupData.onDuplicateGroup?.(groupData.id, groupData.nodeIds, groupData.name);
+    },
+    [groupData, nodeCount]
+  );
+
+  const handleOpenBulk = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (groupData.isReadOnly || nodeCount === 0) return;
+    setBulkDialogOpen(true);
+  }, [groupData, nodeCount]);
+
+  const handleBulkSubmit = useCallback(
+    async (options: {
+      descriptionPrefix?: string;
+      descriptionSuffix?: string;
+      tagId?: string;
+      topLevelPropertyReadOnly?: boolean;
+    }) => {
+      await groupData.onBulkEditGroupClasses?.(groupData.id, groupData.nodeIds, groupData.name, options);
+    },
+    [groupData]
+  );
 
   const handleColorChange = useCallback((colorName: string) => {
     if (groupData.isReadOnly) return;
@@ -468,6 +530,79 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 <Edit2 className="h-3.5 w-3.5" />
               </button>
 
+              {/* Export OpenAPI (JSON/YAML) — group + transitive schema deps (#156) */}
+              {nodeCount > 0 && (
+                <Popover.Root open={exportPopoverOpen} onOpenChange={setExportPopoverOpen}>
+                  <Popover.Trigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setExportPopoverOpen((v) => !v);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                      title="Export group as OpenAPI schema file"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Content
+                      className="z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 min-w-[160px]"
+                      sideOffset={5}
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        onClick={(e) => void runExportSchema('json', e)}
+                      >
+                        <FileJson className="h-4 w-4 shrink-0" />
+                        OpenAPI JSON
+                      </button>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 w-full text-left text-sm px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        onClick={(e) => void runExportSchema('yaml', e)}
+                      >
+                        <FileCode2 className="h-4 w-4 shrink-0" />
+                        OpenAPI YAML
+                      </button>
+                      <Popover.Arrow className="fill-white dark:fill-gray-800" />
+                    </Popover.Content>
+                  </Popover.Portal>
+                </Popover.Root>
+              )}
+
+              {/* Duplicate entire group (#156) */}
+              {nodeCount > 0 && (
+                <button
+                  onClick={handleDuplicateGroupClick}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                  title="Duplicate group (all classes)"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {/* Bulk edit classes (#156) */}
+              {nodeCount > 0 && (
+                <button
+                  onClick={handleOpenBulk}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                  title="Bulk edit all classes in group"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                </button>
+              )}
+
               {/* Delete all classes in group (only when group has classes) */}
               {nodeCount > 0 && (
                 <button
@@ -501,6 +636,15 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           </div>
         )}
       </div>
+
+      <GroupBulkEditDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        groupName={groupData.name}
+        classCount={nodeCount}
+        availableTags={groupData.availableTags || []}
+        onSubmit={handleBulkSubmit}
+      />
     </>
   );
 });
