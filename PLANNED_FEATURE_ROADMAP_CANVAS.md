@@ -72,21 +72,6 @@
 
 ---
 
-### 2. Canvas Navigation & Controls
-
-#### Node Visibility Controls 📋 PLANNED
-- ✅ Hide/show individual nodes
-- ✅ Hide all nodes except selected
-- ✅ Hide by criteria:
-  - Hide all empty classes (no properties)
-  - Hide all classes without relationships
-  - Hide deprecated classes
-  - Hide by group membership
-- ✅ "Ghosts mode": Show hidden nodes as semi-transparent
-- ✅ Quick restore: **Show all nodes** in View Mode clears manual hides, filters, ghosts, isolate, and focus
-
----
-
 ### 3. Node Grouping & Organization
 
 #### Group Containers 📋 PARTIALLY IMPLEMENTED
@@ -299,6 +284,21 @@
 | `Cmd/Ctrl + E`         | Open export wizard   | [TODO] |
 | `Cmd/Ctrl + S`         | Save layout          | [TODO] |
 | `Cmd/Ctrl + K`         | Command palette      | [TODO] |
+
+---
+
+### 2. Canvas Navigation & Controls
+
+#### Node Visibility Controls 📋 PLANNED
+- ✅ Hide/show individual nodes
+- ✅ Hide all nodes except selected
+- ✅ Hide by criteria:
+  - Hide all empty classes (no properties)
+  - Hide all classes without relationships
+  - Hide deprecated classes
+  - Hide by group membership
+- ✅ "Ghosts mode": Show hidden nodes as semi-transparent
+- ✅ Quick restore: **Show all nodes** in View Mode clears manual hides, filters, ghosts, isolate, and focus
 
 ---
 
