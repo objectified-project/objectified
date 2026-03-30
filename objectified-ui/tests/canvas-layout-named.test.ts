@@ -465,4 +465,22 @@ describe('Database Helper - default named canvas layout preference', () => {
       ['tenant-1', 'user-1']
     );
   });
+
+  test('getClassIdsForVersion returns ids for non-deleted classes in version', async () => {
+    const { getClassIdsForVersion } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ id: 'class-a' }, { id: 'class-b' }],
+    });
+
+    const result = await getClassIdsForVersion('version-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.classIds).toEqual(['class-a', 'class-b']);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('FROM odb.classes'),
+      ['version-1']
+    );
+  });
 });

@@ -4,6 +4,9 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
+Improvements:
+- Canvas: export and import canvas layouts as versioned JSON (share across versions and projects)
+
 Bug Fixes:
 - Import now handles paths properly
 - Improved Markdown rendering

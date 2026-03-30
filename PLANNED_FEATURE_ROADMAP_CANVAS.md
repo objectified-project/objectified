@@ -27,14 +27,12 @@
 - ✅ Auto-save layout changes every 30 seconds (configurable)
 - ✅ Version control for layouts (track layout history) — #165
 - ✅ Default layout setting per user or per team — #166
-- 📋 [TODO] Export layout as JSON for sharing
-- 📋 [TODO] Import layouts from other versions/projects
+- ✅ Export / import layout as versioned JSON — #167
 - 📋 [TODO] Add ability to save layouts with a custom name
 - ✅ Add simple orthagonal edge routing after auto-layout
 
 | Ticket | Feature                                        |
 |--------|------------------------------------------------|
-| #167   | Export/import layouts as JSON                  |
 | #314   | Canvas snapshots                               |
 | #315   | Canvas auto-save of layout                     |
 | #316   | Export/import canvas layouts                   |

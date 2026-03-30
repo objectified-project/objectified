@@ -960,6 +960,20 @@ export async function getClassesForVersion(versionId: string) {
   }
 }
 
+/** Class IDs for a version (canvas import: restrict layout JSON to classes that exist here). */
+export async function getClassIdsForVersion(versionId: string) {
+  try {
+    const result = await connectionPool.query(
+      `SELECT id FROM odb.classes WHERE version_id = $1 AND deleted_at IS NULL`,
+      [versionId]
+    );
+    return successResponse({ classIds: result.rows.map((r: { id: string }) => r.id) });
+  } catch (error: any) {
+    console.error('Error fetching class ids for version:', error);
+    return errorResponse(error.message);
+  }
+}
+
 export async function createClass(versionId: string, name: string, description: string | null, schema: any) {
   try {
     if (!name || name.trim().length === 0) {
