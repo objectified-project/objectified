@@ -35,7 +35,12 @@ describe('canvasLayoutPayload', () => {
       },
     ] as Node[];
     const out = mapNodesForLayoutSave(nodes);
-    expect(out[0].data).toEqual({ name: 'G', color: '#fff', nodeIds: ['a'] });
+    expect(out[0].data).toEqual({
+      name: 'G',
+      color: '#fff',
+      nodeIds: ['a'],
+      parentId: null,
+    });
   });
 
   it('maps edges with handles', () => {

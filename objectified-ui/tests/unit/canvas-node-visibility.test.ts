@@ -27,4 +27,14 @@ describe('canvas-node-visibility (#482)', () => {
       new Set(['c', 'g2'])
     );
   });
+
+  it('getVisibleNodeIdsForIsolateSelection includes ancestor frames for nested groups (#155)', () => {
+    const nested = [
+      { id: 'g1', nodeIds: ['a'], parentId: null as string | null },
+      { id: 'g2', nodeIds: ['c'], parentId: 'g1' },
+    ];
+    expect(getVisibleNodeIdsForIsolateSelection(nested, new Set(['c']))).toEqual(
+      new Set(['c', 'g2', 'g1'])
+    );
+  });
 });

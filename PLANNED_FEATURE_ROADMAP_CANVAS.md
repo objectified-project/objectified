@@ -63,7 +63,10 @@
   - ✅ Click chevron to collapse: compact frame with title and class count
   - ✅ Alt+Shift+[ / Alt+Shift+] — collapse all / expand all groups
   - ✅ Collapsed state persisted per user per version (localStorage)
-- 📋 [TODO] Nested groups for hierarchical organization (max 3 levels)
+- ✅ Nested groups for hierarchical organization (max 3 levels) (#155):
+  - ✅ Parent groups can contain child group frames; drag a group into another to nest, or out to the canvas to unnest
+  - ✅ Breadcrumb (Canvas → …) when drilling into nested groups; tree icon on the group header enters nested view
+  - ✅ `parent_group_id` on `odb.groups`; sync and load preserve hierarchy
 - ✅ Group-level operations (#156):
   - ✅ Move entire group with one drag
   - ✅ Delete all classes in a group
@@ -77,10 +80,6 @@
   - ✅ Background color/opacity customization
   - ✅ Optional group icons from icon library
 - ✅ Group object is drag-and-drop to the canvas
-
-| Ticket | Feature                                                                   |
-|--------|-------------------------------------------------------------------------------|
-| #155   | Nested groups for hierarchical organization                                  |
 
 ---
 

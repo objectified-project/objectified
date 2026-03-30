@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 Improvements:
+- Canvas: nested groups up to three levels — drag group frames into each other, breadcrumb navigation and drill-in control, nested export/bulk/delete-all include descendant groups (#155)
 - Canvas: group toolbar — export the group’s schemas as OpenAPI JSON or YAML (with referenced types), duplicate the whole group into a new frame, and apply bulk class updates (description prefix/suffix, tag, top-level read-only) (#156)
 - Canvas: groups can collapse to a compact title bar (chevron); Alt+Shift+[ / ] collapse or expand all; your choices are remembered per version (#154)
 - Canvas: presentation mode — save viewport slides, present in fullscreen with speaker notes, timer, and keyboard controls (#517)

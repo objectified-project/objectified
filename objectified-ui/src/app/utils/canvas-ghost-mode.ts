@@ -42,12 +42,13 @@ export function ghostNodeClassName(
   nodeType: string | undefined,
   group: CanvasGroupForVisibility | undefined,
   visibleClassIds: Set<string>,
-  nodeGhostsModeEnabled: boolean
+  nodeGhostsModeEnabled: boolean,
+  allGroups?: CanvasGroupForVisibility[]
 ): string {
   if (!nodeGhostsModeEnabled) return '';
   if (nodeType === 'groupNode') {
     if (!group) return '';
-    return groupNodeIdIsVisible(group, visibleClassIds) ? '' : 'canvas-node-ghost';
+    return groupNodeIdIsVisible(group, visibleClassIds, allGroups) ? '' : 'canvas-node-ghost';
   }
   return visibleClassIds.has(nodeId) ? '' : 'canvas-node-ghost';
 }
