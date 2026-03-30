@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -33,6 +33,7 @@ import {
   Wand2,
   Image,
   FileCode,
+  FileJson,
   BarChart3,
   Network,
   Zap,
@@ -108,6 +109,8 @@ import {
   listCanvasLayoutRevisions,
   restoreCanvasLayoutFromRevision,
   getGroupsForVersion,
+  getClassIdsForVersion,
+  syncGroupsForVersion,
   addClassToGroup,
   updateClassPositionInGroup,
   isTenantAdmin
@@ -138,6 +141,11 @@ import {
   ghostNodeClassName,
 } from '@/app/utils/canvas-ghost-mode';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
+import {
+  buildCanvasLayoutJsonDocument,
+  parseCanvasLayoutJson,
+  filterCanvasLayoutForTargetClasses,
+} from '@/app/utils/canvas-layout-json';
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
@@ -468,6 +476,7 @@ const StudioContent = () => {
   const [exportWizardOpen, setExportWizardOpen] = useState(false);
   const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const layoutDropdownRef = useRef<HTMLDivElement>(null);
+  const layoutJsonImportInputRef = useRef<HTMLInputElement>(null);
   const [layoutHistoryOpen, setLayoutHistoryOpen] = useState(false);
   const [layoutHistoryRevisions, setLayoutHistoryRevisions] = useState<
     Array<{ id: string; revision: number; created_at: string }>
@@ -3669,6 +3678,190 @@ const StudioContent = () => {
     return () => window.clearInterval(intervalId);
   }, [autoSaveLayoutEnabled, autoSaveLayoutIntervalSeconds, autoSaveDefaultLayout]);
 
+  /**
+   * Shared path for applying saved layout data (DB or JSON import) after groups are in the database.
+   */
+  const applyCanvasLayoutPayload = useCallback(
+    async (options: {
+      layout: {
+        viewport?: { x?: number; y?: number; zoom?: number };
+        nodes?: unknown;
+      };
+      layoutNameToSet?: string;
+      clearGroupsWhenEmpty?: boolean;
+    }) => {
+      const { layout, layoutNameToSet, clearGroupsWhenEmpty } = options;
+
+      if (layout.viewport) {
+        const viewport = layout.viewport;
+        const x =
+          typeof viewport.x === 'number' && Number.isFinite(viewport.x) ? viewport.x : 0;
+        const y =
+          typeof viewport.y === 'number' && Number.isFinite(viewport.y) ? viewport.y : 0;
+        const zoom =
+          typeof viewport.zoom === 'number' && Number.isFinite(viewport.zoom) ? viewport.zoom : 1;
+        setViewport(
+          { x, y, zoom },
+          { duration: 250 }
+        );
+      }
+
+      let loadedGroups: any[] = [];
+      let classPositionsInGroups: Record<string, { x: number | null; y: number | null }> = {};
+      try {
+        const groupsResult = await getGroupsForVersion(selectedVersionId!);
+        loadedGroups = JSON.parse(groupsResult);
+
+        if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
+          loadedGroups.forEach((g: any) => {
+            if (g.classPositions) {
+              Object.assign(classPositionsInGroups, g.classPositions);
+            }
+          });
+
+          const canvasGroups = loadedGroups.map((g: any) => ({
+            id: g.id,
+            name: g.name,
+            description: g.description,
+            color: g.color,
+            position: g.position,
+            dimensions: g.dimensions,
+            nodeIds: g.nodeIds || [],
+            tags: g.metadata?.tags || [],
+            styleOptions: {
+              borderStyle: g.borderStyle || 'dashed',
+              opacity: g.opacity ?? 1,
+              shadow: g.metadata?.shadow || 'none',
+              icon: g.metadata?.icon || 'folder',
+            },
+          }));
+          setGroups(canvasGroups);
+          loadedGroups = canvasGroups;
+
+          canvasGroups.forEach((group: any) => {
+            groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
+          });
+        } else if (clearGroupsWhenEmpty) {
+          setGroups([]);
+          groupPositionsRef.current.clear();
+        }
+      } catch (error) {
+        console.error('Error loading groups:', error);
+      }
+
+      await reloadClasses(false);
+
+      setTimeout(() => {
+        const layoutNodes = Array.isArray(layout.nodes) ? layout.nodes : [];
+        const availableTags = projectTags.map((t) => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
+
+        const groupNodes: Node[] = [];
+        if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
+          loadedGroups.forEach((group: any) => {
+            const groupNode: Node = {
+              id: group.id,
+              type: 'groupNode',
+              position: group.position,
+              width: group.dimensions.width,
+              height: group.dimensions.height,
+              style: {
+                width: group.dimensions.width,
+                height: group.dimensions.height,
+                zIndex: -1,
+              },
+              data: {
+                id: group.id,
+                name: group.name,
+                color: group.color,
+                nodeIds: group.nodeIds || [],
+                tags: group.metadata?.tags || [],
+                styleOptions: group.styleOptions,
+                availableTags,
+                onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
+                onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
+                onDeleteAllClassesInGroup: (groupId: string) =>
+                  handleDeleteAllClassesInGroupRef.current?.(groupId),
+                onColorChange: (groupId: string, color: string) =>
+                  handleGroupColorChangeRef.current?.(groupId, color),
+                onStyleChange: (groupId: string, style: any) =>
+                  handleGroupStyleChangeRef.current?.(groupId, style),
+                onTagsChange: (groupId: string, tags: any[]) =>
+                  handleGroupTagsChangeRef.current?.(groupId, tags),
+                isReadOnly,
+              },
+            };
+            groupNodes.push(groupNode);
+          });
+        }
+
+        if (layoutNodes.length > 0) {
+          const layoutNodeMap = new Map<string, any>(
+            layoutNodes.map((n: any) => [n.id, n])
+          );
+          setNodes((prevNodes) => {
+            const updatedNodes = prevNodes.map((node) => {
+              const { measured, width, height, ...restNode } = node as any;
+
+              if (classPositionsInGroups[node.id]) {
+                const savedPos = classPositionsInGroups[node.id];
+                if (savedPos.x !== null && savedPos.y !== null) {
+                  return {
+                    ...restNode,
+                    position: { x: savedPos.x, y: savedPos.y },
+                  };
+                }
+              }
+
+              const savedNode = layoutNodeMap.get(node.id);
+              if (savedNode) {
+                return {
+                  ...restNode,
+                  position: savedNode.position,
+                };
+              }
+              return restNode;
+            });
+
+            return [...groupNodes, ...updatedNodes];
+          });
+
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              layoutNodes.forEach((n: any) => {
+                if (n.id) {
+                  updateNodeInternals(n.id);
+                }
+              });
+            }, 100);
+          });
+        } else {
+          setNodes((prevNodes) => [...groupNodes, ...prevNodes]);
+        }
+
+        triggerSidebarRefresh();
+
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+        setLayoutDropdownOpen(false);
+      }, 500);
+
+      if (layoutNameToSet !== undefined) {
+        setSelectedLayoutName(layoutNameToSet);
+      }
+    },
+    [
+      selectedVersionId,
+      reloadClasses,
+      setNodes,
+      setGroups,
+      setViewport,
+      projectTags,
+      isReadOnly,
+      triggerSidebarRefresh,
+      updateNodeInternals,
+    ]
+  );
+
   // Load saved canvas layout
   const handleLoadLayout = useCallback(async () => {
     if (!selectedVersionId || !currentUserId) return;
@@ -3686,7 +3879,6 @@ const StudioContent = () => {
       setLoadingMessage('Loading canvas layout...');
       setIsLoadingCanvas(true);
 
-      // Fetch selected named layout from database
       const result = await getNamedCanvasLayout(selectedVersionId, currentUserId, layoutName);
       const response = JSON.parse(result);
 
@@ -3701,160 +3893,10 @@ const StudioContent = () => {
         return;
       }
 
-      const layout = response.layout;
-
-      // Restore viewport using setViewport for accurate restoration
-      if (layout.viewport) {
-        setViewport({ x: layout.viewport.x, y: layout.viewport.y, zoom: layout.viewport.zoom }, { duration: 250 });
-      }
-
-      // Load groups from dedicated table
-      let loadedGroups: any[] = [];
-      let classPositionsInGroups: Record<string, { x: number | null; y: number | null }> = {};
-      try {
-        const groupsResult = await getGroupsForVersion(selectedVersionId);
-        loadedGroups = JSON.parse(groupsResult);
-
-        if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
-          // Extract class positions from all groups
-          loadedGroups.forEach((g: any) => {
-            if (g.classPositions) {
-              Object.assign(classPositionsInGroups, g.classPositions);
-            }
-          });
-
-          // Transform to CanvasGroup format
-          const canvasGroups = loadedGroups.map((g: any) => ({
-            id: g.id,
-            name: g.name,
-            description: g.description,
-            color: g.color,
-            position: g.position,
-            dimensions: g.dimensions,
-            nodeIds: g.nodeIds || [],
-            tags: g.metadata?.tags || [],
-            styleOptions: {
-              borderStyle: g.borderStyle || 'dashed',
-              opacity: g.opacity ?? 1,
-              shadow: g.metadata?.shadow || 'none',
-              icon: g.metadata?.icon || 'folder'
-            }
-          }));
-          setGroups(canvasGroups);
-          loadedGroups = canvasGroups;
-
-          // Initialize group positions ref for delta tracking during drag
-          canvasGroups.forEach((group: any) => {
-            groupPositionsRef.current.set(group.id, { x: group.position.x, y: group.position.y });
-          });
-        }
-      } catch (error) {
-        console.error('Error loading groups:', error);
-      }
-
-      // Restore nodes - need to reload classes and apply saved positions
-      await reloadClasses(false);
-
-      // After classes are loaded, apply saved positions and create group nodes
-      setTimeout(() => {
-        const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
-
-        // Create group nodes from loaded groups
-        const groupNodes: Node[] = [];
-        if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
-          loadedGroups.forEach((group: any) => {
-            const groupNode: Node = {
-              id: group.id,
-              type: 'groupNode',
-              position: group.position,
-              width: group.dimensions.width,
-              height: group.dimensions.height,
-              style: {
-                width: group.dimensions.width,
-                height: group.dimensions.height,
-                zIndex: -1
-              },
-              data: {
-                id: group.id,
-                name: group.name,
-                color: group.color,
-                nodeIds: group.nodeIds || [],
-                tags: group.metadata?.tags || [],
-                styleOptions: group.styleOptions,
-                availableTags,
-                onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
-                onDelete: (groupId: string) => handleGroupDeleteRef.current?.(groupId),
-                onDeleteAllClassesInGroup: (groupId: string) => handleDeleteAllClassesInGroupRef.current?.(groupId),
-                onColorChange: (groupId: string, color: string) => handleGroupColorChangeRef.current?.(groupId, color),
-                onStyleChange: (groupId: string, style: any) => handleGroupStyleChangeRef.current?.(groupId, style),
-                onTagsChange: (groupId: string, tags: any[]) => handleGroupTagsChangeRef.current?.(groupId, tags),
-                isReadOnly
-              }
-            };
-            groupNodes.push(groupNode);
-          });
-        }
-
-        if (layout.nodes && Array.isArray(layout.nodes)) {
-          setNodes(prevNodes => {
-            // Map existing nodes to update positions
-            const updatedNodes = prevNodes.map(node => {
-              // Clear measured property to force React Flow to remeasure
-              const { measured, width, height, ...restNode } = node as any;
-
-              // First check if this node is in a group and has saved position
-              if (classPositionsInGroups[node.id]) {
-                const savedPos = classPositionsInGroups[node.id];
-                if (savedPos.x !== null && savedPos.y !== null) {
-                  return {
-                    ...restNode,
-                    position: { x: savedPos.x, y: savedPos.y }
-                  };
-                }
-              }
-
-              // Otherwise use position from layout.nodes
-              // Note: We intentionally do NOT restore saved dimensions
-              // because the node content may have changed since the layout was saved
-              const savedNode = layout.nodes.find((n: any) => n.id === node.id);
-              if (savedNode) {
-                return {
-                  ...restNode,
-                  position: savedNode.position
-                };
-              }
-              return restNode;
-            });
-
-            // Add group nodes at the beginning (behind other nodes due to zIndex: -1)
-            return [...groupNodes, ...updatedNodes];
-          });
-
-          // After nodes are set, update internals for all class nodes to recalculate handle positions
-          // This is needed because the node sizes may differ from when they were saved
-          requestAnimationFrame(() => {
-            setTimeout(() => {
-              layout.nodes.forEach((n: any) => {
-                if (n.id) {
-                  updateNodeInternals(n.id);
-                }
-              });
-            }, 100);
-          });
-        } else {
-          // If no saved nodes, just add group nodes
-          setNodes(prevNodes => [...groupNodes, ...prevNodes]);
-        }
-
-        // Trigger sidebar refresh to update groups list
-        triggerSidebarRefresh();
-
-        setIsLoadingCanvas(false);
-        setLoadingMessage('');
-        setLayoutDropdownOpen(false);
-      }, 500);
-
-      setSelectedLayoutName(layoutName);
+      await applyCanvasLayoutPayload({
+        layout: response.layout,
+        layoutNameToSet: layoutName,
+      });
     } catch (error) {
       console.error('Error loading canvas layout:', error);
       await alertDialog({
@@ -3865,7 +3907,188 @@ const StudioContent = () => {
       setLoadingMessage('');
       setLayoutDropdownOpen(false);
     }
-  }, [selectedVersionId, currentUserId, selectedLayoutName, reloadClasses, setNodes, setGroups, setViewport, alertDialog, projectTags, isReadOnly, triggerSidebarRefresh, updateNodeInternals]);
+  }, [selectedVersionId, currentUserId, selectedLayoutName, reloadClasses, alertDialog, applyCanvasLayoutPayload]);
+
+  const handleExportLayoutJson = useCallback(() => {
+    if (!selectedVersionId) return;
+    const viewport = getViewport();
+    const nodeData = nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      position: node.position,
+      dimensions: {
+        width: node.measured?.width || node.width || node.style?.width,
+        height: node.measured?.height || node.height || node.style?.height,
+      },
+      data:
+        node.type === 'groupNode'
+          ? {
+              name: node.data.name,
+              color: node.data.color,
+              nodeIds: node.data.nodeIds,
+            }
+          : undefined,
+    }));
+    const edgeData = edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+    }));
+    const doc = buildCanvasLayoutJsonDocument({
+      layoutName: selectedLayoutName.trim() || undefined,
+      viewport,
+      nodes: nodeData,
+      edges: edgeData,
+      groups,
+      gridSettings: {
+        size: gridSize,
+        snapToGrid,
+        showGrid,
+        gridStyle,
+      },
+      generator: { name: 'objectified-ui' },
+    });
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const base =
+      selectedLayoutName
+        .trim()
+        .replace(/[^a-zA-Z0-9-_]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'canvas-layout';
+    a.href = url;
+    a.download = `${base}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [
+    selectedVersionId,
+    getViewport,
+    nodes,
+    edges,
+    groups,
+    selectedLayoutName,
+    gridSize,
+    snapToGrid,
+    showGrid,
+    gridStyle,
+  ]);
+
+  const handleImportLayoutJsonPick = useCallback(() => {
+    layoutJsonImportInputRef.current?.click();
+  }, []);
+
+  const handleImportLayoutJsonSelected = useCallback(
+    async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file || !selectedVersionId || !currentUserId || isReadOnly) return;
+
+      let text: string;
+      try {
+        text = await file.text();
+      } catch {
+        await alertDialog({ message: 'Could not read the file.', variant: 'error' });
+        return;
+      }
+
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(text);
+      } catch {
+        await alertDialog({ message: 'The file is not valid JSON.', variant: 'error' });
+        return;
+      }
+
+      const parsed = parseCanvasLayoutJson(parsedJson);
+      if (!parsed.ok) {
+        await alertDialog({ message: parsed.error, variant: 'error' });
+        return;
+      }
+
+      const ok = await confirmDialog({
+        title: 'Import layout from JSON',
+        message:
+          'Replace the current canvas with this layout? Class positions apply only to classes that exist in this version. Groups and viewport will match the file after import.',
+      });
+      if (!ok) return;
+
+      try {
+        setLoadingMessage('Importing layout...');
+        setIsLoadingCanvas(true);
+
+        const idsRes = await getClassIdsForVersion(selectedVersionId);
+        const idsParsed = JSON.parse(idsRes);
+        if (!idsParsed.success || !Array.isArray(idsParsed.classIds)) {
+          await alertDialog({
+            message: idsParsed.error || 'Could not load classes for this version.',
+            variant: 'error',
+          });
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
+          return;
+        }
+
+        const validIds = new Set<string>(idsParsed.classIds);
+        const filtered = filterCanvasLayoutForTargetClasses(parsed.doc, validIds);
+
+        const syncRes = await syncGroupsForVersion(
+          selectedVersionId,
+          filtered.groups,
+          filtered.nodePositions
+        );
+        const syncParsed = JSON.parse(syncRes);
+        if (!syncParsed.success) {
+          await alertDialog({
+            message: syncParsed.error || 'Failed to sync groups for this layout.',
+            variant: 'error',
+          });
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
+          return;
+        }
+
+        if (filtered.droppedClassCount > 0) {
+          await alertDialog({
+            message: `${filtered.droppedClassCount} class(es) from the file are not in this version and were skipped.`,
+            variant: 'warning',
+          });
+        }
+
+        const layoutPayload = {
+          viewport: filtered.viewport,
+          nodes: filtered.nodes,
+        };
+
+        await applyCanvasLayoutPayload({
+          layout: layoutPayload,
+          layoutNameToSet: parsed.doc.layoutName?.trim() || selectedLayoutName,
+          clearGroupsWhenEmpty: true,
+        });
+      } catch (err) {
+        console.error('Error importing layout JSON:', err);
+        await alertDialog({
+          message: 'An error occurred while importing the layout.',
+          variant: 'error',
+        });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+        setLayoutDropdownOpen(false);
+      }
+    },
+    [
+      selectedVersionId,
+      currentUserId,
+      isReadOnly,
+      alertDialog,
+      confirmDialog,
+      applyCanvasLayoutPayload,
+      selectedLayoutName,
+    ]
+  );
 
   const handleRestoreLayoutRevision = useCallback(
     async (revisionId: string) => {
@@ -6978,6 +7201,14 @@ const StudioContent = () => {
             {/* Layout Control Button */}
             <Panel position="top-right" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80" style={{ marginRight: '60px' }}>
               <div className="relative" ref={layoutDropdownRef}>
+                <input
+                  ref={layoutJsonImportInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  aria-hidden
+                  onChange={(e) => void handleImportLayoutJsonSelected(e)}
+                />
                 <button
                   onClick={() => setLayoutDropdownOpen(!layoutDropdownOpen)}
                   className={`p-2 text-sm font-medium rounded-lg border transition-all duration-200 shadow-sm hover:shadow-md ${
@@ -7065,6 +7296,39 @@ const StudioContent = () => {
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Type a custom name or pick a suggestion. Save and load multiple layouts per version.
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 mt-3">
+                          <button
+                            type="button"
+                            onClick={handleExportLayoutJson}
+                            disabled={!selectedVersionId}
+                            className={`px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                              selectedVersionId
+                                ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 border border-slate-200 dark:border-slate-700'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border border-gray-200 dark:border-gray-600'
+                            }`}
+                            title="Download the current canvas layout as versioned JSON"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span>Export JSON</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleImportLayoutJsonPick}
+                            disabled={isReadOnly || !selectedVersionId || !currentUserId}
+                            className={`px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
+                              !isReadOnly && selectedVersionId && currentUserId
+                                ? 'bg-slate-50 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900/50 border border-slate-200 dark:border-slate-700'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border border-gray-200 dark:border-gray-600'
+                            }`}
+                            title="Apply a layout from a JSON file exported from Objectified"
+                          >
+                            <FileJson className="w-4 h-4" />
+                            <span>Import JSON</span>
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          Versioned JSON for sharing layouts across versions and projects. Import applies only classes that exist in this version.
                         </p>
                         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
                           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
