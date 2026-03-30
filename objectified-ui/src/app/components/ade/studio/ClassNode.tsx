@@ -2146,6 +2146,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
                               e.currentTarget.style.background = 'transparent';
                               e.currentTarget.style.color = '#94a3b8';
                             }}
+                            type="button"
+                            aria-label="Edit property"
                             title="Edit property"
                           >
                             <Edit size={11} />
@@ -2184,6 +2186,8 @@ function ClassNode({ id, data, selected }: NodeProps) {
                               e.currentTarget.style.background = 'transparent';
                               e.currentTarget.style.color = '#94a3b8';
                             }}
+                            type="button"
+                            aria-label="Remove property from class"
                             title="Remove property from class"
                           >
                             <Trash2 size={11} />
