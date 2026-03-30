@@ -76,7 +76,7 @@ describe('canvas-display-visibility (#483)', () => {
 
   it('hiddenGroupIds on ancestor removes members of nested groups (#155)', () => {
     const nested = [
-      { id: 'g1', nodeIds: ['a'], parentId: null as string | null },
+      { id: 'g1', nodeIds: ['a', 'b'], parentId: null as string | null },
       { id: 'g2', nodeIds: ['c'], parentId: 'g1' },
     ];
     expect(

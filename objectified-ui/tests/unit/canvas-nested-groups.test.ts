@@ -57,7 +57,7 @@ describe('canvas-nested-groups (#155)', () => {
     expect(isStrictDescendantGroup('r', 'c1', byId)).toBe(true);
     expect(isStrictDescendantGroup('r', 'c2', byId)).toBe(true);
     expect(isStrictDescendantGroup('c1', 'r', byId)).toBe(false);
-    expect(isStrictDescendantGroup('c2', 'c1', byId)).toBe(true);
+    expect(isStrictDescendantGroup('c1', 'c2', byId)).toBe(true);
   });
 
   it('collectDescendantGroupIds and collectSubtreeGroupIds', () => {
