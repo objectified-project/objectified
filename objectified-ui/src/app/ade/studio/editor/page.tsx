@@ -60,7 +60,8 @@ import {
   Ban,
   Ghost,
   Undo2,
-  TrendingUp
+  TrendingUp,
+  Presentation,
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -156,6 +157,13 @@ import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
 import { useSearchHistory } from '../hooks/useSearchHistory';
+import {
+  loadPresentationBookmarks,
+  savePresentationBookmarks,
+  newPresentationBookmarkId,
+  type CanvasPresentationBookmark,
+} from './lib/canvas-presentation-bookmarks';
+import { CanvasPresentationPanel, PresentationExitHint } from './components/CanvasPresentationPanel';
 
 // Import extracted components
 import { useExportFunctions } from './components';
@@ -275,7 +283,8 @@ const StudioContent = () => {
     deleteGroup: deleteGroupFromContext,
     setDeleteAllClassesInGroupFn,
     setSearchHistoryCount,
-    setClearSearchHistoryFn
+    setClearSearchHistoryFn,
+    setCanvasPresentationMode,
   } = useStudio();
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
@@ -465,6 +474,7 @@ const StudioContent = () => {
   /** Data URLs for saved layout snapshots keyed by trimmed layout name */
   const [namedLayoutSnapshotDataUrls, setNamedLayoutSnapshotDataUrls] = useState<Record<string, string>>({});
   const canvasCaptureAreaRef = useRef<HTMLDivElement>(null);
+  const presentationShellRef = useRef<HTMLDivElement>(null);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
   const [autoSavePending, setAutoSavePending] = useState(false);
   const autoSaveInFlightRef = useRef(false);
@@ -490,6 +500,15 @@ const StudioContent = () => {
     Array<{ id: string; revision: number; created_at: string }>
   >([]);
   const [layoutHistoryLoading, setLayoutHistoryLoading] = useState(false);
+
+  // #517: Canvas presentation — fullscreen slideshow of viewport bookmarks, speaker notes, timer
+  const [canvasPresentationActive, setCanvasPresentationActive] = useState(false);
+  const [presentationBookmarks, setPresentationBookmarks] = useState<CanvasPresentationBookmark[]>([]);
+  const [presentationSlideIndex, setPresentationSlideIndex] = useState(0);
+  const [presentationShowSpeakerNotes, setPresentationShowSpeakerNotes] = useState(true);
+  const [presentationTimerStartMs, setPresentationTimerStartMs] = useState<number | null>(null);
+  const [presentationTimerTick, setPresentationTimerTick] = useState(0);
+  const [presentationHintVisible, setPresentationHintVisible] = useState(false);
 
   // #471: Preview layout suggestions before applying
   const [layoutPreviewNodes, setLayoutPreviewNodes] = useState<Node[] | null>(null);
@@ -1115,11 +1134,204 @@ const StudioContent = () => {
     setFocusModeDegree(1);
   }, []);
 
+  useEffect(() => {
+    if (!selectedVersionId) {
+      setPresentationBookmarks([]);
+      return;
+    }
+    setPresentationBookmarks(loadPresentationBookmarks(selectedVersionId));
+    setPresentationSlideIndex(0);
+  }, [selectedVersionId]);
+
+  useEffect(() => {
+    if (!selectedVersionId) return;
+    savePresentationBookmarks(selectedVersionId, presentationBookmarks);
+  }, [selectedVersionId, presentationBookmarks]);
+
+  useEffect(() => {
+    setCanvasPresentationMode(canvasPresentationActive);
+    return () => setCanvasPresentationMode(false);
+  }, [canvasPresentationActive, setCanvasPresentationMode]);
+
+  useEffect(() => {
+    if (!canvasPresentationActive || presentationTimerStartMs === null) return;
+    const id = window.setInterval(() => setPresentationTimerTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [canvasPresentationActive, presentationTimerStartMs]);
+
+  const applyPresentationSlide = useCallback(
+    (index: number, bookmarks: CanvasPresentationBookmark[]) => {
+      const b = bookmarks[index];
+      if (!b) return;
+      setViewport({ x: b.viewport.x, y: b.viewport.y, zoom: b.viewport.zoom }, { duration: 400 });
+    },
+    [setViewport]
+  );
+
+  const exitPresentation = useCallback(async () => {
+    setCanvasPresentationActive(false);
+    setPresentationHintVisible(false);
+    try {
+      if (document.fullscreenElement && presentationShellRef.current && document.fullscreenElement === presentationShellRef.current) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const startPresentation = useCallback(async () => {
+    if (presentationBookmarks.length === 0) {
+      await alertDialog({
+        message: 'Add at least one slide from the current canvas view (Layout → Presentation slides), then start again.',
+        variant: 'warning',
+      });
+      return;
+    }
+    setPresentationSlideIndex(0);
+    applyPresentationSlide(0, presentationBookmarks);
+    setPresentationTimerStartMs(Date.now());
+    setPresentationTimerTick(0);
+    setCanvasPresentationActive(true);
+    setPresentationHintVisible(true);
+    window.setTimeout(() => setPresentationHintVisible(false), 10000);
+    const el = presentationShellRef.current;
+    if (el?.requestFullscreen) {
+      try {
+        await el.requestFullscreen();
+      } catch {
+        /* user denied or not allowed */
+      }
+    }
+  }, [presentationBookmarks, applyPresentationSlide, alertDialog]);
+
+  const addPresentationSlideFromView = useCallback(() => {
+    const vp = getViewport();
+    setPresentationBookmarks((prev) => [
+      ...prev,
+      {
+        id: newPresentationBookmarkId(),
+        title: `Slide ${prev.length + 1}`,
+        viewport: { x: vp.x, y: vp.y, zoom: vp.zoom },
+        speakerNote: '',
+      },
+    ]);
+  }, [getViewport]);
+
+  const updatePresentationSlideTitle = useCallback((id: string, title: string) => {
+    setPresentationBookmarks((prev) => prev.map((b) => (b.id === id ? { ...b, title } : b)));
+  }, []);
+
+  const updatePresentationSlideNote = useCallback((id: string, speakerNote: string) => {
+    setPresentationBookmarks((prev) => prev.map((b) => (b.id === id ? { ...b, speakerNote } : b)));
+  }, []);
+
+  const removePresentationSlide = useCallback((id: string) => {
+    setPresentationBookmarks((prev) => {
+      const next = prev.filter((b) => b.id !== id);
+      setPresentationSlideIndex((i) => Math.min(i, Math.max(0, next.length - 1)));
+      return next;
+    });
+  }, []);
+
+  const goPresentationPrev = useCallback(() => {
+    setPresentationSlideIndex((i) => {
+      const next = Math.max(0, i - 1);
+      applyPresentationSlide(next, presentationBookmarks);
+      return next;
+    });
+  }, [applyPresentationSlide, presentationBookmarks]);
+
+  const goPresentationNext = useCallback(() => {
+    setPresentationSlideIndex((i) => {
+      const next = Math.min(presentationBookmarks.length - 1, i + 1);
+      applyPresentationSlide(next, presentationBookmarks);
+      return next;
+    });
+  }, [applyPresentationSlide, presentationBookmarks]);
+
+  useEffect(() => {
+    if (!canvasPresentationActive) return;
+    const onFs = () => {
+      if (!document.fullscreenElement) {
+        setCanvasPresentationActive(false);
+        setPresentationHintVisible(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, [canvasPresentationActive]);
+
+  useEffect(() => {
+    if (!canvasPresentationActive) return;
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const inField = Boolean(t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT'));
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        void exitPresentation();
+        return;
+      }
+      if (inField && e.key !== 'Escape') return;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        goPresentationNext();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        goPresentationPrev();
+      } else if (e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        goPresentationNext();
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        goPresentationPrev();
+      } else if (e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        setPresentationShowSpeakerNotes((v) => !v);
+      } else if (e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        setPresentationTimerStartMs(Date.now());
+        setPresentationTimerTick((x) => x + 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setPresentationSlideIndex(0);
+        applyPresentationSlide(0, presentationBookmarks);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        const last = Math.max(0, presentationBookmarks.length - 1);
+        setPresentationSlideIndex(last);
+        applyPresentationSlide(last, presentationBookmarks);
+      }
+    };
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [
+    canvasPresentationActive,
+    exitPresentation,
+    goPresentationNext,
+    goPresentationPrev,
+    applyPresentationSlide,
+    presentationBookmarks,
+  ]);
+
+  const presentationElapsedLabel = useMemo(() => {
+    if (presentationTimerStartMs === null) return '0:00';
+    const sec = Math.floor((Date.now() - presentationTimerStartMs) / 1000);
+    const m = Math.floor(sec / 60);
+    const r = sec % 60;
+    return `${m}:${r.toString().padStart(2, '0')}`;
+  }, [presentationTimerStartMs, presentationTimerTick]);
+
   // Keyboard shortcut for canvas search (Cmd+F or Ctrl+F) and focus mode (Esc)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only handle in canvas view mode
       if (viewMode !== 'canvas') return;
+
+      if (canvasPresentationActive) return;
 
       // Cmd+F or Ctrl+F to open search
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
@@ -1143,7 +1355,16 @@ const StudioContent = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, canvasSearchOpen, openCanvasSearch, closeCanvasSearch, focusModeEnabled, exitFocusMode, isolateSelectionEnabled]);
+  }, [
+    viewMode,
+    canvasSearchOpen,
+    openCanvasSearch,
+    closeCanvasSearch,
+    focusModeEnabled,
+    exitFocusMode,
+    isolateSelectionEnabled,
+    canvasPresentationActive,
+  ]);
 
   // #482: Turn off isolate when the class selection is cleared
   useEffect(() => {
@@ -5736,7 +5957,8 @@ const StudioContent = () => {
           }
         `}</style>
 
-      {/* Header with Project and Version Selectors - spans full width including over sidebar */}
+      {/* Header with Project and Version Selectors — hidden in canvas presentation mode (#517) */}
+      {!canvasPresentationActive && (
       <div className="bg-gradient-to-r from-white via-slate-50 to-white dark:from-gray-800 dark:via-gray-800 dark:to-gray-800 border-b border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5 shadow-sm" style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 1000 }}>
         <div className="flex flex-wrap items-center gap-4 w-full">
           {/* Project Selector - Radix UI Select */}
@@ -5935,9 +6157,10 @@ const StudioContent = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* Canvas/Code Area - with top padding for fixed header */}
-      <div className="flex-1 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 overflow-hidden relative">
+      <div className={`flex-1 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 overflow-hidden relative ${canvasPresentationActive ? 'pt-0' : ''}`}>
         {!selectedProjectId || !selectedVersionId ? (
           // Empty state when no project/version selected
           <div className="h-full flex items-center justify-center">
@@ -5993,7 +6216,7 @@ const StudioContent = () => {
             )}
 
             {/* #547: Dependency graph overlay indicator; #551: Upstream/downstream toggles */}
-            {showDependencyOverlay && !layoutPreviewNodes && (
+            {showDependencyOverlay && !layoutPreviewNodes && !canvasPresentationActive && (
               <Panel position="top-center" className="!mt-4 z-[1001]">
                 <div className="flex items-center gap-3 px-3 py-2 rounded-lg shadow-md border border-indigo-200/80 dark:border-indigo-700/50 bg-indigo-50/95 dark:bg-indigo-900/30 backdrop-blur-sm">
                   <Network className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -6062,7 +6285,7 @@ const StudioContent = () => {
               </Panel>
             )}
             {/* #550: Impact Analysis indicator (stack below dependency overlay when both on) */}
-            {impactAnalysisMode && !layoutPreviewNodes && (
+            {impactAnalysisMode && !layoutPreviewNodes && !canvasPresentationActive && (
               <Panel position="top-center" className={showDependencyOverlay ? '!mt-14 z-[1001]' : '!mt-4 z-[1001]'}>
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-md border border-amber-200/80 dark:border-amber-700/50 bg-amber-50/95 dark:bg-amber-900/30 backdrop-blur-sm">
                   <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -6086,7 +6309,7 @@ const StudioContent = () => {
               </Panel>
             )}
             {/* #471: Layout preview bar — Apply or Cancel suggested layout */}
-            {layoutPreviewNodes && (
+            {layoutPreviewNodes && !canvasPresentationActive && (
               <Panel position="top-center" className="!mt-4 z-[1001]">
                 <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-teal-200 dark:border-teal-700 px-4 py-3 flex items-center gap-4">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -6114,7 +6337,18 @@ const StudioContent = () => {
               </Panel>
             )}
 
-            <div ref={canvasCaptureAreaRef} className="absolute inset-0 w-full h-full min-h-0">
+            <div
+              ref={presentationShellRef}
+              className={`absolute inset-0 flex min-h-0 w-full ${
+                canvasPresentationActive && presentationShowSpeakerNotes ? 'flex-row' : 'flex-col'
+              }`}
+            >
+              <div
+                ref={canvasCaptureAreaRef}
+                className={`relative min-h-0 overflow-hidden ${
+                  canvasPresentationActive && presentationShowSpeakerNotes ? 'min-w-0 flex-1' : 'h-full w-full'
+                }`}
+              >
               <ReactFlow
               nodes={displayNodes}
               edges={edgesWithHover}
@@ -6245,6 +6479,7 @@ const StudioContent = () => {
                 }}
               />
             )}
+            {!canvasPresentationActive && (
             <Controls
               className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden"
               style={{
@@ -6252,6 +6487,8 @@ const StudioContent = () => {
                 overflow: 'hidden',
               }}
             />
+            )}
+            {!canvasPresentationActive && (
             <MiniMap
               nodeStrokeColor={(node) => {
                 if (node.type === 'input') return '#6366f1';
@@ -6270,6 +6507,7 @@ const StudioContent = () => {
                 border: '1px solid rgba(99, 102, 241, 0.2)',
               }}
             />
+            )}
 
             {/* Smart Guides for Alignment - uses viewport to render in flow coordinate space */}
             {(guides.horizontal.length > 0 || guides.vertical.length > 0) && (() => {
@@ -6508,7 +6746,7 @@ const StudioContent = () => {
             })()}
 
             {/* Spacing Tools Panel - shown when multiple nodes selected */}
-            {selectedNodeIds.length >= 2 && (
+            {selectedNodeIds.length >= 2 && !canvasPresentationActive && (
               <Panel
                 position="bottom-center"
                 className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 px-2 py-1.5"
@@ -6563,7 +6801,7 @@ const StudioContent = () => {
             )}
 
             {/* Focus mode indicator - by selection+degree (#489) or by group (#490), exit with Esc or X */}
-            {focusModeEnabled && (
+            {focusModeEnabled && !canvasPresentationActive && (
               <Panel position="top-center" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700/80 px-4 py-2">
                 <div className="flex items-center gap-2">
                   <Focus className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -6632,7 +6870,7 @@ const StudioContent = () => {
             )}
 
             {/* Read Only Indicator */}
-            {isReadOnly && (
+            {isReadOnly && !canvasPresentationActive && (
               <Panel position="top-left" className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-900/30 text-amber-800 dark:text-amber-200 rounded-xl shadow-lg px-4 py-2 border border-amber-200/80 dark:border-amber-700/50 backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <div className="p-1 bg-amber-100 dark:bg-amber-800/50 rounded-lg">
@@ -6644,6 +6882,7 @@ const StudioContent = () => {
             )}
 
             {/* Expand/Collapse All Controls */}
+            {!canvasPresentationActive && (
             <Panel
               position="top-left"
               className={`bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80 ${isReadOnly ? 'mt-14' : ''}`}
@@ -6885,9 +7124,10 @@ const StudioContent = () => {
                 )}
               </div>
             </Panel>
+            )}
 
             {/* Canvas Search Panel */}
-            {canvasSearchOpen && (
+            {canvasSearchOpen && !canvasPresentationActive && (
               <Panel
                 position="top-center"
                 className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
@@ -7186,7 +7426,7 @@ const StudioContent = () => {
             {/* Dangling $ref warning */}
             {(() => {
               const warn = hasDanglingRefs(nodes.map(n => ({ id: n.id, name: (n.data as any)?.name, properties: (n.data as any)?.properties })));
-              return warn ? (
+              return warn && !canvasPresentationActive ? (
                 <Panel position="top-left" className={`bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30 text-red-800 dark:text-red-200 rounded-xl shadow-lg px-4 py-2.5 border border-red-200/80 dark:border-red-700/50 backdrop-blur-sm ${isReadOnly ? 'mt-[8rem]' : 'mt-[4.5rem]'}`}>
                   <div className="flex items-center gap-2.5">
                     <div className="p-1 bg-red-100 dark:bg-red-800/50 rounded-lg">
@@ -7199,6 +7439,7 @@ const StudioContent = () => {
             })()}
 
             {/* Layout Control Button */}
+            {!canvasPresentationActive && (
             <Panel position="top-right" className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80" style={{ marginRight: '60px' }}>
               <div className="relative" ref={layoutDropdownRef}>
                 <input
@@ -7463,6 +7704,67 @@ const StudioContent = () => {
                         </div>
                       </div>
 
+                      {/* #517 Presentation slides */}
+                      <div className="border-t border-gray-200 dark:border-gray-700 mx-4" />
+                      <div className="px-4 py-3">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                          <Presentation className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          Presentation
+                        </h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          Save viewport positions as slides, then present fullscreen with notes and a timer (local to this browser).
+                        </p>
+                        <button
+                          type="button"
+                          onClick={addPresentationSlideFromView}
+                          disabled={isReadOnly || !selectedVersionId}
+                          className="w-full mb-2 px-3 py-2 text-sm font-medium rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Add slide from current view
+                        </button>
+                        <ul className="mb-2 max-h-32 space-y-1 overflow-y-auto">
+                          {presentationBookmarks.map((b, idx) => (
+                            <li key={b.id} className="flex items-center gap-1 text-xs">
+                              <span className="w-4 shrink-0 tabular-nums text-gray-400">{idx + 1}.</span>
+                              <input
+                                value={b.title}
+                                onChange={(e) => updatePresentationSlideTitle(b.id, e.target.value)}
+                                className="min-w-0 flex-1 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-gray-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                                aria-label={`Slide ${idx + 1} title`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPresentationSlideIndex(idx);
+                                  applyPresentationSlide(idx, presentationBookmarks);
+                                }}
+                                className="shrink-0 text-indigo-600 hover:underline dark:text-indigo-400"
+                              >
+                                Go
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removePresentationSlide(b.id)}
+                                className="shrink-0 rounded p-0.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                                title="Remove slide"
+                                aria-label={`Remove slide ${idx + 1}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          type="button"
+                          onClick={() => void startPresentation()}
+                          disabled={presentationBookmarks.length === 0}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+                        >
+                          <Presentation className="h-4 w-4 shrink-0" aria-hidden />
+                          Start presentation
+                        </button>
+                      </div>
+
                       {/* Divider */}
                       <div className="border-t border-gray-200 dark:border-gray-700 mx-4" />
 
@@ -7581,8 +7883,10 @@ const StudioContent = () => {
                 )}
               </div>
             </Panel>
+            )}
 
             {/* Export Button Panel */}
+            {!canvasPresentationActive && (
             <Panel
               position="top-right"
               className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
@@ -7595,8 +7899,10 @@ const StudioContent = () => {
                 <Download className="w-5 h-5" />
               </button>
             </Panel>
+            )}
 
             {/* Schema Metrics & Memory Profiler buttons - next to map controls (bottom-left) */}
+            {!canvasPresentationActive && (
             <Panel
               position="bottom-left"
               className="flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200/80 dark:border-gray-700/80"
@@ -7630,12 +7936,68 @@ const StudioContent = () => {
                 </button>
               )}
             </Panel>
+            )}
+
+            {canvasPresentationActive && (
+              <>
+                <Panel position="bottom-center" className="z-[1002] mb-2 max-w-[min(100%,42rem)]">
+                  <CanvasPresentationPanel
+                    slideLabel={presentationBookmarks[presentationSlideIndex]?.title ?? 'Slide'}
+                    slideIndexDisplay={presentationBookmarks.length === 0 ? 0 : presentationSlideIndex + 1}
+                    slideTotal={Math.max(1, presentationBookmarks.length)}
+                    elapsedLabel={presentationElapsedLabel}
+                    showSpeakerNotes={presentationShowSpeakerNotes}
+                    onToggleSpeakerNotes={() => setPresentationShowSpeakerNotes((v) => !v)}
+                    onPrev={goPresentationPrev}
+                    onNext={goPresentationNext}
+                    onResetTimer={() => {
+                      setPresentationTimerStartMs(Date.now());
+                      setPresentationTimerTick((x) => x + 1);
+                    }}
+                    onExit={() => void exitPresentation()}
+                    canGoPrev={presentationSlideIndex > 0}
+                    canGoNext={
+                      presentationBookmarks.length > 0 &&
+                      presentationSlideIndex < presentationBookmarks.length - 1
+                    }
+                  />
+                </Panel>
+                {presentationHintVisible && (
+                  <Panel position="top-center" className="z-[1002] !mt-4 max-w-lg">
+                    <PresentationExitHint onDismiss={() => setPresentationHintVisible(false)} />
+                  </Panel>
+                )}
+              </>
+            )}
 
               </ReactFlow>
+              </div>
+            {canvasPresentationActive && presentationShowSpeakerNotes && (
+              <aside className="flex h-full max-h-full w-80 min-w-0 shrink-0 flex-col border-l border-gray-200 bg-white/98 dark:border-gray-700 dark:bg-gray-950/98">
+                <div className="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Speaker notes
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-500">
+                    Current slide only · saved with this version (this browser)
+                  </p>
+                </div>
+                <textarea
+                  value={presentationBookmarks[presentationSlideIndex]?.speakerNote ?? ''}
+                  onChange={(e) => {
+                    const id = presentationBookmarks[presentationSlideIndex]?.id;
+                    if (id) updatePresentationSlideNote(id, e.target.value);
+                  }}
+                  className="min-h-0 flex-1 resize-none border-0 bg-transparent px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-600"
+                  placeholder="Notes for this slide…"
+                  aria-label="Speaker notes for current slide"
+                />
+              </aside>
+            )}
             </div>
 
           {/* Draggable panels (outside ReactFlow so position:fixed is viewport-relative) */}
-          {schemaMetricsOpen && (
+          {schemaMetricsOpen && !canvasPresentationActive && (
             <DraggablePanel
               storageKey="schema-metrics-panel"
               defaultPosition={{ left: 20, top: 120 }}
@@ -7651,7 +8013,7 @@ const StudioContent = () => {
                 />
             </DraggablePanel>
           )}
-          {memoryProfilerOpen && (
+          {memoryProfilerOpen && !canvasPresentationActive && (
             <DraggablePanel
               storageKey="memory-profiler-panel"
               defaultPosition={{ left: 20, top: 120 }}
@@ -7666,7 +8028,7 @@ const StudioContent = () => {
               />
             </DraggablePanel>
           )}
-          {schemaTimelineOpen && (
+          {schemaTimelineOpen && !canvasPresentationActive && (
             <DraggablePanel
               storageKey="schema-timeline-panel"
               defaultPosition={{ left: 20, top: 280 }}

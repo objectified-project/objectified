@@ -36,7 +36,23 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
   const pathname = usePathname();
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
-  const { selectedProjectId, selectedVersionId, triggerCanvasRefresh, triggerSidebarRefresh, sidebarRefreshKey, isReadOnly, zoomToClassFn, toggleClassVisibilityFn, hiddenClassIds, createGroupFn, clickToFocusEnabled, groups, deleteGroup, updateGroup } = useStudio();
+  const {
+    selectedProjectId,
+    selectedVersionId,
+    triggerCanvasRefresh,
+    triggerSidebarRefresh,
+    sidebarRefreshKey,
+    isReadOnly,
+    zoomToClassFn,
+    toggleClassVisibilityFn,
+    hiddenClassIds,
+    createGroupFn,
+    clickToFocusEnabled,
+    groups,
+    deleteGroup,
+    updateGroup,
+    canvasPresentationMode,
+  } = useStudio();
 
   // Check if we're on the code or paths view - hide sidebar for these views
   const isCodeView = pathname?.includes('/code') || pathname?.includes('/paths');
@@ -410,15 +426,28 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)" }}>
-      {/* Static Header with Project/Version selectors */}
-      <StudioHeader
-        onProjectTagsLoaded={(tags) => setProjectTags(tags)}
-      />
+      {/* Static Header with Project/Version selectors — hidden during canvas presentation (#517) */}
+      {!canvasPresentationMode && (
+        <StudioHeader
+          onProjectTagsLoaded={(tags) => setProjectTags(tags)}
+        />
+      )}
 
       {/* Sidebar and main content area - with padding for fixed header */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", marginTop: "48px" }}>
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          overflow: "hidden",
+          marginTop: canvasPresentationMode ? 0 : "48px",
+        }}
+      >
         {/* Only show sidebar for canvas/editor view, not for code view */}
-        {!isCodeView && currentTenantId && selectedProjectId && selectedVersionId && (
+        {!canvasPresentationMode &&
+          !isCodeView &&
+          currentTenantId &&
+          selectedProjectId &&
+          selectedVersionId && (
           <StudioSideNav classes={classes} properties={properties} groups={sidebarGroups} callbacks={callbacks} refreshKey={refreshKey}
                          hiddenClassIds={hiddenClassIds}
                          selectedProjectId={selectedProjectId} selectedVersionId={selectedVersionId} isReadOnly={isReadOnly} />
