@@ -6,6 +6,7 @@ Supports both JWT tokens (from NextAuth) and API keys for authentication.
 
 import logging
 import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Header
 
@@ -38,10 +39,10 @@ def decode_jwt(token: str) -> Optional[Dict[str, Any]]:
         )
 
         return payload
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         logger.warning("decode_jwt: Token expired")
         return None
-    except jwt.InvalidTokenError as e:
+    except InvalidTokenError as e:
         logger.warning(f"decode_jwt: Invalid token - {e}")
         return None
     except Exception as e:
