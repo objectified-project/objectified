@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 Improvements:
+- Canvas: layout auto-save uses a steady timer while edits are pending so saves occur every 30 seconds (or your chosen interval) without resetting on each move (#315)
 - Canvas: schema timeline panel shows class count, relationships, and complexity across project versions (#323)
 - Canvas: named layout saves store a PNG snapshot for thumbnail preview in the layout menu
 - Canvas: export and import canvas layouts as versioned JSON (share across versions and projects)
