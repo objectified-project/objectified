@@ -2,6 +2,8 @@
  * Canvas layout JSON interchange format (versioned for compatibility across app and project copies).
  */
 
+import type { Edge } from '@xyflow/react';
+
 export const CANVAS_LAYOUT_JSON_FORMAT_VERSION = 1 as const;
 
 export type CanvasLayoutJsonDocument = {
@@ -188,4 +190,36 @@ export function filterCanvasLayoutForTargetClasses(
     nodePositions,
     droppedClassCount,
   };
+}
+
+/**
+ * After the canvas rebuilds edges from schema, overlay handle IDs from an imported or saved layout
+ * so routing matches the exported file when edge IDs still match.
+ */
+export function mergeSavedEdgeHandles(
+  currentEdges: Edge[],
+  savedEdges: unknown[] | undefined
+): Edge[] {
+  if (!savedEdges?.length) {
+    return currentEdges;
+  }
+  const byId = new Map<string, { sourceHandle?: string; targetHandle?: string }>();
+  for (const raw of savedEdges) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const e = raw as Record<string, unknown>;
+    if (typeof e.id !== 'string') continue;
+    const overlay: { sourceHandle?: string; targetHandle?: string } = {};
+    if (typeof e.sourceHandle === 'string') overlay.sourceHandle = e.sourceHandle;
+    if (typeof e.targetHandle === 'string') overlay.targetHandle = e.targetHandle;
+    if (Object.keys(overlay).length === 0) continue;
+    byId.set(e.id, overlay);
+  }
+  if (byId.size === 0) {
+    return currentEdges;
+  }
+  return currentEdges.map((edge) => {
+    const o = byId.get(edge.id);
+    if (!o) return edge;
+    return { ...edge, ...o };
+  });
 }

@@ -1,8 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
+import type { Edge } from '@xyflow/react';
 import {
   buildCanvasLayoutJsonDocument,
   CANVAS_LAYOUT_JSON_FORMAT_VERSION,
   filterCanvasLayoutForTargetClasses,
+  mergeSavedEdgeHandles,
   parseCanvasLayoutJson,
 } from '../src/app/utils/canvas-layout-json';
 
@@ -130,5 +132,33 @@ describe('canvas-layout-json', () => {
     expect(filtered.nodes).toHaveLength(1);
     expect(filtered.nodes[0].id).toBe('valid');
     expect(filtered.nodePositions).toEqual({ valid: { x: 5, y: 10 } });
+  });
+
+  test('mergeSavedEdgeHandles overlays handles by edge id', () => {
+    const current: Edge[] = [
+      {
+        id: 'e1',
+        source: 'a',
+        target: 'b',
+        sourceHandle: 'old-src',
+        targetHandle: 'old-tgt',
+      } as Edge,
+    ];
+    const merged = mergeSavedEdgeHandles(current, [
+      { id: 'e1', sourceHandle: 'new-src', targetHandle: 'new-tgt' },
+    ]);
+    expect(merged[0].sourceHandle).toBe('new-src');
+    expect(merged[0].targetHandle).toBe('new-tgt');
+  });
+
+  test('mergeSavedEdgeHandles ignores entries without string handles', () => {
+    const current: Edge[] = [{ id: 'e1', source: 'a', target: 'b' } as Edge];
+    expect(mergeSavedEdgeHandles(current, [{ id: 'e1', sourceHandle: 1 }])).toEqual(current);
+  });
+
+  test('mergeSavedEdgeHandles returns current when saved is empty', () => {
+    const current: Edge[] = [{ id: 'e1', source: 'a', target: 'b' } as Edge];
+    expect(mergeSavedEdgeHandles(current, [])).toEqual(current);
+    expect(mergeSavedEdgeHandles(current, undefined)).toEqual(current);
   });
 });

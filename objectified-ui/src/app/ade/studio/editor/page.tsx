@@ -147,6 +147,7 @@ import {
   buildCanvasLayoutJsonDocument,
   parseCanvasLayoutJson,
   filterCanvasLayoutForTargetClasses,
+  mergeSavedEdgeHandles,
 } from '@/app/utils/canvas-layout-json';
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
 import { toPng } from 'html-to-image';
@@ -3688,6 +3689,7 @@ const StudioContent = () => {
       layout: {
         viewport?: { x?: number; y?: number; zoom?: number };
         nodes?: unknown;
+        edges?: unknown;
       };
       layoutNameToSet?: string;
       clearGroupsWhenEmpty?: boolean;
@@ -3842,6 +3844,10 @@ const StudioContent = () => {
 
         triggerSidebarRefresh();
 
+        if (Array.isArray(layout.edges) && layout.edges.length > 0) {
+          setEdges((eds) => mergeSavedEdgeHandles(eds, layout.edges as unknown[]));
+        }
+
         setIsLoadingCanvas(false);
         setLoadingMessage('');
         setLayoutDropdownOpen(false);
@@ -3855,6 +3861,7 @@ const StudioContent = () => {
       selectedVersionId,
       reloadClasses,
       setNodes,
+      setEdges,
       setGroups,
       setViewport,
       projectTags,
@@ -3914,30 +3921,8 @@ const StudioContent = () => {
   const handleExportLayoutJson = useCallback(() => {
     if (!selectedVersionId) return;
     const viewport = getViewport();
-    const nodeData = nodes.map((node) => ({
-      id: node.id,
-      type: node.type,
-      position: node.position,
-      dimensions: {
-        width: node.measured?.width || node.width || node.style?.width,
-        height: node.measured?.height || node.height || node.style?.height,
-      },
-      data:
-        node.type === 'groupNode'
-          ? {
-              name: node.data.name,
-              color: node.data.color,
-              nodeIds: node.data.nodeIds,
-            }
-          : undefined,
-    }));
-    const edgeData = edges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-    }));
+    const nodeData = mapNodesForLayoutSave(nodes);
+    const edgeData = mapEdgesForLayoutSave(edges);
     const doc = buildCanvasLayoutJsonDocument({
       layoutName: selectedLayoutName.trim() || undefined,
       viewport,
@@ -4063,6 +4048,7 @@ const StudioContent = () => {
         const layoutPayload = {
           viewport: filtered.viewport,
           nodes: filtered.nodes,
+          edges: filtered.edges,
         };
 
         await applyCanvasLayoutPayload({
