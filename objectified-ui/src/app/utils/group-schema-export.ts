@@ -12,6 +12,8 @@ export function expandClassesForGroupExport(rootClassIds: string[], allClasses: 
     if (byId.has(id)) included.add(id);
   }
 
+  const byName = new Map<string, any>((allClasses || []).map((c) => [c.name, c]));
+
   let changed = true;
   while (changed) {
     changed = false;
@@ -37,7 +39,7 @@ export function expandClassesForGroupExport(rootClassIds: string[], allClasses: 
       }
 
       for (const refName of refs) {
-        const dep = (allClasses || []).find((c: any) => c.name === refName);
+        const dep = byName.get(refName);
         if (dep && !included.has(dep.id)) {
           included.add(dep.id);
           changed = true;

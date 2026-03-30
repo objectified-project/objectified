@@ -657,13 +657,17 @@ function makeUniqueCopyName(stem: string, taken: Set<string>): string {
  * Used for "duplicate group" on the canvas (#156).
  */
 export async function duplicateClassesInGroup(versionId: string, sourceClassIds: string[]) {
+  const client = await connectionPool.connect();
   try {
     const uniqueIds = [...new Set((sourceClassIds || []).filter(Boolean))];
     if (uniqueIds.length === 0) {
+      client.release();
       return JSON.stringify({ success: true, idMap: {} });
     }
 
-    const classesResult = await connectionPool.query(
+    await client.query('BEGIN');
+
+    const classesResult = await client.query(
       `SELECT id, name, description, schema, enabled
        FROM odb.classes
        WHERE version_id = $1 AND deleted_at IS NULL AND id = ANY($2::uuid[])`,
@@ -671,13 +675,14 @@ export async function duplicateClassesInGroup(versionId: string, sourceClassIds:
     );
 
     if (classesResult.rowCount !== uniqueIds.length) {
+      await client.query('ROLLBACK');
       return JSON.stringify({
         success: false,
         error: 'One or more classes were not found in this version.',
       });
     }
 
-    const existingNamesResult = await connectionPool.query(
+    const existingNamesResult = await client.query(
       `SELECT name FROM odb.classes WHERE version_id = $1 AND deleted_at IS NULL`,
       [versionId]
     );
@@ -707,7 +712,7 @@ export async function duplicateClassesInGroup(versionId: string, sourceClassIds:
         typeof row.schema === 'string' ? JSON.parse(row.schema) : row.schema || {};
       schemaObj = rewriteOpenApiRefsInValue(schemaObj, oldNameToNewName) as Record<string, unknown>;
 
-      const insertResult = await connectionPool.query(
+      const insertResult = await client.query(
         `INSERT INTO odb.classes (version_id, name, description, schema, enabled, canvas_metadata)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
@@ -724,7 +729,7 @@ export async function duplicateClassesInGroup(versionId: string, sourceClassIds:
       const newId = insertResult.rows[0].id as string;
       idMap[row.id] = newId;
 
-      const originalPropertiesResult = await connectionPool.query(
+      const originalPropertiesResult = await client.query(
         `SELECT id, property_id, name, description, data, parent_id
          FROM odb.class_properties
          WHERE class_id = $1
@@ -760,7 +765,7 @@ export async function duplicateClassesInGroup(versionId: string, sourceClassIds:
           const dataForInsert =
             typeof dataVal === 'string' ? dataVal : JSON.stringify(dataVal ?? {});
 
-          const insertProp = await connectionPool.query(
+          const insertProp = await client.query(
             `INSERT INTO odb.class_properties (class_id, property_id, name, description, data, parent_id)
              VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING id`,
@@ -776,7 +781,7 @@ export async function duplicateClassesInGroup(versionId: string, sourceClassIds:
 
       await copyPropertiesRecursively(null);
 
-      await connectionPool.query(
+      await client.query(
         `INSERT INTO odb.class_tags (class_id, tag_id)
          SELECT $1, tag_id FROM odb.class_tags WHERE class_id = $2
          ON CONFLICT (class_id, tag_id) DO NOTHING`,
@@ -784,17 +789,23 @@ export async function duplicateClassesInGroup(versionId: string, sourceClassIds:
       );
     }
 
+    await client.query('COMMIT');
     return JSON.stringify({ success: true, idMap });
   } catch (error: any) {
+    await client.query('ROLLBACK');
     console.error('duplicateClassesInGroup:', error);
     return JSON.stringify({ success: false, error: error.message });
+  } finally {
+    client.release();
   }
 }
 
 /**
  * Apply bulk metadata / tag / top-level property flag changes to many classes (#156).
+ * `versionId` is required so the function validates that all class IDs belong to that version.
  */
 export async function bulkApplyEditsToGroupClasses(
+  versionId: string,
   classIds: string[],
   options: {
     descriptionPrefix?: string;
@@ -809,11 +820,22 @@ export async function bulkApplyEditsToGroupClasses(
       return JSON.stringify({ success: true });
     }
 
+    // Validate that all requested IDs belong to the given version
+    const ownedResult = await connectionPool.query(
+      `SELECT id FROM odb.classes WHERE version_id = $1 AND deleted_at IS NULL AND id = ANY($2::uuid[])`,
+      [versionId, uniqueIds]
+    );
+    const ownedIds = new Set<string>(ownedResult.rows.map((r: { id: string }) => r.id));
+    const validIds = uniqueIds.filter((id) => ownedIds.has(id));
+    if (validIds.length === 0) {
+      return JSON.stringify({ success: false, error: 'No valid class IDs for this version.' });
+    }
+
     const prefix = options.descriptionPrefix ?? '';
     const suffix = options.descriptionSuffix ?? '';
 
     if (prefix !== '' || suffix !== '') {
-      for (const classId of uniqueIds) {
+      for (const classId of validIds) {
         const r = await connectionPool.query(
           `SELECT id, name, description, schema FROM odb.classes WHERE id = $1 AND deleted_at IS NULL`,
           [classId]
@@ -827,35 +849,42 @@ export async function bulkApplyEditsToGroupClasses(
     }
 
     if (options.tagId) {
-      for (const classId of uniqueIds) {
+      for (const classId of validIds) {
         await assignTagToClass(classId, options.tagId);
       }
     }
 
     if (typeof options.topLevelPropertyReadOnly === 'boolean') {
       const ro = options.topLevelPropertyReadOnly;
-      for (const classId of uniqueIds) {
-        const props = await connectionPool.query(
-          `SELECT id, data FROM odb.class_properties WHERE class_id = $1 AND parent_id IS NULL`,
-          [classId]
-        );
-        for (const p of props.rows) {
-          let data: Record<string, unknown>;
-          try {
-            data =
-              typeof p.data === 'string'
-                ? JSON.parse(p.data || '{}')
-                : { ...(p.data as object) };
-          } catch {
-            data = {};
+      await connectionPool.query('BEGIN');
+      try {
+        for (const classId of validIds) {
+          const props = await connectionPool.query(
+            `SELECT id, data FROM odb.class_properties WHERE class_id = $1 AND parent_id IS NULL`,
+            [classId]
+          );
+          for (const p of props.rows) {
+            let data: Record<string, unknown>;
+            try {
+              data =
+                typeof p.data === 'string'
+                  ? JSON.parse(p.data || '{}')
+                  : { ...(p.data as object) };
+            } catch {
+              data = {};
+            }
+            if (ro) data.readOnly = true;
+            else delete data.readOnly;
+            await connectionPool.query(`UPDATE odb.class_properties SET data = $1 WHERE id = $2`, [
+              JSON.stringify(data),
+              p.id,
+            ]);
           }
-          if (ro) data.readOnly = true;
-          else delete data.readOnly;
-          await connectionPool.query(`UPDATE odb.class_properties SET data = $1 WHERE id = $2`, [
-            JSON.stringify(data),
-            p.id,
-          ]);
         }
+        await connectionPool.query('COMMIT');
+      } catch (e) {
+        await connectionPool.query('ROLLBACK');
+        throw e;
       }
     }
 

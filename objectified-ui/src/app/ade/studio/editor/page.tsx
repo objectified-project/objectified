@@ -2064,13 +2064,11 @@ const StudioContent = () => {
       setLoadingMessage('Updating nodes and edges...');
 
       // Preserve group frame nodes across refresh; merge class nodes by position (#156).
-      let existingPositions = new Map<string, { x: number; y: number }>();
-      let savedGroupNodes: Node[] = [];
-      setNodes((currentNodes) => {
-        savedGroupNodes = currentNodes.filter((n) => n.type === 'groupNode');
-        existingPositions = new Map(currentNodes.map(n => [n.id, n.position]));
-        return currentNodes;
-      });
+      const currentNodes = getNodes();
+      const savedGroupNodes: Node[] = currentNodes.filter((n) => n.type === 'groupNode');
+      const existingPositions = new Map<string, { x: number; y: number }>(
+        currentNodes.map((n) => [n.id, n.position])
+      );
 
       const newNodes = await classesToNodes(classesWithProperties);
       // Restore positions from existing nodes
@@ -2090,7 +2088,7 @@ const StudioContent = () => {
       setIsLoadingCanvas(false);
       setLoadingMessage('');
     }
-  }, [selectedVersionId, projects, versions]);
+  }, [selectedVersionId, projects, versions, getNodes]);
 
   // Helper to update only a single class node without reloading the entire canvas
   const updateSingleClassNode = useCallback(async (classId: string) => {
@@ -2780,33 +2778,42 @@ const StudioContent = () => {
     async (groupId: string, nodeIds: string[], groupName: string, format: 'json' | 'yaml') => {
       void groupId;
       if (!selectedVersionId || nodeIds.length === 0) return;
-      const res = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
-      if (!res.success || !res.classes) {
-        await alertDialog({
-          message: res.error || 'Failed to load classes for export.',
-          variant: 'error',
+      try {
+        const res = await getClassesWithPropertiesAndTagsWithSession(selectedVersionId);
+        if (!res.success || !res.classes) {
+          await alertDialog({
+            message: res.error || 'Failed to load classes for export.',
+            variant: 'error',
+          });
+          return;
+        }
+        const expanded = expandClassesForGroupExport(nodeIds, res.classes);
+        if (expanded.length === 0) {
+          await alertDialog({ message: 'No classes in this group to export.', variant: 'warning' });
+          return;
+        }
+        const project = projects.find((p) => p.id === selectedProjectId);
+        const ver = versions.find((v) => v.id === selectedVersionId);
+        const specJson = await generateOpenApiSpec(expanded, {
+          projectName: project?.name ? `${project.name} — ${groupName}` : groupName,
+          version: ver?.version_id ?? '1.0.0',
+          description: `OpenAPI components for canvas group "${groupName}" (Objectified export).`,
         });
-        return;
-      }
-      const expanded = expandClassesForGroupExport(nodeIds, res.classes);
-      if (expanded.length === 0) {
-        await alertDialog({ message: 'No classes in this group to export.', variant: 'warning' });
-        return;
-      }
-      const project = projects.find((p) => p.id === selectedProjectId);
-      const ver = versions.find((v) => v.id === selectedVersionId);
-      const specJson = await generateOpenApiSpec(expanded, {
-        projectName: project?.name ? `${project.name} — ${groupName}` : groupName,
-        version: ver?.version_id ?? '1.0.0',
-        description: `OpenAPI components for canvas group "${groupName}" (Objectified export).`,
-      });
-      const safe = groupName.replace(/[^\w\-]+/g, '-').toLowerCase().slice(0, 80) || 'group';
-      if (format === 'yaml') {
-        const doc = JSON.parse(specJson);
-        const yaml = YAML.stringify(doc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
-        downloadTextFile(`${safe}-openapi.yaml`, yaml, 'text/yaml');
-      } else {
-        downloadTextFile(`${safe}-openapi.json`, specJson, 'application/json');
+        const safe = groupName.replace(/[^\w\-]+/g, '-').toLowerCase().slice(0, 80) || 'group';
+        if (format === 'yaml') {
+          const doc = JSON.parse(specJson);
+          const yaml = YAML.stringify(doc, { lineWidth: 0, aliasDuplicateObjects: false } as any);
+          downloadTextFile(`${safe}-openapi.yaml`, yaml, 'text/yaml');
+        } else {
+          downloadTextFile(`${safe}-openapi.json`, specJson, 'application/json');
+        }
+      } catch (err: unknown) {
+        console.error('Failed to export group schema:', err);
+        const message =
+          err instanceof Error
+            ? `Failed to export group schema: ${err.message}`
+            : 'Failed to export group schema due to an unexpected error.';
+        await alertDialog({ message, variant: 'error' });
       }
     },
     [selectedVersionId, selectedProjectId, projects, versions, alertDialog]
@@ -2846,7 +2853,7 @@ const StudioContent = () => {
       });
       if (!ok) throw new Error('cancelled');
 
-      const raw = await bulkApplyEditsToGroupClasses(nodeIds, {
+      const raw = await bulkApplyEditsToGroupClasses(selectedVersionId!, nodeIds, {
         descriptionPrefix:
           options.descriptionPrefix && options.descriptionPrefix.trim().length > 0
             ? options.descriptionPrefix
@@ -2870,7 +2877,7 @@ const StudioContent = () => {
       triggerSidebarRefresh();
       await alertDialog({ message: 'Bulk changes applied to all classes in this group.', variant: 'success' });
     },
-    [isReadOnly, confirmDialog, alertDialog, reloadClasses, triggerSidebarRefresh]
+    [isReadOnly, selectedVersionId, confirmDialog, alertDialog, reloadClasses, triggerSidebarRefresh]
   );
 
   const handleDuplicateGroup = useCallback(
