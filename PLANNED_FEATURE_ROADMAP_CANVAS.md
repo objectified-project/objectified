@@ -79,10 +79,10 @@
 - ✅ Moving a group moves all contained classes together
 - ✅ Nodes stay within group when partially overlapping - only ungroup when completely outside
 - ✅ Grouped nodes are locked to group bounds during dragging - cannot escape unless dragged completely outside
-- 📋 [TODO] Collapsible groups to reduce canvas clutter
-  - 📋 [TODO] Click to collapse: shows only group title and count
-  - 📋 [TODO] Expand/collapse all groups with keyboard shortcut
-  - 📋 [TODO] Remember collapsed state per user
+- ✅ Collapsible groups to reduce canvas clutter (#154)
+  - ✅ Click chevron to collapse: compact frame with title and class count
+  - ✅ Alt+Shift+[ / Alt+Shift+] — collapse all / expand all groups
+  - ✅ Collapsed state persisted per user per version (localStorage)
 - 📋 [TODO] Nested groups for hierarchical organization (max 3 levels)
 - ✅ Group-level operations:
   - ✅ Move entire group with one drag
@@ -97,7 +97,6 @@
 
 | Ticket | Feature                                                             |
 |--------|---------------------------------------------------------------------|
-| #154   | Collapsible groups to reduce canvas clutter                         |
 | #155   | Nested groups for hierarchical organization                         |
 | #156   | Group-level operations: move, delete, export, duplicate, bulk edit  |
 

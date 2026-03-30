@@ -139,6 +139,12 @@ import {
   groupNodeIdIsVisible,
 } from '@/app/utils/canvas-display-visibility';
 import {
+  collapsePrefsStorageKey,
+  getClassIdsInCollapsedGroups,
+  COLLAPSED_GROUP_FRAME_WIDTH,
+  COLLAPSED_GROUP_FRAME_HEIGHT,
+} from '@/app/utils/canvas-group-collapse';
+import {
   edgeBelongsOnCanvas,
   ghostEdgeClassName,
   ghostNodeClassName,
@@ -396,6 +402,70 @@ const StudioContent = () => {
       return next;
     });
   }, []);
+
+  // #154: Collapsed canvas groups — member classes hidden, compact frame; prefs per user + version
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!currentUserId || !selectedVersionId) {
+      setCollapsedGroupIds(new Set());
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(collapsePrefsStorageKey(currentUserId, selectedVersionId));
+      setCollapsedGroupIds(raw ? new Set(JSON.parse(raw) as string[]) : new Set());
+    } catch {
+      setCollapsedGroupIds(new Set());
+    }
+  }, [currentUserId, selectedVersionId]);
+
+  const persistCollapsedGroupIds = useCallback(
+    (next: Set<string>) => {
+      if (!currentUserId || !selectedVersionId) return;
+      try {
+        localStorage.setItem(
+          collapsePrefsStorageKey(currentUserId, selectedVersionId),
+          JSON.stringify([...next])
+        );
+      } catch {
+        /* ignore quota / private mode */
+      }
+    },
+    [currentUserId, selectedVersionId]
+  );
+
+  const toggleGroupCollapsed = useCallback(
+    (groupId: string) => {
+      setCollapsedGroupIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(groupId)) next.delete(groupId);
+        else next.add(groupId);
+        persistCollapsedGroupIds(next);
+        return next;
+      });
+    },
+    [persistCollapsedGroupIds]
+  );
+
+  const collapseAllCanvasGroups = useCallback(() => {
+    if (groups.length === 0) return;
+    const next = new Set(groups.map((g) => g.id));
+    setCollapsedGroupIds(next);
+    persistCollapsedGroupIds(next);
+  }, [groups, persistCollapsedGroupIds]);
+
+  const expandAllCanvasGroups = useCallback(() => {
+    const next = new Set<string>();
+    setCollapsedGroupIds(next);
+    persistCollapsedGroupIds(next);
+  }, [persistCollapsedGroupIds]);
+
+  const toggleGroupCollapsedRef = useRef<(id: string) => void>(() => {});
+  toggleGroupCollapsedRef.current = toggleGroupCollapsed;
+  const collapseAllCanvasGroupsRef = useRef<() => void>(() => {});
+  const expandAllCanvasGroupsRef = useRef<() => void>(() => {});
+  collapseAllCanvasGroupsRef.current = collapseAllCanvasGroups;
+  expandAllCanvasGroupsRef.current = expandAllCanvasGroups;
 
   /** Avoid clobbering localStorage on hydrate: save effect runs after load in the same tick. */
   const skipNextHideCriteriaPersistRef = useRef(false);
@@ -1355,6 +1425,19 @@ const StudioContent = () => {
           closeCanvasSearch();
         }
       }
+
+      // #154: Alt+Shift+[ collapse all groups; Alt+Shift+] expand all
+      if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && (e.key === '[' || e.key === ']')) {
+        const el = e.target as HTMLElement | null;
+        if (el?.closest('input, textarea, [contenteditable="true"]')) return;
+        if (groups.length === 0) return;
+        e.preventDefault();
+        if (e.key === '[') {
+          collapseAllCanvasGroupsRef.current();
+        } else {
+          expandAllCanvasGroupsRef.current();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -1368,6 +1451,7 @@ const StudioContent = () => {
     exitFocusMode,
     isolateSelectionEnabled,
     canvasPresentationActive,
+    groups.length,
   ]);
 
   // #482: Turn off isolate when the class selection is cleared
@@ -1376,6 +1460,12 @@ const StudioContent = () => {
       setIsolateSelectionEnabled(false);
     }
   }, [isolateSelectionEnabled, selectedNodeIds.length]);
+
+  // #154: Class node IDs hidden because they belong to a collapsed group — shared between displayNodes and displayEdges
+  const classIdsHiddenByCollapse = useMemo(
+    () => getClassIdsInCollapsedGroups(groups, collapsedGroupIds),
+    [groups, collapsedGroupIds],
+  );
 
   // Compute nodes with search and/or focus mode styling applied (#471: use preview nodes when in layout preview)
   const displayNodes = useMemo(() => {
@@ -1419,6 +1509,14 @@ const StudioContent = () => {
     if (isolateSelectionEnabled && selectedNodeIds.length > 0) {
       const visibleIds = getVisibleNodeIdsForIsolateSelection(groups, new Set(selectedNodeIds));
       result = result.filter((node) => visibleIds.has(node.id));
+    }
+
+    // #154: Hide member class nodes for collapsed groups (compact frame applied below)
+    if (classIdsHiddenByCollapse.size > 0) {
+      result = result.filter((node) => {
+        if (node.type === 'groupNode') return true;
+        return !classIdsHiddenByCollapse.has(node.id);
+      });
     }
 
     // Apply search classes when search is active
@@ -1567,8 +1665,43 @@ const StudioContent = () => {
       });
     }
 
+    // #154: Wire collapse toggle and collapsed state into all group nodes; compact frame for collapsed ones
+    result = result.map((node) => {
+      if (node.type !== 'groupNode') return node;
+
+      const isCollapsed = collapsedGroupIds.has(node.id);
+      const z = node.style?.zIndex ?? -1;
+
+      return {
+        ...node,
+        ...(isCollapsed
+          ? {
+              width: COLLAPSED_GROUP_FRAME_WIDTH,
+              height: COLLAPSED_GROUP_FRAME_HEIGHT,
+            }
+          : {}),
+        style: {
+          ...node.style,
+          ...(isCollapsed
+            ? {
+                width: COLLAPSED_GROUP_FRAME_WIDTH,
+                height: COLLAPSED_GROUP_FRAME_HEIGHT,
+              }
+            : {}),
+          zIndex: z,
+        },
+        data: {
+          ...(node.data as object),
+          collapsed: isCollapsed,
+          onToggleCollapse: () => {
+            toggleGroupCollapsedRef.current(node.id);
+          },
+        },
+      };
+    });
+
     return result;
-  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [nodes, layoutPreviewNodes, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, collapsedGroupIds, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, nodesWithDependencyIds, dependencyDepthMap, circularNodeIdsSet, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // Compute edges with search and/or focus mode styling applied
   const displayEdges = useMemo(() => {
@@ -1589,6 +1722,13 @@ const StudioContent = () => {
       const visibleIds = getVisibleNodeIdsForIsolateSelection(groups, new Set(selectedNodeIds));
       result = result.filter(
         (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target)
+      );
+    }
+
+    if (classIdsHiddenByCollapse.size > 0) {
+      result = result.filter(
+        (edge) =>
+          !classIdsHiddenByCollapse.has(edge.source) && !classIdsHiddenByCollapse.has(edge.target)
       );
     }
 
@@ -1692,7 +1832,7 @@ const StudioContent = () => {
     }
 
     return result;
-  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
+  }, [edges, visibleClassIdsAfterHideCriteria, allBaseClassNodeIds, nodeGhostsModeEnabled, isolateSelectionEnabled, selectedNodeIds, groups, classIdsHiddenByCollapse, canvasSearchQuery, canvasSearchOpen, matchingNodeIds, focusModeEnabled, focusModeFocusedSet, showDependencyOverlay, dependencyView, dependencyFocalNodeId, dependencyUpstreamIds, dependencyDownstreamIds, dependencyPathChain, dependencyEdgeIds, circularEdgeIds, impactAnalysisMode, impactAnalysisSourceId, affectedClassIds]);
 
   // #349: Apply hover highlight to the hovered edge (thicker stroke, higher zIndex)
   const edgesWithHover = useMemo(() => {
