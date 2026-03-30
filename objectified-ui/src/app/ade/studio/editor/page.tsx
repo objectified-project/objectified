@@ -170,6 +170,8 @@ import { useExportFunctions } from './components';
 import type { Project, Version, ViewMode } from './components/types';
 
 // Dynamically import Monaco Editor with SSR disabled
+const PRESENTATION_SAVE_DEBOUNCE_MS = 500;
+
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
@@ -1145,13 +1147,13 @@ const StudioContent = () => {
 
   useEffect(() => {
     if (!selectedVersionId) return;
-    savePresentationBookmarks(selectedVersionId, presentationBookmarks);
+    const timeoutId = window.setTimeout(() => {
+      savePresentationBookmarks(selectedVersionId, presentationBookmarks);
+    }, PRESENTATION_SAVE_DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [selectedVersionId, presentationBookmarks]);
-
-  useEffect(() => {
-    setCanvasPresentationMode(canvasPresentationActive);
-    return () => setCanvasPresentationMode(false);
-  }, [canvasPresentationActive, setCanvasPresentationMode]);
 
   useEffect(() => {
     if (!canvasPresentationActive || presentationTimerStartMs === null) return;
@@ -1170,6 +1172,7 @@ const StudioContent = () => {
 
   const exitPresentation = useCallback(async () => {
     setCanvasPresentationActive(false);
+    setCanvasPresentationMode(false);
     setPresentationHintVisible(false);
     try {
       if (document.fullscreenElement && presentationShellRef.current && document.fullscreenElement === presentationShellRef.current) {
@@ -1178,7 +1181,7 @@ const StudioContent = () => {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [setCanvasPresentationMode]);
 
   const startPresentation = useCallback(async () => {
     if (presentationBookmarks.length === 0) {
@@ -1193,6 +1196,7 @@ const StudioContent = () => {
     setPresentationTimerStartMs(Date.now());
     setPresentationTimerTick(0);
     setCanvasPresentationActive(true);
+    setCanvasPresentationMode(true);
     setPresentationHintVisible(true);
     window.setTimeout(() => setPresentationHintVisible(false), 10000);
     const el = presentationShellRef.current;
@@ -1203,7 +1207,7 @@ const StudioContent = () => {
         /* user denied or not allowed */
       }
     }
-  }, [presentationBookmarks, applyPresentationSlide, alertDialog]);
+  }, [presentationBookmarks, applyPresentationSlide, alertDialog, setCanvasPresentationMode]);
 
   const addPresentationSlideFromView = useCallback(() => {
     const vp = getViewport();

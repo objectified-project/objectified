@@ -22,6 +22,9 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
+
 function isViewport(v: unknown): v is CanvasPresentationViewport {
   if (!isPlainObject(v)) return false;
   return (
@@ -30,8 +33,15 @@ function isViewport(v: unknown): v is CanvasPresentationViewport {
     typeof v.zoom === 'number' &&
     Number.isFinite(v.x) &&
     Number.isFinite(v.y) &&
-    Number.isFinite(v.zoom)
+    Number.isFinite(v.zoom) &&
+    v.zoom >= MIN_ZOOM &&
+    v.zoom <= MAX_ZOOM
   );
+}
+
+/** Clamp a raw viewport's zoom into the ReactFlow allowed range [0.1, 2]. */
+export function clampViewportZoom(vp: CanvasPresentationViewport): CanvasPresentationViewport {
+  return { ...vp, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, vp.zoom)) };
 }
 
 export function isPresentationBookmark(v: unknown): v is CanvasPresentationBookmark {
