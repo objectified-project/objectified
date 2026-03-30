@@ -31,10 +31,6 @@
 - 📋 [TODO] Add ability to save layouts with a custom name
 - ✅ Add simple orthagonal edge routing after auto-layout
 
-| Ticket | Feature                                        |
-|--------|------------------------------------------------|
-| #316   | Export/import canvas layouts                   |
-
 #### Layout Snapshots ✅ BASIC (named layouts)
 - ✅ PNG snapshot stored with each named layout save; thumbnail preview when picking a layout name (#314)
 - 📋 [TODO] Take quick snapshots of current layout

@@ -9,6 +9,7 @@ Improvements:
 - Canvas: schema timeline panel shows class count, relationships, and complexity across project versions (#323)
 - Canvas: named layout saves store a PNG snapshot for thumbnail preview in the layout menu
 - Canvas: export and import canvas layouts as versioned JSON (share across versions and projects)
+- Canvas: layout import and named layout load restore edge handle routing when saved edge IDs match the canvas (#316)
 
 Bug Fixes:
 - Import now handles paths properly
