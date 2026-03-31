@@ -1439,7 +1439,7 @@ const ClassEditDialog = ({ open, onClose, editingClassData, nodes, isReadOnly = 
         showCloseButton={true}
         aria-describedby={undefined}
       >
-        <DialogHeader className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <DialogHeader className="pl-6 pr-10 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
             <div className="flex items-center gap-3 flex-wrap min-w-0">
               {showAIChatMode ? (
