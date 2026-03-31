@@ -77,14 +77,17 @@ export function groupNodeIdIsVisible(
   _visited.add(group.id);
 
   if (group.nodeIds.some((id) => visibleClassIds.has(id))) return true;
+  let hasChildGroups = false;
   if (allGroups) {
     for (const cg of allGroups) {
-      if (cg.parentId === group.id && groupNodeIdIsVisible(cg, visibleClassIds, allGroups, _visited)) {
-        return true;
+      if (cg.parentId === group.id) {
+        hasChildGroups = true;
+        if (groupNodeIdIsVisible(cg, visibleClassIds, allGroups, _visited)) {
+          return true;
+        }
       }
     }
   }
-  const hasChildGroups = allGroups?.some((cg) => cg.parentId === group.id) ?? false;
   return group.nodeIds.length === 0 && !hasChildGroups;
 }
 
