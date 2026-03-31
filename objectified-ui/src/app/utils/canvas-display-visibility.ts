@@ -62,7 +62,11 @@ export function computeClassIdsPassingHideCriteria(
   return visible;
 }
 
-/** Group frame is visible if any member class passes criteria or a visible nested child group does (#155). Safe against cycles via a visited set. */
+/**
+ * Group frame is visible if any member class passes criteria or a visible nested child group does (#155).
+ * Empty leaf groups (no members, no child group frames) stay visible so a newly dropped group renders (#848).
+ * Safe against cycles via a visited set.
+ */
 export function groupNodeIdIsVisible(
   group: CanvasGroupForVisibility,
   visibleClassIds: Set<string>,
@@ -80,7 +84,8 @@ export function groupNodeIdIsVisible(
       }
     }
   }
-  return false;
+  const hasChildGroups = allGroups?.some((cg) => cg.parentId === group.id) ?? false;
+  return group.nodeIds.length === 0 && !hasChildGroups;
 }
 
 /**
