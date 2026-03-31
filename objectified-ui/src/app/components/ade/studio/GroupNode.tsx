@@ -420,6 +420,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 <Popover.Trigger asChild>
                   <button
                     type="button"
+                    aria-label="Style settings"
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
@@ -540,6 +541,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 <Popover.Trigger asChild>
                   <button
                     type="button"
+                    aria-label="Change color"
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
@@ -583,6 +585,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 onClick={handleStartEdit}
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Rename group"
                 className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
                 title="Rename group"
               >
@@ -595,6 +598,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   <Popover.Trigger asChild>
                     <button
                       type="button"
+                      aria-label="Export group as OpenAPI schema file"
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -642,6 +646,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   onClick={handleDuplicateGroupClick}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Duplicate group (all classes)"
                   className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
                   title="Duplicate group (all classes)"
                 >
@@ -655,6 +660,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   onClick={handleOpenBulk}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Bulk edit all classes in group"
                   className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
                   title="Bulk edit all classes in group"
                 >
@@ -668,6 +674,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   onClick={handleDeleteAllClassesInGroup}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Delete all classes in group"
                   className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-amber-400/40 text-amber-200' : 'hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}
                   title="Delete all classes in group"
                 >
@@ -679,6 +686,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 onClick={handleDelete}
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Delete group"
                 className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-red-400/40 text-red-200' : 'hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'}`}
                 title="Delete group"
               >
