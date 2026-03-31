@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
+import { useCallback, useState, useEffect, useRef, useMemo, type ChangeEvent, type SetStateAction } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -305,6 +305,7 @@ const StudioContent = () => {
     updateGroup,
     deleteGroup: deleteGroupFromContext,
     setDeleteAllClassesInGroupFn,
+    setDeleteGroupFn,
     setSearchHistoryCount,
     setClearSearchHistoryFn,
     setCanvasPresentationMode,
@@ -4006,6 +4007,16 @@ const StudioContent = () => {
     );
     return () => setDeleteAllClassesInGroupFn(null);
   }, [setDeleteAllClassesInGroupFn]);
+
+  // Register group delete for sidebar (persists layout, removes nested subtree + group nodes)
+  useEffect(() => {
+    const register: SetStateAction<((groupId: string) => Promise<void>) | null> = () =>
+      async (groupId: string) => {
+        await handleGroupDeleteRef.current?.(groupId);
+      };
+    setDeleteGroupFn(register);
+    return () => setDeleteGroupFn(null);
+  }, [setDeleteGroupFn]);
 
   // Create a new group at a specific position (for drag-and-drop)
   const handleCreateGroupAtPosition = useCallback(async (dropPosition: { x: number; y: number }) => {

@@ -49,7 +49,7 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
     createGroupFn,
     clickToFocusEnabled,
     groups,
-    deleteGroup,
+    deleteGroupFn,
     updateGroup,
     canvasPresentationMode,
   } = useStudio();
@@ -345,19 +345,15 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
         return;
       }
 
-      const group = groups.find(g => g.id === groupId);
-      const confirmed = await confirmDialog({
-        title: 'Delete Group',
-        message: `Are you sure you want to delete the group "${group?.name || 'this group'}"? The classes inside will not be deleted.`,
+      if (deleteGroupFn) {
+        await deleteGroupFn(groupId);
+        return;
+      }
+
+      await alertDialog({
+        message: 'Canvas editor is still loading. Please try again in a moment.',
         variant: 'warning',
-        confirmLabel: 'Delete Group',
-        cancelLabel: 'Cancel',
       });
-
-      if (!confirmed) return;
-
-      deleteGroup(groupId);
-      triggerCanvasRefresh();
     },
     onGroupDeleteAllClasses: async (groupId) => {
       if (isReadOnly) return;
