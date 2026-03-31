@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useMemo } from 'react';
 import { NodeProps, NodeResizer } from '@xyflow/react';
 import {
   Folder, Edit2, Trash2, X, Check, Palette, Settings,
@@ -147,6 +147,27 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [isFrameHovered, setIsFrameHovered] = useState(false);
+
+  const showFloatingToolbar = useMemo(
+    () =>
+      !groupData.isReadOnly &&
+      !isEditing &&
+      (selected ||
+        isFrameHovered ||
+        settingsOpen ||
+        colorPickerOpen ||
+        exportPopoverOpen),
+    [
+      groupData.isReadOnly,
+      isEditing,
+      selected,
+      isFrameHovered,
+      settingsOpen,
+      colorPickerOpen,
+      exportPopoverOpen,
+    ]
+  );
 
   // Get color configuration
   const colorConfig = GROUP_COLORS.find(c => c.name === groupData.color) || GROUP_COLORS[0];
@@ -279,8 +300,9 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
       />
 
       <div
+        data-testid="group-node-surface"
         className={`
-          w-full h-full rounded-2xl border-2 transition-all duration-200
+          relative w-full h-full rounded-2xl border-2 transition-all duration-200
           ${borderStyleClass} ${colorConfig.border} ${shadowClass}
           ${selected ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-900' : ''}
           ${groupData.isHighlighted ? 'ring-4 ring-green-500 ring-offset-4 dark:ring-offset-gray-900 scale-[1.02] border-green-500 dark:border-green-400' : ''}
@@ -290,6 +312,8 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           minHeight: isCollapsed ? COLLAPSED_GROUP_FRAME_HEIGHT : 150,
           backgroundColor: `${colorConfig.hex}${Math.round(styleOptions.opacity * 25.5).toString(16).padStart(2, '0')}`
         }}
+        onMouseEnter={() => setIsFrameHovered(true)}
+        onMouseLeave={() => setIsFrameHovered(false)}
       >
         {/* Group Header */}
         <div
@@ -373,15 +397,30 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
               <span className="text-xs opacity-70">({nodeCount})</span>
             </>
           )}
+        </div>
 
-          {/* Actions (visible when selected and not editing) */}
-          {selected && !isEditing && !groupData.isReadOnly && (
-            <div className={`flex items-center gap-1 ml-2 pl-2 border-l ${useLightText ? 'border-white/30' : 'border-current/20'}`}>
+        {/* Floating toolbar: outside the title pill, top -24px / right -2px (#859) */}
+        {showFloatingToolbar && (
+          <div
+            role="toolbar"
+            aria-label="Group edit actions"
+            className={`
+              absolute -top-6 right-[-2px] z-20 flex max-w-[min(100%,calc(100vw-2rem))] flex-wrap items-center gap-1 rounded-lg border px-1.5 py-1
+              ${shadowClass || 'shadow-md'}
+              ${colorConfig.border} ${textColorClass}
+            `}
+            style={{
+              backgroundColor: `${colorConfig.hex}${Math.round(Math.min(styleOptions.opacity + 0.3, 1) * 255).toString(16).padStart(2, '0')}`
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
               {/* Settings popover */}
               <Popover.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <Popover.Trigger asChild>
                   <button
                     type="button"
+                    aria-label="Style settings"
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
@@ -502,6 +541,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 <Popover.Trigger asChild>
                   <button
                     type="button"
+                    aria-label="Change color"
                     onClick={(e) => {
                       e.stopPropagation();
                       e.preventDefault();
@@ -545,6 +585,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 onClick={handleStartEdit}
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Rename group"
                 className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
                 title="Rename group"
               >
@@ -557,6 +598,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   <Popover.Trigger asChild>
                     <button
                       type="button"
+                      aria-label="Export group as OpenAPI schema file"
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -604,6 +646,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   onClick={handleDuplicateGroupClick}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Duplicate group (all classes)"
                   className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
                   title="Duplicate group (all classes)"
                 >
@@ -617,6 +660,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   onClick={handleOpenBulk}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Bulk edit all classes in group"
                   className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-white/30' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
                   title="Bulk edit all classes in group"
                 >
@@ -630,6 +674,7 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                   onClick={handleDeleteAllClassesInGroup}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
+                  aria-label="Delete all classes in group"
                   className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-amber-400/40 text-amber-200' : 'hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400'}`}
                   title="Delete all classes in group"
                 >
@@ -641,14 +686,14 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                 onClick={handleDelete}
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
+                aria-label="Delete group"
                 className={`p-1 rounded transition-colors ${useLightText ? 'hover:bg-red-400/40 text-red-200' : 'hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400'}`}
                 title="Delete group"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Description (if any) */}
         {groupData.description && !isCollapsed && (
