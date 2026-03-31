@@ -1202,7 +1202,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
       {!typedData.isReadOnly && (
         <div
           className={cn(
-            'absolute -right-1.5 -top-1.5 z-[35]',
+            'absolute -right-[2px] -top-[24px] z-[35]',
             'flex items-center gap-0.5',
             'rounded-lg border border-slate-200/90',
             'bg-white/95 py-0.5 pl-0.5 pr-0.5',
