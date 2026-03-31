@@ -178,17 +178,17 @@ export class StudioPage {
     return this.page.getByRole('button', { name: /^tools$/i });
   }
 
-  // Expand/Collapse — inside the canvas tools dialog (#842)
+  // Expand/Collapse — inside the canvas tools mini drawer (#842)
   get expandAllButton() {
-    return this.page.getByRole('dialog', { name: /canvas tools/i }).getByRole('button', { name: /^expand$/i });
+    return this.page.getByRole('button', { name: /^expand$/i });
   }
 
   get collapseAllButton() {
-    return this.page.getByRole('dialog', { name: /canvas tools/i }).getByRole('button', { name: /^collapse$/i });
+    return this.page.getByRole('button', { name: /^collapse$/i });
   }
 
   get tagsButton() {
-    return this.page.getByRole('dialog', { name: /canvas tools/i }).getByRole('button', { name: /^tags$/i });
+    return this.page.getByRole('button', { name: /^tags$/i });
   }
 
   // ReactFlow canvas
