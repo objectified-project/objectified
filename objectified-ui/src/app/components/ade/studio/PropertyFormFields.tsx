@@ -5,7 +5,7 @@
 import React, { useMemo } from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
-import { Plus, Trash2, Sparkles, ArrowUpDown, GripVertical, ExternalLink, Info, SlidersHorizontal, Settings, Code } from 'lucide-react';
+import { Plus, Trash2, Sparkles, ArrowUpDown, GripVertical, ExternalLink, Info, SlidersHorizontal, Settings, Code, FileText } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -29,6 +29,7 @@ import { PrimitiveSelector } from './PrimitiveSelector';
 import { Input } from '../../ui/Input';
 import { Label } from '../../ui/Label';
 import { Badge } from '../../ui/Badge';
+import { Textarea } from '../../ui/Textarea';
 import { Checkbox as ShadcnCheckbox } from '../../ui/Checkbox';
 
 // Radix/native stubs replacing MUI (no MUI dependency)
@@ -3703,59 +3704,31 @@ value={data.format || ''}
           )}
         </div>
 
-        {/* Schema Metadata (JSON Schema 2020-12) */}
-        <Box sx={{
-          mt: 3,
-          p: 2.5,
-          bgcolor: isDark ? '#0f172a' : 'white',
-          borderRadius: 2.5,
-          border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        }}>
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            mb: 2,
-            pb: 1.5,
-            borderBottom: '1px solid rgba(99, 102, 241, 0.15)',
-          }}>
-            <Box sx={{
-              p: 0.75,
-              borderRadius: 1.5,
-              bgcolor: 'rgba(99, 102, 241, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <InfoOutlinedIcon sx={{ color: '#6366f1', fontSize: 16 }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
-                Schema Comment
-              </Typography>
-              <Typography variant="caption" sx={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-                Internal notes for schema authors
-              </Typography>
-            </Box>
-          </Box>
-
-          <TextField
-            label="$comment"
-            size={size}
-            fullWidth
-            multiline
-            rows={2}
-            value={data.$comment || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('$comment', e.target.value)}
-            placeholder="Internal notes about this property (not for end users)"
-            helperText="JSON Schema $comment - visible only to schema authors, not API consumers"
-            sx={{
-              '& .MuiOutlinedInput-root': { borderRadius: 2 },
-              '& .MuiFormHelperText-root': { fontSize: '0.7rem' },
-            }}
-          />
-        </Box>
+        {/* Schema Metadata ($comment) — match ClassEditDialog Schema Metadata card */}
+        <div className="mt-3 w-full min-w-0 p-4 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText className="h-4 w-4 shrink-0 text-indigo-500" />
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Schema Metadata</h4>
+            </div>
+            <Badge variant="secondary" className="text-xs shrink-0">JSON Schema 2020-12</Badge>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Advanced schema identification and documentation
+          </p>
+          <div className="space-y-1 min-w-0">
+            <Label htmlFor="prop-schema-comment">$comment</Label>
+            <Textarea
+              id="prop-schema-comment"
+              rows={2}
+              value={data.$comment || ''}
+              onChange={(e) => onChange('$comment', e.target.value)}
+              placeholder="Internal notes for schema authors..."
+              className="resize-y min-h-[72px]"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">Comments for schema authors (not shown to API consumers)</p>
+          </div>
+        </div>
 
         {/* Extensions */}
         <Box sx={{

@@ -1533,6 +1533,7 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                       showMetadata={false}
                       showTitle={false}
                       showHint={false}
+                      showPrimitiveSelector={false}
                       size="small"
                       nestedProperties={
                         baseType === 'object'
