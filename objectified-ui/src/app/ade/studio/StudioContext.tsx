@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Dispatch, SetStateAction } from 'react';
 
 // Group style options
 export interface GroupStyleOptions {
@@ -150,6 +150,9 @@ interface StudioContextType {
   /** Called to delete all classes contained in a group (registered by editor). */
   deleteAllClassesInGroupFn: ((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null;
   setDeleteAllClassesInGroupFn: (fn: ((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null) => void;
+  /** Full group delete from sidebar: nested subtree, canvas nodes, layout persistence (registered by editor). */
+  deleteGroupFn: ((groupId: string) => Promise<void>) | null;
+  setDeleteGroupFn: Dispatch<SetStateAction<((groupId: string) => Promise<void>) | null>>;
   addNodeToGroup: (groupId: string, nodeId: string) => void;
   removeNodeFromGroup: (groupId: string, nodeId: string) => void;
   // Search history
@@ -448,6 +451,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   };
 
   const [deleteAllClassesInGroupFn, setDeleteAllClassesInGroupFn] = useState<((groupId: string, classIds?: string[], groupName?: string) => Promise<void>) | null>(null);
+  const [deleteGroupFn, setDeleteGroupFn] = useState<((groupId: string) => Promise<void>) | null>(null);
 
   const addNodeToGroup = (groupId: string, nodeId: string) => {
     setGroups(prev => prev.map(g => {
@@ -524,6 +528,8 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       deleteGroup,
       deleteAllClassesInGroupFn,
       setDeleteAllClassesInGroupFn,
+      deleteGroupFn,
+      setDeleteGroupFn,
       addNodeToGroup,
       removeNodeFromGroup,
       searchHistoryCount,

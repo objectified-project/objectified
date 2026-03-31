@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Search, Plus, Pencil, Trash2, Trash2 as DeleteSweep, Upload, Library, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
@@ -708,7 +708,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                                 title="Delete all classes in group"
                                 className="p-1.5 rounded hover:bg-amber-500/10 hover:text-amber-500"
                               >
-                                <DeleteSweep className="w-4 h-4" />
+                                <FileX className="w-4 h-4" />
                               </button>
                             )}
                             <button
