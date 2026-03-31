@@ -1208,7 +1208,7 @@ function ClassNode({ id, data, selected }: NodeProps) {
             'bg-white/95 py-0.5 pl-0.5 pr-0.5',
             'shadow-lg backdrop-blur-sm',
             'dark:border-slate-600/90 dark:bg-slate-900/95',
-            'transition-opacity pointer-events-none opacity-0',
+            'pointer-events-none opacity-0',
             'group-hover:pointer-events-auto group-hover:opacity-100',
             'focus-within:pointer-events-auto focus-within:opacity-100',
             (colorPickerOpen || iconPickerOpen) && '!opacity-100 !pointer-events-auto',
