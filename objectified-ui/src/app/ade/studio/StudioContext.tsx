@@ -244,11 +244,11 @@ export function StudioProvider({ children }: { children: ReactNode }) {
           return JSON.parse(saved);
         } catch (e) {
           console.error('Failed to parse autoSaveLayoutEnabled from localStorage:', e);
-          return true;
+          return false;
         }
       }
     }
-    return true;
+    return false;
   });
   const [autoSaveLayoutIntervalSeconds, setAutoSaveLayoutIntervalSecondsRaw] = useState<number>(() => {
     if (typeof window !== 'undefined') {

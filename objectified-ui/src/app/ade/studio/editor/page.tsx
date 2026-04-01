@@ -187,6 +187,7 @@ import {
   type CanvasPresentationBookmark,
 } from './lib/canvas-presentation-bookmarks';
 import { CanvasPresentationPanel, PresentationExitHint } from './components/CanvasPresentationPanel';
+import { Switch } from '@/app/components/ui/Switch';
 
 // Import extracted components
 import { useExportFunctions } from './components';
@@ -300,6 +301,8 @@ const StudioContent = () => {
     setSmartGuidesEnabled,
     autoSaveLayoutEnabled,
     autoSaveLayoutIntervalSeconds,
+    setAutoSaveLayoutEnabled,
+    setAutoSaveLayoutIntervalSeconds,
     canvasBackground,
     groups,
     setGroups,
@@ -4633,6 +4636,7 @@ const StudioContent = () => {
   const autoSaveDefaultLayout = useCallback(async () => {
     if (
       !autoSaveLayoutEnabled ||
+      !hasExistingLayout ||
       !autoSavePendingRef.current ||
       isReadOnly ||
       !selectedVersionId ||
@@ -4668,6 +4672,7 @@ const StudioContent = () => {
     }
   }, [
     autoSaveLayoutEnabled,
+    hasExistingLayout,
     isReadOnly,
     selectedVersionId,
     currentUserId,
@@ -4675,14 +4680,14 @@ const StudioContent = () => {
   ]);
 
   useEffect(() => {
-    if (!autoSaveLayoutEnabled || autoSaveLayoutIntervalSeconds < 10) return;
+    if (!autoSaveLayoutEnabled || !hasExistingLayout || autoSaveLayoutIntervalSeconds < 10) return;
 
     const intervalId = window.setInterval(() => {
       void autoSaveDefaultLayout();
     }, autoSaveLayoutIntervalSeconds * 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [autoSaveLayoutEnabled, autoSaveLayoutIntervalSeconds, autoSaveDefaultLayout]);
+  }, [autoSaveLayoutEnabled, hasExistingLayout, autoSaveLayoutIntervalSeconds, autoSaveDefaultLayout]);
 
   /**
    * Shared path for applying saved layout data (DB or JSON import) after groups are in the database.
@@ -8357,7 +8362,7 @@ const StudioContent = () => {
 
                 {/* Dropdown Menu */}
                 {layoutDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[1002]">
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-[1002]">
                     <div className="py-2">
                       {/* Save/Load Layout Buttons */}
                       <div className="px-4 py-3">
@@ -8439,6 +8444,54 @@ const StudioContent = () => {
                             <Upload className="w-4 h-4" />
                             <span>Load</span>
                           </button>
+                        </div>
+                        <div
+                          className={`mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 ${
+                            !hasExistingLayout ? 'opacity-60' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Auto-save default layout
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {hasExistingLayout
+                                  ? 'Periodically saves the working canvas to your default slot. Interval applies while enabled.'
+                                  : 'Save a layout for this name first—then you can enable auto-save and choose an interval.'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs tabular-nums px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-medium">
+                                {autoSaveLayoutIntervalSeconds}s
+                              </span>
+                              <Switch
+                                checked={autoSaveLayoutEnabled}
+                                disabled={!hasExistingLayout || isReadOnly}
+                                onCheckedChange={setAutoSaveLayoutEnabled}
+                                aria-label="Toggle layout auto-save"
+                              />
+                            </div>
+                          </div>
+                          <div className="p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">Interval</span>
+                              <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                                10s–300s
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={10}
+                              max={300}
+                              step={5}
+                              value={autoSaveLayoutIntervalSeconds}
+                              disabled={!hasExistingLayout || isReadOnly || !autoSaveLayoutEnabled}
+                              onChange={(e) => setAutoSaveLayoutIntervalSeconds(Number(e.target.value))}
+                              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              aria-label={`Auto-save interval: ${autoSaveLayoutIntervalSeconds} seconds`}
+                            />
+                          </div>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Type a custom name or pick a suggestion. Save and load multiple layouts per version.

@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 Improvements:
+- Canvas: layout auto-save interval and on/off switch moved into the layout menu; auto-save stays off by default and is only available after you have saved a layout for the current name (#831)
 - Canvas: Expand, Collapse, Search, View Mode, and Tags live in a left slide-out drawer opened from the **Tools** control in the upper-left (#842)
 - Canvas: group edit controls (style, color, rename, export, duplicate, bulk, delete) sit in a compact floating card above the frame (`-top-6`, `right: -2px`) so the title row stays readable on hover or when selected (#859)
 - Studio: the amber “differs from defaults” hint appears in the dialog header next to the title for class and property editors so it stays visible (#856)
