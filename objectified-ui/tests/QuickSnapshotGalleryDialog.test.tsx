@@ -9,6 +9,9 @@ import { QuickSnapshotGalleryDialog } from '../src/app/ade/studio/editor/compone
 import type { QuickLayoutSnapshot } from '../src/app/ade/studio/editor/lib/quick-layout-snapshots';
 import { QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION } from '../src/app/ade/studio/editor/lib/quick-layout-snapshots';
 
+const noopAlert = async () => {};
+const noopImport = async () => ({ success: true as const });
+
 function makeSnapshot(
   id: string,
   createdAt: string,
@@ -41,6 +44,9 @@ describe('QuickSnapshotGalleryDialog', () => {
         snapshots={[]}
         onRestore={() => {}}
         restoreDisabled={false}
+        versionId="version-1"
+        onImportSharedJson={noopImport}
+        alertDialog={noopAlert}
       />
     );
     expect(screen.getByText(/No quick snapshots yet/i)).toBeInTheDocument();
@@ -59,6 +65,9 @@ describe('QuickSnapshotGalleryDialog', () => {
         snapshots={[b, a]}
         onRestore={() => {}}
         restoreDisabled={false}
+        versionId="version-1"
+        onImportSharedJson={noopImport}
+        alertDialog={noopAlert}
       />
     );
 
@@ -82,6 +91,9 @@ describe('QuickSnapshotGalleryDialog', () => {
         snapshots={[withThumb, noThumb]}
         onRestore={onRestore}
         restoreDisabled={false}
+        versionId="version-1"
+        onImportSharedJson={noopImport}
+        alertDialog={noopAlert}
       />
     );
 
@@ -102,6 +114,9 @@ describe('QuickSnapshotGalleryDialog', () => {
         onRestore={() => {}}
         restoreDisabled
         restoreDisabledReason="Read-only"
+        versionId="version-1"
+        onImportSharedJson={noopImport}
+        alertDialog={noopAlert}
       />
     );
     expect(screen.getByRole('button', { name: /Restore quick snapshot/i })).toBeDisabled();

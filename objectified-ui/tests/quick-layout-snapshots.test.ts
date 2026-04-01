@@ -1,6 +1,9 @@
 import {
   appendQuickLayoutSnapshot,
+  buildQuickLayoutShareEnvelope,
+  cloneQuickLayoutSnapshotForImport,
   loadQuickLayoutSnapshots,
+  parseQuickLayoutShareText,
   quickLayoutSnapshotsStorageKey,
   isQuickLayoutSnapshot,
   DEFAULT_MAX_QUICK_LAYOUT_SNAPSHOTS,
@@ -9,6 +12,8 @@ import {
   quickSnapshotListLabel,
   quickSnapshotMatchesSearch,
   quickSnapshotOptionLabel,
+  stringifyQuickLayoutShareEnvelope,
+  QUICK_LAYOUT_SHARE_KIND,
   type QuickLayoutSnapshot,
 } from '@/app/ade/studio/editor/lib/quick-layout-snapshots';
 
@@ -237,5 +242,36 @@ describe('quick-layout-snapshots', () => {
     expect(quickSnapshotOptionLabel(snap)).toBe(`Beta · ${cap}`);
     delete snap.summary;
     expect(quickSnapshotOptionLabel(snap)).toBe(cap);
+  });
+
+  it('buildQuickLayoutShareEnvelope includes kind and version', () => {
+    const snap = makeSnapshot('snap-1', '2026-01-01T00:00:00.000Z');
+    const env = buildQuickLayoutShareEnvelope('ver-a', snap);
+    expect(env.kind).toBe(QUICK_LAYOUT_SHARE_KIND);
+    expect(env.versionId).toBe('ver-a');
+    expect(env.snapshot.id).toBe('snap-1');
+  });
+
+  it('stringifyQuickLayoutShareEnvelope round-trips with parseQuickLayoutShareText', () => {
+    const snap = makeSnapshot('snap-1', '2026-01-01T00:00:00.000Z');
+    const text = stringifyQuickLayoutShareEnvelope('ver-a', snap);
+    const parsed = parseQuickLayoutShareText(text);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error('expected ok');
+    expect(parsed.versionId).toBe('ver-a');
+    expect(parsed.snapshot.id).toBe('snap-1');
+  });
+
+  it('parseQuickLayoutShareText rejects empty or wrong kind', () => {
+    expect(parseQuickLayoutShareText('').ok).toBe(false);
+    expect(parseQuickLayoutShareText('{}').ok).toBe(false);
+    expect(parseQuickLayoutShareText('{"kind":"other"}').ok).toBe(false);
+  });
+
+  it('cloneQuickLayoutSnapshotForImport assigns a new id', () => {
+    const snap = makeSnapshot('old-id', '2026-01-01T00:00:00.000Z');
+    const c = cloneQuickLayoutSnapshotForImport(snap);
+    expect(c.id).not.toBe('old-id');
+    expect(c.createdAt).toBe(snap.createdAt);
   });
 });
