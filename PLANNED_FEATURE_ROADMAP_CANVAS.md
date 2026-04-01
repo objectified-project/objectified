@@ -11,16 +11,6 @@
 
 ### 1. Canvas Layout & Organization
 
-#### Layout Snapshots ✅ BASIC (named layouts)
-- ✅ PNG snapshot stored with each named layout save; thumbnail preview when picking a layout name (#314)
-- ✅ Take quick snapshots of current layout (#168) — local browser capture from Layout panel
-- ✅ Thumbnail preview of each snapshot (#169)
-- ✅ Restore any snapshot with one click (#170)
-- ✅ Compare two snapshots side-by-side (#171)
-- ✅ Snapshot gallery view with search/filter (#172)
-- 📋 [TODO] Auto-snapshots before major changes
-- ✅ Snapshot metadata: timestamp, author, summary, and description on capture (#173)
-
 #### Layout Sharing 📋 PLANNED
 - 📋 [TODO] Share layout configurations with team members
 - 📋 [TODO] "Pin" layout as team default
@@ -249,6 +239,16 @@
 - ✅ Export / import layout as versioned JSON — #167
 - ✅ Add ability to save layouts with a custom name
 - ✅ Add simple orthagonal edge routing after auto-layout
+
+#### Layout Snapshots ✅ BASIC (named layouts)
+- ✅ PNG snapshot stored with each named layout save; thumbnail preview when picking a layout name (#314)
+- ✅ Take quick snapshots of current layout (#168) — local browser capture from Layout panel
+- ✅ Thumbnail preview of each snapshot (#169)
+- ✅ Restore any snapshot with one click (#170)
+- ✅ Compare two snapshots side-by-side (#171)
+- ✅ Snapshot gallery view with search/filter (#172)
+- 📋 [TODO] Auto-snapshots before major changes
+- ✅ Snapshot metadata: timestamp, author, summary, and description on capture (#173)
 
 ---
 
