@@ -129,8 +129,10 @@ import { expandClassesForGroupExport, downloadTextFile } from '@/app/utils/group
 import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
 import {
   appendQuickLayoutSnapshot,
+  cloneQuickLayoutSnapshotForImport,
   loadQuickLayoutSnapshots,
   makeQuickLayoutSnapshotId,
+  parseQuickLayoutShareText,
   QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION,
   type QuickLayoutSnapshot,
 } from './lib/quick-layout-snapshots';
@@ -4687,6 +4689,44 @@ const StudioContent = () => {
     ]
   );
 
+  /** Import a teammate's shared quick snapshot JSON (same API version) into local storage (#174). */
+  const handleImportSharedQuickSnapshotJson = useCallback(
+    async (jsonText: string): Promise<{ success: true } | { success: false; message: string }> => {
+      const vid = selectedVersionId?.trim();
+      if (!vid) {
+        return { success: false, message: 'Open a version before importing a shared snapshot.' };
+      }
+      if (!currentUserId) {
+        return { success: false, message: 'Sign in to import snapshots into your gallery.' };
+      }
+      const parsed = parseQuickLayoutShareText(jsonText);
+      if (!parsed.ok) {
+        return { success: false, message: parsed.error };
+      }
+      if (parsed.versionId !== vid) {
+        return {
+          success: false,
+          message: `This snapshot is for API version "${parsed.versionId}" but the open version is "${vid}". Open the matching version or ask your teammate to export again.`,
+        };
+      }
+      const incoming = cloneQuickLayoutSnapshotForImport(parsed.snapshot);
+      const { snapshots: next, persisted } = appendQuickLayoutSnapshot(
+        vid,
+        currentUserId,
+        incoming
+      );
+      if (!persisted) {
+        return {
+          success: false,
+          message: 'Could not save the imported snapshot (storage quota may be full). Try removing old snapshots.',
+        };
+      }
+      setQuickLayoutSnapshots(next);
+      return { success: true };
+    },
+    [selectedVersionId, currentUserId]
+  );
+
   const handleSetMyDefaultLayoutName = useCallback(async () => {
     if (isReadOnly || !selectedVersionId || !currentUserId) return;
     const layoutName = selectedLayoutName.trim();
@@ -8726,8 +8766,9 @@ const StudioContent = () => {
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
                             Save the current canvas to this browser only—no layout name or server save. Capture asks for a
-                            short summary and optional description; author and timestamp are stored automatically. Open the
-                            gallery to restore (sign-in required; confirms before replacing the canvas).
+                            short summary and optional description; author and timestamp are stored automatically. Share a
+                            snapshot as JSON from the gallery or import a teammate&apos;s file for this API version. Open
+                            the gallery to restore (sign-in required; confirms before replacing the canvas).
                           </p>
                           <div className="grid grid-cols-2 gap-2">
                             <button
@@ -8783,16 +8824,16 @@ const StudioContent = () => {
                           <button
                             type="button"
                             onClick={() => setQuickSnapshotGalleryOpen(true)}
-                            disabled={quickLayoutSnapshots.length === 0}
+                            disabled={!selectedVersionId}
                             className={`mt-2 w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
-                              quickLayoutSnapshots.length > 0
+                              selectedVersionId
                                 ? 'bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-600'
                             }`}
                             title={
-                              quickLayoutSnapshots.length === 0
-                                ? 'Capture at least one snapshot to open the gallery'
-                                : 'Browse all quick snapshots with search and filters'
+                              !selectedVersionId
+                                ? 'Open a version first'
+                                : 'Browse snapshots, search, import shared JSON, or copy JSON for teammates'
                             }
                           >
                             <LayoutGrid className="w-4 h-4" />
@@ -9442,6 +9483,9 @@ const StudioContent = () => {
                     ? 'Please wait…'
                     : undefined
             }
+            versionId={selectedVersionId}
+            onImportSharedJson={handleImportSharedQuickSnapshotJson}
+            alertDialog={alertDialog}
           />
           <ExportWizard
             open={exportWizardOpen}

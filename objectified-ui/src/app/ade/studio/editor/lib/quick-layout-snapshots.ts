@@ -196,3 +196,86 @@ export function makeQuickLayoutSnapshotId(): string {
   }
   return `qs-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
+
+// --- Team share envelope (#174): JSON teammates can pass via file or chat for the same API version ---
+
+export const QUICK_LAYOUT_SHARE_KIND = 'objectified.quickLayoutSnapshotShare' as const;
+export const QUICK_LAYOUT_SHARE_SCHEMA_VERSION = 1 as const;
+
+export interface QuickLayoutShareEnvelope {
+  kind: typeof QUICK_LAYOUT_SHARE_KIND;
+  schemaVersion: typeof QUICK_LAYOUT_SHARE_SCHEMA_VERSION;
+  /** API version this snapshot was captured for; import requires an exact match. */
+  versionId: string;
+  snapshot: QuickLayoutSnapshot;
+}
+
+export function buildQuickLayoutShareEnvelope(
+  versionId: string,
+  snapshot: QuickLayoutSnapshot
+): QuickLayoutShareEnvelope {
+  const vid = versionId.trim();
+  if (!vid) {
+    throw new Error('versionId is required to share a quick layout snapshot');
+  }
+  return {
+    kind: QUICK_LAYOUT_SHARE_KIND,
+    schemaVersion: QUICK_LAYOUT_SHARE_SCHEMA_VERSION,
+    versionId: vid,
+    snapshot,
+  };
+}
+
+export function stringifyQuickLayoutShareEnvelope(versionId: string, snapshot: QuickLayoutSnapshot): string {
+  return JSON.stringify(buildQuickLayoutShareEnvelope(versionId, snapshot), null, 2);
+}
+
+export type ParseQuickLayoutShareResult =
+  | { ok: true; versionId: string; snapshot: QuickLayoutSnapshot }
+  | { ok: false; error: string };
+
+/**
+ * Validates a JSON string produced for team sharing. Rejects truncated or wrong-kind payloads.
+ */
+export function parseQuickLayoutShareText(text: string): ParseQuickLayoutShareResult {
+  const raw = text.trim();
+  if (!raw) {
+    return { ok: false, error: 'No JSON to import.' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    return { ok: false, error: 'Shared snapshot must be a JSON object.' };
+  }
+  const o = parsed as Record<string, unknown>;
+  if (o.kind !== QUICK_LAYOUT_SHARE_KIND) {
+    return {
+      ok: false,
+      error: 'Not a shared quick snapshot file (missing or wrong kind). Use Copy JSON or Download from the gallery.',
+    };
+  }
+  if (o.schemaVersion !== QUICK_LAYOUT_SHARE_SCHEMA_VERSION) {
+    return { ok: false, error: `Unsupported share format version: ${String(o.schemaVersion)}.` };
+  }
+  if (typeof o.versionId !== 'string' || !o.versionId.trim()) {
+    return { ok: false, error: 'Shared snapshot is missing versionId.' };
+  }
+  if (!isQuickLayoutSnapshot(o.snapshot)) {
+    return { ok: false, error: 'Shared snapshot data is invalid or corrupt.' };
+  }
+  return { ok: true, versionId: o.versionId.trim(), snapshot: o.snapshot };
+}
+
+/**
+ * Clone a teammate's snapshot with a new id so it can live alongside local captures without collision.
+ */
+export function cloneQuickLayoutSnapshotForImport(snapshot: QuickLayoutSnapshot): QuickLayoutSnapshot {
+  return {
+    ...snapshot,
+    id: makeQuickLayoutSnapshotId(),
+  };
+}
