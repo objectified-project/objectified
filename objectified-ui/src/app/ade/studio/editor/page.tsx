@@ -4692,7 +4692,8 @@ const StudioContent = () => {
   /** Import a teammate's shared quick snapshot JSON (same API version) into local storage (#174). */
   const handleImportSharedQuickSnapshotJson = useCallback(
     async (jsonText: string): Promise<{ success: true } | { success: false; message: string }> => {
-      if (!selectedVersionId?.trim()) {
+      const vid = selectedVersionId?.trim();
+      if (!vid) {
         return { success: false, message: 'Open a version before importing a shared snapshot.' };
       }
       if (!currentUserId) {
@@ -4702,15 +4703,15 @@ const StudioContent = () => {
       if (!parsed.ok) {
         return { success: false, message: parsed.error };
       }
-      if (parsed.versionId !== selectedVersionId.trim()) {
+      if (parsed.versionId !== vid) {
         return {
           success: false,
-          message: `This snapshot is for API version "${parsed.versionId}" but the open version is "${selectedVersionId.trim()}". Open the matching version or ask your teammate to export again.`,
+          message: `This snapshot is for API version "${parsed.versionId}" but the open version is "${vid}". Open the matching version or ask your teammate to export again.`,
         };
       }
       const incoming = cloneQuickLayoutSnapshotForImport(parsed.snapshot);
       const { snapshots: next, persisted } = appendQuickLayoutSnapshot(
-        selectedVersionId,
+        vid,
         currentUserId,
         incoming
       );

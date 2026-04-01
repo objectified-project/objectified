@@ -406,6 +406,9 @@ export function QuickSnapshotGalleryDialog({
               onPointerDownOutside={(e) => {
                 if (importBusy) e.preventDefault();
               }}
+              onEscapeKeyDown={(e) => {
+                if (importBusy) e.preventDefault();
+              }}
             >
               <Dialog.Title className="text-sm font-semibold text-gray-900 dark:text-white">
                 Import shared snapshot

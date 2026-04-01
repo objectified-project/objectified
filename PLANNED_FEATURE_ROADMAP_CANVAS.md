@@ -11,7 +11,7 @@
 
 ### 1. Canvas Layout & Organization
 
-#### Layout Sharing 📋 PLANNED
+#### Layout Sharing 📋 PARTIALLY IMPLEMENTED
 - ✅ Share layout configurations with team members (#174) — quick snapshot gallery: copy/download JSON envelope, import shared JSON for same API version
 - 📋 [TODO] "Pin" layout as team default
 - 📋 [TODO] Layout permissions (view, edit, delete)
