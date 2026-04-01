@@ -124,6 +124,7 @@ import {
   isTenantAdmin,
   duplicateClassesInGroup,
   bulkApplyEditsToGroupClasses,
+  pinTeamDefaultQuickSnapshot,
 } from '../../../../../lib/db/helper';
 import { expandClassesForGroupExport, downloadTextFile } from '@/app/utils/group-schema-export';
 import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
@@ -134,6 +135,7 @@ import {
   makeQuickLayoutSnapshotId,
   parseQuickLayoutShareText,
   QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION,
+  TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME,
   type QuickLayoutSnapshot,
 } from './lib/quick-layout-snapshots';
 import {
@@ -4831,6 +4833,75 @@ const StudioContent = () => {
     alertDialog,
   ]);
 
+  /** Save snapshot geometry as a shared named layout and point tenant default at it (#175). */
+  const handlePinQuickSnapshotAsTeamDefault = useCallback(
+    async (snapshot: QuickLayoutSnapshot) => {
+      if (
+        isReadOnly ||
+        !selectedVersionId ||
+        !currentUserId ||
+        !currentTenantId ||
+        !effectiveIsTenantAdmin
+      ) {
+        return;
+      }
+      const ok = await confirmDialog({
+        title: 'Pin as team default',
+        message: `Save this snapshot as the shared named layout "${TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME}" and set it as the team default for this API version? Members who have not chosen a personal default will load this layout when they open the version.`,
+      });
+      if (!ok) return;
+      try {
+        setLoadingMessage('Pinning team layout…');
+        setIsLoadingCanvas(true);
+        const { viewport, nodes, edges } = snapshot.payload;
+        let snapshotBase64: string | undefined;
+        const thumb = snapshot.thumbnailDataUrl;
+        if (thumb?.startsWith('data:image/png;base64,')) {
+          snapshotBase64 = thumb.slice('data:image/png;base64,'.length);
+        }
+        const pinResult = await pinTeamDefaultQuickSnapshot(
+          selectedVersionId,
+          currentTenantId,
+          viewport,
+          nodes,
+          edges,
+          snapshotBase64
+        );
+        const pinParsed = JSON.parse(pinResult);
+        if (!pinParsed.success) {
+          await alertDialog({
+            message: pinParsed.error || 'Could not pin this snapshot as the team default.',
+            variant: 'error',
+          });
+          return;
+        }
+        setSelectedLayoutName(TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME);
+        await alertDialog({
+          message: `Team default for this version is now "${TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME}".`,
+          variant: 'success',
+        });
+      } catch (e) {
+        console.error('Pin quick snapshot as team default failed:', e);
+        await alertDialog({
+          message: 'Could not pin this snapshot as the team default.',
+          variant: 'error',
+        });
+      } finally {
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+      }
+    },
+    [
+      isReadOnly,
+      selectedVersionId,
+      currentUserId,
+      currentTenantId,
+      effectiveIsTenantAdmin,
+      confirmDialog,
+      alertDialog,
+    ]
+  );
+
   const autoSaveDefaultLayout = useCallback(async () => {
     if (
       !autoSaveLayoutEnabled ||
@@ -9486,6 +9557,15 @@ const StudioContent = () => {
             versionId={selectedVersionId}
             onImportSharedJson={handleImportSharedQuickSnapshotJson}
             alertDialog={alertDialog}
+            pinTeamDefaultEnabled={Boolean(
+              selectedVersionId &&
+                currentUserId &&
+                currentTenantId &&
+                effectiveIsTenantAdmin &&
+                !isReadOnly &&
+                !isLoadingCanvas
+            )}
+            onPinTeamDefault={(s) => void handlePinQuickSnapshotAsTeamDefault(s)}
           />
           <ExportWizard
             open={exportWizardOpen}

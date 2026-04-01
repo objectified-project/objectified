@@ -20,6 +20,12 @@ const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0
 /** 4-byte ASCII chunk type for the required IHDR chunk (first chunk in every PNG). */
 const PNG_IHDR_TYPE = Buffer.from([0x49, 0x48, 0x44, 0x52]);
 
+/**
+ * Reserved named layout used when a tenant admin pins a quick snapshot as the team default (#175).
+ * Must match the client-side constant TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME in quick-layout-snapshots.ts.
+ */
+const TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME = 'Team default (quick snapshot)';
+
 function parseLayoutSnapshotBase64(
   snapshotPngBase64: string
 ): { ok: true; buffer: Buffer } | { ok: false; error: string } {
@@ -3549,6 +3555,116 @@ export async function clearTenantCanvasLayoutDefaultName(
 }
 
 /**
+ * Atomically pin a quick snapshot as the shared team-default named layout for a version (#175).
+ * Derives the acting user from the session — never from a client-supplied parameter.
+ * Only tenant administrators of the owning tenant may call this action.
+ * Groups are intentionally excluded to avoid overwriting live group positions for all members.
+ */
+export async function pinTeamDefaultQuickSnapshot(
+  versionId: string,
+  tenantId: string,
+  viewport: any,
+  nodes: any,
+  edges?: any,
+  snapshotPngBase64?: string
+) {
+  const session = await getAuthSession();
+  const actingUserId = (session?.user as any)?.user_id;
+  if (!actingUserId) {
+    return errorResponse('Unauthorized');
+  }
+  try {
+    const adminCheck = await connectionPool.query(
+      `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,
+      [tenantId, actingUserId]
+    );
+    if (!adminCheck.rows.length) {
+      return errorResponse('Only tenant administrators can pin a team default layout');
+    }
+    const verCheck = await connectionPool.query(
+      `SELECT 1 FROM odb.versions v
+       INNER JOIN odb.projects p ON v.project_id = p.id
+       WHERE v.id = $1 AND p.tenant_id = $2 AND v.deleted_at IS NULL AND p.deleted_at IS NULL`,
+      [versionId, tenantId]
+    );
+    if (!verCheck.rows.length) {
+      return errorResponse('Version not found for this tenant');
+    }
+
+    let snapshotBuffer: Buffer | undefined;
+    if (snapshotPngBase64 !== undefined && snapshotPngBase64.trim() !== '') {
+      const parsed = parseLayoutSnapshotBase64(snapshotPngBase64);
+      if (!parsed.ok) {
+        return errorResponse(parsed.error);
+      }
+      snapshotBuffer = parsed.buffer;
+    }
+
+    const name = TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME;
+
+    // Upsert the shared (user_id = null) layout without touching group positions.
+    const existingResult = await connectionPool.query(
+      `SELECT id FROM odb.canvas_layouts
+       WHERE version_id = $1 AND name = $2 AND user_id IS NULL
+       LIMIT 1`,
+      [versionId, name]
+    );
+
+    if (existingResult.rowCount > 0) {
+      const updates: { viewport: any; nodes: any; edges: any; snapshotImage?: Buffer } = {
+        viewport,
+        nodes,
+        edges: edges || [],
+      };
+      if (snapshotBuffer !== undefined) {
+        updates.snapshotImage = snapshotBuffer;
+      }
+      const updateResult = await updateCanvasLayout(
+        existingResult.rows[0].id,
+        updates,
+        { recordRevision: true, revisionUserId: actingUserId }
+      );
+      const updateParsed = JSON.parse(updateResult);
+      if (!updateParsed.success) {
+        return errorResponse(updateParsed.error || 'Failed to update shared layout');
+      }
+    } else {
+      const createResult = await createCanvasLayout(
+        versionId,
+        null,
+        name,
+        false,
+        viewport,
+        nodes,
+        edges || [],
+        null,
+        { enabled: true, size: 20, snapToGrid: true, showGrid: true },
+        { enabled: true, position: 'bottom-right', size: 'medium' },
+        {},
+        snapshotBuffer ?? null
+      );
+      const createParsed = JSON.parse(createResult);
+      if (!createParsed.success) {
+        return errorResponse(createParsed.error || 'Failed to create shared layout');
+      }
+    }
+
+    // Set tenant canvas layout default atomically.
+    await connectionPool.query(
+      `INSERT INTO odb.tenant_canvas_layout_defaults (tenant_id, version_id, layout_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (tenant_id, version_id) DO UPDATE
+       SET layout_name = EXCLUDED.layout_name, updated_at = CURRENT_TIMESTAMP`,
+      [tenantId, versionId, name]
+    );
+    return successResponse({ layoutName: name });
+  } catch (error: any) {
+    console.error('Error pinning team default quick snapshot:', error);
+    return errorResponse(error.message);
+  }
+}
+
+/**
  * Get all named canvas layouts for a version, preferring user-specific layouts.
  * Returns at most one layout per name.
  */
@@ -3592,6 +3708,8 @@ export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?
 
 /**
  * Get a named canvas layout for a version, preferring user-specific layout.
+ * For the reserved team-default name, always loads the shared (user_id = null) layout so that
+ * a personal layout saved with the same name cannot shadow the team default.
  */
 export async function getNamedCanvasLayout(versionId: string, userId: string | null, name: string) {
   try {
@@ -3599,6 +3717,10 @@ export async function getNamedCanvasLayout(versionId: string, userId: string | n
     if (!nameValue) {
       return successResponse({ layout: null });
     }
+
+    // The pinned team-default is always shared; never allow a personal row to shadow it.
+    const isReserved = nameValue === TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME;
+    const effectiveUserId = isReserved ? null : userId;
 
     const result = await connectionPool.query(
       `SELECT id, version_id, user_id, name, is_default, viewport, nodes, edges,
@@ -3609,7 +3731,7 @@ export async function getNamedCanvasLayout(versionId: string, userId: string | n
          AND (user_id = $3 OR user_id IS NULL)
        ORDER BY (user_id = $3) DESC NULLS LAST, updated_at DESC
        LIMIT 1`,
-      [versionId, nameValue, userId]
+      [versionId, nameValue, effectiveUserId]
     );
 
     if (result.rowCount === 0) {
@@ -3650,6 +3772,11 @@ export async function saveNamedCanvasLayout(
     const nameValue = name.trim();
     if (!nameValue) {
       return errorResponse('Layout name is required');
+    }
+
+    // Prevent personal layouts from using the reserved team-default name so it cannot be shadowed.
+    if (userId !== null && nameValue === TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME) {
+      return errorResponse(`"${TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME}" is reserved for the shared team default and cannot be used as a personal layout name`);
     }
 
     let snapshotBuffer: Buffer | undefined;
