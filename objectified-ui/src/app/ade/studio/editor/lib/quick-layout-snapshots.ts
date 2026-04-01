@@ -23,6 +23,45 @@ export interface QuickLayoutSnapshot {
   payload: QuickLayoutSnapshotPayload;
 }
 
+/** Locale-aware caption for UI lists and search (same formatting across gallery and compare). */
+export function formatQuickSnapshotCaption(createdAt: string): string {
+  const d = new Date(createdAt);
+  if (!Number.isFinite(d.getTime())) return 'Unknown time';
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function quickSnapshotCountsSummary(s: QuickLayoutSnapshot): string {
+  const { nodes, edges, groups } = s.payload;
+  const n = Array.isArray(nodes) ? nodes.length : 0;
+  const e = Array.isArray(edges) ? edges.length : 0;
+  const g = Array.isArray(groups) ? groups.length : 0;
+  return `${n} nodes · ${e} edges · ${g} groups`;
+}
+
+/**
+ * Case-insensitive match: every whitespace-separated token must appear in id, ISO time,
+ * formatted caption, or counts summary.
+ */
+export function quickSnapshotMatchesSearch(snapshot: QuickLayoutSnapshot, query: string): boolean {
+  const raw = query.trim().toLowerCase();
+  if (!raw) return true;
+  const haystack = [
+    snapshot.id,
+    snapshot.createdAt,
+    formatQuickSnapshotCaption(snapshot.createdAt),
+    quickSnapshotCountsSummary(snapshot),
+  ]
+    .join('\n')
+    .toLowerCase();
+  const tokens = raw.split(/\s+/).filter(Boolean);
+  return tokens.every((t) => haystack.includes(t));
+}
+
 export function quickLayoutSnapshotsStorageKey(versionId: string, userId: string | null): string {
   const uid = userId && userId.trim() ? userId.trim() : 'anonymous';
   return `objectified.quickCanvasSnapshots.v${QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION}:${versionId}:${uid}`;
