@@ -16,14 +16,13 @@
 - ✅ Take quick snapshots of current layout (#168) — local browser capture from Layout panel
 - ✅ Thumbnail preview of each snapshot (#169)
 - ✅ Restore any snapshot with one click (#170)
-- 📋 [TODO] Compare two snapshots side-by-side
+- ✅ Compare two snapshots side-by-side (#171)
 - 📋 [TODO] Snapshot gallery view with search/filter
 - 📋 [TODO] Auto-snapshots before major changes
 - 📋 [TODO] Snapshot metadata: timestamp, author, description
 
 | Ticket | Feature                                           |
 |--------|---------------------------------------------------|
-| #171   | Compare two snapshots side-by-side                |
 | #172   | Snapshot gallery view with search/filter          |
 | #173   | Snapshot metadata: timestamp, author, description |
 
