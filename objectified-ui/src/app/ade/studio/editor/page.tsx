@@ -17,6 +17,7 @@ import {
   Tag,
   Layout,
   Code2,
+  Loader2,
   Sun,
   Moon,
   Eye,
@@ -6804,9 +6805,16 @@ const StudioContent = () => {
               }}
               disabled={isLoadingProjects || !currentTenantId}
             >
-              <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
-                <Folder className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <Select.Value placeholder="Select project..." />
+              <Select.Trigger
+                aria-busy={isLoadingProjects}
+                className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoadingProjects ? (
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-500 dark:text-indigo-400" aria-hidden />
+                ) : (
+                  <Folder className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                )}
+                <Select.Value placeholder={isLoadingProjects ? 'Loading projects…' : 'Select project...'} />
                 <Select.Icon className="ml-auto">
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </Select.Icon>
@@ -6849,9 +6857,16 @@ const StudioContent = () => {
               }}
               disabled={isLoadingVersions || !selectedProjectId || versions.length === 0}
             >
-              <Select.Trigger className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed">
-                <Tag className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <Select.Value placeholder="Select version..." />
+              <Select.Trigger
+                aria-busy={isLoadingVersions}
+                className="inline-flex items-center gap-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm px-3 py-2 text-sm text-gray-900 dark:text-white hover:border-indigo-300 dark:hover:border-indigo-500/50 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 min-w-[220px] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoadingVersions ? (
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin text-indigo-500 dark:text-indigo-400" aria-hidden />
+                ) : (
+                  <Tag className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                )}
+                <Select.Value placeholder={isLoadingVersions ? 'Loading versions…' : 'Select version...'} />
                 <Select.Icon className="ml-auto">
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </Select.Icon>
