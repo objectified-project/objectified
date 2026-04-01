@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef } from 'react';
 import { Check, Settings, Copy, Download, Loader2 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
