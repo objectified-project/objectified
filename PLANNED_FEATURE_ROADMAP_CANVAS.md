@@ -13,7 +13,7 @@
 
 #### Layout Snapshots ✅ BASIC (named layouts)
 - ✅ PNG snapshot stored with each named layout save; thumbnail preview when picking a layout name (#314)
-- 📋 [TODO] Take quick snapshots of current layout
+- ✅ Take quick snapshots of current layout (#168) — local browser capture from Layout panel
 - 📋 [TODO] Thumbnail preview of each snapshot
 - 📋 [TODO] Restore any snapshot with one click
 - 📋 [TODO] Compare two snapshots side-by-side
@@ -23,7 +23,6 @@
 
 | Ticket | Feature                                           |
 |--------|---------------------------------------------------|
-| #168   | Take quick snapshots of current layout            |
 | #169   | Thumbnail preview of each snapshot                |
 | #170   | Restore any snapshot with one click               |
 | #171   | Compare two snapshots side-by-side                |
