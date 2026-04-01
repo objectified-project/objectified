@@ -3,31 +3,16 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Columns2, ArrowLeftRight, Image as ImageIcon } from 'lucide-react';
-import type { QuickLayoutSnapshot } from '../lib/quick-layout-snapshots';
+import {
+  formatQuickSnapshotCaption,
+  quickSnapshotCountsSummary,
+  type QuickLayoutSnapshot,
+} from '../lib/quick-layout-snapshots';
 
 export interface QuickSnapshotCompareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   snapshots: QuickLayoutSnapshot[];
-}
-
-function formatSnapshotCaption(createdAt: string): string {
-  const d = new Date(createdAt);
-  if (!Number.isFinite(d.getTime())) return 'Unknown time';
-  return d.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function snapshotSummary(s: QuickLayoutSnapshot): string {
-  const { nodes, edges, groups } = s.payload;
-  const n = Array.isArray(nodes) ? nodes.length : 0;
-  const e = Array.isArray(edges) ? edges.length : 0;
-  const g = Array.isArray(groups) ? groups.length : 0;
-  return `${n} nodes · ${e} edges · ${g} groups`;
 }
 
 export function QuickSnapshotCompareDialog({
@@ -130,7 +115,7 @@ export function QuickSnapshotCompareDialog({
                       >
                         {snapshots.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {formatSnapshotCaption(s.createdAt)}
+                            {formatQuickSnapshotCaption(s.createdAt)}
                           </option>
                         ))}
                       </select>
@@ -156,8 +141,8 @@ export function QuickSnapshotCompareDialog({
                         <div className="border-t border-gray-200 px-2 py-1.5 text-[10px] leading-snug text-gray-600 dark:text-gray-300 dark:border-gray-700">
                           {snap ? (
                             <>
-                              <p className="font-medium tabular-nums">{formatSnapshotCaption(snap.createdAt)}</p>
-                              <p className="text-gray-500 dark:text-gray-400">{snapshotSummary(snap)}</p>
+                              <p className="font-medium tabular-nums">{formatQuickSnapshotCaption(snap.createdAt)}</p>
+                              <p className="text-gray-500 dark:text-gray-400">{quickSnapshotCountsSummary(snap)}</p>
                             </>
                           ) : (
                             <p className="text-gray-500">Select a snapshot</p>

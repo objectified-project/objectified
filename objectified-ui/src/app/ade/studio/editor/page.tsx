@@ -66,6 +66,7 @@ import {
   PanelLeft,
   Camera,
   Columns2,
+  LayoutGrid,
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -189,6 +190,7 @@ import {
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
 import { toPng } from 'html-to-image';
 import { QuickSnapshotCompareDialog } from './components/QuickSnapshotCompareDialog';
+import { QuickSnapshotGalleryDialog } from './components/QuickSnapshotGalleryDialog';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -605,6 +607,7 @@ const StudioContent = () => {
   const [quickLayoutSnapshots, setQuickLayoutSnapshots] = useState<QuickLayoutSnapshot[]>([]);
   const [quickSnapshotSavedFlash, setQuickSnapshotSavedFlash] = useState(false);
   const [quickSnapshotCompareOpen, setQuickSnapshotCompareOpen] = useState(false);
+  const [quickSnapshotGalleryOpen, setQuickSnapshotGalleryOpen] = useState(false);
   const canvasCaptureAreaRef = useRef<HTMLDivElement>(null);
   const presentationShellRef = useRef<HTMLDivElement>(null);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
@@ -8742,6 +8745,24 @@ const StudioContent = () => {
                               <span>Compare</span>
                             </button>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => setQuickSnapshotGalleryOpen(true)}
+                            disabled={quickLayoutSnapshots.length === 0}
+                            className={`mt-2 w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
+                              quickLayoutSnapshots.length > 0
+                                ? 'bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-600'
+                            }`}
+                            title={
+                              quickLayoutSnapshots.length === 0
+                                ? 'Capture at least one snapshot to open the gallery'
+                                : 'Browse all quick snapshots with search and filters'
+                            }
+                          >
+                            <LayoutGrid className="w-4 h-4" />
+                            <span>Gallery</span>
+                          </button>
                           {quickLayoutSnapshots.length > 0 ? (
                             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 px-2.5 py-2 max-h-60 overflow-y-auto overscroll-contain">
                               <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
@@ -9360,6 +9381,22 @@ const StudioContent = () => {
             open={quickSnapshotCompareOpen}
             onOpenChange={setQuickSnapshotCompareOpen}
             snapshots={quickLayoutSnapshots}
+          />
+          <QuickSnapshotGalleryDialog
+            open={quickSnapshotGalleryOpen}
+            onOpenChange={setQuickSnapshotGalleryOpen}
+            snapshots={quickLayoutSnapshots}
+            onRestore={(s) => void handleRestoreQuickLayoutSnapshot(s)}
+            restoreDisabled={isReadOnly || !currentUserId || isLoadingCanvas}
+            restoreDisabledReason={
+              isReadOnly
+                ? 'Read-only: cannot restore'
+                : !currentUserId
+                  ? 'Sign in to restore snapshots'
+                  : isLoadingCanvas
+                    ? 'Please wait…'
+                    : undefined
+            }
           />
           <ExportWizard
             open={exportWizardOpen}

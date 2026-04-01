@@ -4,6 +4,9 @@ import {
   quickLayoutSnapshotsStorageKey,
   isQuickLayoutSnapshot,
   DEFAULT_MAX_QUICK_LAYOUT_SNAPSHOTS,
+  formatQuickSnapshotCaption,
+  quickSnapshotCountsSummary,
+  quickSnapshotMatchesSearch,
   type QuickLayoutSnapshot,
 } from '@/app/ade/studio/editor/lib/quick-layout-snapshots';
 
@@ -148,5 +151,38 @@ describe('quick-layout-snapshots', () => {
         payload: samplePayload,
       })
     ).toBe(true);
+  });
+
+  it('formatQuickSnapshotCaption handles invalid dates', () => {
+    expect(formatQuickSnapshotCaption('not-a-date')).toBe('Unknown time');
+  });
+
+  it('quickSnapshotCountsSummary reflects payload arrays', () => {
+    const snap: QuickLayoutSnapshot = {
+      id: 'x',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      payload: {
+        schemaVersion: 1,
+        viewport: { x: 0, y: 0, zoom: 1 },
+        nodes: [{ id: 'a' }, { id: 'b' }],
+        edges: [{ id: 'e1' }],
+        groups: [{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }],
+      },
+    };
+    expect(quickSnapshotCountsSummary(snap)).toBe('2 nodes · 1 edges · 3 groups');
+  });
+
+  it('quickSnapshotMatchesSearch matches id, iso time, and count tokens', () => {
+    const snap = makeSnapshot('abc-unique-id', '2026-06-15T12:30:00.000Z');
+    snap.payload = {
+      ...samplePayload,
+      nodes: [{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }],
+    };
+    expect(quickSnapshotMatchesSearch(snap, '')).toBe(true);
+    expect(quickSnapshotMatchesSearch(snap, 'unique')).toBe(true);
+    expect(quickSnapshotMatchesSearch(snap, '2026-06-15')).toBe(true);
+    expect(quickSnapshotMatchesSearch(snap, '3 nodes')).toBe(true);
+    expect(quickSnapshotMatchesSearch(snap, '2026-06-15 3 nodes')).toBe(true);
+    expect(quickSnapshotMatchesSearch(snap, 'nomatch-xyz-123')).toBe(false);
   });
 });

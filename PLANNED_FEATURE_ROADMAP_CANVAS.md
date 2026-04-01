@@ -17,13 +17,12 @@
 - ✅ Thumbnail preview of each snapshot (#169)
 - ✅ Restore any snapshot with one click (#170)
 - ✅ Compare two snapshots side-by-side (#171)
-- 📋 [TODO] Snapshot gallery view with search/filter
+- ✅ Snapshot gallery view with search/filter (#172)
 - 📋 [TODO] Auto-snapshots before major changes
 - 📋 [TODO] Snapshot metadata: timestamp, author, description
 
 | Ticket | Feature                                           |
 |--------|---------------------------------------------------|
-| #172   | Snapshot gallery view with search/filter          |
 | #173   | Snapshot metadata: timestamp, author, description |
 
 #### Layout Sharing 📋 PLANNED

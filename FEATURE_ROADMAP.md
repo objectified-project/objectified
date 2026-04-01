@@ -114,7 +114,7 @@
 - Thumbnail preview of each snapshot
 - ✅ Restore any snapshot with one click (#170)
 - Compare two snapshots side-by-side
-- Snapshot gallery view with search/filter
+- ✅ Snapshot gallery view with search/filter (#172)
 - Auto-snapshots before major changes
 - Snapshot metadata: timestamp, author, description
 
