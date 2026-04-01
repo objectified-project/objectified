@@ -112,7 +112,7 @@
 **Layout Snapshots**
 - Take quick snapshots of current layout
 - Thumbnail preview of each snapshot
-- Restore any snapshot with one click
+- ✅ Restore any snapshot with one click (#170)
 - Compare two snapshots side-by-side
 - Snapshot gallery view with search/filter
 - Auto-snapshots before major changes

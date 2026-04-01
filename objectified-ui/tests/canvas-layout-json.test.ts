@@ -116,6 +116,28 @@ describe('canvas-layout-json', () => {
     expect((filtered.groups[0] as { nodeIds: string[] }).nodeIds).toEqual(['keep']);
   });
 
+  test('filterCanvasLayoutForTargetClasses accepts quick snapshot style nodes from mapNodesForLayoutSave', () => {
+    const doc = buildCanvasLayoutJsonDocument({
+      viewport: { x: 2, y: -3, zoom: 0.75 },
+      nodes: [
+        {
+          id: 'c1',
+          type: 'classNode',
+          position: { x: 11, y: 22 },
+          dimensions: { width: 180, height: 90 },
+        },
+      ],
+      edges: [{ id: 'e1', source: 'c1', target: 'c1', sourceHandle: 'h1', targetHandle: 'h2' }],
+      groups: [{ id: 'g1', name: 'G', nodeIds: ['c1'], position: { x: 0, y: 0 }, dimensions: { width: 50, height: 50 } }],
+    });
+    const filtered = filterCanvasLayoutForTargetClasses(doc, new Set(['c1']));
+    expect(filtered.viewport).toEqual({ x: 2, y: -3, zoom: 0.75 });
+    expect(filtered.nodes).toHaveLength(1);
+    expect(filtered.nodes[0]).toEqual({ id: 'c1', position: { x: 11, y: 22 } });
+    expect(filtered.edges).toHaveLength(1);
+    expect((filtered.groups[0] as { id: string }).id).toBe('g1');
+  });
+
   test('filterCanvasLayoutForTargetClasses drops nodes with invalid positions', () => {
     const doc = buildCanvasLayoutJsonDocument({
       viewport: { x: 0, y: 0, zoom: 1 },
