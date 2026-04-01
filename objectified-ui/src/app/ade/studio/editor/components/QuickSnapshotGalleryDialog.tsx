@@ -52,7 +52,13 @@ export function QuickSnapshotGalleryDialog({
       list = list.filter((s) => !s.thumbnailDataUrl);
     }
     const mult = sortOrder === 'newest' ? -1 : 1;
-    return [...list].sort((a, b) => mult * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+    return [...list].sort((a, b) => {
+      const taRaw = Date.parse(a.createdAt as unknown as string);
+      const tbRaw = Date.parse(b.createdAt as unknown as string);
+      const ta = Number.isFinite(taRaw) ? taRaw : 0;
+      const tb = Number.isFinite(tbRaw) ? tbRaw : 0;
+      return mult * (ta - tb);
+    });
   }, [snapshots, query, previewFilter, sortOrder]);
 
   return (
