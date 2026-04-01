@@ -124,6 +124,7 @@ import {
   isTenantAdmin,
   duplicateClassesInGroup,
   bulkApplyEditsToGroupClasses,
+  pinTeamDefaultQuickSnapshot,
 } from '../../../../../lib/db/helper';
 import { expandClassesForGroupExport, downloadTextFile } from '@/app/utils/group-schema-export';
 import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
@@ -4852,41 +4853,24 @@ const StudioContent = () => {
       try {
         setLoadingMessage('Pinning team layout…');
         setIsLoadingCanvas(true);
-        const { viewport, nodes, edges, groups } = snapshot.payload;
+        const { viewport, nodes, edges } = snapshot.payload;
         let snapshotBase64: string | undefined;
         const thumb = snapshot.thumbnailDataUrl;
         if (thumb?.startsWith('data:image/png;base64,')) {
           snapshotBase64 = thumb.slice('data:image/png;base64,'.length);
         }
-        const saveResult = await saveNamedCanvasLayout(
+        const pinResult = await pinTeamDefaultQuickSnapshot(
           selectedVersionId,
-          null,
-          TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME,
+          currentTenantId,
           viewport,
           nodes,
           edges,
-          groups,
           snapshotBase64
         );
-        const saveParsed = JSON.parse(saveResult);
-        if (!saveParsed.success) {
+        const pinParsed = JSON.parse(pinResult);
+        if (!pinParsed.success) {
           await alertDialog({
-            message: saveParsed.error || 'Could not save the shared layout.',
-            variant: 'error',
-          });
-          return;
-        }
-        const tenantResult = await setTenantCanvasLayoutDefaultName(
-          selectedVersionId,
-          currentTenantId,
-          TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME
-        );
-        const tenantParsed = JSON.parse(tenantResult);
-        if (!tenantParsed.success) {
-          await alertDialog({
-            message:
-              tenantParsed.error ||
-              'Layout was saved, but the team default could not be updated.',
+            message: pinParsed.error || 'Could not pin this snapshot as the team default.',
             variant: 'error',
           });
           return;

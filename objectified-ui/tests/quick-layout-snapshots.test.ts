@@ -37,8 +37,7 @@ function makeSnapshot(id: string, createdAt: string): QuickLayoutSnapshot {
 
 describe('quick-layout-snapshots', () => {
   it('TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME is a stable reserved layout name', () => {
-    expect(TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME).toMatch(/quick snapshot/i);
-    expect(TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME.trim().length).toBeGreaterThan(0);
+    expect(TEAM_QUICK_SNAPSHOT_PINNED_LAYOUT_NAME).toBe('Team default (quick snapshot)');
   });
 
   const versionId = 'ver-quick-snap-1';
