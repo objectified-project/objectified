@@ -8489,6 +8489,7 @@ const StudioContent = () => {
                               disabled={!hasExistingLayout || isReadOnly || !autoSaveLayoutEnabled}
                               onChange={(e) => setAutoSaveLayoutIntervalSeconds(Number(e.target.value))}
                               className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              aria-label={`Auto-save interval: ${autoSaveLayoutIntervalSeconds} seconds`}
                             />
                           </div>
                         </div>
