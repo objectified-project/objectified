@@ -8644,10 +8644,13 @@ const StudioContent = () => {
                                             src={s.thumbnailDataUrl}
                                             alt=""
                                             className="absolute inset-0 h-full w-full object-cover"
+                                            loading="lazy"
+                                            decoding="async"
                                           />
                                         ) : (
                                           <div
                                             className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center text-gray-400 dark:text-gray-500"
+                                            role="img"
                                             aria-label="No preview image for this snapshot"
                                           >
                                             <Image className="h-5 w-5 shrink-0 opacity-60" aria-hidden />
