@@ -9355,7 +9355,7 @@ const StudioContent = () => {
             </DraggablePanel>
           )}
 
-          {/* Export Wizard Dialog */}
+          {/* Compare Snapshots & Export Wizard Dialogs */}
           <QuickSnapshotCompareDialog
             open={quickSnapshotCompareOpen}
             onOpenChange={setQuickSnapshotCompareOpen}
