@@ -64,6 +64,7 @@ import {
   TrendingUp,
   Presentation,
   PanelLeft,
+  Camera,
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -124,6 +125,13 @@ import {
 } from '../../../../../lib/db/helper';
 import { expandClassesForGroupExport, downloadTextFile } from '@/app/utils/group-schema-export';
 import { mapEdgesForLayoutSave, mapNodesForLayoutSave } from '../lib/canvasLayoutPayload';
+import {
+  appendQuickLayoutSnapshot,
+  loadQuickLayoutSnapshots,
+  makeQuickLayoutSnapshotId,
+  QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION,
+  type QuickLayoutSnapshot,
+} from './lib/quick-layout-snapshots';
 import {
   deleteClassWithSession,
   updateClassCanvasMetadataWithSession,
@@ -588,6 +596,9 @@ const StudioContent = () => {
   const [availableLayoutNames, setAvailableLayoutNames] = useState<string[]>(BUILTIN_LAYOUT_NAMES);
   /** Data URLs for saved layout snapshots keyed by trimmed layout name */
   const [namedLayoutSnapshotDataUrls, setNamedLayoutSnapshotDataUrls] = useState<Record<string, string>>({});
+  /** Local quick snapshots for this version (#168); restore UI follows in #170. */
+  const [quickLayoutSnapshots, setQuickLayoutSnapshots] = useState<QuickLayoutSnapshot[]>([]);
+  const [quickSnapshotSavedFlash, setQuickSnapshotSavedFlash] = useState(false);
   const canvasCaptureAreaRef = useRef<HTMLDivElement>(null);
   const presentationShellRef = useRef<HTMLDivElement>(null);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
@@ -600,6 +611,14 @@ const StudioContent = () => {
   useEffect(() => {
     selectedLayoutNameRef.current = selectedLayoutName;
   }, [selectedLayoutName]);
+
+  useEffect(() => {
+    if (!selectedVersionId) {
+      setQuickLayoutSnapshots([]);
+      return;
+    }
+    setQuickLayoutSnapshots(loadQuickLayoutSnapshots(selectedVersionId, currentUserId));
+  }, [selectedVersionId, currentUserId]);
 
   useEffect(() => {
     setAutoSavePending(false);
@@ -4529,6 +4548,102 @@ const StudioContent = () => {
       setLoadingMessage('');
     }
   }, [isReadOnly, selectedVersionId, currentUserId, selectedLayoutName, nodes, edges, groups, getViewport, alertDialog, isDark]);
+
+  /** Capture a local quick snapshot (viewport, nodes, edges, groups, optional PNG thumb) without naming. */
+  const handleQuickLayoutSnapshot = useCallback(async () => {
+    if (!selectedVersionId) {
+      await alertDialog({
+        message: 'Open a version to capture a layout snapshot.',
+        variant: 'warning',
+      });
+      return;
+    }
+    try {
+      setLoadingMessage('Capturing quick snapshot...');
+      setIsLoadingCanvas(true);
+      let thumbnailDataUrl: string | undefined;
+      const captureEl = canvasCaptureAreaRef.current;
+      if (captureEl) {
+        try {
+          const dataUrl = await toPng(captureEl, {
+            pixelRatio: 0.4,
+            cacheBust: true,
+            backgroundColor: isDark ? '#111827' : '#f8fafc',
+          });
+          const comma = dataUrl.indexOf(',');
+          if (comma !== -1 && dataUrl.slice(0, comma).includes('image/png')) {
+            const base64Part = dataUrl.slice(comma + 1);
+            if (base64Part.length <= 240_000) {
+              thumbnailDataUrl = dataUrl;
+            }
+          }
+        } catch (snapErr) {
+          console.warn('Quick snapshot thumbnail failed:', snapErr);
+        }
+      }
+      const viewportRaw = getViewport();
+      const viewport = {
+        x: typeof viewportRaw.x === 'number' && Number.isFinite(viewportRaw.x) ? viewportRaw.x : 0,
+        y: typeof viewportRaw.y === 'number' && Number.isFinite(viewportRaw.y) ? viewportRaw.y : 0,
+        zoom: typeof viewportRaw.zoom === 'number' && Number.isFinite(viewportRaw.zoom) ? viewportRaw.zoom : 1,
+      };
+      const nodeData = mapNodesForLayoutSave(nodes);
+      const edgeData = mapEdgesForLayoutSave(edges);
+      const groupsPlain = groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        color: g.color,
+        nodeIds: [...g.nodeIds],
+        parentId: g.parentId ?? null,
+        tags: g.tags ? g.tags.map((t) => ({ ...t })) : undefined,
+        position: { ...g.position },
+        dimensions: { ...g.dimensions },
+        styleOptions: g.styleOptions ? { ...g.styleOptions } : undefined,
+      }));
+      const snapshot: QuickLayoutSnapshot = {
+        id: makeQuickLayoutSnapshotId(),
+        createdAt: new Date().toISOString(),
+        ...(thumbnailDataUrl ? { thumbnailDataUrl } : {}),
+        payload: {
+          schemaVersion: QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION,
+          viewport,
+          nodes: nodeData,
+          edges: edgeData,
+          groups: groupsPlain,
+        },
+      };
+      const { snapshots: next, persisted } = appendQuickLayoutSnapshot(selectedVersionId, currentUserId, snapshot);
+      setQuickLayoutSnapshots(next);
+      if (persisted) {
+        setQuickSnapshotSavedFlash(true);
+        window.setTimeout(() => setQuickSnapshotSavedFlash(false), 2000);
+      } else {
+        await alertDialog({
+          message: 'Quick snapshot could not be saved (storage quota may be full). Try clearing old snapshots.',
+          variant: 'warning',
+        });
+      }
+    } catch (error) {
+      console.error('Error capturing quick layout snapshot:', error);
+      await alertDialog({
+        message: 'Could not save quick snapshot. Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setIsLoadingCanvas(false);
+      setLoadingMessage('');
+    }
+  }, [
+    selectedVersionId,
+    currentUserId,
+    nodes,
+    edges,
+    groups,
+    getViewport,
+    isDark,
+    alertDialog,
+  ]);
 
   const handleSetMyDefaultLayoutName = useCallback(async () => {
     if (isReadOnly || !selectedVersionId || !currentUserId) return;
@@ -8465,6 +8580,75 @@ const StudioContent = () => {
                             <Upload className="w-4 h-4" />
                             <span>Load</span>
                           </button>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Quick snapshots
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
+                            Save the current canvas to this browser only—no layout name or server save. Use for ad-hoc checkpoints; restore and gallery are planned next.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void handleQuickLayoutSnapshot()}
+                            disabled={!selectedVersionId}
+                            className={`w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
+                              quickSnapshotSavedFlash
+                                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
+                                : selectedVersionId
+                                  ? 'bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'
+                                  : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-600'
+                            }`}
+                            title={
+                              !selectedVersionId
+                                ? 'Open a version first'
+                                : quickSnapshotSavedFlash
+                                  ? 'Snapshot captured'
+                                  : 'Capture a local snapshot of this layout'
+                            }
+                          >
+                            {quickSnapshotSavedFlash ? (
+                              <>
+                                <Check className="w-4 h-4" />
+                                <span>Captured</span>
+                              </>
+                            ) : (
+                              <>
+                                <Camera className="w-4 h-4" />
+                                <span>Capture snapshot</span>
+                              </>
+                            )}
+                          </button>
+                          {quickLayoutSnapshots.length > 0 ? (
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 px-2.5 py-2 max-h-32 overflow-y-auto overscroll-contain">
+                              <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                                Recent ({quickLayoutSnapshots.length})
+                              </p>
+                              <ul className="space-y-1.5">
+                                {quickLayoutSnapshots.slice(0, 6).map((s) => (
+                                  <li key={s.id} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                    {s.thumbnailDataUrl ? (
+                                      <img
+                                        src={s.thumbnailDataUrl}
+                                        alt=""
+                                        className="h-9 w-14 shrink-0 rounded object-cover border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-800"
+                                      />
+                                    ) : (
+                                      <span className="h-9 w-14 shrink-0 rounded border border-dashed border-gray-300 dark:border-gray-600 bg-gray-100/50 dark:bg-gray-800/50" />
+                                    )}
+                                    <span className="tabular-nums truncate" title={s.createdAt}>
+                                      {new Date(s.createdAt).toLocaleString(undefined, {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
                         </div>
                         <div
                           className={`mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 ${
