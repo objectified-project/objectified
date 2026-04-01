@@ -65,6 +65,7 @@ import {
   Presentation,
   PanelLeft,
   Camera,
+  Columns2,
 } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -187,6 +188,7 @@ import {
 } from '@/app/utils/canvas-layout-json';
 import { computeSchemaMetrics, getCircularDependencyEdgeIds, getDependencyDepthMap, getAffectedClassIds, getUpstreamClassIds, getDependencyChainNodeAndEdgeIds } from '@/app/utils/schema-metrics';
 import { toPng } from 'html-to-image';
+import { QuickSnapshotCompareDialog } from './components/QuickSnapshotCompareDialog';
 import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
@@ -602,6 +604,7 @@ const StudioContent = () => {
   /** Local quick snapshots for this version (#168); restore UI follows in #170. */
   const [quickLayoutSnapshots, setQuickLayoutSnapshots] = useState<QuickLayoutSnapshot[]>([]);
   const [quickSnapshotSavedFlash, setQuickSnapshotSavedFlash] = useState(false);
+  const [quickSnapshotCompareOpen, setQuickSnapshotCompareOpen] = useState(false);
   const canvasCaptureAreaRef = useRef<HTMLDivElement>(null);
   const presentationShellRef = useRef<HTMLDivElement>(null);
   const selectedLayoutNameRef = useRef(selectedLayoutName);
@@ -8688,37 +8691,57 @@ const StudioContent = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
                             Save the current canvas to this browser only—no layout name or server save. Click a thumbnail to restore that capture (sign-in required; confirms before replacing the canvas).
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => void handleQuickLayoutSnapshot()}
-                            disabled={!selectedVersionId}
-                            className={`w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
-                              quickSnapshotSavedFlash
-                                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
-                                : selectedVersionId
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleQuickLayoutSnapshot()}
+                              disabled={!selectedVersionId}
+                              className={`w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
+                                quickSnapshotSavedFlash
+                                  ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700'
+                                  : selectedVersionId
+                                    ? 'bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-600'
+                              }`}
+                              title={
+                                !selectedVersionId
+                                  ? 'Open a version first'
+                                  : quickSnapshotSavedFlash
+                                    ? 'Snapshot captured'
+                                    : 'Capture a local snapshot of this layout'
+                              }
+                            >
+                              {quickSnapshotSavedFlash ? (
+                                <>
+                                  <Check className="w-4 h-4" />
+                                  <span>Captured</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Camera className="w-4 h-4" />
+                                  <span>Capture</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuickSnapshotCompareOpen(true)}
+                              disabled={quickLayoutSnapshots.length < 2}
+                              className={`w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 border ${
+                                quickLayoutSnapshots.length >= 2
                                   ? 'bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'
                                   : 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed border-gray-200 dark:border-gray-600'
-                            }`}
-                            title={
-                              !selectedVersionId
-                                ? 'Open a version first'
-                                : quickSnapshotSavedFlash
-                                  ? 'Snapshot captured'
-                                  : 'Capture a local snapshot of this layout'
-                            }
-                          >
-                            {quickSnapshotSavedFlash ? (
-                              <>
-                                <Check className="w-4 h-4" />
-                                <span>Captured</span>
-                              </>
-                            ) : (
-                              <>
-                                <Camera className="w-4 h-4" />
-                                <span>Capture snapshot</span>
-                              </>
-                            )}
-                          </button>
+                              }`}
+                              title={
+                                quickLayoutSnapshots.length < 2
+                                  ? 'Capture at least two snapshots to compare'
+                                  : 'Compare two snapshots side by side'
+                              }
+                            >
+                              <Columns2 className="w-4 h-4" />
+                              <span>Compare</span>
+                            </button>
+                          </div>
                           {quickLayoutSnapshots.length > 0 ? (
                             <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 px-2.5 py-2 max-h-60 overflow-y-auto overscroll-contain">
                               <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
@@ -9332,7 +9355,12 @@ const StudioContent = () => {
             </DraggablePanel>
           )}
 
-          {/* Export Wizard Dialog */}
+          {/* Compare Snapshots & Export Wizard Dialogs */}
+          <QuickSnapshotCompareDialog
+            open={quickSnapshotCompareOpen}
+            onOpenChange={setQuickSnapshotCompareOpen}
+            snapshots={quickLayoutSnapshots}
+          />
           <ExportWizard
             open={exportWizardOpen}
             onClose={() => setExportWizardOpen(false)}
