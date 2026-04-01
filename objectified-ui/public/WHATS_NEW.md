@@ -19,8 +19,9 @@ Improvements:
 - Canvas: layout auto-save uses a steady timer while edits are pending so saves occur every 30 seconds (or your chosen interval) without resetting on each move (#315)
 - Canvas: schema timeline panel shows class count, relationships, and complexity across project versions (#323)
 - Canvas: named layout saves store a PNG snapshot for thumbnail preview in the layout menu
-- Canvas: Layout panel quick snapshots capture viewport, nodes, edges, groups, and a local PNG preview in the browser without naming or server save; restore UI is planned (#168)
+- Canvas: Layout panel quick snapshots capture viewport, nodes, edges, groups, and a local PNG preview in the browser without naming or server save (#168)
 - Canvas: quick snapshot list shows a thumbnail card per capture (scrollable grid; placeholder when preview was not stored) (#169)
+- Canvas: click a quick snapshot thumbnail to restore that layout (confirm + sign-in; groups sync like layout import) (#170)
 - Canvas: export and import canvas layouts as versioned JSON (share across versions and projects)
 - Canvas: layout import and named layout load restore edge handle routing when saved edge IDs match the canvas (#316)
 

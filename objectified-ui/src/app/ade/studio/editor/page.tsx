@@ -178,6 +178,8 @@ import {
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
 import {
   buildCanvasLayoutJsonDocument,
+  CANVAS_LAYOUT_JSON_FORMAT_VERSION,
+  type CanvasLayoutJsonDocument,
   parseCanvasLayoutJson,
   filterCanvasLayoutForTargetClasses,
   mergeSavedEdgeHandles,
@@ -5013,6 +5015,113 @@ const StudioContent = () => {
     ]
   );
 
+  /** Restore a local quick snapshot: sync groups to DB then apply viewport, node positions, and edges. */
+  const handleRestoreQuickLayoutSnapshot = useCallback(
+    async (snapshot: QuickLayoutSnapshot) => {
+      if (!selectedVersionId) {
+        await alertDialog({
+          message: 'Open a version before restoring a snapshot.',
+          variant: 'warning',
+        });
+        return;
+      }
+      if (!currentUserId) {
+        await alertDialog({
+          message: 'Sign in to restore a snapshot. Group frames are synced to your workspace.',
+          variant: 'warning',
+        });
+        return;
+      }
+      if (isReadOnly) {
+        await alertDialog({ message: 'Cannot restore a snapshot in read-only mode.', variant: 'warning' });
+        return;
+      }
+      const ok = await confirmDialog({
+        title: 'Restore quick snapshot',
+        message:
+          'Replace the current canvas with this snapshot? Classes removed since the capture are skipped; group membership matches the snapshot after sync.',
+      });
+      if (!ok) return;
+
+      try {
+        setLoadingMessage('Restoring snapshot...');
+        setIsLoadingCanvas(true);
+
+        const idsRes = await getClassIdsForVersion(selectedVersionId);
+        const idsParsed = JSON.parse(idsRes);
+        if (!idsParsed.success || !Array.isArray(idsParsed.classIds)) {
+          await alertDialog({
+            message: idsParsed.error || 'Could not load classes for this version.',
+            variant: 'error',
+          });
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
+          return;
+        }
+
+        const validIds = new Set<string>(idsParsed.classIds);
+        const doc: CanvasLayoutJsonDocument = {
+          formatVersion: CANVAS_LAYOUT_JSON_FORMAT_VERSION,
+          exportedAt: snapshot.createdAt,
+          viewport: snapshot.payload.viewport,
+          nodes: snapshot.payload.nodes as unknown[],
+          edges: snapshot.payload.edges as unknown[],
+          groups: snapshot.payload.groups as unknown[],
+        };
+        const filtered = filterCanvasLayoutForTargetClasses(doc, validIds);
+
+        const syncRes = await syncGroupsForVersion(
+          selectedVersionId,
+          filtered.groups,
+          filtered.nodePositions
+        );
+        const syncParsed = JSON.parse(syncRes);
+        if (!syncParsed.success) {
+          await alertDialog({
+            message: syncParsed.error || 'Failed to sync groups for this snapshot.',
+            variant: 'error',
+          });
+          setIsLoadingCanvas(false);
+          setLoadingMessage('');
+          return;
+        }
+
+        if (filtered.droppedClassCount > 0) {
+          await alertDialog({
+            message: `${filtered.droppedClassCount} class(es) from the snapshot are not in this version and were skipped.`,
+            variant: 'warning',
+          });
+        }
+
+        await applyCanvasLayoutPayload({
+          layout: {
+            viewport: filtered.viewport,
+            nodes: filtered.nodes,
+            edges: filtered.edges,
+          },
+          clearGroupsWhenEmpty: true,
+        });
+      } catch (error) {
+        console.error('Error restoring quick layout snapshot:', error);
+        await alertDialog({
+          message: 'Could not restore this snapshot. Try again.',
+          variant: 'error',
+        });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+        setLayoutDropdownOpen(false);
+      }
+    },
+    [
+      selectedVersionId,
+      currentUserId,
+      isReadOnly,
+      alertDialog,
+      confirmDialog,
+      applyCanvasLayoutPayload,
+    ]
+  );
+
   // Load saved canvas layout
   const handleLoadLayout = useCallback(async () => {
     if (!selectedVersionId || !currentUserId) return;
@@ -8586,7 +8695,7 @@ const StudioContent = () => {
                             Quick snapshots
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">
-                            Save the current canvas to this browser only—no layout name or server save. Each capture keeps a thumbnail preview below; restore is planned next (#170).
+                            Save the current canvas to this browser only—no layout name or server save. Click a thumbnail to restore that capture (sign-in required; confirms before replacing the canvas).
                           </p>
                           <button
                             type="button"
@@ -8632,35 +8741,52 @@ const StudioContent = () => {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                   });
+                                  const restoreDisabled = isReadOnly || !currentUserId || isLoadingCanvas;
                                   return (
-                                    <li
-                                      key={s.id}
-                                      className="overflow-hidden rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/70 shadow-sm"
-                                      title={`Quick snapshot — ${s.createdAt}`}
-                                    >
-                                      <div className="relative aspect-[5/3] w-full bg-gray-100 dark:bg-gray-900">
-                                        {s.thumbnailDataUrl ? (
-                                          <img
-                                            src={s.thumbnailDataUrl}
-                                            alt=""
-                                            className="absolute inset-0 h-full w-full object-cover"
-                                            loading="lazy"
-                                            decoding="async"
-                                          />
-                                        ) : (
-                                          <div
-                                            className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center text-gray-400 dark:text-gray-500"
-                                            role="img"
-                                            aria-label="No preview image for this snapshot"
-                                          >
-                                            <Image className="h-5 w-5 shrink-0 opacity-60" aria-hidden />
-                                            <span className="text-[9px] leading-tight">No preview</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <p className="border-t border-gray-100 dark:border-gray-700/80 px-1.5 py-1 text-[10px] tabular-nums text-gray-600 dark:text-gray-300 truncate">
-                                        {caption}
-                                      </p>
+                                    <li key={s.id} className="list-none">
+                                      <button
+                                        type="button"
+                                        disabled={restoreDisabled}
+                                        onClick={() => void handleRestoreQuickLayoutSnapshot(s)}
+                                        className={`w-full overflow-hidden rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/70 shadow-sm text-left transition-opacity ${
+                                          restoreDisabled
+                                            ? 'opacity-50 cursor-not-allowed'
+                                            : 'hover:ring-2 hover:ring-indigo-400 dark:hover:ring-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500'
+                                        }`}
+                                        title={
+                                          restoreDisabled
+                                            ? isReadOnly
+                                              ? 'Read-only: cannot restore'
+                                              : !currentUserId
+                                                ? 'Sign in to restore snapshots'
+                                                : 'Please wait…'
+                                            : `Restore canvas from ${s.createdAt}`
+                                        }
+                                      >
+                                        <div className="relative aspect-[5/3] w-full bg-gray-100 dark:bg-gray-900 pointer-events-none">
+                                          {s.thumbnailDataUrl ? (
+                                            <img
+                                              src={s.thumbnailDataUrl}
+                                              alt=""
+                                              className="absolute inset-0 h-full w-full object-cover"
+                                              loading="lazy"
+                                              decoding="async"
+                                            />
+                                          ) : (
+                                            <div
+                                              className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-1 text-center text-gray-400 dark:text-gray-500"
+                                              role="img"
+                                              aria-label="No preview image for this snapshot"
+                                            >
+                                              <Image className="h-5 w-5 shrink-0 opacity-60" aria-hidden />
+                                              <span className="text-[9px] leading-tight">No preview</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <p className="border-t border-gray-100 dark:border-gray-700/80 px-1.5 py-1 text-[10px] tabular-nums text-gray-600 dark:text-gray-300 truncate pointer-events-none">
+                                          {caption}
+                                        </p>
+                                      </button>
                                     </li>
                                   );
                                 })}
