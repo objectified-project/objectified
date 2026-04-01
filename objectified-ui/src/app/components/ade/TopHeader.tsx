@@ -21,10 +21,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/ade" },
   { label: "Control Panel", href: "/ade/dashboard" },
   { label: "Designer", href: "/ade/studio" },
-  { label: "Database", href: "/ade/database", enabled: true },
-  { label: "Migration", href: "/ade/migration", enabled: true },
-  { label: "ETL", href: "/ade/etl", enabled: false },
-  { label: "Explorer", href: "/ade/database/explorer", enabled: false },
+  // { label: "Database", href: "/ade/database", enabled: false },
+  // { label: "Migration", href: "/ade/migration", enabled: false },
+  // { label: "ETL", href: "/ade/etl", enabled: false },
+  // { label: "Explorer", href: "/ade/database/explorer", enabled: false },
 ];
 
 const TopHeader = () => {

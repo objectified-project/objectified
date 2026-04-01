@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Palette,
   Globe,
-  Database,
   ArrowRightLeft,
   Search,
   Shield,
@@ -14,7 +13,6 @@ import {
   HelpCircle,
   Users,
   Store,
-  GitCompare,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
@@ -73,46 +71,46 @@ const Ade = () => {
   ];
 
   const dataApps: AppTile[] = [
-    {
-      id: 'database',
-      name: 'Database',
-      description: 'Connect and manage data sources',
-      icon: <Database className="w-8 h-8" />,
-      href: '/ade/database',
-      enabled: true,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      gradient: 'from-emerald-500 to-teal-600',
-    },
-    {
-      id: 'migration',
-      name: 'Migration',
-      description: 'Data Migration Tools',
-      icon: <GitCompare className="w-8 h-8" />,
-      href: '/ade/migration',
-      enabled: true,
-      color: 'text-amber-600 dark:text-amber-400',
-      gradient: 'from-amber-500 to-orange-600',
-    },
-    {
-      id: 'etl',
-      name: 'ETL',
-      description: 'Extract, transform, and load data',
-      icon: <ArrowRightLeft className="w-8 h-8" />,
-      href: '/ade/etl',
-      enabled: false,
-      color: 'text-orange-600 dark:text-orange-400',
-      gradient: 'from-orange-500 to-amber-600',
-    },
-    {
-      id: 'data-explorer',
-      name: 'Data Explorer',
-      description: 'Query and visualize your data',
-      icon: <Search className="w-8 h-8" />,
-      href: '/ade/explorer',
-      enabled: false,
-      color: 'text-rose-600 dark:text-rose-400',
-      gradient: 'from-rose-500 to-red-600',
-    },
+    // {
+    //   id: 'database',
+    //   name: 'Database',
+    //   description: 'Connect and manage data sources',
+    //   icon: <Database className="w-8 h-8" />,
+    //   href: '/ade/database',
+    //   enabled: false,
+    //   color: 'text-emerald-600 dark:text-emerald-400',
+    //   gradient: 'from-emerald-500 to-teal-600',
+    // },
+    // {
+    //   id: 'migration',
+    //   name: 'Migration',
+    //   description: 'Data Migration Tools',
+    //   icon: <GitCompare className="w-8 h-8" />,
+    //   href: '/ade/migration',
+    //   enabled: false,
+    //   color: 'text-amber-600 dark:text-amber-400',
+    //   gradient: 'from-amber-500 to-orange-600',
+    // },
+    // {
+    //   id: 'etl',
+    //   name: 'ETL',
+    //   description: 'Extract, transform, and load data',
+    //   icon: <ArrowRightLeft className="w-8 h-8" />,
+    //   href: '/ade/etl',
+    //   enabled: false,
+    //   color: 'text-orange-600 dark:text-orange-400',
+    //   gradient: 'from-orange-500 to-amber-600',
+    // },
+    // {
+    //   id: 'data-explorer',
+    //   name: 'Data Explorer',
+    //   description: 'Query and visualize your data',
+    //   icon: <Search className="w-8 h-8" />,
+    //   href: '/ade/explorer',
+    //   enabled: false,
+    //   color: 'text-rose-600 dark:text-rose-400',
+    //   gradient: 'from-rose-500 to-red-600',
+    // },
   ];
 
   const auditApps: AppTile[] = [
