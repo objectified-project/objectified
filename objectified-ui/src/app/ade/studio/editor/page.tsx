@@ -4583,7 +4583,14 @@ const StudioContent = () => {
   /** Capture a local quick snapshot (viewport, nodes, edges, groups, optional PNG thumb) with metadata (#173). */
   const performQuickLayoutSnapshotCapture = useCallback(
     async (meta: { summary: string; description: string }) => {
-      if (!selectedVersionId) return;
+      if (!selectedVersionId) {
+        setQuickSnapshotCaptureOpen(false);
+        await alertDialog({
+          message: 'No version is currently open. Please open a version before capturing a snapshot.',
+          variant: 'warning',
+        });
+        return;
+      }
       try {
         setQuickSnapshotCaptureSaving(true);
         setLoadingMessage('Capturing quick snapshot...');

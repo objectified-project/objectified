@@ -74,7 +74,7 @@ export function quickSnapshotAuthorDisplay(snapshot: QuickLayoutSnapshot): strin
 
 /**
  * Case-insensitive match: every whitespace-separated token must appear in id, ISO time,
- * formatted caption, or counts summary.
+ * formatted caption, counts summary, author, summary, or description.
  */
 export function quickSnapshotMatchesSearch(snapshot: QuickLayoutSnapshot, query: string): boolean {
   const raw = query.trim().toLowerCase();
