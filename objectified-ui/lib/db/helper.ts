@@ -3766,9 +3766,49 @@ export async function saveNamedCanvasLayout(
   nodes: any,
   edges?: any,
   groups?: any,
-  snapshotPngBase64?: string
+  snapshotPngBase64?: string,
+  tenantId?: string
 ) {
   try {
+    const session = await getAuthSession();
+    const actingUserId = (session?.user as any)?.user_id;
+    if (!actingUserId) {
+      return errorResponse('Unauthorized');
+    }
+
+    // Personal layout: ensure the caller cannot impersonate another user.
+    if (userId !== null && userId !== actingUserId) {
+      return errorResponse('You can only save layouts for your own account');
+    }
+
+    // Shared layout (userId === null): only tenant admins may create or overwrite them.
+    if (userId === null) {
+      const trimmedTenantId = tenantId?.trim();
+      if (!trimmedTenantId) {
+        return errorResponse('Tenant id is required to save shared layouts');
+      }
+      const tenantOwnsVersionResult = await connectionPool.query(
+        `SELECT 1
+         FROM odb.versions v
+         JOIN odb.projects p ON p.id = v.project_id
+         WHERE v.id = $1
+           AND p.tenant_id = $2
+           AND v.deleted_at IS NULL
+           AND p.deleted_at IS NULL`,
+        [versionId, trimmedTenantId]
+      );
+      if (tenantOwnsVersionResult.rowCount === 0) {
+        return errorResponse('Version does not belong to the provided tenant');
+      }
+      const adminResult = await connectionPool.query(
+        `SELECT 1 FROM odb.tenant_administrators WHERE tenant_id = $1 AND user_id = $2`,
+        [trimmedTenantId, actingUserId]
+      );
+      if (adminResult.rowCount === 0) {
+        return errorResponse('Only tenant administrators can save shared layouts');
+      }
+    }
+
     const nameValue = name.trim();
     if (!nameValue) {
       return errorResponse('Layout name is required');
@@ -4212,6 +4252,7 @@ export async function deleteNamedCanvasLayout(
        FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name = $2
+         AND is_default = false
          AND (user_id = $3 OR user_id IS NULL)
        ORDER BY (user_id = $3) DESC NULLS LAST, updated_at DESC
        LIMIT 1`,
@@ -4233,7 +4274,9 @@ export async function deleteNamedCanvasLayout(
          FROM odb.versions v
          JOIN odb.projects p ON p.id = v.project_id
          WHERE v.id = $1
-           AND p.tenant_id = $2`,
+           AND p.tenant_id = $2
+           AND v.deleted_at IS NULL
+           AND p.deleted_at IS NULL`,
         [versionId, trimmedTenantId]
       );
       if (tenantOwnsVersionResult.rowCount === 0) {

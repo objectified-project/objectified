@@ -22,11 +22,19 @@ jest.mock('crypto', () => ({
 
 describe('Database Helper - Named Canvas Layouts', () => {
   let mockQuery: jest.Mock<any>;
+  let mockGetAuthSession: jest.Mock<any>;
 
   beforeEach(() => {
     const db = require('../lib/db/db');
     mockQuery = db.query as jest.Mock;
     mockQuery.mockReset();
+
+    const serverSession = require('../lib/auth/server-session');
+    mockGetAuthSession = serverSession.getAuthSession as jest.Mock<any>;
+    mockGetAuthSession.mockReset();
+    mockGetAuthSession.mockResolvedValue({
+      user: { user_id: 'user-1', current_tenant_id: 'tenant-1' },
+    });
   });
 
   test('getNamedCanvasLayoutsForVersion deduplicates names and prefers user layouts', async () => {
@@ -279,6 +287,8 @@ describe('Database Helper - Named Canvas Layouts', () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 
     mockQuery
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // version belongs to tenant
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // user is tenant admin
       .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // existing lookup
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1', name: 'Shared Layout' }] }); // create return
 
@@ -288,7 +298,10 @@ describe('Database Helper - Named Canvas Layouts', () => {
       '  Shared Layout  ',
       { x: 0, y: 0, zoom: 1 },
       [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
-      []
+      [],
+      undefined,
+      undefined,
+      'tenant-1'
     );
     const parsed = JSON.parse(result);
 
@@ -296,12 +309,12 @@ describe('Database Helper - Named Canvas Layouts', () => {
     expect(parsed.layout.id).toBe('layout-shared-1');
 
     expect(mockQuery).toHaveBeenNthCalledWith(
-      1,
+      3,
       expect.stringContaining('user_id IS NOT DISTINCT FROM $3'),
       ['version-1', 'Shared Layout', null]
     );
     expect(mockQuery).toHaveBeenNthCalledWith(
-      2,
+      4,
       expect.stringContaining('INSERT INTO odb.canvas_layouts'),
       expect.arrayContaining(['version-1', null, 'Shared Layout'])
     );
@@ -311,6 +324,8 @@ describe('Database Helper - Named Canvas Layouts', () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 
     mockQuery
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // version belongs to tenant
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // user is tenant admin
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1' }] }) // existing lookup (pool)
       .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
       .mockResolvedValueOnce({
@@ -339,14 +354,17 @@ describe('Database Helper - Named Canvas Layouts', () => {
       'Shared Layout',
       { x: 0, y: 0, zoom: 1 },
       [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
-      []
+      [],
+      undefined,
+      undefined,
+      'tenant-1'
     );
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(true);
     expect(parsed.layout.id).toBe('layout-shared-1');
     expect(mockQuery).toHaveBeenNthCalledWith(
-      1,
+      3,
       expect.stringContaining('user_id IS NOT DISTINCT FROM $3'),
       ['version-1', 'Shared Layout', null]
     );
@@ -590,6 +608,42 @@ describe('Database Helper - default named canvas layout preference', () => {
 
     expect(parsed.success).toBe(false);
     expect(parsed.error).toContain('tenant administrators');
+  });
+
+  test('deleteNamedCanvasLayout deletes shared layout when called by tenant admin', async () => {
+    const { deleteNamedCanvasLayout } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'layout-shared-1', user_id: null, name: 'Shared Layout' }],
+      }) // shared layout
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // version belongs to tenant
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // user is tenant admin
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-shared-1' }] }); // delete
+
+    const result = await deleteNamedCanvasLayout('version-1', 'Shared Layout', 'tenant-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.deleted).toBe(true);
+    expect(mockQuery).toHaveBeenCalledTimes(4);
+  });
+
+  test('deleteNamedCanvasLayout errors when deleting shared layout without tenantId', async () => {
+    const { deleteNamedCanvasLayout } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id: 'layout-shared-1', user_id: null, name: 'Shared Layout' }],
+    });
+
+    const result = await deleteNamedCanvasLayout('version-1', 'Shared Layout', undefined as any);
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBeDefined();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
   test('getClassIdsForVersion returns ids for non-deleted classes in version', async () => {

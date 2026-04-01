@@ -4584,7 +4584,8 @@ const StudioContent = () => {
         nodeData,
         edgeData,
         groups,
-        snapshotBase64ForServer
+        snapshotBase64ForServer,
+        currentTenantId ?? undefined
       );
 
       const response = JSON.parse(result);
