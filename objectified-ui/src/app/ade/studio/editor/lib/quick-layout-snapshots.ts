@@ -25,7 +25,7 @@ export interface QuickLayoutSnapshot {
 
 export function quickLayoutSnapshotsStorageKey(versionId: string, userId: string | null): string {
   const uid = userId && userId.trim() ? userId.trim() : 'anonymous';
-  return `objectified.quickCanvasSnapshots.v1:${versionId}:${uid}`;
+  return `objectified.quickCanvasSnapshots.v${QUICK_LAYOUT_SNAPSHOTS_SCHEMA_VERSION}:${versionId}:${uid}`;
 }
 
 function isViewport(v: unknown): v is { x: number; y: number; zoom: number } {
@@ -77,30 +77,43 @@ function persistQuickLayoutSnapshots(
   versionId: string,
   userId: string | null,
   list: QuickLayoutSnapshot[]
-): void {
-  if (typeof window === 'undefined') return;
-  if (!versionId || !versionId.trim()) return;
+): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!versionId || !versionId.trim()) return false;
+  const key = quickLayoutSnapshotsStorageKey(versionId, userId);
   try {
-    window.localStorage.setItem(quickLayoutSnapshotsStorageKey(versionId, userId), JSON.stringify(list));
-  } catch (e) {
-    console.warn('quick layout snapshots: failed to persist', e);
+    window.localStorage.setItem(key, JSON.stringify(list));
+    return true;
+  } catch {
+    // Quota likely exceeded; retry with thumbnails stripped to reduce payload size.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const stripped = list.map(({ thumbnailDataUrl: _t, ...rest }) => rest);
+      window.localStorage.setItem(key, JSON.stringify(stripped));
+      return true;
+    } catch (e) {
+      console.warn('quick layout snapshots: failed to persist', e);
+      return false;
+    }
   }
 }
 
 /**
- * Prepend a snapshot and cap list length. Returns the stored list after write.
+ * Prepend a snapshot and cap list length.
+ * Returns the in-memory list together with a `persisted` flag indicating
+ * whether the write to localStorage succeeded.
  */
 export function appendQuickLayoutSnapshot(
   versionId: string,
   userId: string | null,
   snapshot: QuickLayoutSnapshot,
   options?: { maxSnapshots?: number }
-): QuickLayoutSnapshot[] {
+): { snapshots: QuickLayoutSnapshot[]; persisted: boolean } {
   const max = options?.maxSnapshots ?? DEFAULT_MAX_QUICK_LAYOUT_SNAPSHOTS;
   const existing = loadQuickLayoutSnapshots(versionId, userId);
   const next = [snapshot, ...existing].slice(0, max);
-  persistQuickLayoutSnapshots(versionId, userId, next);
-  return next;
+  const persisted = persistQuickLayoutSnapshots(versionId, userId, next);
+  return { snapshots: next, persisted };
 }
 
 export function makeQuickLayoutSnapshotId(): string {

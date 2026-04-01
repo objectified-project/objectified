@@ -4613,10 +4613,17 @@ const StudioContent = () => {
           groups: groupsPlain,
         },
       };
-      const next = appendQuickLayoutSnapshot(selectedVersionId, currentUserId, snapshot);
+      const { snapshots: next, persisted } = appendQuickLayoutSnapshot(selectedVersionId, currentUserId, snapshot);
       setQuickLayoutSnapshots(next);
-      setQuickSnapshotSavedFlash(true);
-      window.setTimeout(() => setQuickSnapshotSavedFlash(false), 2000);
+      if (persisted) {
+        setQuickSnapshotSavedFlash(true);
+        window.setTimeout(() => setQuickSnapshotSavedFlash(false), 2000);
+      } else {
+        await alertDialog({
+          message: 'Quick snapshot could not be saved (storage quota may be full). Try clearing old snapshots.',
+          variant: 'warning',
+        });
+      }
     } catch (error) {
       console.error('Error capturing quick layout snapshot:', error);
       await alertDialog({

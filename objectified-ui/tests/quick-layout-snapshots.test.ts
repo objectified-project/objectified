@@ -44,11 +44,55 @@ describe('quick-layout-snapshots', () => {
 
   it('round-trips snapshots through localStorage', () => {
     const s = makeSnapshot('a', new Date().toISOString());
-    appendQuickLayoutSnapshot(versionId, userId, s);
+    const { snapshots, persisted } = appendQuickLayoutSnapshot(versionId, userId, s);
+    expect(persisted).toBe(true);
+    expect(snapshots).toHaveLength(1);
     const loaded = loadQuickLayoutSnapshots(versionId, userId);
     expect(loaded).toHaveLength(1);
     expect(loaded[0].id).toBe('a');
     expect(loaded[0].payload.viewport.zoom).toBe(1);
+  });
+
+  it('returns persisted:false and retries without thumbnails when setItem throws', () => {
+    const s = makeSnapshot('quota-test', new Date().toISOString());
+    let callCount = 0;
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = (key: string, value: string) => {
+      callCount += 1;
+      // First call fails (simulates quota exceeded), second call succeeds.
+      if (callCount === 1) throw new DOMException('QuotaExceededError');
+      original.call(localStorage, key, value);
+    };
+    try {
+      const { persisted } = appendQuickLayoutSnapshot(versionId, userId, s);
+      // Second attempt (stripped thumbnails) should succeed.
+      expect(persisted).toBe(true);
+      expect(callCount).toBe(2);
+      // Thumbnail should be stripped in the persisted data.
+      const loaded = loadQuickLayoutSnapshots(versionId, userId);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].thumbnailDataUrl).toBeUndefined();
+    } finally {
+      Storage.prototype.setItem = original;
+    }
+  });
+
+  it('returns persisted:false when both setItem attempts throw', () => {
+    const s = makeSnapshot('always-fails', new Date().toISOString());
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {
+      throw new DOMException('QuotaExceededError');
+    };
+    try {
+      const { snapshots, persisted } = appendQuickLayoutSnapshot(versionId, userId, s);
+      expect(persisted).toBe(false);
+      // In-memory list is still returned.
+      expect(snapshots).toHaveLength(1);
+      // Nothing written to storage.
+      expect(loadQuickLayoutSnapshots(versionId, userId)).toHaveLength(0);
+    } finally {
+      Storage.prototype.setItem = original;
+    }
   });
 
   it('prepends newest snapshots', () => {
