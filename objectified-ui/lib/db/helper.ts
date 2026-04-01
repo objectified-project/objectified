@@ -3890,17 +3890,26 @@ export async function saveNamedCanvasLayout(
         existingResult.rows[0]?.metadata && typeof existingResult.rows[0].metadata === 'object'
           ? existingResult.rows[0].metadata
           : {};
-      const mergedMetadata = {
+      const mergedMetadata: Record<string, unknown> = {
         ...existingMetadata,
-        ...(normalizedAnnotations.comment !== undefined ? { comment: normalizedAnnotations.comment } : {}),
-        ...(normalizedAnnotations.annotations !== undefined ? { annotations: normalizedAnnotations.annotations } : {}),
       };
-      // If user cleared a field, remove it rather than keeping stale text.
-      if (normalizedAnnotations.comment === undefined) {
-        delete mergedMetadata.comment;
-      }
-      if (normalizedAnnotations.annotations === undefined) {
-        delete mergedMetadata.annotations;
+      // Apply metadata changes only when explicitly provided.
+      // Treat empty strings as an explicit request to clear the field.
+      if (annotationsInput != null) {
+        if (Object.prototype.hasOwnProperty.call(annotationsInput, 'comment')) {
+          if (normalizedAnnotations.comment) {
+            mergedMetadata.comment = normalizedAnnotations.comment;
+          } else {
+            delete mergedMetadata.comment;
+          }
+        }
+        if (Object.prototype.hasOwnProperty.call(annotationsInput, 'annotations')) {
+          if (normalizedAnnotations.annotations) {
+            mergedMetadata.annotations = normalizedAnnotations.annotations;
+          } else {
+            delete mergedMetadata.annotations;
+          }
+        }
       }
       updates.metadata = mergedMetadata;
       if (snapshotBuffer !== undefined) {

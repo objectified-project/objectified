@@ -252,6 +252,131 @@ describe('Database Helper - Named Canvas Layouts', () => {
     );
   });
 
+  test('saveNamedCanvasLayout merges metadata on update and preserves unrelated keys', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'layout-4', name: 'Annotated Layout', metadata: { comment: 'Old comment', annotations: 'Existing note', extra: 'keep-me' } }],
+      }) // existing layout lookup
+      .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ version_id: 'version-1', user_id: 'user-1', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [], grid_settings: {}, minimap_settings: {} }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ n: 0 }] }) // max revision
+      .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
+      .mockResolvedValueOnce({ rowCount: 0 }) // prune old revisions
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-4', name: 'Annotated Layout' }] }) // UPDATE RETURNING
+      .mockResolvedValueOnce({ rowCount: 0 }); // COMMIT
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'Annotated Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { comment: 'Updated comment' }
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      7,
+      expect.stringContaining('UPDATE odb.canvas_layouts'),
+      expect.arrayContaining([
+        JSON.stringify({ comment: 'Updated comment', annotations: 'Existing note', extra: 'keep-me' }),
+      ])
+    );
+  });
+
+  test('saveNamedCanvasLayout clears comment on update when empty string is provided but preserves other metadata', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'layout-5', name: 'Annotated Layout', metadata: { comment: 'Old comment', annotations: 'Existing note', extra: 'keep-me' } }],
+      }) // existing layout lookup
+      .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ version_id: 'version-1', user_id: 'user-1', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [], grid_settings: {}, minimap_settings: {} }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ n: 0 }] }) // max revision
+      .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
+      .mockResolvedValueOnce({ rowCount: 0 }) // prune old revisions
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-5', name: 'Annotated Layout' }] }) // UPDATE RETURNING
+      .mockResolvedValueOnce({ rowCount: 0 }); // COMMIT
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'Annotated Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [],
+      undefined,
+      undefined,
+      undefined,
+      { comment: '' }
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      7,
+      expect.stringContaining('UPDATE odb.canvas_layouts'),
+      expect.arrayContaining([
+        JSON.stringify({ annotations: 'Existing note', extra: 'keep-me' }),
+      ])
+    );
+  });
+
+  test('saveNamedCanvasLayout preserves existing metadata on update when annotationsInput is omitted', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 'layout-6', name: 'Annotated Layout', metadata: { comment: 'Old comment', annotations: 'Existing note', extra: 'keep-me' } }],
+      }) // existing layout lookup
+      .mockResolvedValueOnce({ rowCount: 0 }) // BEGIN
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ version_id: 'version-1', user_id: 'user-1', viewport: { x: 0, y: 0, zoom: 1 }, nodes: [], edges: [], grid_settings: {}, minimap_settings: {} }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ n: 0 }] }) // max revision
+      .mockResolvedValueOnce({ rowCount: 1 }) // insert revision
+      .mockResolvedValueOnce({ rowCount: 0 }) // prune old revisions
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-6', name: 'Annotated Layout' }] }) // UPDATE RETURNING
+      .mockResolvedValueOnce({ rowCount: 0 }); // COMMIT
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'Annotated Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [] // no annotationsInput -> should not alter existing metadata
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      7,
+      expect.stringContaining('UPDATE odb.canvas_layouts'),
+      expect.arrayContaining([
+        JSON.stringify({ comment: 'Old comment', annotations: 'Existing note', extra: 'keep-me' }),
+      ])
+    );
+  });
+
   test('saveNamedCanvasLayout rejects blank layout name after trim', async () => {
     const { saveNamedCanvasLayout } = await import('../lib/db/helper');
 
