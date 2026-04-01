@@ -180,6 +180,7 @@ import {
   buildCanvasLayoutJsonDocument,
   CANVAS_LAYOUT_JSON_FORMAT_VERSION,
   type CanvasLayoutJsonDocument,
+  type FilteredCanvasLayoutForImport,
   parseCanvasLayoutJson,
   filterCanvasLayoutForTargetClasses,
   mergeSavedEdgeHandles,
@@ -5015,6 +5016,54 @@ const StudioContent = () => {
     ]
   );
 
+  /**
+   * Shared helper: sync groups for the current version, warn about dropped classes, then apply the
+   * filtered layout. Returns `true` on success, `false` if sync failed (caller should abort).
+   */
+  const syncGroupsAndApplyFilteredLayout = useCallback(
+    async (
+      filtered: FilteredCanvasLayoutForImport,
+      options?: { layoutNameToSet?: string; droppedFromLabel?: string }
+    ): Promise<boolean> => {
+      const syncRes = await syncGroupsForVersion(
+        selectedVersionId,
+        filtered.groups,
+        filtered.nodePositions
+      );
+      const syncParsed = JSON.parse(syncRes);
+      if (!syncParsed.success) {
+        await alertDialog({
+          message: syncParsed.error || 'Failed to sync groups for this layout.',
+          variant: 'error',
+        });
+        setIsLoadingCanvas(false);
+        setLoadingMessage('');
+        return false;
+      }
+
+      if (filtered.droppedClassCount > 0) {
+        const from = options?.droppedFromLabel ?? 'the layout';
+        await alertDialog({
+          message: `${filtered.droppedClassCount} class(es) from ${from} are not in this version and were skipped.`,
+          variant: 'warning',
+        });
+      }
+
+      await applyCanvasLayoutPayload({
+        layout: {
+          viewport: filtered.viewport,
+          nodes: filtered.nodes,
+          edges: filtered.edges,
+        },
+        layoutNameToSet: options?.layoutNameToSet,
+        clearGroupsWhenEmpty: true,
+      });
+
+      return true;
+    },
+    [selectedVersionId, alertDialog, applyCanvasLayoutPayload]
+  );
+
   /** Restore a local quick snapshot: sync groups to DB then apply viewport, node positions, and edges. */
   const handleRestoreQuickLayoutSnapshot = useCallback(
     async (snapshot: QuickLayoutSnapshot) => {
@@ -5070,37 +5119,10 @@ const StudioContent = () => {
         };
         const filtered = filterCanvasLayoutForTargetClasses(doc, validIds);
 
-        const syncRes = await syncGroupsForVersion(
-          selectedVersionId,
-          filtered.groups,
-          filtered.nodePositions
-        );
-        const syncParsed = JSON.parse(syncRes);
-        if (!syncParsed.success) {
-          await alertDialog({
-            message: syncParsed.error || 'Failed to sync groups for this snapshot.',
-            variant: 'error',
-          });
-          setIsLoadingCanvas(false);
-          setLoadingMessage('');
-          return;
-        }
-
-        if (filtered.droppedClassCount > 0) {
-          await alertDialog({
-            message: `${filtered.droppedClassCount} class(es) from the snapshot are not in this version and were skipped.`,
-            variant: 'warning',
-          });
-        }
-
-        await applyCanvasLayoutPayload({
-          layout: {
-            viewport: filtered.viewport,
-            nodes: filtered.nodes,
-            edges: filtered.edges,
-          },
-          clearGroupsWhenEmpty: true,
+        const applied = await syncGroupsAndApplyFilteredLayout(filtered, {
+          droppedFromLabel: 'the snapshot',
         });
+        if (!applied) return;
       } catch (error) {
         console.error('Error restoring quick layout snapshot:', error);
         await alertDialog({
@@ -5118,10 +5140,9 @@ const StudioContent = () => {
       isReadOnly,
       alertDialog,
       confirmDialog,
-      applyCanvasLayoutPayload,
+      syncGroupsAndApplyFilteredLayout,
     ]
   );
-
   // Load saved canvas layout
   const handleLoadLayout = useCallback(async () => {
     if (!selectedVersionId || !currentUserId) return;
@@ -5273,40 +5294,11 @@ const StudioContent = () => {
         const validIds = new Set<string>(idsParsed.classIds);
         const filtered = filterCanvasLayoutForTargetClasses(parsed.doc, validIds);
 
-        const syncRes = await syncGroupsForVersion(
-          selectedVersionId,
-          filtered.groups,
-          filtered.nodePositions
-        );
-        const syncParsed = JSON.parse(syncRes);
-        if (!syncParsed.success) {
-          await alertDialog({
-            message: syncParsed.error || 'Failed to sync groups for this layout.',
-            variant: 'error',
-          });
-          setIsLoadingCanvas(false);
-          setLoadingMessage('');
-          return;
-        }
-
-        if (filtered.droppedClassCount > 0) {
-          await alertDialog({
-            message: `${filtered.droppedClassCount} class(es) from the file are not in this version and were skipped.`,
-            variant: 'warning',
-          });
-        }
-
-        const layoutPayload = {
-          viewport: filtered.viewport,
-          nodes: filtered.nodes,
-          edges: filtered.edges,
-        };
-
-        await applyCanvasLayoutPayload({
-          layout: layoutPayload,
+        const applied = await syncGroupsAndApplyFilteredLayout(filtered, {
           layoutNameToSet: parsed.doc.layoutName?.trim() || selectedLayoutName,
-          clearGroupsWhenEmpty: true,
+          droppedFromLabel: 'the file',
         });
+        if (!applied) return;
       } catch (err) {
         console.error('Error importing layout JSON:', err);
         await alertDialog({
@@ -5324,11 +5316,10 @@ const StudioContent = () => {
       isReadOnly,
       alertDialog,
       confirmDialog,
-      applyCanvasLayoutPayload,
+      syncGroupsAndApplyFilteredLayout,
       selectedLayoutName,
     ]
   );
-
   const handleRestoreLayoutRevision = useCallback(
     async (revisionId: string) => {
       if (!selectedVersionId || !currentUserId || isReadOnly) return;
@@ -8748,6 +8739,7 @@ const StudioContent = () => {
                                         type="button"
                                         disabled={restoreDisabled}
                                         onClick={() => void handleRestoreQuickLayoutSnapshot(s)}
+                                        aria-label={`Restore quick snapshot from ${caption}`}
                                         className={`w-full overflow-hidden rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/70 shadow-sm text-left transition-opacity ${
                                           restoreDisabled
                                             ? 'opacity-50 cursor-not-allowed'
@@ -8760,9 +8752,9 @@ const StudioContent = () => {
                                               : !currentUserId
                                                 ? 'Sign in to restore snapshots'
                                                 : 'Please wait…'
-                                            : `Restore canvas from ${s.createdAt}`
+                                            : `Restore canvas from ${caption}`
                                         }
-                                      >
+                                       >
                                         <div className="relative aspect-[5/3] w-full bg-gray-100 dark:bg-gray-900 pointer-events-none">
                                           {s.thumbnailDataUrl ? (
                                             <img
