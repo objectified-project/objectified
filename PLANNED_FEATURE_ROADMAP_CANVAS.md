@@ -15,12 +15,11 @@
 - ✅ Share layout configurations with team members (#174) — quick snapshot gallery: copy/download JSON envelope, import shared JSON for same API version
 - ✅ "Pin" layout as team default (#175) — tenant admins: Share → Pin as team default saves a shared named layout and sets tenant default for the version
 - ✅ Layout permissions (view, edit, delete) (#176) — named layouts now expose view/edit/delete capability in the Layout panel; shared layouts are view-only for non-admins and only tenant admins can delete shared entries
-- 📋 [TODO] Layout comments and annotations
+- ✅ Layout comments and annotations (#177) — named layouts now support a short comment and longer annotations in the Layout panel; both are saved per layout and restored when the name is selected
 - 📋 [TODO] Layout versioning with diff viewer
 
 | Ticket | Feature                                       |
 |--------|-----------------------------------------------|
-| #177   | Layout comments and annotations               |
 | #178   | Layout versioning with diff viewer            |
 
 ---

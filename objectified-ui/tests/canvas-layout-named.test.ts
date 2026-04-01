@@ -81,6 +81,31 @@ describe('Database Helper - Named Canvas Layouts', () => {
     expect(parsed.layouts[0].name).toBe('Development Layout');
   });
 
+  test('getNamedCanvasLayoutsForVersion includes stored layout annotations metadata', async () => {
+    const { getNamedCanvasLayoutsForVersion } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({
+      rows: [
+        {
+          id: 'u1',
+          name: 'Development Layout',
+          user_id: 'user-1',
+          metadata: { comment: 'Review', annotations: 'Keep service nodes grouped.' },
+        },
+      ],
+    });
+
+    const result = await getNamedCanvasLayoutsForVersion('version-1', 'user-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.layouts).toHaveLength(1);
+    expect(parsed.layouts[0].metadata).toEqual({
+      comment: 'Review',
+      annotations: 'Keep service nodes grouped.',
+    });
+  });
+
   test('getNamedCanvasLayout returns null when no named layout exists', async () => {
     const { getNamedCanvasLayout } = await import('../lib/db/helper');
 
@@ -182,6 +207,49 @@ describe('Database Helper - Named Canvas Layouts', () => {
 
     expect(parsed.success).toBe(true);
     expect(parsed.layout.name).toBe('Presentation Layout');
+  });
+
+  test('saveNamedCanvasLayout stores comment and annotations in metadata on create', async () => {
+    const { saveNamedCanvasLayout } = await import('../lib/db/helper');
+
+    mockQuery
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] }) // existing lookup
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'layout-3', name: 'Annotated Layout' }] }); // create return
+
+    const result = await saveNamedCanvasLayout(
+      'version-1',
+      'user-1',
+      'Annotated Layout',
+      { x: 0, y: 0, zoom: 1 },
+      [{ id: 'node-1', type: 'classNode', position: { x: 1, y: 2 } }],
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        comment: 'Team review',
+        annotations: 'Use this before migration.',
+      }
+    );
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('INSERT INTO odb.canvas_layouts'),
+      expect.arrayContaining([
+        'version-1',
+        'user-1',
+        'Annotated Layout',
+        expect.anything(),
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+        JSON.stringify({ comment: 'Team review', annotations: 'Use this before migration.' }),
+      ])
+    );
   });
 
   test('saveNamedCanvasLayout rejects blank layout name after trim', async () => {

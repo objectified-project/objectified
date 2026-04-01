@@ -19,6 +19,8 @@ const MAX_CANVAS_LAYOUT_SNAPSHOT_BASE64_CHARS = Math.ceil(MAX_CANVAS_LAYOUT_SNAP
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 /** 4-byte ASCII chunk type for the required IHDR chunk (first chunk in every PNG). */
 const PNG_IHDR_TYPE = Buffer.from([0x49, 0x48, 0x44, 0x52]);
+const MAX_LAYOUT_COMMENT_LENGTH = 240;
+const MAX_LAYOUT_ANNOTATIONS_LENGTH = 4000;
 
 /**
  * Reserved named layout used when a tenant admin pins a quick snapshot as the team default (#175).
@@ -66,6 +68,22 @@ function layoutRowWithoutBinarySnapshot(row: any) {
   if (!row) return row;
   const { snapshot_image: _s, ...rest } = row;
   return rest;
+}
+
+type NamedLayoutAnnotationsInput =
+  | {
+      comment?: unknown;
+      annotations?: unknown;
+    }
+  | null
+  | undefined;
+
+function sanitizeNamedLayoutAnnotations(input: NamedLayoutAnnotationsInput) {
+  const rawComment = typeof input?.comment === 'string' ? input.comment.trim() : '';
+  const rawAnnotations = typeof input?.annotations === 'string' ? input.annotations.trim() : '';
+  const comment = rawComment ? rawComment.slice(0, MAX_LAYOUT_COMMENT_LENGTH) : undefined;
+  const annotations = rawAnnotations ? rawAnnotations.slice(0, MAX_LAYOUT_ANNOTATIONS_LENGTH) : undefined;
+  return { comment, annotations };
 }
 
 export const getUserByEmail = async (emailAddress: string) =>
@@ -3671,7 +3689,7 @@ export async function pinTeamDefaultQuickSnapshot(
 export async function getNamedCanvasLayoutsForVersion(versionId: string, userId?: string) {
   try {
     const result = await connectionPool.query(
-      `SELECT id, version_id, user_id, name, is_default, snapshot_image, created_at, updated_at
+      `SELECT id, version_id, user_id, name, is_default, metadata, snapshot_image, created_at, updated_at
        FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name IS NOT NULL
@@ -3767,7 +3785,8 @@ export async function saveNamedCanvasLayout(
   edges?: any,
   groups?: any,
   snapshotPngBase64?: string,
-  tenantId?: string
+  tenantId?: string,
+  annotationsInput?: NamedLayoutAnnotationsInput
 ) {
   try {
     const session = await getAuthSession();
@@ -3829,13 +3848,14 @@ export async function saveNamedCanvasLayout(
     }
 
     const existingResult = await connectionPool.query(
-      `SELECT id FROM odb.canvas_layouts
+      `SELECT id, metadata FROM odb.canvas_layouts
        WHERE version_id = $1
          AND name = $2
          AND user_id IS NOT DISTINCT FROM $3
        LIMIT 1`,
       [versionId, nameValue, userId]
     );
+    const normalizedAnnotations = sanitizeNamedLayoutAnnotations(annotationsInput);
 
     // Keep group storage behavior aligned with default layout saves.
     if (groups && Array.isArray(groups)) {
@@ -3859,12 +3879,30 @@ export async function saveNamedCanvasLayout(
         viewport: any;
         nodes: any;
         edges: any;
+        metadata?: any;
         snapshotImage?: Buffer;
       } = {
         viewport,
         nodes,
         edges: edges || []
       };
+      const existingMetadata =
+        existingResult.rows[0]?.metadata && typeof existingResult.rows[0].metadata === 'object'
+          ? existingResult.rows[0].metadata
+          : {};
+      const mergedMetadata = {
+        ...existingMetadata,
+        ...(normalizedAnnotations.comment !== undefined ? { comment: normalizedAnnotations.comment } : {}),
+        ...(normalizedAnnotations.annotations !== undefined ? { annotations: normalizedAnnotations.annotations } : {}),
+      };
+      // If user cleared a field, remove it rather than keeping stale text.
+      if (normalizedAnnotations.comment === undefined) {
+        delete mergedMetadata.comment;
+      }
+      if (normalizedAnnotations.annotations === undefined) {
+        delete mergedMetadata.annotations;
+      }
+      updates.metadata = mergedMetadata;
       if (snapshotBuffer !== undefined) {
         updates.snapshotImage = snapshotBuffer;
       }
@@ -3886,7 +3924,10 @@ export async function saveNamedCanvasLayout(
       null,
       { enabled: true, size: 20, snapToGrid: true, showGrid: true },
       { enabled: true, position: 'bottom-right', size: 'medium' },
-      {},
+      {
+        ...(normalizedAnnotations.comment !== undefined ? { comment: normalizedAnnotations.comment } : {}),
+        ...(normalizedAnnotations.annotations !== undefined ? { annotations: normalizedAnnotations.annotations } : {}),
+      },
       snapshotBuffer ?? null
     );
   } catch (error: any) {
