@@ -99,7 +99,7 @@ export default function GroupBulkEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Bulk edit classes in &ldquo;{groupName}&rdquo;</DialogTitle>
           <p className="text-sm text-gray-600 dark:text-gray-400">

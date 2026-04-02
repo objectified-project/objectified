@@ -556,7 +556,7 @@ const Projects = () => {
           if (!isLoading) setShowCreateDialog(open);
         }}
       >
-        <DialogContent className="w-[1280px] max-w-[95vw] h-[90vh] flex flex-col">
+        <DialogContent className="w-[1280px] max-w-[95vw] h-[90vh] flex flex-col" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-900/30 dark:to-indigo-900/30">
@@ -759,7 +759,7 @@ const Projects = () => {
 
       {/* Edit Project Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
           </DialogHeader>

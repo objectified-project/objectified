@@ -93,7 +93,10 @@ export default function ExtractToClassDialog({
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10001]" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6 max-h-[90vh] overflow-auto">
+        <Dialog.Content
+          aria-describedby={undefined}
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6 max-h-[90vh] overflow-auto"
+        >
           <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">Extract Property to Class</Dialog.Title>
 
           {error && (

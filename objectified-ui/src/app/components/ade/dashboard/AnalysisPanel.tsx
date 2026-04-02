@@ -655,7 +655,10 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
         <Dialog.Root open={selectedCategory !== null} onOpenChange={(open) => !open && setSelectedCategory(null)}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10000]" />
-            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-[10001] w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <Dialog.Content
+              aria-describedby={undefined}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-[10001] w-full max-w-2xl max-h-[80vh] overflow-hidden"
+            >
               {selectedCategory && (
                 <>
                   <div className={`p-6 bg-gradient-to-r ${getCategoryGradient(selectedCategory)} text-white`}>

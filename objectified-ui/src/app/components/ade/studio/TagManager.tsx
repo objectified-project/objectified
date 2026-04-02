@@ -206,7 +206,7 @@ const TagManager = ({ open, onClose, projectId, tags, onTagsChanged }: TagManage
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-w-md w-full" showCloseButton={true}>
+      <DialogContent className="max-w-md w-full" showCloseButton={true} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TagIcon size={20} />

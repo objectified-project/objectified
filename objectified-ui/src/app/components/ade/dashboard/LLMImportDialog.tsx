@@ -595,7 +595,7 @@ export default function LLMImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0">
+      <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0" aria-describedby={undefined}>
         <LLMChatPanel
           ref={panelRef}
           tenantId={tenantId}

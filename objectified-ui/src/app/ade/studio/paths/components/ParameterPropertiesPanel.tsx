@@ -880,6 +880,7 @@ export default function ParameterPropertiesPanel({
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
           <Dialog.Content
+            aria-describedby={undefined}
             className={`fixed left-1/2 top-1/2 z-[9999] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg shadow-xl ${
               isDark ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'
             }`}

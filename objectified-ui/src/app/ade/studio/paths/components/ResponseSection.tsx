@@ -926,7 +926,10 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
       <Dialog.Root open={showAddContentTypeDialog} onOpenChange={setShowAddContentTypeDialog}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4"
+          >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Content Type</Dialog.Title>
             <Label className="text-xs font-medium mb-1 block">Media Type</Label>
             <Select value={newMediaType} onValueChange={setNewMediaType}>
@@ -953,7 +956,10 @@ export default function ResponseSection({ response, onUpdate, onRefresh }: Respo
       <Dialog.Root open={showAddPropertyDialog} onOpenChange={setShowAddPropertyDialog}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[9998]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4">
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed left-1/2 top-1/2 z-[9999] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl p-4"
+          >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Property</Dialog.Title>
             <Label className="text-xs font-medium mb-1 block">Property Name</Label>
             <Input
