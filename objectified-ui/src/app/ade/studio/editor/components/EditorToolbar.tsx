@@ -383,7 +383,7 @@ export function EditorToolbar({
                   <div className="absolute right-0 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800 z-[1002]">
                     <div
                       aria-hidden="true"
-                      className="absolute -top-2 right-5 h-3.5 w-3.5 rotate-45 border-l border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+                      className="absolute -top-3 right-6 h-5 w-5 rotate-45 border-l-2 border-t-2 border-gray-300 bg-white shadow-sm dark:border-gray-600 dark:bg-gray-800"
                     />
                     <div className="p-2">
                       <button

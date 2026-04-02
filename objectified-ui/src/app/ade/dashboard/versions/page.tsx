@@ -526,32 +526,39 @@ const Versions = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-            <Package className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Versions</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage versions with semantic versioning</p>
+    <>
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Package className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                Versions
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                Manage versions with semantic versioning
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="w-56"><SelectValue placeholder="Select Project" /></SelectTrigger>
+                <SelectContent>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Button variant="secondary" onClick={handleCompareDialogOpen} disabled={!selectedProjectId || versions.length < 2}>
+                <Copy className="h-4 w-4 mr-2" />
+                Compare
+              </Button>
+              <Button onClick={handleCreateClick} disabled={!selectedProjectId}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Version
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="flex gap-3">
-          <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-            <SelectTrigger className="w-56"><SelectValue placeholder="Select Project" /></SelectTrigger>
-            <SelectContent>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-          </Select>
-          <Button variant="secondary" onClick={handleCompareDialogOpen} disabled={!selectedProjectId || versions.length < 2} className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white">
-            <Copy className="h-4 w-4" />Compare
-          </Button>
-          <Button onClick={handleCreateClick} disabled={!selectedProjectId} className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600">
-            <Plus className="h-4 w-4" />New Version
-          </Button>
-        </div>
-      </div>
+      </header>
 
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-7xl mx-auto">
       {/* Versions List */}
       {versions.length === 0 ? (
         <div className="relative">
@@ -741,6 +748,8 @@ const Versions = () => {
           </table>
         </div>
       )}
+        </div>
+      </main>
 
       {/* Create Version Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
@@ -1274,7 +1283,7 @@ const Versions = () => {
         classesWithProperties={relationshipGraphClasses}
         isLoading={isLoadingRelationshipGraph}
       />
-    </div>
+    </>
   );
 };
 

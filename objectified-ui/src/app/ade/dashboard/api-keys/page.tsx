@@ -203,24 +203,29 @@ const ApiKeys = () => {
 
   return (
     <TooltipProvider>
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/25">
-              <Key className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">API Keys</h1>
-              <p className="text-gray-500 dark:text-gray-300 mt-1">Manage API keys for external REST API access</p>
+      <>
+        <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Key className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  API Keys
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                  Manage API keys for external REST API access
+                </p>
+              </div>
+              <Button onClick={handleCreateApiKey}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create API Key
+              </Button>
             </div>
           </div>
-          <Button onClick={handleCreateApiKey} className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
-            <Plus className="h-5 w-5" />
-            Create API Key
-          </Button>
-        </div>
+        </header>
 
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto">
         {/* API Keys List */}
         <div className="space-y-4">
           {apiKeys.length === 0 ? (
@@ -393,7 +398,9 @@ const ApiKeys = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+          </div>
+        </main>
+      </>
     </TooltipProvider>
   );
 };

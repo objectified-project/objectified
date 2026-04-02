@@ -310,37 +310,43 @@ const Projects = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
-            <FolderOpen className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Projects</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage projects for the current tenant</p>
+    <>
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <FolderOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                Projects
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                Manage projects for the current tenant
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => {
+                  setImportOpenedFromNewProjectAI(false);
+                  setShowNewImportDialog(true);
+                }}
+                variant="secondary"
+                disabled={!currentTenantId}
+                title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+              <Button onClick={handleCreateClick}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Project
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => {
-              setImportOpenedFromNewProjectAI(false);
-              setShowNewImportDialog(true);
-            }}
-            variant="outline"
-            className="border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
-            disabled={!currentTenantId}
-            title={!currentTenantId ? 'Please select a tenant first' : 'Import specification'}
-          >
-            <Upload className="h-5 w-5" />Import
-          </Button>
-          <Button onClick={handleCreateClick} className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
-            <Plus className="h-5 w-5" />New Project
-          </Button>
-        </div>
-      </div>
+      </header>
 
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-7xl mx-auto">
       {/* Projects List */}
       {projects.length === 0 ? (
         <div className="relative">
@@ -528,6 +534,8 @@ const Projects = () => {
           </div>
         </div>
       )}
+        </div>
+      </main>
 
       {/* Create Project Dialog */}
       <Dialog
@@ -912,7 +920,7 @@ const Projects = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
 

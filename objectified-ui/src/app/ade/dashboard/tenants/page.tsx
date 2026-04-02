@@ -424,20 +424,25 @@ const Tenants = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
-            <Building2 className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Tenants</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage tenants and switch between them</p>
+    <>
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Building2 className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                Tenants
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                Manage tenants and switch between them
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-7xl mx-auto">
       {tenants.length === 0 ? (
         <div className="relative">
           <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-full blur-3xl opacity-60" />
@@ -787,7 +792,9 @@ const Tenants = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
+      </main>
+    </>
   );
 };
 

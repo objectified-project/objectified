@@ -228,17 +228,25 @@ const LinkedAccounts = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Page Header - same design as Published */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
-          <LinkIcon className="h-7 w-7 text-white" />
+    <>
+      <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <LinkIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                Linked Accounts
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                Link external accounts for single sign-on and repository access
+              </p>
+            </div>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Linked Accounts</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Link external accounts for single sign-on (SSO) and repository access.</p>
-        </div>
-      </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-7xl mx-auto">
 
       {/* Success / Error */}
       {successMessage && <Alert variant="success" className="mb-4" onClose={() => setSuccessMessage('')}>{successMessage}</Alert>}
@@ -449,7 +457,9 @@ const LinkedAccounts = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+        </div>
+      </main>
+    </>
   );
 };
 

@@ -252,18 +252,25 @@ const PublishedVersions = () => {
 
   return (
     <TooltipProvider>
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
-            <Eye className="h-7 w-7 text-white" />
+      <>
+        <header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Eye className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  Published Versions
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                  View published and locked versions, access URLs, and visibility settings
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Published Versions</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">View all published and locked versions with their access URLs and visibility settings.</p>
-          </div>
-        </div>
+        </header>
 
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto">
         {/* Search */}
         <div className="mb-6 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -536,7 +543,9 @@ const PublishedVersions = () => {
             {searchQuery && filteredVersions.length < versions.length && <span className="ml-2 text-blue-600 dark:text-blue-400">(filtered)</span>}
           </div>
         )}
-      </div>
+          </div>
+        </main>
+      </>
 
       {/* API key dialog for private View links */}
       <Dialog open={!!apiKeyDialog} onOpenChange={(open) => !open && setApiKeyDialog(null)}>
