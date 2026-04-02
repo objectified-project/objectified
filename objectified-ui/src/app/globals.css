@@ -4,6 +4,9 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  --app-font-sans: "Aptos", "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --app-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-inter: var(--app-font-sans);
   --background: #ffffff;
   --foreground: #171717;
   --surface: #ffffff;
@@ -11,6 +14,9 @@
   --border-subtle: #e2e8f0;
   --focus-ring: #6366f1;
   --text-muted: #475569;
+  --radius-md: 0.5rem;
+  --shadow-subtle: 0 1px 2px rgb(15 23 42 / 0.06);
+  --control-height: 2.5rem;
 }
 
 /* ===== THEME SYSTEM ===== */
@@ -137,7 +143,12 @@ body[data-theme="darcula"] .dark\:bg-gray-800 {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-text-muted: var(--text-muted);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
 
   /* Animation keyframes for Radix UI */
   --animate-in: enter 0.2s ease-out;
@@ -215,7 +226,7 @@ body[data-theme="darcula"] .dark\:bg-gray-800 {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--app-font-sans);
   line-height: 1.45;
   letter-spacing: 0.002em;
   text-rendering: optimizeLegibility;

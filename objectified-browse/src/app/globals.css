@@ -1,22 +1,63 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for ThemeProvider */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
+  --app-font-sans: "Aptos", "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --app-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-geist-sans: var(--app-font-sans);
+  --font-geist-mono: var(--app-font-mono);
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border-subtle: #e2e8f0;
+  --focus-ring: #6366f1;
+  --text-muted: #475569;
+  --radius-md: 0.5rem;
+  --shadow-subtle: 0 1px 2px rgb(15 23 42 / 0.06);
+  --control-height: 2.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-text-muted: var(--text-muted);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #111827;
+    --surface-muted: #0f172a;
+    --border-subtle: #334155;
+    --text-muted: #cbd5e1;
   }
+}
+
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --surface: #111827;
+  --surface-muted: #0f172a;
+  --border-subtle: #334155;
+  --text-muted: #cbd5e1;
+}
+
+html.light {
+  --background: #ffffff;
+  --foreground: #171717;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border-subtle: #e2e8f0;
+  --text-muted: #475569;
 }
 
 /* Base styles */
@@ -27,7 +68,32 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--app-font-sans);
+  line-height: 1.45;
+  letter-spacing: 0.002em;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  text-transform: none;
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.015em;
+}
+
+h1 {
+  font-size: clamp(1.4rem, 1.15rem + 1.1vw, 2rem);
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: clamp(1.2rem, 1.06rem + 0.6vw, 1.55rem);
+  line-height: 1.25;
+}
+
+input, textarea, select, button {
+  font: inherit;
 }
 
 /* Custom scrollbar */
@@ -59,7 +125,7 @@ body {
 
 /* Code block styling */
 pre, code, .font-mono {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-family: var(--app-font-mono) !important;
 }
 
 /* Line clamp utility */
@@ -108,8 +174,8 @@ a.table-row:hover {
 
 /* Focus styles */
 *:focus-visible {
-  outline: 2px solid rgb(59 130 246);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 30%, transparent);
 }
 
 /* Selection styles */

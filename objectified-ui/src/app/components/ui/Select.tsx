@@ -16,13 +16,13 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-lg border border-slate-300/90 dark:border-slate-600',
-      'bg-white/95 dark:bg-slate-800 px-3 py-2 text-sm',
+      'flex h-10 w-full items-center justify-between rounded-md border border-slate-300 dark:border-slate-600',
+      'bg-white dark:bg-slate-800 px-3 py-2 text-sm',
       'text-slate-900 dark:text-slate-100',
       'ring-offset-white placeholder:text-slate-400 dark:placeholder:text-slate-500',
-      'focus:outline-none focus:ring-2 focus:ring-indigo-500/80 focus:ring-offset-2',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-offset-2 dark:ring-offset-slate-900',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'shadow-[0_1px_2px_rgba(2,6,23,0.04)]',
+      'shadow-sm transition-[border-color,box-shadow,background-color] duration-150',
       '[&>span]:line-clamp-1',
       className
     )}
@@ -72,8 +72,8 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-[10000] max-h-96 min-w-[8rem] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700',
-        'bg-white/95 dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-lg shadow-slate-900/10',
+        'relative z-[10000] max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-slate-200 dark:border-slate-700',
+        'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-lg shadow-slate-900/10',
         position === 'popper' &&
           'data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1',
         className

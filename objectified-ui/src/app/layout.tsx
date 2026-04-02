@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import "@radix-ui/themes/styles.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
@@ -8,12 +7,6 @@ import { DialogProvider } from "@/app/components/providers/DialogProvider";
 import { Toaster } from "@/app/components/ui/Toaster";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { Theme as RadixTheme } from "@radix-ui/themes";
-
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
 
 export const metadata: Metadata = {
   title: "Objectified",
@@ -26,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <NextThemesProvider
           attribute="class"
