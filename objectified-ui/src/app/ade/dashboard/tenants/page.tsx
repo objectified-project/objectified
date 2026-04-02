@@ -21,6 +21,7 @@ import { Checkbox } from '../../../components/ui/Checkbox';
 import { Textarea } from '../../../components/ui/Textarea';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { useDialog } from '../../../components/providers/DialogProvider';
+import { toast } from 'sonner';
 
 interface Tenant {
   id: string;
@@ -360,7 +361,7 @@ const Tenants = () => {
       await refreshData();
 
       if (slugChanged && response.slug) {
-        await alertDialog({ message: `Tenant updated successfully. New slug: ${response.slug}`, variant: 'success' });
+        toast.success(`Tenant updated successfully. New slug: ${response.slug}`);
       }
     } catch (error: any) {
       setErrorMessage(error.message || 'An error occurred');

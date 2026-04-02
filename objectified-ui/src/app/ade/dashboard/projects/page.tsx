@@ -19,6 +19,7 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
+import { toast } from 'sonner';
 import { createProject, updateProject, deleteProject, permanentDeleteProject } from '../../../../../lib/db/helper';
 import OpenAPIImportDialog from '../../../components/ade/dashboard/OpenAPIImportDialog';
 import ImportDialog from '../../../components/ade/dashboard/ImportDialog';
@@ -265,7 +266,7 @@ const Projects = () => {
       const result = await permanentDeleteProject(project.id);
       const response = JSON.parse(result);
       if (response.success) {
-        await alertDialog({ message: 'Project and all associated data have been permanently deleted.', variant: 'success' });
+        toast.success('Project and all associated data have been permanently deleted.');
         await loadProjects();
       } else {
         await alertDialog({ message: response.error || 'Failed to permanently delete project', variant: 'error' });

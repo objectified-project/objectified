@@ -5,6 +5,7 @@ import "@radix-ui/themes/styles.css";
 import SessionWrapper from "@/app/components/auth/SessionWrapper";
 import ThemeRegistry from "@/app/components/theme/ThemeRegistry";
 import { DialogProvider } from "@/app/components/providers/DialogProvider";
+import { Toaster } from "@/app/components/ui/Toaster";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { Theme as RadixTheme } from "@radix-ui/themes";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
               <SessionWrapper>
                 <DialogProvider>
                   {children}
+                  <Toaster />
                 </DialogProvider>
               </SessionWrapper>
             </ThemeRegistry>

@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/Tooltip';
 import { cn } from '../../../../../lib/utils';
 import { useDialog } from '../../../components/providers/DialogProvider';
+import { toast } from 'sonner';
 
 interface PublishedVersion {
   id: string;
@@ -120,9 +121,11 @@ const PublishedVersions = () => {
     try {
       await navigator.clipboard.writeText(getFullAccessUrl(version));
       setCopiedUrl(version.id);
+      toast.success('Published API URL copied to clipboard.');
       setTimeout(() => setCopiedUrl(null), 2000);
     } catch (error) {
       console.error('Failed to copy URL:', error);
+      toast.error('Failed to copy URL to clipboard.');
     }
   };
 
@@ -196,6 +199,7 @@ const PublishedVersions = () => {
       const response = JSON.parse(result);
       if (response.success) {
         setVersions(versions.map(v => v.id === version.id ? { ...v, visibility: newVisibility } : v));
+        toast.success(`Visibility changed to ${newVisibility}.`);
       } else {
         await alertDialog({ message: `Failed to update visibility: ${response.error}`, variant: 'error' });
       }

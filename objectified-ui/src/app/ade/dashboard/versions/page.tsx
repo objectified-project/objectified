@@ -35,6 +35,7 @@ import YAML from 'yaml';
 import { diffLines, Change } from 'diff';
 import { compareSchemas, type DiffSummary, getPathLabel } from '../../../../../lib/schema-diff';
 import RelationshipGraphDialog from './RelationshipGraphDialog';
+import { toast } from 'sonner';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -236,8 +237,8 @@ const Versions = () => {
       if (response.success) {
         setShowCreateDialog(false);
         await loadVersions();
-        if (response.copiedClasses > 0) await alertDialog({ message: `Version created! Copied ${response.copiedClasses} class(es).`, variant: 'success' });
-        else if (response.copyWarning) await alertDialog({ message: `Version created, but: ${response.copyWarning}`, variant: 'warning' });
+        if (response.copiedClasses > 0) toast.success(`Version created! Copied ${response.copiedClasses} class(es).`);
+        else if (response.copyWarning) toast.warning(`Version created, but: ${response.copyWarning}`);
       } else setErrorMessage(response.error || 'Failed to create version');
     } catch (error: any) { setErrorMessage(error.message || 'An error occurred'); }
     finally { setIsLoading(false); }
@@ -301,7 +302,7 @@ const Versions = () => {
   const handleUnpublish = async (versionRecordId: string) => {
     const ver = versions.find((v) => v.id === versionRecordId);
     if (!ver) { await alertDialog({ message: 'Version not found', variant: 'error' }); return; }
-    if (ver.creator_id !== currentUserId && !effectiveIsAdmin) { await alertDialog({ message: 'Only owner or admin can unpublish', variant: 'warning' }); return; }
+    if (ver.creator_id !== currentUserId && !effectiveIsAdmin) { toast.warning('Only owner or admin can unpublish'); return; }
     const confirmed = await confirmDialog({ title: 'Unpublish Version', message: 'Best practice is to keep it published. Are you sure?', variant: 'danger', confirmLabel: 'Unpublish', cancelLabel: 'Cancel' });
     if (!confirmed) return;
     try {
@@ -318,11 +319,11 @@ const Versions = () => {
 
   const handleFreezeSchema = async (version: Version) => {
     if (version.creator_id !== currentUserId && !effectiveIsAdmin) {
-      await alertDialog({ message: 'Only the version owner or a tenant admin can freeze schema.', variant: 'warning' });
+      toast.warning('Only the version owner or a tenant admin can freeze schema.');
       return;
     }
     if (hasClassSchemaMap[version.id]) {
-      await alertDialog({ message: 'Schema is already frozen for this version.', variant: 'info' });
+      toast.info('Schema is already frozen for this version.');
       return;
     }
     const confirmed = await confirmDialog({
@@ -343,7 +344,7 @@ const Versions = () => {
       const response = await res.json();
       if (response.success) {
         await loadVersions();
-        await alertDialog({ message: 'Schema frozen successfully. This version can now be used in the Database section.', variant: 'success' });
+        toast.success('Schema frozen successfully. This version can now be used in the Database section.');
       } else {
         await alertDialog({ message: response.error || 'Failed to freeze schema', variant: 'error' });
       }
@@ -415,8 +416,8 @@ const Versions = () => {
   };
 
   const handleCompareVersions = async () => {
-    if (!compareVersion1Id || !compareVersion2Id) { await alertDialog({ message: 'Please select two versions', variant: 'warning' }); return; }
-    if (compareVersion1Id === compareVersion2Id) { await alertDialog({ message: 'Select two different versions', variant: 'warning' }); return; }
+    if (!compareVersion1Id || !compareVersion2Id) { toast.warning('Please select two versions'); return; }
+    if (compareVersion1Id === compareVersion2Id) { toast.warning('Select two different versions'); return; }
     setIsLoadingComparison(true);
     try {
       const [spec1, spec2] = await Promise.all([loadVersionSpec(compareVersion1Id), loadVersionSpec(compareVersion2Id)]);
@@ -482,9 +483,9 @@ const Versions = () => {
       case 'view': await handleViewOpenApi(version); break;
       case 'relationshipGraph': await handleShowRelationshipGraph(version); break;
       case 'edit': if (!isPublished) handleEditClick(version); else setErrorMessage('Cannot edit published version'); break;
-      case 'publish': if (canPub) handlePublishClick(version.id); else await alertDialog({ message: 'Only owner or admin can publish', variant: 'warning' }); break;
-      case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else await alertDialog({ message: 'Only owner or admin can unpublish', variant: 'warning' }); break;
-      case 'freezeSchema': if (canModify(version)) await handleFreezeSchema(version); else await alertDialog({ message: 'Only owner or admin can freeze schema', variant: 'warning' }); break;
+      case 'publish': if (canPub) handlePublishClick(version.id); else toast.warning('Only owner or admin can publish'); break;
+      case 'unpublish': if (canUnpub) await handleUnpublish(version.id); else toast.warning('Only owner or admin can unpublish'); break;
+      case 'freezeSchema': if (canModify(version)) await handleFreezeSchema(version); else toast.warning('Only owner or admin can freeze schema'); break;
       case 'delete': await handleDelete(version.id); break;
     }
   };
@@ -912,7 +913,7 @@ const Versions = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowOpenApiDialog(false)}>Close</Button>
-            <Button onClick={async () => { await navigator.clipboard.writeText(openApiFormat === 'json' ? openApiSpec : YAML.stringify(JSON.parse(openApiSpec))); await alertDialog({ message: 'Copied to clipboard!', variant: 'success' }); }} disabled={isLoadingSpec}>Copy</Button>
+            <Button onClick={async () => { await navigator.clipboard.writeText(openApiFormat === 'json' ? openApiSpec : YAML.stringify(JSON.parse(openApiSpec))); toast.success('Copied to clipboard!'); }} disabled={isLoadingSpec}>Copy</Button>
             <Button onClick={() => {
               const content = openApiFormat === 'json' ? openApiSpec : YAML.stringify(JSON.parse(openApiSpec));
               const blob = new Blob([content], { type: openApiFormat === 'json' ? 'application/json' : 'text/yaml' });

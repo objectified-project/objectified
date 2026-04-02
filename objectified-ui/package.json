@@ -1,6 +1,6 @@
 {
   "name": "objectified-ui",
-  "version": "0.8.90",
+  "version": "0.8.91",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -83,6 +83,7 @@
     "react-markdown": "^10.1.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "sonner": "latest",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
