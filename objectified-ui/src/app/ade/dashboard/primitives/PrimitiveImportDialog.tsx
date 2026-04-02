@@ -442,7 +442,7 @@ export default function PrimitiveImportDialog({ onClose, onComplete, onMessage }
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl h-[70vh] min-h-[70vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-5xl h-[70vh] min-h-[70vh] flex flex-col overflow-hidden" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5" />

@@ -874,6 +874,7 @@ export default function PathsSidebar({
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
           <Dialog.Content
+            aria-describedby={undefined}
             className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-full max-w-md rounded-lg shadow-lg ${
               isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
             }`}
@@ -982,6 +983,7 @@ export default function PathsSidebar({
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
           <Dialog.Content
+            aria-describedby={undefined}
             className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-full max-w-lg rounded-lg shadow-lg ${
               isDark ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
             }`}

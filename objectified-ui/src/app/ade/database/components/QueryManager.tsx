@@ -550,7 +550,7 @@ export default function QueryManager() {
         />
       )}
       <Dialog open={!!viewRecord} onOpenChange={(open) => !open && setViewRecord(null)}>
-        <DialogContent className="h-[70vh] max-h-[70vh] w-[90vw] max-w-4xl flex flex-col gap-4" showCloseButton>
+        <DialogContent className="h-[70vh] max-h-[70vh] w-[90vw] max-w-4xl flex flex-col gap-4" showCloseButton aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Record — {viewRecord?.record_id ?? ''}</DialogTitle>
           </DialogHeader>

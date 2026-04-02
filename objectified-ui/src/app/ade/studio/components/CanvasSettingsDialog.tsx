@@ -419,7 +419,7 @@ export default function CanvasSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[85vh] max-h-[800px] p-0 flex flex-col" showCloseButton={false}>
+      <DialogContent className="max-w-5xl w-[95vw] h-[85vh] max-h-[800px] p-0 flex flex-col" showCloseButton={false} aria-describedby={undefined}>
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-700">
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-indigo-500" />

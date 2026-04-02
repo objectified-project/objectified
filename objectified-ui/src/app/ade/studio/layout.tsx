@@ -534,7 +534,10 @@ function StudioLayoutContent({ children }: Readonly<{ children: React.ReactNode 
       <Dialog.Root open={deleteDialog.open} onOpenChange={(open) => !open && setDeleteDialog({ open: false, target: null })}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10001]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6">
+          <Dialog.Content
+            aria-describedby={undefined}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[10002] w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6"
+          >
             <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirm Delete</Dialog.Title>
             <p className="mt-2 text-gray-700 dark:text-gray-300">
               Are you sure you want to delete this {deleteDialog.target?.type}? This action cannot be undone.

@@ -129,7 +129,7 @@ export const ReferenceDialog: React.FC<ReferenceDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md" showCloseButton={true}>
+      <DialogContent className="max-w-md" showCloseButton={true} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Create Reference</DialogTitle>
         </DialogHeader>

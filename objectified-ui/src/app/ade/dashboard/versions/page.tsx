@@ -761,7 +761,7 @@ const Versions = () => {
 
       {/* Create Version Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => !isLoading && setShowCreateDialog(open)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Create New Version</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
@@ -827,7 +827,7 @@ const Versions = () => {
 
       {/* Edit Version Dialog */}
       <Dialog open={showEditDialog} onOpenChange={(open) => !isLoading && setShowEditDialog(open)}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Edit Version</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
@@ -886,7 +886,7 @@ const Versions = () => {
 
       {/* OpenAPI Viewer Dialog */}
       <Dialog open={showOpenApiDialog} onOpenChange={setShowOpenApiDialog}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="max-w-4xl max-h-[80vh]" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div>
@@ -929,7 +929,7 @@ const Versions = () => {
 
       {/* Version Comparison Dialog */}
       <Dialog open={showCompareDialog} onOpenChange={setShowCompareDialog}>
-        <DialogContent className="max-w-6xl h-[90vh] min-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-6xl h-[90vh] min-h-[90vh] flex flex-col" aria-describedby={undefined}>
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center justify-between">
               <div>

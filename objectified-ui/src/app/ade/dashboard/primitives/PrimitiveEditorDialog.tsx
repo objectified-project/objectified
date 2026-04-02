@@ -658,7 +658,7 @@ export default function PrimitiveEditorDialog({ primitive, onClose, onSave, onMe
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh] min-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-4xl h-[90vh] min-h-[90vh] flex flex-col overflow-hidden" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{primitive ? 'Edit Primitive' : 'Create Primitive'}</DialogTitle>
         </DialogHeader>
