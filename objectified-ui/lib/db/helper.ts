@@ -4263,10 +4263,15 @@ export async function restoreCanvasLayoutFromRevision(
 export async function getCanvasLayoutRevisionData(
   revisionId: string,
   layoutId: string,
-  versionId: string,
-  userId: string | null
+  versionId: string
 ) {
   try {
+    const session = await getAuthSession();
+    const actingUserId = (session?.user as any)?.user_id;
+    if (!actingUserId) {
+      return errorResponse('Unauthorized');
+    }
+
     const result = await connectionPool.query(
       `SELECT r.id, r.revision, r.viewport, r.nodes, r.edges,
               r.grid_settings, r.minimap_settings, r.created_at, r.created_by
@@ -4276,7 +4281,7 @@ export async function getCanvasLayoutRevisionData(
          AND r.canvas_layout_id = $2
          AND cl.version_id = $3
          AND (cl.user_id = $4 OR cl.user_id IS NULL)`,
-      [revisionId, layoutId, versionId, userId]
+      [revisionId, layoutId, versionId, actingUserId]
     );
 
     if (result.rowCount === 0) {

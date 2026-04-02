@@ -150,9 +150,8 @@ function compareNodes(leftNodes: LayoutNode[], rightNodes: LayoutNode[]) {
       changes.push('dimensions');
     }
     if (
-      leftNode.data &&
-      rightNode.data &&
-      JSON.stringify(leftNode.data) !== JSON.stringify(rightNode.data)
+      JSON.stringify(leftNode.data ?? null) !==
+      JSON.stringify(rightNode.data ?? null)
     ) {
       changes.push('data');
     }

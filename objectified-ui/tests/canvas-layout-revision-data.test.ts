@@ -22,11 +22,18 @@ jest.mock('crypto', () => ({
 
 describe('Database Helper - getCanvasLayoutRevisionData', () => {
   let mockQuery: jest.Mock<any>;
+  let mockGetAuthSession: jest.Mock<any>;
 
   beforeEach(() => {
     const db = require('../lib/db/db');
     mockQuery = db.query as jest.Mock;
     mockQuery.mockReset();
+
+    const serverSession = require('../lib/auth/server-session');
+    mockGetAuthSession = serverSession.getAuthSession as jest.Mock<any>;
+    mockGetAuthSession.mockResolvedValue({
+      user: { user_id: 'session-user-1' },
+    });
   });
 
   test('returns full revision data with viewport, nodes, edges, and settings', async () => {
@@ -49,12 +56,7 @@ describe('Database Helper - getCanvasLayoutRevisionData', () => {
 
     mockQuery.mockResolvedValue({ rowCount: 1, rows: [revisionData] });
 
-    const result = await getCanvasLayoutRevisionData(
-      'rev-1',
-      'layout-1',
-      'version-1',
-      'user-1'
-    );
+    const result = await getCanvasLayoutRevisionData('rev-1', 'layout-1', 'version-1');
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(true);
@@ -70,19 +72,14 @@ describe('Database Helper - getCanvasLayoutRevisionData', () => {
 
     mockQuery.mockResolvedValue({ rowCount: 0, rows: [] });
 
-    const result = await getCanvasLayoutRevisionData(
-      'nonexistent',
-      'layout-1',
-      'version-1',
-      'user-1'
-    );
+    const result = await getCanvasLayoutRevisionData('nonexistent', 'layout-1', 'version-1');
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(false);
     expect(parsed.error).toBe('Revision not found');
   });
 
-  test('queries with correct parameters including access control', async () => {
+  test('queries with correct parameters derived from session (access control)', async () => {
     const { getCanvasLayoutRevisionData } = await import('../lib/db/helper');
 
     mockQuery.mockResolvedValue({
@@ -90,11 +87,11 @@ describe('Database Helper - getCanvasLayoutRevisionData', () => {
       rows: [{ id: 'rev-1', revision: 1, viewport: null, nodes: [], edges: [] }],
     });
 
-    await getCanvasLayoutRevisionData('rev-id', 'layout-id', 'ver-id', 'usr-id');
+    await getCanvasLayoutRevisionData('rev-id', 'layout-id', 'ver-id');
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('canvas_layout_revisions'),
-      ['rev-id', 'layout-id', 'ver-id', 'usr-id']
+      ['rev-id', 'layout-id', 'ver-id', 'session-user-1']
     );
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('cl.user_id = $4 OR cl.user_id IS NULL'),
@@ -102,17 +99,25 @@ describe('Database Helper - getCanvasLayoutRevisionData', () => {
     );
   });
 
+  test('returns Unauthorized when no session', async () => {
+    mockGetAuthSession.mockResolvedValue(null);
+
+    const { getCanvasLayoutRevisionData } = await import('../lib/db/helper');
+
+    const result = await getCanvasLayoutRevisionData('rev-1', 'layout-1', 'version-1');
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error).toBe('Unauthorized');
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
   test('handles database errors gracefully', async () => {
     const { getCanvasLayoutRevisionData } = await import('../lib/db/helper');
 
     mockQuery.mockRejectedValue(new Error('Connection failed'));
 
-    const result = await getCanvasLayoutRevisionData(
-      'rev-1',
-      'layout-1',
-      'version-1',
-      'user-1'
-    );
+    const result = await getCanvasLayoutRevisionData('rev-1', 'layout-1', 'version-1');
     const parsed = JSON.parse(result);
 
     expect(parsed.success).toBe(false);

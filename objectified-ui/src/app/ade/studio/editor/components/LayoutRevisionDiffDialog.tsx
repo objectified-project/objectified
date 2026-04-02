@@ -158,7 +158,8 @@ export function LayoutRevisionDiffDialog({
   useEffect(() => {
     if (!open) return;
     if (revisions.length >= 1) {
-      setLeftId(revisions[0].id);
+      const oldestRevision = revisions[revisions.length - 1];
+      setLeftId(oldestRevision.id);
       setRightId('current');
     }
   }, [open, revisions]);

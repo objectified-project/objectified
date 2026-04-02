@@ -132,6 +132,36 @@ describe('layout-diff', () => {
       expect(diff.nodes.modified[0].changes).toContain('data');
     });
 
+    test('detects data added when left has no data but right does', () => {
+      const left: LayoutState = {
+        ...emptyState,
+        nodes: [{ id: 'n1', type: 'classNode', position: { x: 0, y: 0 } }],
+      };
+      const right: LayoutState = {
+        ...emptyState,
+        nodes: [{ id: 'n1', type: 'classNode', position: { x: 0, y: 0 }, data: { label: 'new' } }],
+      };
+      const diff = compareLayouts(left, right);
+
+      expect(diff.nodes.modified).toHaveLength(1);
+      expect(diff.nodes.modified[0].changes).toContain('data');
+    });
+
+    test('detects data removed when left has data but right does not', () => {
+      const left: LayoutState = {
+        ...emptyState,
+        nodes: [{ id: 'n1', type: 'classNode', position: { x: 0, y: 0 }, data: { label: 'old' } }],
+      };
+      const right: LayoutState = {
+        ...emptyState,
+        nodes: [{ id: 'n1', type: 'classNode', position: { x: 0, y: 0 } }],
+      };
+      const diff = compareLayouts(left, right);
+
+      expect(diff.nodes.modified).toHaveLength(1);
+      expect(diff.nodes.modified[0].changes).toContain('data');
+    });
+
     test('reports unchanged node count', () => {
       const nodes = [
         { id: 'n1', type: 'classNode', position: { x: 10, y: 20 } },

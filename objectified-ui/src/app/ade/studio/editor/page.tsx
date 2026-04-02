@@ -686,6 +686,7 @@ const StudioContent = () => {
     Array<{ id: string; revision: number; created_at: string }>
   >([]);
   const [layoutHistoryLoading, setLayoutHistoryLoading] = useState(false);
+  const [layoutHistoryLayoutId, setLayoutHistoryLayoutId] = useState<string | null>(null);
   const [layoutDiffOpen, setLayoutDiffOpen] = useState(false);
 
   // #517: Canvas presentation — fullscreen slideshow of viewport bookmarks, speaker notes, timer
@@ -5737,6 +5738,7 @@ const StudioContent = () => {
         if (!name) {
           if (!cancelled) {
             setLayoutHistoryRevisions([]);
+            setLayoutHistoryLayoutId(null);
           }
           return;
         }
@@ -5745,6 +5747,7 @@ const StudioContent = () => {
         if (!parsed.success || !parsed.layout) {
           if (!cancelled) {
             setLayoutHistoryRevisions([]);
+            setLayoutHistoryLayoutId(null);
           }
           return;
         }
@@ -5752,11 +5755,13 @@ const StudioContent = () => {
         const revParsed = JSON.parse(revRes);
         if (!cancelled && revParsed.success) {
           setLayoutHistoryRevisions(revParsed.revisions || []);
+          setLayoutHistoryLayoutId(parsed.layout.id);
         }
       } catch (error) {
         console.error('Error loading layout history:', error);
         if (!cancelled) {
           setLayoutHistoryRevisions([]);
+          setLayoutHistoryLayoutId(null);
         }
       } finally {
         if (!cancelled) {
@@ -5788,19 +5793,12 @@ const StudioContent = () => {
 
   const handleFetchRevisionDataForDiff = useCallback(
     async (revisionId: string) => {
-      if (!selectedVersionId || !currentUserId) return null;
-      const name = selectedLayoutName.trim();
-      if (!name) return null;
+      if (!selectedVersionId || !layoutHistoryLayoutId) return null;
       try {
-        const layoutRes = await getNamedCanvasLayout(selectedVersionId, currentUserId, name);
-        const layoutParsed = JSON.parse(layoutRes);
-        if (!layoutParsed.success || !layoutParsed.layout) return null;
-
         const res = await getCanvasLayoutRevisionData(
           revisionId,
-          layoutParsed.layout.id,
-          selectedVersionId,
-          currentUserId
+          layoutHistoryLayoutId,
+          selectedVersionId
         );
         const parsed = JSON.parse(res);
         if (!parsed.success || !parsed.revision) return null;
@@ -5817,7 +5815,7 @@ const StudioContent = () => {
         return null;
       }
     },
-    [selectedVersionId, currentUserId, selectedLayoutName]
+    [selectedVersionId, layoutHistoryLayoutId]
   );
 
   // #471: Preview layout before applying — compute layout and show preview (do not commit)
