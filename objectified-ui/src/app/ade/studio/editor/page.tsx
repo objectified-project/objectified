@@ -227,6 +227,9 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
   ),
 });
 
+const LAYOUT_COMMENT_MAX_LENGTH = 240;
+const LAYOUT_ANNOTATIONS_MAX_LENGTH = 4000;
+
 const StudioContent = () => {
   const BUILTIN_LAYOUT_NAMES = useMemo(
     () => ['Development Layout', 'Presentation Layout', 'Logical Layout', 'Dependency Layout'],
@@ -621,6 +624,11 @@ const StudioContent = () => {
   const [namedLayoutAccessByName, setNamedLayoutAccessByName] = useState<
     Record<string, { isShared: boolean; canEdit: boolean; canDelete: boolean }>
   >({});
+  const [namedLayoutAnnotationsByName, setNamedLayoutAnnotationsByName] = useState<
+    Record<string, { comment?: string; annotations?: string }>
+  >({});
+  const [layoutCommentDraft, setLayoutCommentDraft] = useState('');
+  const [layoutAnnotationsDraft, setLayoutAnnotationsDraft] = useState('');
   /** Local quick snapshots for this version (#168); restore UI follows in #170. */
   const [quickLayoutSnapshots, setQuickLayoutSnapshots] = useState<QuickLayoutSnapshot[]>([]);
   const [quickSnapshotSavedFlash, setQuickSnapshotSavedFlash] = useState(false);
@@ -640,6 +648,18 @@ const StudioContent = () => {
   useEffect(() => {
     selectedLayoutNameRef.current = selectedLayoutName;
   }, [selectedLayoutName]);
+
+  useEffect(() => {
+    const key = selectedLayoutName.trim();
+    if (!key) {
+      setLayoutCommentDraft('');
+      setLayoutAnnotationsDraft('');
+      return;
+    }
+    const existing = namedLayoutAnnotationsByName[key];
+    setLayoutCommentDraft(existing?.comment ?? '');
+    setLayoutAnnotationsDraft(existing?.annotations ?? '');
+  }, [selectedLayoutName, namedLayoutAnnotationsByName]);
 
   useEffect(() => {
     if (!selectedVersionId) {
@@ -4574,6 +4594,8 @@ const StudioContent = () => {
 
       const nodeData = mapNodesForLayoutSave(nodes);
       const edgeData = mapEdgesForLayoutSave(edges);
+      const comment = layoutCommentDraft.trim().slice(0, LAYOUT_COMMENT_MAX_LENGTH);
+      const annotations = layoutAnnotationsDraft.trim().slice(0, LAYOUT_ANNOTATIONS_MAX_LENGTH);
 
       // Save selected named layout to database
       const result = await saveNamedCanvasLayout(
@@ -4585,7 +4607,11 @@ const StudioContent = () => {
         edgeData,
         groups,
         snapshotBase64ForServer,
-        currentTenantId ?? undefined
+        currentTenantId ?? undefined,
+        {
+          comment,
+          annotations,
+        }
       );
 
       const response = JSON.parse(result);
@@ -4602,6 +4628,18 @@ const StudioContent = () => {
           ...prev,
           [layoutName]: { isShared: false, canEdit: true, canDelete: true },
         }));
+        setNamedLayoutAnnotationsByName((prev) => {
+          const next = { ...prev };
+          if (comment || annotations) {
+            next[layoutName] = {
+              ...(comment ? { comment } : {}),
+              ...(annotations ? { annotations } : {}),
+            };
+          } else {
+            delete next[layoutName];
+          }
+          return next;
+        });
         setAvailableLayoutNames(prev => {
           if (prev.includes(layoutName)) return prev;
           return [...prev, layoutName];
@@ -4639,6 +4677,8 @@ const StudioContent = () => {
     getViewport,
     alertDialog,
     isDark,
+    layoutCommentDraft,
+    layoutAnnotationsDraft,
   ]);
 
   const handleDeleteLayout = useCallback(async () => {
@@ -4686,6 +4726,11 @@ const StudioContent = () => {
         return next;
       });
       setNamedLayoutAccessByName((prev) => {
+        const next = { ...prev };
+        delete next[layoutName];
+        return next;
+      });
+      setNamedLayoutAnnotationsByName((prev) => {
         const next = { ...prev };
         delete next[layoutName];
         return next;
@@ -6669,6 +6714,7 @@ const StudioContent = () => {
         setAvailableLayoutNames(BUILTIN_LAYOUT_NAMES);
         setNamedLayoutSnapshotDataUrls({});
         setNamedLayoutAccessByName({});
+        setNamedLayoutAnnotationsByName({});
         return;
       }
 
@@ -6687,6 +6733,7 @@ const StudioContent = () => {
 
         const snapMap: Record<string, string> = {};
         const accessByName: Record<string, { isShared: boolean; canEdit: boolean; canDelete: boolean }> = {};
+        const annotationsByName: Record<string, { comment?: string; annotations?: string }> = {};
         for (const layout of allLayoutsResponse.layouts || []) {
           const n = typeof layout.name === 'string' ? layout.name.trim() : '';
           if (!n) continue;
@@ -6700,9 +6747,24 @@ const StudioContent = () => {
           if (n && layout.snapshotImageBase64) {
             snapMap[n] = `data:image/png;base64,${layout.snapshotImageBase64}`;
           }
+          const rawComment =
+            layout?.metadata && typeof layout.metadata === 'object' && typeof layout.metadata.comment === 'string'
+              ? layout.metadata.comment.trim()
+              : '';
+          const rawAnnotations =
+            layout?.metadata && typeof layout.metadata === 'object' && typeof layout.metadata.annotations === 'string'
+              ? layout.metadata.annotations.trim()
+              : '';
+          if (rawComment || rawAnnotations) {
+            annotationsByName[n] = {
+              ...(rawComment ? { comment: rawComment } : {}),
+              ...(rawAnnotations ? { annotations: rawAnnotations } : {}),
+            };
+          }
         }
         setNamedLayoutSnapshotDataUrls(snapMap);
         setNamedLayoutAccessByName(accessByName);
+        setNamedLayoutAnnotationsByName(annotationsByName);
 
         const trimmedSelection = selectedLayoutName.trim();
         const hasExistingLayoutForSelection =
@@ -6717,6 +6779,7 @@ const StudioContent = () => {
         setAvailableLayoutNames(BUILTIN_LAYOUT_NAMES);
         setNamedLayoutSnapshotDataUrls({});
         setNamedLayoutAccessByName({});
+        setNamedLayoutAnnotationsByName({});
       }
     };
 
@@ -8963,6 +9026,48 @@ const StudioContent = () => {
                               </span>
                             </div>
                           ) : null}
+                          <div className="mt-3 space-y-2">
+                            <div>
+                              <label
+                                htmlFor="layout-comment-input"
+                                className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                              >
+                                Comment
+                              </label>
+                              <input
+                                id="layout-comment-input"
+                                type="text"
+                                value={layoutCommentDraft}
+                                onChange={(e) => setLayoutCommentDraft(e.target.value.slice(0, LAYOUT_COMMENT_MAX_LENGTH))}
+                                placeholder="Short context for this layout"
+                                className="w-full px-2.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                              <p className="mt-1 text-right text-[10px] text-gray-400 dark:text-gray-500">
+                                {layoutCommentDraft.length}/{LAYOUT_COMMENT_MAX_LENGTH}
+                              </p>
+                            </div>
+                            <div>
+                              <label
+                                htmlFor="layout-annotations-input"
+                                className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                              >
+                                Annotations
+                              </label>
+                              <textarea
+                                id="layout-annotations-input"
+                                value={layoutAnnotationsDraft}
+                                onChange={(e) =>
+                                  setLayoutAnnotationsDraft(e.target.value.slice(0, LAYOUT_ANNOTATIONS_MAX_LENGTH))
+                                }
+                                rows={3}
+                                placeholder="Longer notes, reminders, or review context"
+                                className="w-full px-2.5 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                              />
+                              <p className="mt-1 text-right text-[10px] text-gray-400 dark:text-gray-500">
+                                {layoutAnnotationsDraft.length}/{LAYOUT_ANNOTATIONS_MAX_LENGTH}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                           <button
