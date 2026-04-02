@@ -17,6 +17,7 @@ import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { LoadingState } from '../../../components/ui/LoadingState';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { Card, CardContent } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { cn } from '../../../../../lib/utils';
@@ -256,15 +257,12 @@ const LinkedAccounts = () => {
       {/* Linked Accounts - same list container as Published */}
       <section className="mb-10">
         {linkedAccounts.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-            <div className="p-16 text-center">
-              <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/30">
-                <LinkIcon className="h-10 w-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Linked Accounts</h3>
-              <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">Link a provider below to sign in with SSO and manage repository access.</p>
-            </div>
-          </div>
+          <EmptyState
+            icon={<LinkIcon className="h-10 w-10" />}
+            title="No Linked Accounts"
+            description="Link a provider below to sign in with SSO and manage repository access."
+            iconContainerClassName="from-cyan-500 to-blue-600 shadow-cyan-500/30"
+          />
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">

@@ -19,6 +19,7 @@ import {
 import { Button } from '@/app/components/ui/Button';
 import { Input } from '@/app/components/ui/Input';
 import { Alert } from '@/app/components/ui/Alert';
+import { EmptyState } from '@/app/components/ui/EmptyState';
 import { useDialog } from '@/app/components/providers/DialogProvider';
 import PrimitiveEditorDialog from './PrimitiveEditorDialog';
 import PrimitiveImportDialog from './PrimitiveImportDialog';
@@ -359,9 +360,15 @@ export default function PrimitivesManagementClient() {
                 <RefreshCw className="w-6 h-6 animate-spin text-indigo-600" />
               </div>
             ) : filteredPrimitives.length === 0 ? (
-              <div className="text-center py-12">
-                <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">No primitives found</p>
+              <div className="p-6">
+                <EmptyState
+                  icon={<Database className="h-8 w-8" />}
+                  title="No Primitives Found"
+                  description="Try adjusting your filters or create a new primitive."
+                  variant="compact"
+                  showOrbs={false}
+                  iconContainerClassName="h-14 w-14 from-gray-400 to-gray-500 shadow-gray-500/30"
+                />
               </div>
             ) : (
               <div className="overflow-x-auto">

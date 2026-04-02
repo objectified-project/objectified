@@ -17,6 +17,7 @@ import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Badge } from '../../../components/ui/Badge';
 import { LoadingState } from '../../../components/ui/LoadingState';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/Tooltip';
 import { cn } from '../../../../../lib/utils';
@@ -284,25 +285,20 @@ const PublishedVersions = () => {
             message="Loading published versions..."
           />
         ) : versions.length === 0 ? (
-          <div className="relative">
-            <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-full blur-3xl opacity-60" />
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-3xl opacity-60" />
-            <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
-              <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <Eye className="h-10 w-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Published Versions</h3>
-              <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">You don't have any published versions yet. Publish a version to make it available via API.</p>
-            </div>
-          </div>
+          <EmptyState
+            icon={<Eye className="h-10 w-10" />}
+            title="No Published Versions"
+            description="You don't have any published versions yet. Publish a version to make it available via API."
+          />
         ) : filteredVersions.length === 0 ? (
-          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-400 to-gray-500 rounded-2xl flex items-center justify-center shadow-lg shadow-gray-500/30">
-              <Search className="h-10 w-10 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Matching Versions</h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">No published versions match your search query.</p>
-          </div>
+          <EmptyState
+            icon={<Search className="h-10 w-10" />}
+            title="No Matching Versions"
+            description="No published versions match your search query."
+            variant="compact"
+            showOrbs={false}
+            iconContainerClassName="from-gray-400 to-gray-500 shadow-gray-500/30"
+          />
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">

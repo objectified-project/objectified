@@ -19,6 +19,7 @@ import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { Checkbox } from '../../../components/ui/Checkbox';
 import { Textarea } from '../../../components/ui/Textarea';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { useDialog } from '../../../components/providers/DialogProvider';
 
 interface Tenant {
@@ -444,18 +445,12 @@ const Tenants = () => {
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-7xl mx-auto">
       {tenants.length === 0 ? (
-        <div className="relative">
-          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-full blur-3xl opacity-60" />
-          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-cyan-100 to-teal-100 dark:from-cyan-900/20 dark:to-teal-900/20 rounded-full blur-3xl opacity-60" />
-
-          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Building2 className="h-10 w-10 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Tenants Available</h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">You are not a member of any tenants yet</p>
-          </div>
-        </div>
+        <EmptyState
+          icon={<Building2 className="h-10 w-10" />}
+          title="No Tenants Available"
+          description="You are not a member of any tenants yet"
+          iconContainerClassName="from-blue-500 to-cyan-600 shadow-blue-500/30"
+        />
       ) : (
         <div className="space-y-6">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">

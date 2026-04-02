@@ -17,6 +17,7 @@ import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { LoadingState } from '../../../components/ui/LoadingState';
+import { EmptyState } from '../../../components/ui/EmptyState';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Badge } from '../../../components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
@@ -521,20 +522,17 @@ const Versions = () => {
   if (projects.length === 0) {
     return (
       <div className="p-6 max-w-5xl mx-auto">
-        <div className="relative">
-          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-full blur-3xl opacity-60" />
-          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full blur-3xl opacity-60" />
-          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Package className="h-10 w-10 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Projects Available</h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">Please create a project before managing versions.</p>
+        <EmptyState
+          icon={<Package className="h-10 w-10" />}
+          title="No Projects Available"
+          description="Please create a project before managing versions."
+          iconContainerClassName="from-indigo-500 to-purple-600 shadow-indigo-500/30"
+          action={(
             <Button asChild className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
               <a href="/ade/dashboard/projects">Go to Projects</a>
             </Button>
-          </div>
-        </div>
+          )}
+        />
       </div>
     );
   }
@@ -575,17 +573,12 @@ const Versions = () => {
         <div className="max-w-7xl mx-auto">
       {/* Versions List */}
       {versions.length === 0 ? (
-        <div className="relative">
-          <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-full blur-3xl opacity-60" />
-          <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-gradient-to-br from-teal-100 to-cyan-100 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-full blur-3xl opacity-60" />
-          <div className="relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 rounded-2xl p-16 text-center shadow-xl">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <Package className="h-10 w-10 text-white" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No Versions Yet</h3>
-            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">Get started by creating your first version</p>
-          </div>
-        </div>
+        <EmptyState
+          icon={<Package className="h-10 w-10" />}
+          title="No Versions Yet"
+          description="Get started by creating your first version"
+          iconContainerClassName="from-emerald-500 to-teal-600 shadow-emerald-500/30"
+        />
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
