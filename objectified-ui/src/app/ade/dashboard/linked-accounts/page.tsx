@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
+import { LoadingState } from '../../../components/ui/LoadingState';
 import { Card, CardContent } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { cn } from '../../../../../lib/utils';
@@ -221,8 +222,8 @@ const LinkedAccounts = () => {
 
   if (!session) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-64">
-        <p className="text-gray-500 dark:text-gray-300">Loading...</p>
+      <div className="p-6">
+        <LoadingState minHeightClassName="min-h-64" message="Loading linked accounts..." />
       </div>
     );
   }

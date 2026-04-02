@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
+import { LoadingState } from '../../../components/ui/LoadingState';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Badge } from '../../../components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
@@ -36,7 +37,14 @@ import RelationshipGraphDialog from './RelationshipGraphDialog';
 
 const Editor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
-  loading: () => <div className="h-full flex items-center justify-center"><div className="text-gray-500 dark:text-gray-400">Loading editor...</div></div>,
+  loading: () => (
+    <LoadingState
+      className="h-full"
+      minHeightClassName="min-h-0"
+      spinnerSize="md"
+      message="Loading editor..."
+    />
+  ),
 });
 
 interface Project { id: string; name: string; slug: string; }
@@ -480,7 +488,13 @@ const Versions = () => {
     }
   };
 
-  if (!session) return <div className="p-6"><p>Loading...</p></div>;
+  if (!session) {
+    return (
+      <div className="p-6">
+        <LoadingState minHeightClassName="min-h-[220px]" message="Loading versions..." />
+      </div>
+    );
+  }
 
   if (!currentTenantId) {
     return (
@@ -893,7 +907,12 @@ const Versions = () => {
           </DialogHeader>
           <div className="h-[60vh]">
             {isLoadingSpec ? (
-              <div className="h-full flex items-center justify-center"><div className="text-gray-500 dark:text-gray-400">Loading specification...</div></div>
+              <LoadingState
+                className="h-full"
+                minHeightClassName="min-h-0"
+                spinnerSize="md"
+                message="Loading specification..."
+              />
             ) : (
               <Editor height="100%" language={openApiFormat} value={openApiFormat === 'json' ? openApiSpec : YAML.stringify(JSON.parse(openApiSpec || '{}'))} theme="vs-dark" options={{ readOnly: true, minimap: { enabled: true }, fontSize: 13 }} />
             )}

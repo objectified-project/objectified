@@ -16,6 +16,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Badge } from '../../../components/ui/Badge';
+import { LoadingState } from '../../../components/ui/LoadingState';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../../components/ui/Tooltip';
 import { cn } from '../../../../../lib/utils';
@@ -278,12 +279,10 @@ const PublishedVersions = () => {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <div className="text-gray-500 dark:text-gray-400">Loading published versions...</div>
-            </div>
-          </div>
+          <LoadingState
+            minHeightClassName="min-h-[400px]"
+            message="Loading published versions..."
+          />
         ) : versions.length === 0 ? (
           <div className="relative">
             <div className="absolute -top-10 -left-10 w-40 h-40 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-full blur-3xl opacity-60" />

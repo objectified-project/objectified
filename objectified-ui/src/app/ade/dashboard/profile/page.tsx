@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
+import { LoadingState } from '../../../components/ui/LoadingState';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/Card';
 import { updateUserName, updateUserPassword } from '../../../../../lib/db/helper';
 
@@ -111,10 +112,7 @@ const Profile = () => {
   if (!session) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center justify-center min-h-[320px] gap-4">
-          <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">Loading profile…</p>
-        </div>
+        <LoadingState minHeightClassName="min-h-[320px]" message="Loading profile..." />
       </div>
     );
   }

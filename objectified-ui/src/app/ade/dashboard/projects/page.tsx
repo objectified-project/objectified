@@ -14,6 +14,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
+import { LoadingState } from '../../../components/ui/LoadingState';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/Select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../components/ui/Tabs';
@@ -290,7 +291,13 @@ const Projects = () => {
     }
   };
 
-  if (!session) return <div className="p-6"><p>Loading...</p></div>;
+  if (!session) {
+    return (
+      <div className="p-6">
+        <LoadingState minHeightClassName="min-h-[220px]" message="Loading projects..." />
+      </div>
+    );
+  }
 
   if (!currentTenantId) {
     return (
