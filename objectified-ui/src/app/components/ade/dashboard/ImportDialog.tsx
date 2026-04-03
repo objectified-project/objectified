@@ -94,7 +94,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
         setCurrentStep('analysis');
       })
       .catch((err) => {
-        console.error('Analysis error:', err);
         setErrorMessage(err instanceof Error ? err.message : 'Analysis failed');
       })
       .finally(() => setIsAnalyzing(false));
@@ -247,7 +246,6 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       setCurrentStep('analysis');
       console.log('State updated to analysis step');
     } catch (error) {
-      console.error('Analysis error:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Analysis failed. Please check the specification and try again.');
     } finally {
       setIsAnalyzing(false);
@@ -319,6 +317,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
 
     if (validExtensions.includes(fileExtension)) {
+      setErrorMessage(null);
       setSelectedFile(file);
       setFileMetadata(null);
       console.log('File selected:', file.name);
@@ -332,13 +331,16 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
           setFileMetadata(metadata);
           console.log('File metadata extracted:', metadata);
         } catch (error) {
-          console.error('Error extracting metadata:', error);
+          setErrorMessage(
+            error instanceof Error ? error.message : 'Could not read or preview this file. Try another file or format.'
+          );
         } finally {
           setIsLoadingMetadata(false);
         }
       }
     } else {
-      console.error('Invalid file type');
+      setSelectedFile(null);
+      setFileMetadata(null);
       setErrorMessage(`Unsupported file type. Allowed: ${validExtensions.join(', ')}`);
     }
   };
@@ -401,7 +403,12 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) void handleClose();
+      }}
+    >
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col" showCloseButton={false} aria-describedby={undefined}>
         <DialogHeader className="border-b border-gray-200 dark:border-gray-700 pb-4">
           <div className="flex items-center justify-between">
