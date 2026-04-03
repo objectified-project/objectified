@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated and one-off scripts
+    "coverage/**",
+    "convert-mui-to-radix.js",
   ]),
 ]);
 
