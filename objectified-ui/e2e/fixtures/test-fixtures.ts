@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/rules-of-hooks -- Playwright fixture callback is named "use", not React's use() hook */
 import { test as base, expect, Page } from '@playwright/test';
 
 /**
@@ -218,14 +217,14 @@ export const test = base.extend<{
   dashboardPage: DashboardPage;
   studioPage: StudioPage;
 }>({
-  loginPage: async ({ page }, use) => {
-    await use(new LoginPage(page));
+  loginPage: async ({ page }, useFixture) => {
+    await useFixture(new LoginPage(page));
   },
-  dashboardPage: async ({ page }, use) => {
-    await use(new DashboardPage(page));
+  dashboardPage: async ({ page }, useFixture) => {
+    await useFixture(new DashboardPage(page));
   },
-  studioPage: async ({ page }, use) => {
-    await use(new StudioPage(page));
+  studioPage: async ({ page }, useFixture) => {
+    await useFixture(new StudioPage(page));
   },
 });
 
