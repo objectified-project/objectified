@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, Layers } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -27,13 +27,14 @@ import { LLMChatPanel } from '../../../components/ade/dashboard/LLMImportDialog'
 import { useDialog } from '../../../components/providers/DialogProvider';
 import { filterSlugInput } from '../../../utils/slug';
 import { SPDX_LICENSES, getLicenseUrl, SPDXLicense } from '../../../utils/spdx-licenses';
+import {
+  PROJECT_START_TEMPLATES,
+  applyProjectStartTemplate,
+  getProjectStartTemplate,
+  type ProjectOpenApiMetadata,
+} from '../../../utils/project-templates';
 
-interface ProjectMetadata {
-  summary?: string;
-  termsOfService?: string;
-  contact?: { name?: string; url?: string; email?: string };
-  license?: { name?: string; identifier?: string; url?: string };
-}
+type ProjectMetadata = ProjectOpenApiMetadata;
 
 interface Project {
   id: string;
@@ -82,9 +83,11 @@ const Projects = () => {
   const [metadataLicenseName, setMetadataLicenseName] = useState('');
   const [metadataLicenseIdentifier, setMetadataLicenseIdentifier] = useState('');
   const [metadataLicenseUrl, setMetadataLicenseUrl] = useState('');
+  const [selectedStartTemplateId, setSelectedStartTemplateId] = useState('blank');
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
+  const selectedStartTemplateHint = getProjectStartTemplate(selectedStartTemplateId)?.hint;
 
   const generateSlug = (name: string) => {
     return name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
@@ -128,7 +131,22 @@ const Projects = () => {
     setMetadataLicenseName('');
     setMetadataLicenseIdentifier('');
     setMetadataLicenseUrl('');
+    setSelectedStartTemplateId('blank');
     setShowCreateDialog(true);
+  };
+
+  const applyStartTemplateToForm = (templateId: string) => {
+    setSelectedStartTemplateId(templateId);
+    const { metadata, suggestedDescription } = applyProjectStartTemplate(templateId);
+    setProjectDescription(suggestedDescription);
+    setMetadataSummary(metadata.summary ?? '');
+    setMetadataTermsOfService(metadata.termsOfService ?? '');
+    setMetadataContactName(metadata.contact?.name ?? '');
+    setMetadataContactUrl(metadata.contact?.url ?? '');
+    setMetadataContactEmail(metadata.contact?.email ?? '');
+    setMetadataLicenseName(metadata.license?.name ?? '');
+    setMetadataLicenseIdentifier(metadata.license?.identifier ?? '');
+    setMetadataLicenseUrl(metadata.license?.url ?? '');
   };
 
   const handleImportClick = () => setShowImportDialog(true);
@@ -584,6 +602,40 @@ const Projects = () => {
             </TabsList>
             <TabsContent value="manual" className="mt-4 flex-1 min-h-0">
           {errorMessage && <Alert variant="error" className="mb-4">{errorMessage}</Alert>}
+          <div className="mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shrink-0">
+                <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400" aria-hidden />
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <Label htmlFor="projectStartTemplate" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  Starting template
+                </Label>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Choose a preset for OpenAPI-oriented fields (summary, contact, license, terms). You can edit everything before creating the project.
+                </p>
+                <Select
+                  value={selectedStartTemplateId}
+                  onValueChange={(id) => applyStartTemplateToForm(id)}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="projectStartTemplate" className="max-w-xl">
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {PROJECT_START_TEMPLATES.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedStartTemplateHint ? (
+                  <p className="text-xs text-gray-500 dark:text-gray-500 max-w-3xl">{selectedStartTemplateHint}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-x divide-gray-200 dark:divide-gray-700">
             {/* Left: Basic Information */}
             <div className="flex flex-col pr-4 lg:pr-6">
