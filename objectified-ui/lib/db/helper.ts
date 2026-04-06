@@ -283,6 +283,38 @@ export async function updateUserName(userId: string, name: string) {
   }
 }
 
+/** Persists successful login time for the user (credentials or OAuth). Errors are logged only; login must not fail. */
+export async function updateUserLastLoginAt(userId: string) {
+  try {
+    await connectionPool.query(
+      'UPDATE odb.users SET last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL',
+      [userId]
+    );
+  } catch (error: any) {
+    console.error('Error updating user last_login_at:', error);
+  }
+}
+
+export async function getCurrentUserLastLoginAt() {
+  try {
+    const session = await getAuthSession();
+    const userId = (session?.user as any)?.user_id;
+    if (!userId) {
+      return errorResponse('Unauthorized');
+    }
+    const result = await connectionPool.query(
+      'SELECT last_login_at FROM odb.users WHERE id = $1 AND deleted_at IS NULL',
+      [userId]
+    );
+    if (!result.rowCount) {
+      return errorResponse('User not found');
+    }
+    return successResponse({ lastLoginAt: result.rows[0].last_login_at });
+  } catch (error: any) {
+    return errorResponse(error.message);
+  }
+}
+
 const validatePassword = (password: string) => {
   if (!password || password.length < 8) return 'Password must be at least 8 characters long';
   if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
