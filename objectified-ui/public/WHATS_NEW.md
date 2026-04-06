@@ -4,8 +4,8 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
-Improvements:
-- Projects: when creating a project manually, choose a starting template to pre-fill OpenAPI-oriented metadata (summary, contact, license, terms) and a suggested description (#52)
+## Projects:
+- Added ability to start a new project from a template
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
