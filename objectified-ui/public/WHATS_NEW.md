@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 Improvements:
+- Projects: when creating a project manually, choose a starting template to pre-fill OpenAPI-oriented metadata (summary, contact, license, terms) and a suggested description (#52)
 - Canvas: compare any two layout revisions (or the current layout) in a structured diff viewer showing nodes added/removed/moved, edges changed, viewport and settings differences (#178)
 - Canvas: named layouts now support a short comment and longer annotations in the Layout panel, saved per layout name and restored when selected (#177)
 - Canvas: layout permissions added for named layouts (#176) — Layout panel now shows view/edit/delete capability, enforces view-only behavior for shared layouts, and allows shared layout deletion only for tenant administrators
