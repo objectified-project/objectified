@@ -1,4 +1,4 @@
-# Objectified 03-2026
+# Objectified 04-2026
 
 We continue to improve the platform based on your feedback with improvements and new features!
 
@@ -6,82 +6,6 @@ We continue to improve the platform based on your feedback with improvements and
 
 Improvements:
 - Projects: when creating a project manually, choose a starting template to pre-fill OpenAPI-oriented metadata (summary, contact, license, terms) and a suggested description (#52)
-- Canvas: compare any two layout revisions (or the current layout) in a structured diff viewer showing nodes added/removed/moved, edges changed, viewport and settings differences (#178)
-- Canvas: named layouts now support a short comment and longer annotations in the Layout panel, saved per layout name and restored when selected (#177)
-- Canvas: layout permissions added for named layouts (#176) — Layout panel now shows view/edit/delete capability, enforces view-only behavior for shared layouts, and allows shared layout deletion only for tenant administrators
-- Canvas: tenant administrators can pin a quick snapshot as the team default from the gallery (Share → Pin as team default); saves a shared named layout for the API version (#175)
-- Canvas: share quick layout snapshots with teammates via JSON (copy or download from the gallery) and import shared files or pasted JSON for the same API version (#174)
-- Canvas: quick snapshots store timestamp, author (from your session), a required short summary, and optional description; capture opens a short form before saving (#173)
-- Canvas: quick snapshot gallery in the Layout panel—browse captures in a scrollable grid with search, preview filters (all / with image / no image), and newest-or-oldest sort (#172)
-- Canvas: project and version dropdowns show a loading spinner and label while projects or versions are being fetched (#866)
-- Canvas: layout auto-save interval and on/off switch moved into the layout menu; auto-save stays off by default and is only available after you have saved a layout for the current name (#831)
-- Canvas: Expand, Collapse, Search, View Mode, and Tags live in a left slide-out drawer opened from the **Tools** control in the upper-left (#842)
-- Canvas: group edit controls (style, color, rename, export, duplicate, bulk, delete) sit in a compact floating card above the frame (`-top-6`, `right: -2px`) so the title row stays readable on hover or when selected (#859)
-- Studio: the amber “differs from defaults” hint appears in the dialog header next to the title for class and property editors so it stays visible (#856)
-- Canvas: class node color, icon, hide, and delete controls appear in a compact bar attached to the upper-right outside the card while hovering (or while a popover is open) (#853)
-- Canvas: class node property rows show the type chip by default; hovering a row swaps it for edit and remove actions on the right (#854)
-- Canvas: nested groups up to three levels — drag group frames into each other, breadcrumb navigation and drill-in control, nested export/bulk/delete-all include descendant groups (#155)
-- Canvas: group toolbar — export the group’s schemas as OpenAPI JSON or YAML (with referenced types), duplicate the whole group into a new frame, and apply bulk class updates (description prefix/suffix, tag, top-level read-only) (#156)
-- Canvas: groups can collapse to a compact title bar (chevron); Alt+Shift+[ / ] collapse or expand all; your choices are remembered per version (#154)
-- Canvas: presentation mode — save viewport slides, present in fullscreen with speaker notes, timer, and keyboard controls (#517)
-- Canvas: layout auto-save uses a steady timer while edits are pending so saves occur every 30 seconds (or your chosen interval) without resetting on each move (#315)
-- Canvas: schema timeline panel shows class count, relationships, and complexity across project versions (#323)
-- Canvas: named layout saves store a PNG snapshot for thumbnail preview in the layout menu
-- Canvas: Layout panel quick snapshots capture viewport, nodes, edges, groups, and a local PNG preview in the browser without naming or server save (#168)
-- Canvas: quick snapshot list shows a thumbnail card per capture (scrollable grid; placeholder when preview was not stored) (#169)
-- Canvas: click a quick snapshot thumbnail to restore that layout (confirm + sign-in; groups sync like layout import) (#170)
-- Canvas: compare two quick snapshots side by side (previews, timestamps, node/edge/group counts) from the Layout panel (#171)
-- Canvas: export and import canvas layouts as versioned JSON (share across versions and projects)
-- Canvas: layout import and named layout load restore edge handle routing when saved edge IDs match the canvas (#316)
-
-Bug Fixes:
-- Studio: deleting a group from the sidebar now removes it from the list and persists like canvas delete (nested frames, layout save) (#849)
-- Studio: property editor XML section and object min/max properties use the same card, typography, and helper text patterns as the class form (#852)
-- Canvas: empty group frames from drag-to-canvas now appear (visibility treated empty leaf groups as visible) (#848)
-- Import now handles paths properly
-- Improved Markdown rendering
-- Improved layout of primitives form
-- Improved layout of class form
-- Improved layout of profile page
-- Improved handling of light/dark system theme settings
-- Conversion of forms to use modern components
-- System-wide clean up of modern UI
-- Publishing a version can select the visibility at the time of publish
-- Improved published view page
-  - Now displays the different types of object representations as a submenu (OpenAPI, Arazzo, JSON)
-  - Now applies API Key when viewing private published pages
-  - Fixes REST service to apply API Key on retrieval
-- Improved layout of the linked accounts page
-  - Linked accounts page is slightly wider matching those of other dashboard layouts
-  - Provider cards now show PAT hints so users can match the PATs that were assigned
-- Canvas: optional default named layout on open — save a personal or team (tenant) default per version
-- Improvements in the canvas
-  - Class node customization form is slightly more compact
-  - Class and Properties forms now have tabs instead of button groupings
-  - Export page now uses stylized monaco-editor to display export data
-  - Class and Properties edit forms now display changed elements in more obvious colored background sections
-  - Removal of groups and group classes are now working properly
-  - Class nodes show the name of the singular reference - arrays were already correct
-  - Class form was displaying a prompt for dependent schemas - this has been corrected
-  - Class template library form is wider to show better detail
-  - Class nodes show ghost preview of node while dragging
-  - Property template button now appears properly when in dark mode
-  - Property template form is also now wider to show better detail
-  - Renaming a property no longer rearranges the entire canvas
-  - Adding a reference to a class no longer rearranges the entire canvas
-  - Now handles multiple saved layouts per version
-  - Named layout saves keep version history with restore (up to 50 prior states per layout)
-  - Adds auto-save layout changes every 30 seconds (configurable)
-  - Adds the ability to save custom layout names per version
-  - Adds view mode to show and hide all nodes except selected
-    - Adds hiding by criteria
-  - View Mode can show hidden nodes as semi-transparent (node ghosts) instead of removing them
-  - Introduces the ability to hide/show individual nodes
-  - Canvas **View mode** menu includes **Show all nodes** to restore full visibility after manual hides, filters, ghosts, isolate selection, or focus mode
-- Project form:
-  - Now includes the metadata section
-  - Moved AI Assistant here
-  - Shows creation metadata when editing
 
 View our YouTube channel [here](https://www.youtube.com/@objectifieddev) for detailed tutorials and walkthroughs!
 
