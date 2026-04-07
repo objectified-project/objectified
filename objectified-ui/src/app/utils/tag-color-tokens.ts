@@ -21,7 +21,7 @@ export function tagChipClass(color: string): string {
     success:
       'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700',
   };
-  return m[color] ?? m.default;
+  return m[color] || m.default;
 }
 
 /** Maps a project-tag color name to a Tailwind text-color class for a color dot. */
@@ -35,7 +35,7 @@ export function tagDotClass(color: string): string {
     info: 'text-blue-500',
     success: 'text-emerald-500',
   };
-  return m[color] ?? m.default;
+  return m[color] || m.default;
 }
 
 /** Maps a project-tag color name to inline rgba bg/border values (used by canvas nodes with inline styles). */
@@ -49,5 +49,5 @@ export function tagInlineColors(color: string): { bg: string; border: string } {
     info: { bg: 'rgba(59, 130, 246, 0.3)', border: 'rgba(59, 130, 246, 0.5)' },
     success: { bg: 'rgba(16, 185, 129, 0.3)', border: 'rgba(16, 185, 129, 0.5)' },
   };
-  return m[color] ?? m.default;
+  return m[color] || m.default;
 }
