@@ -11,7 +11,9 @@ export interface TagGroupPlanEntry {
 /**
  * Plans canvas groups so each tag name (shared by at least two classes) gets its own group.
  * Classes with multiple tags are assigned to at most one group: the first tag name in
- * Unicode sort order among tag names that still need members (greedy assignment).
+ * Unicode code-point order among tag names that still need members (greedy assignment).
+ * Code-point ordering is used (not localeCompare) to guarantee identical results across
+ * all runtime locales.
  */
 export function computeTagGroupPlan(
   classes: Array<{ id: string; tags?: Array<{ id: string; tag_name?: string; name?: string }> }>,
@@ -45,7 +47,7 @@ export function computeTagGroupPlan(
     }
   }
 
-  const sortedNames = [...byTagName.keys()].sort((a, b) => a.localeCompare(b));
+  const sortedNames = [...byTagName.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const assigned = new Set<string>();
   const result: TagGroupPlanEntry[] = [];
 

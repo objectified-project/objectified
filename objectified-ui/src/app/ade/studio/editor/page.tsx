@@ -5949,22 +5949,44 @@ const StudioContent = () => {
     const CELL_W = 280;
     const CELL_H = 180;
     const COLS = 2;
-    const GAP_X = 520;
-    const GAP_Y = 420;
+    const INTER_PAD = 40;
+    const GROUP_COLS = 3;
     const ORIGIN_X = 100;
     const ORIGIN_Y = 100;
+
+    // Pre-compute dimensions for each group frame (height varies by class count).
+    const planDims = plan.map((entry) => {
+      const n = entry.classIds.length;
+      const innerRows = Math.ceil(n / COLS);
+      const width = Math.max(400, PAD * 2 + COLS * CELL_W);
+      const height = Math.max(260, PAD * 2 + innerRows * CELL_H);
+      return { width, height };
+    });
+
+    // Track the tallest frame in each group-row to avoid vertical overlap.
+    const rowMaxHeights: number[] = [];
+    planDims.forEach(({ height }, index) => {
+      const row = Math.floor(index / GROUP_COLS);
+      rowMaxHeights[row] = Math.max(rowMaxHeights[row] ?? 0, height);
+    });
+
+    // Derive group-frame origins from actual dimensions + padding.
+    const planPositions = planDims.map(({ width }, index) => {
+      const col = index % GROUP_COLS;
+      const row = Math.floor(index / GROUP_COLS);
+      const gx = ORIGIN_X + col * (width + INTER_PAD);
+      let gy = ORIGIN_Y;
+      for (let r = 0; r < row; r++) {
+        gy += (rowMaxHeights[r] ?? 0) + INTER_PAD;
+      }
+      return { gx, gy };
+    });
 
     const newCanvasGroups: CanvasGroup[] = [];
 
     plan.forEach((entry, index) => {
-      const col = index % 3;
-      const row = Math.floor(index / 3);
-      const gx = ORIGIN_X + col * GAP_X;
-      const gy = ORIGIN_Y + row * GAP_Y;
-      const n = entry.classIds.length;
-      const rows = Math.ceil(n / COLS);
-      const width = Math.max(400, PAD * 2 + COLS * CELL_W);
-      const height = Math.max(260, PAD * 2 + rows * CELL_H);
+      const { gx, gy } = planPositions[index]!;
+      const { width, height } = planDims[index]!;
 
       const groupId = generateGroupId();
       const groupTags = normalizeStoredGroupTags([{ id: entry.tagId }], tagCatalog);
@@ -5993,10 +6015,7 @@ const StudioContent = () => {
 
     const classPositionUpdates = new Map<string, { x: number; y: number }>();
     plan.forEach((entry, index) => {
-      const col = index % 3;
-      const row = Math.floor(index / 3);
-      const gx = ORIGIN_X + col * GAP_X;
-      const gy = ORIGIN_Y + row * GAP_Y;
+      const { gx, gy } = planPositions[index]!;
       entry.classIds.forEach((classId, i) => {
         classPositionUpdates.set(classId, {
           x: gx + PAD + (i % COLS) * CELL_W,
