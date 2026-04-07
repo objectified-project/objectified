@@ -1,15 +1,38 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Progress from '@radix-ui/react-progress';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
-import { AlertCircle, CheckCircle2, Info, XCircle, Pause, RotateCw, MinusCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Circle,
+  Info,
+  Loader2,
+  XCircle,
+  RotateCw,
+  MinusCircle,
+} from 'lucide-react';
 import { cancelImport, getImportStatus, commitImport, rollbackImport, retryImport } from '../../../../../lib/db/import-actions';
-import { getErrorEvents, formatEventContext, getLiveProgressRowClasses, getImportLogLineClasses, isSkippedEvent } from '../../../../../lib/import-execution-error-indicators';
+import {
+  getErrorEvents,
+  formatEventContext,
+  getLiveProgressRowClasses,
+  getImportLogLineClasses,
+  isSkippedEvent,
+} from '../../../../../lib/import-execution-error-indicators';
+import {
+  buildImportLiveChecklist,
+  formatProgressPrimaryLine,
+  estimateSecondsRemaining,
+} from '../../../../../lib/import-execution-live-rows';
 
 interface ImportExecutionPanelProps {
   jobId: string;
+  /** Schema names selected on the Preview step — drives the live checklist (#296). */
+  selectedSchemas?: string[];
   onComplete?: (succeeded: boolean) => void;
   /** When user retries a failed/canceled import, called with the new job ID so the dialog can switch to it. */
   onRetry?: (newJobId: string) => void;
@@ -24,11 +47,19 @@ interface ImportEvent {
   level: LogLevel;
   code: string;
   message: string;
-  context?: any;
+  context?: unknown;
 }
 
 interface ProgressInfo {
-  phase: 'initializing' | 'creating-project' | 'creating-version' | 'creating-properties' | 'creating-classes' | 'linking-properties' | 'verifying' | 'finalizing';
+  phase:
+    | 'initializing'
+    | 'creating-project'
+    | 'creating-version'
+    | 'creating-properties'
+    | 'creating-classes'
+    | 'linking-properties'
+    | 'verifying'
+    | 'finalizing';
   total: number;
   completed: number;
   currentItem?: string;
@@ -36,53 +67,85 @@ interface ProgressInfo {
 
 type JobState = 'queued' | 'running' | 'pending-approval' | 'committing' | 'completed' | 'failed' | 'canceled' | 'rolled-back';
 
-export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isReviewing }: ImportExecutionPanelProps) {
+const IMPORT_LOG_PREVIEW_COUNT = 8;
+
+function formatEtaLine(seconds: number | null): string | null {
+  if (seconds == null) return null;
+  if (seconds < 60) return `Estimated time remaining: about ${seconds} seconds`;
+  const m = Math.max(1, Math.round(seconds / 60));
+  return m === 1 ? 'Estimated time remaining: about 1 minute' : `Estimated time remaining: about ${m} minutes`;
+}
+
+export default function ImportExecutionPanel({
+  jobId,
+  selectedSchemas = [],
+  onComplete,
+  onRetry,
+  isReviewing,
+}: ImportExecutionPanelProps) {
   const [state, setState] = useState<JobState>('queued');
   const [percent, setPercent] = useState(0);
   const [progress, setProgress] = useState<ProgressInfo | undefined>(undefined);
   const [events, setEvents] = useState<ImportEvent[]>([]);
-  const [summary, setSummary] = useState<any>(null);
-  const [hasNotifiedComplete, setHasNotifiedComplete] = useState(false);
+  const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isRollingBack, setIsRollingBack] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [transactionPending, setTransactionPending] = useState(false);
+  const [logExpanded, setLogExpanded] = useState(false);
+  const importStartedAtMs = useRef<number | null>(null);
+  const completionNotifiedRef = useRef(false);
 
-  // Reset completion notification when jobId changes (e.g. after retry)
+  const liveRows = useMemo(
+    () => buildImportLiveChecklist(selectedSchemas, events, progress, state),
+    [selectedSchemas, events, progress, state]
+  );
+
+  const primaryLine = formatProgressPrimaryLine(progress, state);
+  const etaSeconds = estimateSecondsRemaining(
+    percent,
+    importStartedAtMs.current != null ? Date.now() - importStartedAtMs.current : 0
+  );
+  const etaLine =
+    ['running', 'queued', 'committing'].includes(state) && percent > 0 && percent < 100
+      ? formatEtaLine(etaSeconds)
+      : null;
+
   useEffect(() => {
-    setHasNotifiedComplete(false);
+    completionNotifiedRef.current = false;
+    importStartedAtMs.current = null;
   }, [jobId]);
 
   useEffect(() => {
     let mounted = true;
-    let timer: any;
+    let timer: ReturnType<typeof setInterval> | undefined;
 
     const poll = async () => {
       try {
         const status = await getImportStatus(jobId);
         if (!mounted) return;
+        if (importStartedAtMs.current === null && ((status.percent ?? 0) > 0 || (status.events?.length ?? 0) > 0)) {
+          importStartedAtMs.current = Date.now();
+        }
         setState(status.state as JobState);
         setPercent(status.percent || 0);
-        setProgress(status.progress as any);
+        setProgress(status.progress as ProgressInfo | undefined);
         setEvents(status.events || []);
         setSummary(status.summary || null);
-        setTransactionPending((status as any).transactionPending || false);
+        setTransactionPending((status as { transactionPending?: boolean }).transactionPending || false);
 
-        // Stop polling when in a terminal state or pending-approval
         if (['completed', 'failed', 'canceled', 'rolled-back', 'pending-approval'].includes(status.state)) {
-          clearInterval(timer);
-          // Notify parent that import reached a decision point
-          if (!hasNotifiedComplete && onComplete) {
-            setHasNotifiedComplete(true);
+          if (timer) clearInterval(timer);
+          if (!completionNotifiedRef.current && onComplete) {
+            completionNotifiedRef.current = true;
             onComplete(status.state === 'completed');
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore transient errors
       }
     };
 
-    // If reviewing (came back from done step), just poll once to get final state
     if (isReviewing) {
       poll();
     } else {
@@ -94,7 +157,7 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
       mounted = false;
       if (timer) clearInterval(timer);
     };
-  }, [jobId, onComplete, isReviewing, hasNotifiedComplete]);
+  }, [jobId, onComplete, isReviewing]);
 
   const onCancel = async () => {
     await cancelImport(jobId);
@@ -110,7 +173,6 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
           onComplete(true);
         }
       } else {
-        // Poll to get updated state
         const status = await getImportStatus(jobId);
         setState(status.state as JobState);
         setEvents(status.events || []);
@@ -158,132 +220,27 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
     return <Info className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />;
   };
 
+  const checklistIcon = (status: (typeof liveRows)[0]['status']) => {
+    switch (status) {
+      case 'success':
+        return <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />;
+      case 'warning':
+        return <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />;
+      case 'error':
+        return <XCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden />;
+      case 'importing':
+        return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-indigo-600 dark:text-indigo-400" aria-hidden />;
+      default:
+        return <Circle className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" aria-hidden />;
+    }
+  };
+
   const errorEvents = getErrorEvents(events);
+  const logShown = logExpanded ? events : events.slice(0, IMPORT_LOG_PREVIEW_COUNT);
+  const logOverflow = events.length > IMPORT_LOG_PREVIEW_COUNT;
 
   return (
-    <div className="space-y-6">
-      {/* Overall Progress */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Import Progress</h3>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {progress?.phase?.replace(/-/g,' ') || 'starting'}{progress?.currentItem ? `: ${progress.currentItem}` : ''}
-            </div>
-          </div>
-          <div>
-            <Badge variant={
-              state === 'completed' ? 'success' :
-              state === 'failed' ? 'error' :
-              state === 'canceled' || state === 'rolled-back' ? 'secondary' :
-              state === 'pending-approval' ? 'warning' :
-              'default'
-            }>
-              {state === 'pending-approval' ? 'PENDING APPROVAL' : state.toUpperCase().replace('-', ' ')}
-            </Badge>
-          </div>
-        </div>
-        <Progress.Root className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" value={percent}>
-          <Progress.Indicator
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-transform duration-300"
-            style={{ transform: `translateX(-${100 - (percent || 0)}%)` }}
-          />
-        </Progress.Root>
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
-          <span>{percent}%</span>
-          {progress && <span>{progress.completed} of {progress.total}</span>}
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {state === 'pending-approval' ? (
-            <>
-              <Button
-                onClick={onAccept}
-                disabled={isCommitting || isRollingBack}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1"/>
-                {isCommitting ? 'Committing...' : 'Accept & Commit'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={onReject}
-                disabled={isCommitting || isRollingBack}
-                className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
-              >
-                <XCircle className="h-4 w-4 mr-1"/>
-                {isRollingBack ? 'Rolling Back...' : 'Reject & Rollback'}
-              </Button>
-            </>
-          ) : state === 'failed' || state === 'canceled' ? (
-            <>
-              {onRetry && (
-                <Button
-                  onClick={onRetryClick}
-                  disabled={isRetrying}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                >
-                  <RotateCw className={`h-4 w-4 mr-1 ${isRetrying ? 'animate-spin' : ''}`}/>
-                  {isRetrying ? 'Starting retry...' : 'Retry Import'}
-                </Button>
-              )}
-              <Button variant="outline" onClick={onCancel} disabled={isRetrying}>
-                <Pause className="h-4 w-4 mr-1"/> Cancel Import
-              </Button>
-            </>
-          ) : (
-            <Button variant="outline" onClick={onCancel} disabled={['completed','failed','canceled','rolled-back','pending-approval'].includes(state)}>
-              <Pause className="h-4 w-4 mr-1"/> Cancel Import
-            </Button>
-          )}
-        </div>
-
-        {/* Dry run complete notice */}
-        {state === 'completed' && summary?.dryRun && (
-          <div className="mt-4 p-3 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
-            <div className="flex items-center gap-2 text-sky-800 dark:text-sky-200">
-              <Info className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                Dry run complete. No changes were saved.
-              </span>
-            </div>
-            <p className="text-xs text-sky-700 dark:text-sky-300 mt-1 ml-6">
-              Review the summary above. Uncheck &quot;Dry run (preview only)&quot; and run again to import for real.
-            </p>
-          </div>
-        )}
-
-        {/* Incremental mode complete notice */}
-        {state === 'completed' && summary?.incrementalMode && !summary?.dryRun && (
-          <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
-            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
-              <CheckCircle2 className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                Incremental import complete.
-              </span>
-            </div>
-            <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 ml-6">
-              Successful classes were saved; failed classes were skipped. You can open the project in Canvas or close this dialog.
-            </p>
-          </div>
-        )}
-
-        {/* Transaction pending notice */}
-        {transactionPending && state === 'pending-approval' && (
-          <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                Transaction pending - changes will only be saved if you accept.
-              </span>
-            </div>
-            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 ml-6">
-              Closing this dialog or rejecting will rollback all changes.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Error indicators: red for failures with details (#731) */}
+    <div className="space-y-4">
       {errorEvents.length > 0 && (
         <div
           className="rounded-xl border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 p-6"
@@ -296,7 +253,7 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
               Failures ({errorEvents.length})
             </h3>
           </div>
-          <ul className="space-y-3 max-h-[280px] overflow-y-auto">
+          <ul className="space-y-3 max-h-72 overflow-y-auto">
             {errorEvents.map((ev) => (
               <li
                 key={ev.id}
@@ -320,61 +277,235 @@ export default function ImportExecutionPanel({ jobId, onComplete, onRetry, isRev
         </div>
       )}
 
-      {/* Live Progress - per event log */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Live Progress</h3>
-          <div className="max-h-[320px] overflow-y-auto space-y-2">
-            {events.slice().reverse().map(ev => (
-              <div key={ev.id} className={getLiveProgressRowClasses(ev)}>
-                {isSkippedEvent(ev) ? (
-                  <MinusCircle className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" aria-label="Intentionally skipped" />
-                ) : (
-                  levelIcon(ev.level)
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className={`text-xs ${isSkippedEvent(ev) ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}>{new Date(ev.ts).toLocaleTimeString()} • {ev.code}</div>
-                  <div className={`text-sm ${ev.level === 'error' ? 'text-red-900 dark:text-red-100 font-medium' : isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>{ev.message}</div>
-                  {ev.context != null && (
-                    <pre className="mt-1 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-24">
-                      {formatEventContext(ev.context)}
-                    </pre>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">Import Progress</h3>
+          <Badge
+            variant={
+              state === 'completed'
+                ? 'success'
+                : state === 'failed'
+                  ? 'error'
+                  : state === 'canceled' || state === 'rolled-back'
+                    ? 'secondary'
+                    : state === 'pending-approval'
+                      ? 'warning'
+                      : 'default'
+            }
+          >
+            {state === 'pending-approval' ? 'PENDING APPROVAL' : state.toUpperCase().replace(/-/g, ' ')}
+          </Badge>
         </div>
 
-        {/* Import Log */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Import Log</h3>
-          <div className="max-h-[320px] overflow-y-auto space-y-1">
-            {events.map(ev => (
-              <div key={ev.id} className={getImportLogLineClasses(ev)}>
-                <span className={`mr-2 px-1.5 py-0.5 rounded ${isSkippedEvent(ev) ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400' : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'}`}>{new Date(ev.ts).toLocaleTimeString()}</span>
-                <span className={`mr-2 font-semibold ${isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : ev.level === 'error' ? 'text-red-600 dark:text-red-400' : ev.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}>{isSkippedEvent(ev) ? '[SKIPPED]' : `[${ev.level.toUpperCase()}]`}</span>
-                <span className={isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : ev.level === 'error' ? 'text-red-900 dark:text-red-100' : 'text-gray-800 dark:text-gray-200'}>{ev.message}</span>
-                {ev.level === 'error' && ev.context != null && (
-                  <pre className="mt-1.5 ml-0 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-20 border border-red-200 dark:border-red-800">
-                    {formatEventContext(ev.context)}
-                  </pre>
-                )}
-              </div>
-            ))}
-          </div>
+        <div className="flex items-center gap-4 mb-3">
+          <Progress.Root className="relative h-3 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700" value={percent}>
+            <Progress.Indicator
+              className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-transform duration-300 ease-out"
+              style={{ transform: `translateX(-${100 - (percent || 0)}%)` }}
+            />
+          </Progress.Root>
+          <span className="text-2xl font-semibold tabular-nums text-gray-900 dark:text-white shrink-0">{percent}%</span>
         </div>
+
+        <p className="text-sm text-gray-700 dark:text-gray-300">{primaryLine}</p>
+        {etaLine && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{etaLine}</p>}
+        {progress && progress.total > 0 && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Step {progress.completed} of {progress.total}
+          </p>
+        )}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {state === 'pending-approval' ? (
+            <>
+              <Button
+                onClick={onAccept}
+                disabled={isCommitting || isRollingBack}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                {isCommitting ? 'Committing...' : 'Accept & Commit'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onReject}
+                disabled={isCommitting || isRollingBack}
+                className="text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20"
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                {isRollingBack ? 'Rolling Back...' : 'Reject & Rollback'}
+              </Button>
+            </>
+          ) : state === 'failed' || state === 'canceled' ? (
+            <>
+              {onRetry && (
+                <Button
+                  onClick={onRetryClick}
+                  disabled={isRetrying}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <RotateCw className={`h-4 w-4 mr-1 ${isRetrying ? 'animate-spin' : ''}`} />
+                  {isRetrying ? 'Starting retry...' : 'Retry Import'}
+                </Button>
+              )}
+              <Button variant="outline" onClick={onCancel} disabled={isRetrying}>
+                Cancel import
+              </Button>
+            </>
+          ) : null}
+        </div>
+
+        {state === 'completed' && summary?.['dryRun'] === true && (
+          <div className="mt-4 p-3 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
+            <div className="flex items-center gap-2 text-sky-800 dark:text-sky-200">
+              <Info className="h-4 w-4" />
+              <span className="text-sm font-medium">Dry run complete. No changes were saved.</span>
+            </div>
+            <p className="text-xs text-sky-700 dark:text-sky-300 mt-1 ml-6">
+              Review the summary below. Uncheck &quot;Dry run (preview only)&quot; and run again to import for real.
+            </p>
+          </div>
+        )}
+
+        {state === 'completed' && summary?.['incrementalMode'] === true && summary?.['dryRun'] !== true && (
+          <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-sm font-medium">Incremental import complete.</span>
+            </div>
+            <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 ml-6">
+              Successful classes were saved; failed classes were skipped. You can open the project in Canvas or close this dialog.
+            </p>
+          </div>
+        )}
+
+        {transactionPending && state === 'pending-approval' && (
+          <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">Transaction pending — changes will only be saved if you accept.</span>
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 ml-6">
+              Closing this dialog or rejecting will rollback all changes.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Summary */}
-      {summary && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400"/>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Import Summary</h3>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">Live Progress</h3>
+        {liveRows.length > 0 ? (
+          <ul className="max-h-80 overflow-y-auto space-y-2 pr-1" aria-label="Per-schema import status">
+            {liveRows.map((row) => (
+              <li key={row.id} className="flex items-start gap-2 text-sm">
+                {checklistIcon(row.status)}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{row.label}</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {row.status === 'success' && 'Imported successfully'}
+                      {row.status === 'warning' && 'Imported with warnings'}
+                      {row.status === 'error' && 'Failed'}
+                      {row.status === 'importing' && 'Importing…'}
+                      {row.status === 'pending' && 'Pending'}
+                    </span>
+                  </div>
+                  {row.detail && (
+                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-200 border-l-2 border-amber-300 dark:border-amber-700 pl-2">
+                      {row.detail}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="max-h-80 overflow-y-auto space-y-2">
+            {events.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">Waiting for import events…</p>
+            ) : (
+              events
+                .slice()
+                .reverse()
+                .slice(0, 20)
+                .map((ev) => (
+                  <div key={ev.id} className={getLiveProgressRowClasses(ev)}>
+                    {isSkippedEvent(ev) ? (
+                      <MinusCircle className="h-4 w-4 text-gray-500 dark:text-gray-400 shrink-0" aria-label="Intentionally skipped" />
+                    ) : (
+                      levelIcon(ev.level)
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={`text-xs ${isSkippedEvent(ev) ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'}`}
+                      >
+                        {new Date(ev.ts).toLocaleTimeString()} • {ev.code}
+                      </div>
+                      <div
+                        className={`text-sm ${ev.level === 'error' ? 'text-red-900 dark:text-red-100 font-medium' : isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}
+                      >
+                        {ev.message}
+                      </div>
+                    </div>
+                  </div>
+                ))
+            )}
           </div>
-          <pre className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-auto">{JSON.stringify(summary, null, 2)}</pre>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">Import Log</h3>
+        <div className="max-h-72 overflow-y-auto space-y-1 font-mono text-xs">
+          {logShown.map((ev) => (
+            <div key={ev.id} className={getImportLogLineClasses(ev)}>
+              <span
+                className={`mr-2 font-semibold ${isSkippedEvent(ev) ? 'text-gray-500 dark:text-gray-400' : ev.level === 'error' ? 'text-red-600 dark:text-red-400' : ev.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' : 'text-indigo-600 dark:text-indigo-400'}`}
+              >
+                {isSkippedEvent(ev) ? '[SKIPPED]' : `[${ev.level.toUpperCase()}]`}
+              </span>
+              <span className="text-gray-500 dark:text-gray-500 mr-2">{new Date(ev.ts).toLocaleTimeString()}</span>
+              <span
+                className={
+                  isSkippedEvent(ev)
+                    ? 'text-gray-500 dark:text-gray-400'
+                    : ev.level === 'error'
+                      ? 'text-red-900 dark:text-red-100'
+                      : 'text-gray-800 dark:text-gray-200'
+                }
+              >
+                {ev.message}
+              </span>
+              {ev.level === 'error' && ev.context != null && (
+                <pre className="mt-1.5 text-xs text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded p-2 overflow-auto max-h-20 border border-red-200 dark:border-red-800">
+                  {formatEventContext(ev.context)}
+                </pre>
+              )}
+            </div>
+          ))}
         </div>
+        {logOverflow && (
+          <button
+            type="button"
+            onClick={() => setLogExpanded((e) => !e)}
+            className="mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+          >
+            {logExpanded ? 'Show less' : 'Show more…'}
+          </button>
+        )}
+      </div>
+
+      {summary && (
+        <details className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 shadow-sm group">
+          <summary className="cursor-pointer text-base font-semibold text-gray-900 dark:text-white list-none flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+            Import Summary
+            <span className="text-sm font-normal text-gray-500 dark:text-gray-400">(technical details)</span>
+          </summary>
+          <pre className="mt-3 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-auto max-h-64">
+            {JSON.stringify(summary, null, 2)}
+          </pre>
+        </details>
       )}
     </div>
   );
