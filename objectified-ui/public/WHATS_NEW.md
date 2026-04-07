@@ -6,6 +6,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Projects:
 - Added ability to start a new project from a template
+- Layout panel: group classes that share the same project tag name into separate canvas frames (multi-tagged classes are placed in one group via a clear A–Z rule)
 - Canvas groups can be assigned project tags from the group style settings (saved with the group for future search and filtering)
 - Fixed group tag picker and chips so tag names and colors show correctly (project tags use `name`/`color` from the database)
 

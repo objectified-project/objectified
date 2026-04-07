@@ -4,7 +4,7 @@ import { useCallback, useState, useEffect, useRef, useMemo, type ChangeEvent, ty
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useStudio } from '../StudioContext';
+import { useStudio, type CanvasGroup } from '../StudioContext';
 import {
   Copy,
   Download,
@@ -154,6 +154,7 @@ import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
 import { mapProjectTagToGroupOption, normalizeStoredGroupTags } from '@/app/utils/tag-color-tokens';
+import { computeTagGroupPlan } from '@/app/utils/group-classes-by-tag-name';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { getVisibleNodeIdsForIsolateSelection } from '@/app/utils/canvas-node-visibility';
@@ -5898,6 +5899,245 @@ const StudioContent = () => {
     [handlePreviewLayout]
   );
 
+  /** #96: Create one canvas group per tag name (≥2 classes), greedy assignment by tag name A–Z. */
+  const handleGroupCanvasByTagName = useCallback(async () => {
+    if (isReadOnly) {
+      await alertDialog({
+        message: 'Switch to an editable version to group classes by tag.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const confirmed = await confirmDialog({
+      title: 'Group classes by tag',
+      message:
+        'Create one canvas group per tag name that has at least two classes. Classes with multiple tags are placed in only one group (first tag name in A–Z order among tags that still need members). Classes are removed from their current groups. Continue?',
+    });
+    if (!confirmed) return;
+
+    setLayoutDropdownOpen(false);
+
+    const classNodes = getNodes().filter((n) => n.type === 'classNode');
+    const plan = computeTagGroupPlan(
+      classNodes.map((n) => ({
+        id: n.id,
+        tags: (n.data as { tags?: Array<{ id: string; tag_name?: string; name?: string }> }).tags,
+      })),
+      projectTags
+    );
+
+    if (plan.length === 0) {
+      await alertDialog({
+        message:
+          'No tag has two or more classes on the canvas. Add shared project tags to classes first.',
+        variant: 'info',
+      });
+      return;
+    }
+
+    const assignedIds = new Set(plan.flatMap((p) => p.classIds));
+
+    const strippedGroups = groups.map((g) => ({
+      ...g,
+      nodeIds: g.nodeIds.filter((id) => !assignedIds.has(id)),
+    }));
+
+    const tagCatalog = new Map(projectTags.map((t) => [t.id, mapProjectTagToGroupOption(t)]));
+
+    const PAD = 40;
+    const CELL_W = 280;
+    const CELL_H = 180;
+    const COLS = 2;
+    const GAP_X = 520;
+    const GAP_Y = 420;
+    const ORIGIN_X = 100;
+    const ORIGIN_Y = 100;
+
+    const newCanvasGroups: CanvasGroup[] = [];
+
+    plan.forEach((entry, index) => {
+      const col = index % 3;
+      const row = Math.floor(index / 3);
+      const gx = ORIGIN_X + col * GAP_X;
+      const gy = ORIGIN_Y + row * GAP_Y;
+      const n = entry.classIds.length;
+      const rows = Math.ceil(n / COLS);
+      const width = Math.max(400, PAD * 2 + COLS * CELL_W);
+      const height = Math.max(260, PAD * 2 + rows * CELL_H);
+
+      const groupId = generateGroupId();
+      const groupTags = normalizeStoredGroupTags([{ id: entry.tagId }], tagCatalog);
+      const colorName = GROUP_COLORS[(strippedGroups.length + index) % GROUP_COLORS.length]!.name;
+
+      newCanvasGroups.push({
+        id: groupId,
+        name: entry.tagName,
+        color: colorName,
+        nodeIds: [...entry.classIds],
+        parentId: null,
+        position: { x: gx, y: gy },
+        dimensions: { width, height },
+        styleOptions: {
+          borderStyle: 'dashed',
+          opacity: 1,
+          shadow: 'none',
+          icon: 'tag',
+        },
+        tags: groupTags,
+      });
+    });
+
+    const nextGroups = [...strippedGroups, ...newCanvasGroups];
+    setGroups(nextGroups);
+
+    const classPositionUpdates = new Map<string, { x: number; y: number }>();
+    plan.forEach((entry, index) => {
+      const col = index % 3;
+      const row = Math.floor(index / 3);
+      const gx = ORIGIN_X + col * GAP_X;
+      const gy = ORIGIN_Y + row * GAP_Y;
+      entry.classIds.forEach((classId, i) => {
+        classPositionUpdates.set(classId, {
+          x: gx + PAD + (i % COLS) * CELL_W,
+          y: gy + PAD + Math.floor(i / COLS) * CELL_H,
+        });
+      });
+    });
+
+    const availableTags = projectTags.map(mapProjectTagToGroupOption);
+
+    const newFlowNodes: Node[] = newCanvasGroups.map((newGroup) => {
+      const groupId = newGroup.id;
+      groupPositionsRef.current.set(groupId, { ...newGroup.position });
+      return {
+        id: groupId,
+        type: 'groupNode',
+        position: newGroup.position,
+        width: newGroup.dimensions.width,
+        height: newGroup.dimensions.height,
+        style: {
+          width: newGroup.dimensions.width,
+          height: newGroup.dimensions.height,
+          zIndex: -1,
+        },
+        data: {
+          id: groupId,
+          name: newGroup.name,
+          color: newGroup.color,
+          nodeIds: newGroup.nodeIds,
+          styleOptions: newGroup.styleOptions,
+          parentId: null,
+          availableTags,
+          tags: newGroup.tags ?? [],
+          onRename: (gid: string, name: string) => handleGroupRenameRef.current?.(gid, name),
+          onDelete: (gid: string) => handleGroupDeleteRef.current?.(gid),
+          onDeleteAllClassesInGroup: (gid: string, cids?: string[], gn?: string) =>
+            handleDeleteAllClassesInGroupRef.current?.(gid, cids, gn),
+          onExportGroupSchema: (gid: string, cids: string[], gn: string, fmt: 'json' | 'yaml') =>
+            handleExportGroupSchemaRef.current?.(gid, cids, gn, fmt),
+          onDuplicateGroup: (gid: string, cids: string[], gn: string) =>
+            handleDuplicateGroupRef.current?.(gid, cids, gn),
+          onBulkEditGroupClasses: (
+            gid: string,
+            cids: string[],
+            gn: string,
+            opts: {
+              descriptionPrefix?: string;
+              descriptionSuffix?: string;
+              tagId?: string;
+              topLevelPropertyReadOnly?: boolean;
+            }
+          ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
+          onColorChange: (gid: string, color: string) => handleGroupColorChangeRef.current?.(gid, color),
+          onStyleChange: (gid: string, style: unknown) => handleGroupStyleChangeRef.current?.(gid, style),
+          onTagsChange: (gid: string, t: unknown[]) => handleGroupTagsChangeRef.current?.(gid, t),
+          onDrillInto: () => handleDrillIntoNestedGroupRef.current(groupId),
+          isReadOnly,
+        },
+      };
+    });
+
+    const prevFlow = getNodes();
+    const mergedNodes: Node[] = [
+      ...newFlowNodes,
+      ...prevFlow.map((node) => {
+        if (node.type === 'classNode' && classPositionUpdates.has(node.id)) {
+          return {
+            ...node,
+            position: classPositionUpdates.get(node.id)!,
+          };
+        }
+        if (node.type === 'groupNode') {
+          const g = nextGroups.find((ng) => ng.id === node.id);
+          if (g) {
+            return {
+              ...node,
+              position: g.position,
+              width: g.dimensions.width,
+              height: g.dimensions.height,
+              style: {
+                ...node.style,
+                width: g.dimensions.width,
+                height: g.dimensions.height,
+              },
+              data: {
+                ...node.data,
+                nodeIds: g.nodeIds,
+                name: g.name,
+                tags: g.tags ?? (node.data as { tags?: unknown }).tags,
+              },
+            };
+          }
+        }
+        return node;
+      }),
+    ];
+
+    setNodes(mergedNodes);
+
+    if (selectedVersionId && currentUserId) {
+      try {
+        const viewport = getViewport();
+        await saveDefaultCanvasLayout(
+          selectedVersionId,
+          currentUserId,
+          viewport,
+          mapNodesForLayoutSave(mergedNodes),
+          mapEdgesForLayoutSave(getEdges()),
+          nextGroups
+        );
+      } catch (e) {
+        console.error('Failed to save canvas after group-by-tag:', e);
+      }
+    }
+
+    setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 120);
+    triggerSidebarRefresh();
+
+    await alertDialog({
+      message: `Created ${plan.length} group(s) from shared tag names.`,
+      variant: 'success',
+    });
+  }, [
+    isReadOnly,
+    alertDialog,
+    confirmDialog,
+    getNodes,
+    getEdges,
+    projectTags,
+    groups,
+    generateGroupId,
+    setGroups,
+    setNodes,
+    saveDefaultCanvasLayout,
+    selectedVersionId,
+    currentUserId,
+    getViewport,
+    fitView,
+    triggerSidebarRefresh,
+  ]);
+
   // ============================================================================
   // END LAYOUT SAVE/LOAD HANDLERS
   // ============================================================================
@@ -9612,6 +9852,31 @@ const StudioContent = () => {
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Automatically arrange classes hierarchically based on relationships
+                        </p>
+                      </section>
+
+                      {/* #96 Group classes that share a project tag name */}
+                      <section aria-labelledby="layout-popover-group-by-tag-heading" className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <h4 id="layout-popover-group-by-tag-heading" className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                          Group by tag
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => void handleGroupCanvasByTagName()}
+                          disabled={
+                            isReadOnly ||
+                            nodes.filter((n) => n.type === 'classNode').length === 0 ||
+                            projectTags.length === 0
+                          }
+                          className="w-full px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Create one group per tag name that has at least two classes"
+                        >
+                          <Tag className="w-4 h-4 shrink-0" aria-hidden />
+                          <span>Group classes with the same tag</span>
+                        </button>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-snug">
+                          Puts classes that share a tag name into separate frames. Multi-tagged classes go to one group
+                          only (see confirmation text). Existing group membership is updated.
                         </p>
                       </section>
 
