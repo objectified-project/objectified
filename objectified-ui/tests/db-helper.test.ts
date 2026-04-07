@@ -31,10 +31,6 @@ jest.mock('crypto', () => ({
   randomBytes: jest.fn(() => Buffer.from('test-api-key-data')),
 }));
 
-jest.mock('../lib/auth/server-session', () => ({
-  getAuthSession: jest.fn().mockResolvedValue(null),
-}));
-
 describe('Database Helper - User Functions', () => {
   let mockQuery: jest.Mock;
 

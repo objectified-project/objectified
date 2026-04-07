@@ -166,7 +166,9 @@ export const credentialsSignIn = async (payload: any) => {
   console.log('[credentialsSignIn] Login successful', user.email);
 
   if (user.id) {
-    await helper.updateUserLastLoginAt(user.id);
+    void helper.updateUserLastLoginAt(user.id).catch((error: any) => {
+      console.error('[credentialsSignIn] Failed to update last login timestamp:', error);
+    });
   }
 
   return true;
@@ -227,7 +229,9 @@ export const credentialsGithub = async (payload: any) => {
         payload.user.verified = userResult.verified;
 
         console.log('[credentialsGithub] Login successful via linked account, user_id:', userResult.id);
-        await helper.updateUserLastLoginAt(userResult.id);
+        void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+          console.error('[credentialsGithub] Failed to update last login timestamp:', error);
+        });
         return true;
       }
     }
@@ -265,7 +269,9 @@ export const credentialsGithub = async (payload: any) => {
 
     console.log('[credentialsGithub] Login successful, user_id:', userResult.id);
 
-    await helper.updateUserLastLoginAt(userResult.id);
+    void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+      console.error('[credentialsGithub] Failed to update last login timestamp:', error);
+    });
     return true;
   }
 
@@ -329,7 +335,9 @@ export const credentialsGitlab = async (payload: any) => {
         payload.user.verified = userResult.verified;
 
         console.log('[credentialsGitlab] Login successful via linked account, user_id:', userResult.id);
-        await helper.updateUserLastLoginAt(userResult.id);
+        void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+          console.error('[credentialsGitlab] Failed to update last login timestamp:', error);
+        });
         return true;
       }
     }
@@ -367,7 +375,9 @@ export const credentialsGitlab = async (payload: any) => {
 
     console.log('[credentialsGitlab] Login successful, user_id:', userResult.id);
 
-    await helper.updateUserLastLoginAt(userResult.id);
+    void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+      console.error('[credentialsGitlab] Failed to update last login timestamp:', error);
+    });
     return true;
   }
 
