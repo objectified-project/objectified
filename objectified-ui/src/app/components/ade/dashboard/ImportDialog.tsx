@@ -1002,6 +1002,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               return (
                 <ImportExecutionPanel
                   jobId={jobId}
+                  selectedSchemas={importOptions?.selectedSchemas ?? []}
                   isReviewing={importComplete}
                   onComplete={(succeeded) => {
                     setImportComplete(true);
