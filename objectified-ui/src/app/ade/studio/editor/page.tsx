@@ -153,6 +153,7 @@ import GroupNode, { GROUP_COLORS } from '../../../components/ade/studio/GroupNod
 import SmartEdge from '../../../components/ade/studio/SmartEdge';
 import { applyAutoLayout } from '@/app/utils/canvas-auto-layout';
 import { getCanvasBackgroundStyle } from '@/app/utils/canvas-background-style';
+import { mapProjectTagToGroupOption, normalizeStoredGroupTags } from '@/app/utils/tag-color-tokens';
 import { applyEdgeStyling } from '@/app/utils/edge-styling';
 import { computeCanvasSuggestions } from '@/app/utils/canvas-suggestions';
 import { getVisibleNodeIdsForIsolateSelection } from '@/app/utils/canvas-node-visibility';
@@ -3086,18 +3087,14 @@ const StudioContent = () => {
             icon: 'folder',
           } as const),
         description: sourceGroup?.description,
-        tags: sourceGroup?.tags,
+        tags: normalizeStoredGroupTags(sourceGroup?.tags, projectTags),
       };
 
       const nextGroups = [...groups, newGroup];
       addGroup(newGroup);
       groupPositionsRef.current.set(newGroupId, { ...newGroup.position });
 
-      const availableTags = projectTags.map((t) => ({
-        id: t.id,
-        name: t.tag_name,
-        color: t.tag_color,
-      }));
+      const availableTags = projectTags.map(mapProjectTagToGroupOption);
 
       const newGroupFlowNode: Node = {
         id: newGroupId,
@@ -3975,11 +3972,7 @@ const StudioContent = () => {
       }
     };
 
-    const createGroupAvailableTags = projectTags.map((t) => ({
-      id: t.id,
-      name: t.tag_name,
-      color: t.tag_color,
-    }));
+    const createGroupAvailableTags = projectTags.map(mapProjectTagToGroupOption);
 
     // Add group to context
     addGroup(newGroup);
@@ -4132,11 +4125,7 @@ const StudioContent = () => {
       }
     };
 
-    const createGroupAtDropAvailableTags = projectTags.map((t) => ({
-      id: t.id,
-      name: t.tag_name,
-      color: t.tag_color,
-    }));
+    const createGroupAtDropAvailableTags = projectTags.map(mapProjectTagToGroupOption);
 
     // Add group to context
     addGroup(newGroup);
@@ -5226,7 +5215,8 @@ const StudioContent = () => {
 
       setTimeout(() => {
         const layoutNodes = Array.isArray(layout.nodes) ? layout.nodes : [];
-        const availableTags = projectTags.map((t) => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
+        const availableTags = projectTags.map(mapProjectTagToGroupOption);
+        const groupTagCatalog = new Map(availableTags.map((t) => [t.id, t]));
 
         const groupNodes: Node[] = [];
         if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
@@ -5248,7 +5238,7 @@ const StudioContent = () => {
                 color: group.color,
                 nodeIds: group.nodeIds || [],
                 parentId: group.parentId ?? null,
-                tags: group.tags ?? group.metadata?.tags ?? [],
+                tags: normalizeStoredGroupTags(group.tags ?? group.metadata?.tags ?? [], groupTagCatalog),
                 styleOptions: group.styleOptions,
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
@@ -6552,7 +6542,8 @@ const StudioContent = () => {
             });
 
             // Transform to CanvasGroup format and set in context
-            const availableTags = projectTags.map(t => ({ id: t.id, name: t.tag_name, color: t.tag_color }));
+            const availableTags = projectTags.map(mapProjectTagToGroupOption);
+            const groupTagCatalog = new Map(availableTags.map((t) => [t.id, t]));
             const canvasGroups = loadedGroups.map((g: any) => ({
               id: g.id,
               name: g.name,
@@ -6597,7 +6588,7 @@ const StudioContent = () => {
                   color: group.color,
                   nodeIds: group.nodeIds || [],
                   parentId: group.parentId ?? null,
-                  tags: group.tags ?? group.metadata?.tags ?? [],
+                  tags: normalizeStoredGroupTags(group.tags ?? group.metadata?.tags ?? [], groupTagCatalog),
                   styleOptions: group.styleOptions ?? {
                     borderStyle: 'dashed',
                     opacity: group.opacity ?? 1,

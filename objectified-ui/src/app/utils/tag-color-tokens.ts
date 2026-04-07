@@ -51,3 +51,49 @@ export function tagInlineColors(color: string): { bg: string; border: string } {
   };
   return m[color] || m.default;
 }
+
+/**
+ * Normalizes project-tag rows for group pickers. `getTagsForProject` returns `name`/`color`;
+ * class-tag joins use `tag_name`/`tag_color` (#2526).
+ */
+export function mapProjectTagToGroupOption(t: {
+  id: string;
+  name?: string;
+  tag_name?: string;
+  color?: string;
+  tag_color?: string;
+}): { id: string; name: string; color: string } {
+  return {
+    id: t.id,
+    name: t.tag_name ?? t.name ?? '',
+    color: t.tag_color ?? t.color ?? 'default',
+  };
+}
+
+/** Fills missing tag labels on group nodes from the project tag catalog (e.g. legacy saves, #2526).
+ *  Accepts either a raw project-tag array or a prebuilt catalog Map so callers that process
+ *  multiple groups can build the Map once and reuse it rather than rebuilding it per-group.
+ */
+export function normalizeStoredGroupTags(
+  stored:
+    | Array<{ id: string; name?: string; color?: string; tag_name?: string; tag_color?: string }>
+    | undefined
+    | null,
+  projectTagsOrCatalog:
+    | Array<{ id: string; name?: string; tag_name?: string; color?: string; tag_color?: string }>
+    | Map<string, { id: string; name: string; color: string }>
+): Array<{ id: string; name: string; color: string }> {
+  if (!stored?.length) return [];
+  const catalog =
+    projectTagsOrCatalog instanceof Map
+      ? projectTagsOrCatalog
+      : new Map(projectTagsOrCatalog.map((t) => [t.id, mapProjectTagToGroupOption(t)]));
+  return stored.map((t) => {
+    const c = catalog.get(t.id);
+    return {
+      id: t.id,
+      name: t.tag_name ?? t.name ?? c?.name ?? '',
+      color: t.tag_color ?? t.color ?? c?.color ?? 'default',
+    };
+  });
+}
