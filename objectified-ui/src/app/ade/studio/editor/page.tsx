@@ -4027,6 +4027,8 @@ const StudioContent = () => {
         ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
+        tags: [],
+        onTagsChange: (gid: string, t: any[]) => handleGroupTagsChangeRef.current?.(gid, t),
         onDrillInto: () => handleDrillIntoNestedGroupRef.current(groupId),
         isReadOnly: isReadOnly
       }
@@ -4182,6 +4184,8 @@ const StudioContent = () => {
         ) => handleBulkEditGroupClassesRef.current?.(gid, cids, gn, opts),
         onColorChange: handleGroupColorChange,
         onStyleChange: handleGroupStyleChange,
+        tags: [],
+        onTagsChange: (gid: string, t: any[]) => handleGroupTagsChangeRef.current?.(gid, t),
         onDrillInto: () => handleDrillIntoNestedGroupRef.current(groupId),
         isReadOnly: isReadOnly
       }
@@ -5244,7 +5248,7 @@ const StudioContent = () => {
                 color: group.color,
                 nodeIds: group.nodeIds || [],
                 parentId: group.parentId ?? null,
-                tags: group.metadata?.tags || [],
+                tags: group.tags ?? group.metadata?.tags ?? [],
                 styleOptions: group.styleOptions,
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
@@ -6593,12 +6597,12 @@ const StudioContent = () => {
                   color: group.color,
                   nodeIds: group.nodeIds || [],
                   parentId: group.parentId ?? null,
-                  tags: group.metadata?.tags || [],
-                  styleOptions: {
-                    borderStyle: group.borderStyle || 'dashed',
+                  tags: group.tags ?? group.metadata?.tags ?? [],
+                  styleOptions: group.styleOptions ?? {
+                    borderStyle: 'dashed',
                     opacity: group.opacity ?? 1,
-                    shadow: group.metadata?.shadow || 'none',
-                    icon: group.metadata?.icon || 'folder'
+                    shadow: 'none',
+                    icon: 'folder',
                   },
                   availableTags,
                   onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
