@@ -38,6 +38,9 @@ describe('Database Helper - User Functions', () => {
     const db = require('../lib/db/db');
     mockQuery = db.query as jest.Mock;
     mockQuery.mockClear();
+    const serverSession = require('../lib/auth/server-session');
+    (serverSession.getAuthSession as jest.Mock).mockReset();
+    (serverSession.getAuthSession as jest.Mock).mockResolvedValue(null);
   });
 
   test('getUserByEmail should query by email', async () => {
@@ -88,6 +91,53 @@ describe('Database Helper - User Functions', () => {
       expect.arrayContaining(['New Name', 'user-1'])
     );
     expect(parsed.success).toBe(true);
+  });
+
+  test('updateUserLastLoginAt should update last_login_at', async () => {
+    const { updateUserLastLoginAt } = await import('../lib/db/helper');
+
+    mockQuery.mockResolvedValue({ rowCount: 1 });
+
+    await updateUserLastLoginAt('user-1');
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('last_login_at'),
+      ['user-1']
+    );
+  });
+
+  test('getCurrentUserLastLoginAt should return last login for session user', async () => {
+    const serverSession = await import('../lib/auth/server-session');
+    (serverSession.getAuthSession as jest.Mock).mockResolvedValueOnce({
+      user: { user_id: 'user-1' },
+    });
+
+    mockQuery.mockResolvedValue({
+      rows: [{ last_login_at: '2026-04-01T12:00:00.000Z' }],
+      rowCount: 1,
+    });
+
+    const { getCurrentUserLastLoginAt } = await import('../lib/db/helper');
+    const result = await getCurrentUserLastLoginAt();
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.lastLoginAt).toBe('2026-04-01T12:00:00.000Z');
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('SELECT last_login_at'),
+      ['user-1']
+    );
+  });
+
+  test('getCurrentUserLastLoginAt should fail without session', async () => {
+    const serverSession = await import('../lib/auth/server-session');
+    (serverSession.getAuthSession as jest.Mock).mockResolvedValueOnce(null);
+
+    const { getCurrentUserLastLoginAt } = await import('../lib/db/helper');
+    const result = await getCurrentUserLastLoginAt();
+    const parsed = JSON.parse(result);
+
+    expect(parsed.success).toBe(false);
   });
 
   test('updateUserPassword should validate current password', async () => {

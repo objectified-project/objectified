@@ -150,7 +150,7 @@ export const credentialsAuthorize = async (credentials: ICredentials) => {
  *
  * If all passes, true is returned.
  */
-export const credentialsSignIn = (payload: any) => {
+export const credentialsSignIn = async (payload: any) => {
   const user = payload.user;
 
   console.log('[credentialsSignIn] Handling credentials provider');
@@ -164,6 +164,12 @@ export const credentialsSignIn = (payload: any) => {
   }
 
   console.log('[credentialsSignIn] Login successful', user.email);
+
+  if (user.id) {
+    void helper.updateUserLastLoginAt(user.id).catch((error: any) => {
+      console.error('[credentialsSignIn] Failed to update last login timestamp:', error);
+    });
+  }
 
   return true;
 }
@@ -223,6 +229,9 @@ export const credentialsGithub = async (payload: any) => {
         payload.user.verified = userResult.verified;
 
         console.log('[credentialsGithub] Login successful via linked account, user_id:', userResult.id);
+        void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+          console.error('[credentialsGithub] Failed to update last login timestamp:', error);
+        });
         return true;
       }
     }
@@ -260,6 +269,9 @@ export const credentialsGithub = async (payload: any) => {
 
     console.log('[credentialsGithub] Login successful, user_id:', userResult.id);
 
+    void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+      console.error('[credentialsGithub] Failed to update last login timestamp:', error);
+    });
     return true;
   }
 
@@ -323,6 +335,9 @@ export const credentialsGitlab = async (payload: any) => {
         payload.user.verified = userResult.verified;
 
         console.log('[credentialsGitlab] Login successful via linked account, user_id:', userResult.id);
+        void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+          console.error('[credentialsGitlab] Failed to update last login timestamp:', error);
+        });
         return true;
       }
     }
@@ -360,6 +375,9 @@ export const credentialsGitlab = async (payload: any) => {
 
     console.log('[credentialsGitlab] Login successful, user_id:', userResult.id);
 
+    void helper.updateUserLastLoginAt(userResult.id).catch((error: any) => {
+      console.error('[credentialsGitlab] Failed to update last login timestamp:', error);
+    });
     return true;
   }
 

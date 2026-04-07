@@ -1,8 +1,8 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { User, Mail, Hash, Clock, Building2, Edit2, Key, Shield } from 'lucide-react';
-import { useState } from 'react';
+import { User, Mail, Hash, Clock, Building2, Edit2, Key, Shield, LogIn } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import { Label } from '../../../components/ui/Label';
 import { Alert } from '../../../components/ui/Alert';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/Card';
-import { updateUserName, updateUserPassword } from '../../../../../lib/db/helper';
+import { updateUserName, updateUserPassword, getCurrentUserLastLoginAt } from '../../../../../lib/db/helper';
 
 const Profile = () => {
   const { data: session, update } = useSession();
@@ -32,6 +32,27 @@ const Profile = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [lastLoginAt, setLastLoginAt] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await getCurrentUserLastLoginAt();
+        const parsed = JSON.parse(raw);
+        if (!cancelled && parsed.success) {
+          setLastLoginAt(parsed.lastLoginAt ?? null);
+        } else if (!cancelled) {
+          setLastLoginAt(null);
+        }
+      } catch {
+        if (!cancelled) setLastLoginAt(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user]);
 
   const handleEditClick = () => {
     setEditedName(session?.user?.name || '');
@@ -119,6 +140,13 @@ const Profile = () => {
 
   const { user, expires } = session;
   const expiryDate = new Date(expires);
+
+  const formatLoginDate = (dateString: string) => {
+    const d = new Date(dateString);
+    const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+    const timePart = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${datePart} ${timePart}`;
+  };
 
   const InfoRow = ({
     icon: Icon,
@@ -226,6 +254,18 @@ const Profile = () => {
                 mono
               />
             )}
+            <InfoRow
+              icon={LogIn}
+              iconClassName="bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400"
+              label="Last login"
+              value={
+                lastLoginAt === undefined
+                  ? '…'
+                  : lastLoginAt
+                    ? formatLoginDate(lastLoginAt)
+                    : '—'
+              }
+            />
             <InfoRow
               icon={Clock}
               iconClassName="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
