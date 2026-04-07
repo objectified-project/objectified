@@ -71,7 +71,11 @@ const IMPORT_LOG_PREVIEW_COUNT = 8;
 
 function formatEtaLine(seconds: number | null): string | null {
   if (seconds == null) return null;
-  if (seconds < 60) return `Estimated time remaining: about ${seconds} seconds`;
+  if (seconds < 60) {
+    return seconds === 1
+      ? 'Estimated time remaining: about 1 second'
+      : `Estimated time remaining: about ${seconds} seconds`;
+  }
   const m = Math.max(1, Math.round(seconds / 60));
   return m === 1 ? 'Estimated time remaining: about 1 minute' : `Estimated time remaining: about ${m} minutes`;
 }
@@ -236,7 +240,7 @@ export default function ImportExecutionPanel({
   };
 
   const errorEvents = getErrorEvents(events);
-  const logShown = logExpanded ? events : events.slice(0, IMPORT_LOG_PREVIEW_COUNT);
+  const logShown = logExpanded ? events : events.slice(-IMPORT_LOG_PREVIEW_COUNT);
   const logOverflow = events.length > IMPORT_LOG_PREVIEW_COUNT;
 
   return (
@@ -352,6 +356,11 @@ export default function ImportExecutionPanel({
                 Cancel import
               </Button>
             </>
+          ) : (state === 'queued' || state === 'running' || state === 'committing') ? (
+            <Button variant="outline" onClick={onCancel}>
+              <MinusCircle className="h-4 w-4 mr-1" />
+              Cancel Import
+            </Button>
           ) : null}
         </div>
 

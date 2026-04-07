@@ -124,14 +124,18 @@ export function buildImportLiveChecklist(
     return [];
   }
 
+  const createdLower = new Set<string>([...created].map((n) => n.trim().toLowerCase()));
+  const failedLower = new Set<string>([...failed].map((n) => n.trim().toLowerCase()));
+
   const rows: LiveChecklistRow[] = order.map((label, i) => {
     const id = `schema-${i}-${label}`;
-    const isFailed = [...failed].some((f) => namesMatch(f, label));
+    const labelLower = label.trim().toLowerCase();
+    const isFailed = failedLower.has(labelLower);
     if (isFailed) {
       return { id, label, status: 'error' as const };
     }
 
-    const isCreated = [...created].some((c) => namesMatch(c, label));
+    const isCreated = createdLower.has(labelLower);
 
     if (isCreated) {
       const warnDetail = warningDetailForClass(events, label);
