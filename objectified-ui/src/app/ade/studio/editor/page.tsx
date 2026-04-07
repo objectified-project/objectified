@@ -3087,7 +3087,7 @@ const StudioContent = () => {
             icon: 'folder',
           } as const),
         description: sourceGroup?.description,
-        tags: sourceGroup?.tags,
+        tags: normalizeStoredGroupTags(sourceGroup?.tags, projectTags),
       };
 
       const nextGroups = [...groups, newGroup];
@@ -5216,6 +5216,7 @@ const StudioContent = () => {
       setTimeout(() => {
         const layoutNodes = Array.isArray(layout.nodes) ? layout.nodes : [];
         const availableTags = projectTags.map(mapProjectTagToGroupOption);
+        const groupTagCatalog = new Map(availableTags.map((t) => [t.id, t]));
 
         const groupNodes: Node[] = [];
         if (loadedGroups && Array.isArray(loadedGroups) && loadedGroups.length > 0) {
@@ -5237,7 +5238,7 @@ const StudioContent = () => {
                 color: group.color,
                 nodeIds: group.nodeIds || [],
                 parentId: group.parentId ?? null,
-                tags: normalizeStoredGroupTags(group.tags ?? group.metadata?.tags ?? [], projectTags),
+                tags: normalizeStoredGroupTags(group.tags ?? group.metadata?.tags ?? [], groupTagCatalog),
                 styleOptions: group.styleOptions,
                 availableTags,
                 onRename: (groupId: string, name: string) => handleGroupRenameRef.current?.(groupId, name),
@@ -6542,6 +6543,7 @@ const StudioContent = () => {
 
             // Transform to CanvasGroup format and set in context
             const availableTags = projectTags.map(mapProjectTagToGroupOption);
+            const groupTagCatalog = new Map(availableTags.map((t) => [t.id, t]));
             const canvasGroups = loadedGroups.map((g: any) => ({
               id: g.id,
               name: g.name,
@@ -6586,7 +6588,7 @@ const StudioContent = () => {
                   color: group.color,
                   nodeIds: group.nodeIds || [],
                   parentId: group.parentId ?? null,
-                  tags: normalizeStoredGroupTags(group.tags ?? group.metadata?.tags ?? [], projectTags),
+                  tags: normalizeStoredGroupTags(group.tags ?? group.metadata?.tags ?? [], groupTagCatalog),
                   styleOptions: group.styleOptions ?? {
                     borderStyle: 'dashed',
                     opacity: group.opacity ?? 1,
