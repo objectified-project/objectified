@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, FileX, Upload, Library, ChevronDown, ChevronUp, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { getPropertiesForClass } from '../../../../../lib/db/helper';
 import { useDarkMode } from '@/app/hooks/useDarkMode';
 
@@ -116,6 +116,7 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [classWarnings, setClassWarnings] = useState<Record<string, boolean>>({});
   const [expandedPropertyIds, setExpandedPropertyIds] = useState<Set<string>>(new Set());
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
 
   // Helper to check if a property has inline properties (type: 'object' with properties, or array of objects)
   const hasInlineProperties = (prop: PropertyItem): boolean => {
@@ -161,6 +162,18 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
     }
 
     return children;
+  };
+
+  const toggleGroupExpanded = (groupId: string) => {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
   };
 
   // Toggle expanded state for a property
@@ -681,48 +694,114 @@ const StudioSideNav: React.FC<StudioSideNavProps> = ({
                   </div>
                 ) : (
                   <ul className="py-1 space-y-1 list-none p-0 m-0">
-                    {filteredGroups.map((group) => (
-                      <li key={group.id} className="mb-1 flex items-stretch rounded-lg group">
-                        <button
-                          type="button"
-                          onClick={() => callbacks.onGroupSelect?.(group.id)}
-                          className="flex-1 flex items-center gap-3 text-left rounded-lg px-3 py-2 transition-all hover:bg-violet-500/5 min-w-0"
-                        >
-                          <span
-                            className="w-3 h-3 rounded flex-shrink-0"
-                            style={{ backgroundColor: group.color || '#8b5cf6' }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className="block text-sm font-medium truncate">{group.name}</span>
-                            <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">
-                              {group.nodeIds?.length || 0} classes
-                            </span>
-                          </div>
-                        </button>
-                        {!isReadOnly && (
-                          <div className="flex items-center opacity-60 group-hover:opacity-100">
-                            {(group.nodeIds?.length ?? 0) > 0 && (
+                    {filteredGroups.map((group) => {
+                      const nodeCount = group.nodeIds?.length ?? 0;
+                      const isGroupExpanded = expandedGroupIds.has(group.id);
+                      return (
+                        <li key={group.id} className="mb-1 rounded-lg group">
+                          <div className="flex flex-col rounded-lg">
+                            <div className="flex items-stretch">
                               <button
                                 type="button"
-                                onClick={(e) => { e.stopPropagation(); callbacks.onGroupDeleteAllClasses?.(group.id); }}
-                                title="Delete all classes in group"
-                                className="p-1.5 rounded hover:bg-amber-500/10 hover:text-amber-500"
+                                data-testid={`group-expand-${group.id}`}
+                                aria-expanded={isGroupExpanded}
+                                aria-label={isGroupExpanded ? 'Collapse group' : 'Expand group'}
+                                title={isGroupExpanded ? 'Collapse group' : 'Expand group'}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleGroupExpanded(group.id);
+                                }}
+                                className="shrink-0 flex w-8 items-center justify-center rounded-l-lg text-slate-500 hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400"
                               >
-                                <FileX className="w-4 h-4" />
+                                {isGroupExpanded ? (
+                                  <ChevronDown className="h-4 w-4" aria-hidden />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" aria-hidden />
+                                )}
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => callbacks.onGroupSelect?.(group.id)}
+                                className="flex min-w-0 flex-1 items-center gap-3 rounded-r-lg py-2 pl-1 pr-3 text-left transition-all hover:bg-violet-500/5"
+                              >
+                                <span
+                                  className="h-3 w-3 shrink-0 rounded"
+                                  style={{ backgroundColor: group.color || '#8b5cf6' }}
+                                />
+                                <div className="flex min-w-0 flex-1 items-baseline justify-between gap-2">
+                                  <span className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                                    {group.name}
+                                  </span>
+                                  <span className="shrink-0 text-xs text-slate-500 tabular-nums dark:text-slate-400">
+                                    ({nodeCount})
+                                  </span>
+                                </div>
+                              </button>
+                              {!isReadOnly && (
+                                <div className="flex items-center opacity-60 group-hover:opacity-100">
+                                  {nodeCount > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        callbacks.onGroupDeleteAllClasses?.(group.id);
+                                      }}
+                                      title="Delete all classes in group"
+                                      className="rounded p-1.5 hover:bg-amber-500/10 hover:text-amber-500"
+                                    >
+                                      <FileX className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      callbacks.onGroupDelete?.(group.id);
+                                    }}
+                                    title="Delete group"
+                                    className="rounded p-1.5 hover:bg-red-500/10 hover:text-red-500"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            {isGroupExpanded && (
+                              <ul className="ml-8 mr-2 mb-2 mt-0.5 list-none space-y-0.5 border-l border-slate-200 py-0.5 pl-2 dark:border-slate-600">
+                                {nodeCount === 0 ? (
+                                  <li className="px-1 py-0.5 text-xs italic text-slate-500 dark:text-slate-400">
+                                    No classes in this group
+                                  </li>
+                                ) : (
+                                  group.nodeIds.map((nodeId) => {
+                                    const classItem = classes.find((c) => c.id === nodeId);
+                                    const label = classItem?.name ?? nodeId;
+                                    return (
+                                      <li key={nodeId}>
+                                        <button
+                                          type="button"
+                                          data-testid={`group-class-${group.id}-${nodeId}`}
+                                          onClick={() => {
+                                            if (classItem) {
+                                              handleClassSelect(classItem);
+                                            }
+                                          }}
+                                          disabled={!classItem}
+                                          title={classItem ? `Focus ${classItem.name}` : 'Unknown class'}
+                                          className="w-full truncate rounded px-1 py-0.5 text-left text-xs text-slate-600 hover:bg-violet-500/10 disabled:cursor-default disabled:opacity-60 dark:text-slate-300"
+                                        >
+                                          {label}
+                                        </button>
+                                      </li>
+                                    );
+                                  })
+                                )}
+                              </ul>
                             )}
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); callbacks.onGroupDelete?.(group.id); }}
-                              title="Delete group"
-                              className="p-1.5 rounded hover:bg-red-500/10 hover:text-red-500"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
-                        )}
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
