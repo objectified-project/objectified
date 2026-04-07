@@ -5970,11 +5970,21 @@ const StudioContent = () => {
       rowMaxHeights[row] = Math.max(rowMaxHeights[row] ?? 0, height);
     });
 
+    // Track the widest frame in each group-column to avoid horizontal overlap.
+    const colMaxWidths: number[] = [];
+    planDims.forEach(({ width }, index) => {
+      const col = index % GROUP_COLS;
+      colMaxWidths[col] = Math.max(colMaxWidths[col] ?? 0, width);
+    });
+
     // Derive group-frame origins from actual dimensions + padding.
-    const planPositions = planDims.map(({ width }, index) => {
+    const planPositions = planDims.map((_, index) => {
       const col = index % GROUP_COLS;
       const row = Math.floor(index / GROUP_COLS);
-      const gx = ORIGIN_X + col * (width + INTER_PAD);
+      let gx = ORIGIN_X;
+      for (let c = 0; c < col; c++) {
+        gx += (colMaxWidths[c] ?? 0) + INTER_PAD;
+      }
       let gy = ORIGIN_Y;
       for (let r = 0; r < row; r++) {
         gy += (rowMaxHeights[r] ?? 0) + INTER_PAD;
