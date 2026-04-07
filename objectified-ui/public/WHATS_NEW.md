@@ -6,6 +6,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 ## Projects:
 - Added ability to start a new project from a template
+- Canvas groups can be assigned project tags from the group style settings (saved with the group for future search and filtering)
 
 ## Account:
 - Profile shows your last successful login date and time (stored when you sign in with email/password or OAuth)

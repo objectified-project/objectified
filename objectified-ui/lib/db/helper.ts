@@ -1,6 +1,7 @@
 'use server';
 
 import { getAuthSession } from '../auth/server-session';
+import { buildGroupMetadataForSync } from '../utils/group-metadata';
 import { sortGroupsParentsBeforeChildren } from '../utils/group-sort';
 
 const connectionPool = require('./db');
@@ -4896,7 +4897,7 @@ export async function syncGroupsForVersion(versionId: string, groups: any[], nod
           group.zIndex || 0,
           group.opacity ?? 1.0,
           group.borderStyle || group.styleOptions?.borderStyle || 'dashed',
-          JSON.stringify(group.metadata || group.styleOptions || {}),
+          JSON.stringify(buildGroupMetadataForSync(group as Record<string, unknown>)),
           parentDbId,
           isCollapsed
         ]

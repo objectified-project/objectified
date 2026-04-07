@@ -12,6 +12,12 @@ import {
 import * as Popover from '@radix-ui/react-popover';
 import { COLLAPSED_GROUP_FRAME_WIDTH, COLLAPSED_GROUP_FRAME_HEIGHT } from '@/app/utils/canvas-group-collapse';
 import GroupBulkEditDialog, { type GroupBulkEditTagOption } from './GroupBulkEditDialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/app/components/ui/Select';
 
 // Available group icons
 export const GROUP_ICONS = [
@@ -58,6 +64,33 @@ export const SHADOW_OPTIONS = [
   { name: 'md', label: 'Medium', class: 'shadow-md' },
   { name: 'lg', label: 'Large', class: 'shadow-lg' },
 ];
+
+/** Tailwind classes for project tag chips (matches class-node tag colors). */
+function tagChipClass(color: string): string {
+  const m: Record<string, string> = {
+    default: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-gray-200 dark:border-gray-600',
+    primary: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-700',
+    secondary: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700',
+    error: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700',
+    warning: 'bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700',
+    info: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-700',
+    success: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700',
+  };
+  return m[color] || m.default;
+}
+
+function tagDotClass(color: string): string {
+  const m: Record<string, string> = {
+    default: 'text-gray-500',
+    primary: 'text-indigo-500',
+    secondary: 'text-purple-500',
+    error: 'text-red-500',
+    warning: 'text-amber-500',
+    info: 'text-blue-500',
+    success: 'text-emerald-500',
+  };
+  return m[color] || m.default;
+}
 
 // Predefined group colors with name, bg, border, and text colors
 export const GROUP_COLORS = [
@@ -127,6 +160,9 @@ export interface GroupNodeData {
   ) => void | Promise<void>;
   /** Project tags for bulk assign */
   availableTags?: GroupBulkEditTagOption[];
+  /** Tags assigned to this group frame (project tags); persisted on group metadata (#95). */
+  tags?: Array<{ id: string; name: string; color: string }>;
+  onTagsChange?: (groupId: string, tags: Array<{ id: string; name: string; color: string }>) => void;
   onColorChange?: (groupId: string, newColor: string) => void;
   onStyleChange?: (groupId: string, styleOptions: GroupStyleOptions) => void;
   isReadOnly?: boolean;
@@ -139,7 +175,8 @@ export interface GroupNodeData {
   onDrillInto?: (groupId: string) => void;
 }
 
-const GroupNode = memo(({ id, data, selected }: NodeProps) => {
+const GroupNode = memo((props: NodeProps) => {
+  const { data, selected } = props;
   const groupData = data as unknown as GroupNodeData;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(groupData.name);
@@ -173,7 +210,10 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   const colorConfig = GROUP_COLORS.find(c => c.name === groupData.color) || GROUP_COLORS[0];
 
   // Get style options with defaults
-  const styleOptions = { ...DEFAULT_STYLE_OPTIONS, ...groupData.styleOptions };
+  const styleOptions = useMemo(
+    () => ({ ...DEFAULT_STYLE_OPTIONS, ...groupData.styleOptions }),
+    [groupData.styleOptions]
+  );
 
   // Determine if we should use light text based on background darkness
   const useLightText = true;
@@ -189,6 +229,15 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   const shadowClass = SHADOW_OPTIONS.find(s => s.name === styleOptions.shadow)?.class || '';
 
   const nodeCount = groupData.nodeIds?.length || 0;
+
+  const assignedTags = useMemo(() => groupData.tags ?? [], [groupData.tags]);
+  const addableTags = useMemo(
+    () =>
+      (groupData.availableTags ?? []).filter(
+        (t) => !assignedTags.some((a) => a.id === t.id)
+      ),
+    [groupData.availableTags, assignedTags]
+  );
 
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -280,11 +329,36 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
   }, [groupData]);
 
   // Handle style option changes
-  const handleStyleChange = useCallback((key: keyof GroupStyleOptions, value: any) => {
-    if (groupData.isReadOnly) return;
-    const newOptions = { ...styleOptions, [key]: value };
-    groupData.onStyleChange?.(groupData.id, newOptions);
-  }, [groupData, styleOptions]);
+  const handleStyleChange = useCallback(
+    (key: keyof GroupStyleOptions, value: GroupStyleOptions[keyof GroupStyleOptions]) => {
+      if (groupData.isReadOnly) return;
+      const newOptions = { ...styleOptions, [key]: value };
+      groupData.onStyleChange?.(groupData.id, newOptions);
+    },
+    [groupData, styleOptions]
+  );
+
+  const handleAddGroupTag = useCallback(
+    (tagId: string) => {
+      if (groupData.isReadOnly || !tagId) return;
+      const opt = groupData.availableTags?.find((t) => t.id === tagId);
+      if (!opt) return;
+      const color = opt.color && opt.color.length > 0 ? opt.color : 'default';
+      groupData.onTagsChange?.(groupData.id, [...assignedTags, { id: opt.id, name: opt.name, color }]);
+    },
+    [groupData, assignedTags]
+  );
+
+  const handleRemoveGroupTag = useCallback(
+    (tagId: string) => {
+      if (groupData.isReadOnly) return;
+      groupData.onTagsChange?.(
+        groupData.id,
+        assignedTags.filter((t) => t.id !== tagId)
+      );
+    },
+    [groupData, assignedTags]
+  );
 
   const isCollapsed = Boolean(groupData.collapsed);
 
@@ -399,6 +473,22 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
           )}
         </div>
 
+        {!isCollapsed && assignedTags.length > 0 && (
+          <div
+            className="absolute top-7 left-4 right-4 z-10 flex flex-wrap gap-1 pointer-events-none"
+            aria-label="Group tags"
+          >
+            {assignedTags.map((tag) => (
+              <span
+                key={tag.id}
+                className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${tagChipClass(tag.color)}`}
+              >
+                {tag.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Floating toolbar: outside the title pill, top -24px / right -2px (#859) */}
         {showFloatingToolbar && (
           <div
@@ -441,6 +531,63 @@ const GroupNode = memo(({ id, data, selected }: NodeProps) => {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Group Styling</h4>
+
+                    {(assignedTags.length > 0 ||
+                      (!groupData.isReadOnly && (groupData.availableTags?.length ?? 0) > 0)) && (
+                      <div className="mb-4">
+                        <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">
+                          Tags
+                        </label>
+                        {assignedTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {assignedTags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className={`inline-flex items-center gap-1 text-xs pl-2 pr-1 py-0.5 rounded-md border ${tagChipClass(tag.color)}`}
+                              >
+                                {tag.name}
+                                {!groupData.isReadOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveGroupTag(tag.id)}
+                                    className="rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10"
+                                    aria-label={`Remove tag ${tag.name}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {!groupData.isReadOnly && addableTags.length > 0 && (
+                          <Select
+                            key={assignedTags.map((t) => t.id).join(',')}
+                            value=""
+                            onValueChange={(id) => {
+                              if (id) handleAddGroupTag(id);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs border-dashed w-full">
+                              <Tag className="h-3 w-3 mr-1 shrink-0" />
+                              Add tag
+                            </SelectTrigger>
+                            <SelectContent>
+                              {addableTags.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span className={`text-lg leading-none ${tagDotClass(t.color || 'default')}`}>
+                                      ●
+                                    </span>
+                                    {t.name}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
 
                     {/* Icon Selection */}
                     <div className="mb-4">
