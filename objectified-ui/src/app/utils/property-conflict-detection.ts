@@ -4,32 +4,16 @@
  */
 
 import type { ImportConflict } from '../components/ade/dashboard/ConflictReport';
+import { extractDirectProperties as extractDirectPropertiesFromSchema } from './openapi-schema-direct-properties';
 
 const VOLATILE_KEYS = new Set(['$id', '$schema']);
 
 /**
- * Extract direct properties from an OpenAPI/JSON Schema object (top-level + allOf inline).
- * Mirrors lib/importers/openapi.ts extractDirectProperties for consistency.
- * Exported so sibling utilities (e.g. schema-import-property-diff) stay in sync.
+ * Property map only (same merge rules as OpenAPI import / unified importer).
+ * Exported for schema-import-property-diff and conflict detection.
  */
 export function extractDirectProperties(schema: any): Record<string, any> {
-  const result: Record<string, any> = {};
-  if (!schema || typeof schema !== 'object') return result;
-  if (schema.properties && typeof schema.properties === 'object') {
-    Object.assign(result, schema.properties);
-  }
-  if (Array.isArray(schema.allOf)) {
-    for (const item of schema.allOf) {
-      if (item?.$ref || item?.if !== undefined) continue;
-      if (item?.properties && typeof item.properties === 'object') {
-        Object.assign(result, item.properties);
-      }
-    }
-  }
-  if ((schema.anyOf || schema.oneOf) && Object.keys(result).length === 0) {
-    return {};
-  }
-  return result;
+  return extractDirectPropertiesFromSchema(schema).properties;
 }
 
 /**

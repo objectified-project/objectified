@@ -6,6 +6,7 @@
  */
 
 import YAML from 'yaml';
+import { extractDirectProperties } from './openapi-schema-direct-properties';
 import { convertSwaggerToOpenAPI, isSwagger2 } from './swagger-converter';
 import { convertJsonSchemaToOpenAPI, isJsonSchema } from './jsonschema-converter';
 import { convertGraphQLToOpenAPI, isGraphQL, isGraphQLIntrospection, convertGraphQLIntrospectionToOpenAPI } from './graphql-converter';
@@ -222,51 +223,7 @@ function resolveAllOf(schema: any, schemas: any): any {
   return merged;
 }
 
-/**
- * Extracts only the properties directly defined in this schema (not from $ref)
- * For allOf schemas, returns only properties from inline object definitions.
- * Exported for import mapping UI (e.g. required override #759).
- */
-export function extractDirectProperties(schema: any): { properties: any; required: string[] } {
-  const result = {
-    properties: {},
-    required: [] as string[]
-  };
-
-  // If schema has allOf, extract properties from inline objects only (not from $refs)
-  if (schema.allOf && Array.isArray(schema.allOf)) {
-    for (const item of schema.allOf) {
-      // Skip $ref items - those are inherited
-      if (item.$ref) {
-        continue;
-      }
-
-      // Merge properties from inline definitions
-      if (item.properties) {
-        result.properties = { ...result.properties, ...item.properties };
-      }
-
-      // Merge required arrays
-      if (item.required && Array.isArray(item.required)) {
-        result.required = [...result.required, ...item.required];
-      }
-    }
-    return result;
-  }
-
-  // For anyOf/oneOf, we can't really determine which properties are "direct"
-  // so we'll include all properties if it's a simple schema
-  if (schema.anyOf || schema.oneOf) {
-    // Don't extract properties from composition schemas
-    return result;
-  }
-
-  // Normal schema - return its properties
-  return {
-    properties: schema.properties || {},
-    required: schema.required || []
-  };
-}
+export { extractDirectProperties };
 
 /**
  * Converts an OpenAPI schema property to a property data object with nested children
