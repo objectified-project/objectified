@@ -4,6 +4,9 @@ We continue to improve the platform based on your feedback with improvements and
 
 ---
 
+## UI:
+- **What's New** dialog is centered on the viewport again (overlay renders outside the header so it is not offset downward)
+
 ## Projects:
 - Added ability to start a new project from a template
 
