@@ -1,9 +1,7 @@
 /**
  * Shared extraction of "direct" JSON Schema properties for OpenAPI import.
  * Merges top-level `properties` / `required` with inline fragments from `allOf`
- * (excluding `$ref` items and JSON Schema `if` subschemas). For `anyOf` / `oneOf`
- * schemas that define no concrete properties, yields an empty property map when
- * nothing was collected (variant-only composition).
+ * (excluding `$ref` items and JSON Schema `if` subschemas).
  */
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -47,10 +45,6 @@ export function extractDirectProperties(schema: unknown): { properties: SchemaPr
         }
       }
     }
-  }
-
-  if ((schema.anyOf || schema.oneOf) && Object.keys(result.properties).length === 0) {
-    return result;
   }
 
   return result;
