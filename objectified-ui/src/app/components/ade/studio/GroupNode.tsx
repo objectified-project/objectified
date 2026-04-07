@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { NodeProps, NodeResizer } from '@xyflow/react';
 import {
   Folder, Edit2, Trash2, X, Check, Palette, Settings,
@@ -157,6 +157,7 @@ const GroupNode = memo((props: NodeProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(groupData.name);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const colorPopoverContentRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
@@ -697,6 +698,7 @@ const GroupNode = memo((props: NodeProps) => {
                 </Popover.Trigger>
                 <Popover.Portal>
                   <Popover.Content
+                    ref={colorPopoverContentRef}
                     className="z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-3"
                     sideOffset={5}
                     onOpenAutoFocus={(e) => e.preventDefault()}
@@ -743,7 +745,13 @@ const GroupNode = memo((props: NodeProps) => {
                               if (v) handleColorChange(v);
                             }
                           }}
-                          onBlur={() => {
+                          onBlur={(e) => {
+                            if (
+                              e.relatedTarget instanceof Element &&
+                              colorPopoverContentRef.current?.contains(e.relatedTarget)
+                            ) {
+                              return;
+                            }
                             const v = parseCssHexColor(customHexDraft);
                             if (v) handleColorChange(v);
                           }}
