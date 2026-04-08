@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Upload, Link2, FileText, Github, Cloud, Package, X, FileCode, AlertTriangle, CheckCircle2, FileJson } from 'lucide-react';
 import {
   Dialog,
@@ -15,7 +15,8 @@ import { PreviewPanel, ImportOptions } from './PreviewPanel';
 import { analyzeSpecification, AnalysisResult, extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
 import ImportExecutionPanel from './ImportExecutionPanel';
 import ImportCompletePanel from './ImportCompletePanel';
-import UrlImportPanel from './UrlImportPanel';
+import UrlImportPanel, { type UrlImportPanelHandle, type UrlImportFooterState } from './UrlImportPanel';
+import { ImportSourceTabBar, type ImportSourceTabId } from './ImportSourceTabBar';
 import ClipboardImportPanel from './ClipboardImportPanel';
 import GitImportPanel from './GitImportPanel';
 import SwaggerHubImportPanel from './SwaggerHubImportPanel';
@@ -78,6 +79,16 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [postmanMetadata, setPostmanMetadata] = useState<FileMetadataPreview | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const urlImportRef = useRef<UrlImportPanelHandle>(null);
+  const [urlImportFooter, setUrlImportFooter] = useState<UrlImportFooterState>({
+    canTestUrl: false,
+    isTesting: false,
+    urlTestedSuccessfully: false,
+  });
+  const handleUrlImportFooterState = useCallback((s: UrlImportFooterState) => {
+    setUrlImportFooter(s);
+  }, []);
+
   // When opened with spec from AI Design Chat (Projects dashboard), run analysis immediately
   useEffect(() => {
     if (!open || !initialLLMSpec) return;
@@ -99,7 +110,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
       .finally(() => setIsAnalyzing(false));
   }, [open, initialLLMSpec, onConsumeInitialLLMSpec]);
 
-  const handleSourceClick = (source: string) => {
+  const handleSourceClick = (source: string | ImportSourceTabId) => {
     setErrorMessage(null);
     setSelectedSource(source);
     setCurrentStep('file-upload');
@@ -727,50 +738,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
             <>
               {/* Step 1a: File Upload View */}
 
-              {/* Source Tabs */}
               <div className="mb-6">
-                <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    className="px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                  >
-                    📁 File
-                  </button>
-                  <button
-                    disabled
-                    className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-                    title="Coming soon"
-                  >
-                    🔗 URL
-                  </button>
-                  <button
-                    disabled
-                    className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-                    title="Coming soon"
-                  >
-                    📋 Clipboard
-                  </button>
-                  <button
-                    disabled
-                    className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-                    title="Coming soon"
-                  >
-                    🐙 Git
-                  </button>
-                  <button
-                    disabled
-                    className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-                    title="Coming soon"
-                  >
-                    ☁️ SwaggerHub
-                  </button>
-                  <button
-                    disabled
-                    className="px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50"
-                    title="Coming soon"
-                  >
-                    📦 Registry
-                  </button>
-                </div>
+                <ImportSourceTabBar active="file" onSelect={(id) => handleSourceClick(id)} />
               </div>
 
               {/* Drop Zone */}
@@ -1022,7 +991,10 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
               console.log('Rendering: URL import panel');
               return (
                 <UrlImportPanel
+                  ref={urlImportRef}
                   onSpecificationFetched={handleUrlSpecificationFetched}
+                  onSelectSource={(id) => handleSourceClick(id)}
+                  onFooterStateChange={handleUrlImportFooterState}
                 />
               );
             } else if (currentStep === 'file-upload' && selectedSource === 'clipboard') {
@@ -1126,6 +1098,24 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                 <Button variant="outline" onClick={handleClose}>
                   Cancel
                 </Button>
+                {currentStep === 'file-upload' && selectedSource === 'url' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => void urlImportRef.current?.testUrl()}
+                    disabled={!urlImportFooter.canTestUrl || urlImportFooter.isTesting}
+                    className={
+                      urlImportFooter.urlTestedSuccessfully
+                        ? 'border-green-500 text-green-600 dark:border-green-500 dark:text-green-400'
+                        : undefined
+                    }
+                  >
+                    {urlImportFooter.isTesting
+                      ? 'Testing...'
+                      : urlImportFooter.urlTestedSuccessfully
+                        ? 'URL tested ✓'
+                        : 'Test URL'}
+                  </Button>
+                )}
                 {currentStep === 'file-upload' && selectedSource === 'file' && (
                   <Button
                     onClick={handleAnalyze}
@@ -1141,7 +1131,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
                     disabled={!urlContent || isAnalyzing || (urlMetadata !== null && !urlMetadata.formatSupported)}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
                   >
-                    {isAnalyzing ? 'Analyzing...' : 'Analyze →'}
+                    {isAnalyzing ? 'Analyzing...' : 'Next →'}
                   </Button>
                 )}
                 {currentStep === 'file-upload' && selectedSource === 'clipboard' && (

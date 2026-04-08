@@ -10,6 +10,91 @@ import { isProtobuf } from './protobuf-converter';
 import { isAvroSchemaObject } from './avro-converter';
 import { isThrift } from './thrift-converter';
 
+const URL_IMPORT_CACHE_STORAGE_KEY = 'objectified:url-import-cache:v1';
+const URL_IMPORT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+type UrlImportCacheEntry = {
+  content: string;
+  filename: string;
+  storedAt: number;
+  contentType?: string;
+  fileType?: string;
+};
+
+type UrlImportCacheStore = Record<string, UrlImportCacheEntry>;
+
+function normalizeUrlKey(url: string): string {
+  try {
+    return new URL(url.trim()).href;
+  } catch {
+    return url.trim();
+  }
+}
+
+/**
+ * FNV-1a 32-bit hash – fast, non-reversible, no secrets stored in the key.
+ */
+function fnv1a32(str: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16);
+}
+
+/**
+ * Builds a stable cache key that is scoped to the URL *and* the auth inputs so
+ * that changing credentials always results in a fresh fetch.  Auth secrets are
+ * hashed (FNV-1a) so they are never stored verbatim in the key.
+ */
+function buildCacheKey(options: UrlImportOptions): string {
+  const urlPart = normalizeUrlKey(options.url);
+  const authParts: string[] = [options.authType ?? 'none'];
+  if (options.authType === 'bearer' && options.authToken) {
+    authParts.push(fnv1a32(options.authToken));
+  } else if (options.authType === 'apiKey') {
+    authParts.push(options.apiKeyHeader ?? 'X-API-Key');
+    if (options.authToken) authParts.push(fnv1a32(options.authToken));
+  } else if (options.authType === 'basic') {
+    if (options.username) authParts.push(fnv1a32(options.username));
+    if (options.password) authParts.push(fnv1a32(options.password));
+  }
+  return `${urlPart}::${authParts.join(':')}`;
+}
+
+function readUrlImportCache(cacheKey: string): UrlImportCacheEntry | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(URL_IMPORT_CACHE_STORAGE_KEY);
+    if (!raw) return null;
+    const store = JSON.parse(raw) as UrlImportCacheStore;
+    const entry = store[cacheKey];
+    if (!entry?.content || typeof entry.filename !== 'string') return null;
+    const storedAt = entry.storedAt;
+    if (typeof storedAt !== 'number' || !isFinite(storedAt) || Date.now() - storedAt > URL_IMPORT_CACHE_TTL_MS) {
+      delete store[cacheKey];
+      sessionStorage.setItem(URL_IMPORT_CACHE_STORAGE_KEY, JSON.stringify(store));
+      return null;
+    }
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function writeUrlImportCache(cacheKey: string, content: string, filename: string, contentType?: string, fileType?: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    const raw = sessionStorage.getItem(URL_IMPORT_CACHE_STORAGE_KEY);
+    const store = (raw ? JSON.parse(raw) : {}) as UrlImportCacheStore;
+    store[cacheKey] = { content, filename, storedAt: Date.now(), contentType, fileType };
+    sessionStorage.setItem(URL_IMPORT_CACHE_STORAGE_KEY, JSON.stringify(store));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 export interface UrlImportOptions {
   /** The URL to fetch the specification from */
   url: string;
@@ -25,6 +110,13 @@ export interface UrlImportOptions {
   password?: string;
   /** Whether to follow redirects */
   followRedirects?: boolean;
+  /** When true, reuse a recent successful fetch from session cache (same normalized URL). */
+  useCache?: boolean;
+  /**
+   * Reserved for analysis/import: whether to attempt resolving external $ref URLs.
+   * The initial GET does not bundle refs; this flag is stored for downstream steps.
+   */
+  resolveExternalRefs?: boolean;
   /** Request timeout in milliseconds */
   timeout?: number;
 }
@@ -227,6 +319,20 @@ export async function fetchSpecificationFromUrl(options: UrlImportOptions): Prom
     };
   }
 
+  if (options.useCache) {
+    const cacheKey = buildCacheKey(options);
+    const cached = readUrlImportCache(cacheKey);
+    if (cached) {
+      return {
+        success: true,
+        content: cached.content,
+        contentType: cached.contentType,
+        filename: cached.filename,
+        statusCode: 200,
+      };
+    }
+  }
+
   try {
     // Build request headers
     const headers: Record<string, string> = {
@@ -302,6 +408,11 @@ export async function fetchSpecificationFromUrl(options: UrlImportOptions): Prom
       response.headers.forEach((value, key) => {
         responseHeaders[key] = value;
       });
+
+      if (options.useCache) {
+        const cacheKey = buildCacheKey(options);
+        writeUrlImportCache(cacheKey, content, filename, contentType || undefined, fileType);
+      }
 
       return {
         success: true,
