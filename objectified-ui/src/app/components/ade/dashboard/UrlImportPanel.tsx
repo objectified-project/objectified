@@ -49,8 +49,6 @@ const UrlImportPanel = forwardRef<UrlImportPanelHandle, UrlImportPanelProps>(fun
   const [isFetching, setIsFetching] = useState(false);
   const [fetchResult, setFetchResult] = useState<UrlImportResult | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
-  const [fetchedContent, setFetchedContent] = useState<string | null>(null);
-  const [fetchedFilename, setFetchedFilename] = useState<string | null>(null);
   const [urlTested, setUrlTested] = useState(false);
 
   // Validate URL on change
@@ -88,8 +86,6 @@ const UrlImportPanel = forwardRef<UrlImportPanelHandle, UrlImportPanelProps>(fun
     setIsFetching(true);
     setFetchResult(null);
     setFileMetadata(null);
-    setFetchedContent(null);
-    setFetchedFilename(null);
     setUrlTested(false);
 
     try {
@@ -100,8 +96,6 @@ const UrlImportPanel = forwardRef<UrlImportPanelHandle, UrlImportPanelProps>(fun
         const metadata = extractFileMetadata(result.content);
         setFileMetadata(metadata);
 
-        setFetchedContent(result.content);
-        setFetchedFilename(result.filename || 'openapi-spec.yaml');
         setUrlTested(true);
 
         onSpecificationFetched(result.content, result.filename || 'openapi-spec.yaml', metadata);
@@ -145,8 +139,6 @@ const UrlImportPanel = forwardRef<UrlImportPanelHandle, UrlImportPanelProps>(fun
     setUrlTested(false);
     setFetchResult(null);
     setFileMetadata(null);
-    setFetchedContent(null);
-    setFetchedFilename(null);
   }, [url, authType, token, apiKeyHeader, username, password]);
 
   return (
@@ -506,7 +498,7 @@ const UrlImportPanel = forwardRef<UrlImportPanelHandle, UrlImportPanelProps>(fun
                 URL verified successfully
               </div>
               <div className="text-sm text-green-700 dark:text-green-300 mt-1">
-                Use &quot;Next →&quot; in the dialog footer to continue to analysis.
+                Use the button in the dialog footer to continue to analysis.
               </div>
             </div>
           </div>

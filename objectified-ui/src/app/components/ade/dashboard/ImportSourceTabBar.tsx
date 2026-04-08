@@ -36,7 +36,11 @@ export interface ImportSourceTabBarProps {
 
 export function ImportSourceTabBar({ active, onSelect, className = '', disabledIds }: ImportSourceTabBarProps) {
   return (
-    <div className={`flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700 ${className}`}>
+    <div
+      role="tablist"
+      aria-label="Import source"
+      className={`flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700 ${className}`}
+    >
       {TABS.map(({ id, label, disabled }) => {
         const isDisabled = Boolean(disabled) || Boolean(disabledIds?.includes(id));
         const isActive = active === id;
@@ -45,6 +49,9 @@ export function ImportSourceTabBar({ active, onSelect, className = '', disabledI
           <button
             key={id}
             type="button"
+            role="tab"
+            aria-selected={isActive}
+            aria-disabled={isDisabled || undefined}
             disabled={isDisabled}
             onClick={() => !isDisabled && onSelect(id)}
             title={isDisabled ? 'Coming soon' : undefined}
@@ -56,7 +63,7 @@ export function ImportSourceTabBar({ active, onSelect, className = '', disabledI
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
-            {icon} {label}
+            <span aria-hidden="true">{icon}</span>{' '}{label}
           </button>
         );
       })}
