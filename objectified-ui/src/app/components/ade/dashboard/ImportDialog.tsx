@@ -23,6 +23,7 @@ import SwaggerHubImportPanel from './SwaggerHubImportPanel';
 import PostmanImportPanel from './PostmanImportPanel';
 import { startImport, getImportStatus, rollbackImport } from '../../../../../lib/db/import-actions';
 import { generateSlug } from '../../../utils/slug';
+import { appendProjectQualitySnapshot } from '../../../utils/project-quality-score-history';
 
 interface ImportDialogProps {
   open: boolean;
@@ -80,6 +81,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const urlImportRef = useRef<UrlImportPanelHandle>(null);
+  const dryRunRef = useRef(false);
   const [urlImportFooter, setUrlImportFooter] = useState<UrlImportFooterState>({
     canTestUrl: false,
     isTesting: false,
@@ -88,6 +90,31 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
   const handleUrlImportFooterState = useCallback((s: UrlImportFooterState) => {
     setUrlImportFooter(s);
   }, []);
+
+  useEffect(() => {
+    if (!importComplete || !importSucceeded || !jobId || !analysisResult?.qualityScore) return;
+    if (dryRunRef.current) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await getImportStatus(jobId);
+        if (cancelled) return;
+        const projectId = (status as { result?: { projectId?: string } }).result?.projectId;
+        if (!projectId) return;
+        appendProjectQualitySnapshot(projectId, {
+          overall: analysisResult.qualityScore.overall,
+          grade: analysisResult.qualityScore.grade,
+          importJobId: jobId,
+        });
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [importComplete, importSucceeded, jobId, analysisResult]);
 
   // When opened with spec from AI Design Chat (Projects dashboard), run analysis immediately
   useEffect(() => {
@@ -194,6 +221,7 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
     setPostmanFilename(null);
     setPostmanMetadata(null);
     setErrorMessage(null);
+    dryRunRef.current = false;
   };
 
   const handleClose = async () => {
@@ -364,6 +392,8 @@ const ImportDialog: React.FC<ImportDialogProps> = ({
 
   const beginImport = async () => {
     if (!analysisResult || !importOptions) return;
+
+    dryRunRef.current = Boolean(importOptions.dryRun);
 
     // Validate that we have required IDs
     if (!tenantId) {
