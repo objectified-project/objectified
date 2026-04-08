@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FolderOpen, File, ArrowLeft, Lock, Search, Loader2, Globe, AlertTriangle, CheckCircle2, FileCode } from 'lucide-react';
 import { SiGithub, SiGitlab, SiGoogle, SiAmazon } from 'react-icons/si';
 import { getLinkedAccountsForUser } from '../../../../../lib/db/helper';
 import { extractFileMetadata, FileMetadataPreview } from '../../../utils/openapi-analyzer';
+import { parseGitHubRepoUrl } from '../../../utils/git-repo-url';
 import { Button } from '../../../components/ui/Button';
 
 interface GitImportPanelProps {
@@ -12,46 +13,80 @@ interface GitImportPanelProps {
   onSpecificationFetched: (content: string, filename: string, metadata?: FileMetadataPreview) => void;
 }
 
+interface LinkedAccount {
+  id: string;
+  provider: string;
+  provider_username?: string;
+  provider_email?: string;
+}
+
+interface GitHubRepoSummary {
+  id: number;
+  name: string;
+  full_name: string;
+  description?: string | null;
+  private?: boolean;
+  default_branch?: string;
+  html_url?: string;
+}
+
+interface RepoFileEntry {
+  name: string;
+  path: string;
+  type: 'dir' | 'file';
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export const GitImportPanel: React.FC<GitImportPanelProps> = ({
   userId,
   onSpecificationFetched
 }) => {
   // Linked accounts state
-  const [linkedAccounts, setLinkedAccounts] = useState<any[]>([]);
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
 
   // SSO Repository Browser state
-  const [selectedAccount, setSelectedAccount] = useState<any>(null);
-  const [repositories, setRepositories] = useState<any[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState<any>(null);
-  const [repoFiles, setRepoFiles] = useState<any[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<LinkedAccount | null>(null);
+  const [repositories, setRepositories] = useState<GitHubRepoSummary[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepoSummary | null>(null);
+  const [repoFiles, setRepoFiles] = useState<RepoFileEntry[]>([]);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [repoSearchQuery, setRepoSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  /** GitHub: load repo by URL, branch/tag ref, optional typed spec path */
+  const [repoUrlInput, setRepoUrlInput] = useState('');
+  const [specPathInput, setSpecPathInput] = useState('');
+  const [branchNames, setBranchNames] = useState<string[]>([]);
+  const [tagNames, setTagNames] = useState<string[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
 
   // Content state for preview
   const [fetchedContent, setFetchedContent] = useState<string | null>(null);
   const [fetchedFilename, setFetchedFilename] = useState<string | null>(null);
   const [fileMetadata, setFileMetadata] = useState<FileMetadataPreview | null>(null);
 
-  // Load linked accounts when component mounts
-  useEffect(() => {
-    loadLinkedAccounts();
-  }, [userId]);
-
-  const loadLinkedAccounts = async () => {
+  const loadLinkedAccounts = useCallback(async () => {
     setIsLoadingAccounts(true);
     try {
       const result = await getLinkedAccountsForUser(userId);
-      setLinkedAccounts(JSON.parse(result));
+      setLinkedAccounts(JSON.parse(result) as LinkedAccount[]);
     } catch (error) {
       console.error('Failed to load linked accounts:', error);
       setLinkedAccounts([]);
     } finally {
       setIsLoadingAccounts(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    void loadLinkedAccounts();
+  }, [loadLinkedAccounts]);
 
   const getProviderIcon = (provider: string) => {
     switch (provider.toLowerCase()) {
@@ -68,12 +103,66 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
     }
   };
 
-  const handleSelectAccount = async (account: any) => {
+  const fetchBranchesAndTags = async (account: LinkedAccount, fullName: string) => {
+    if (account.provider?.toLowerCase() !== 'github') {
+      setBranchNames([]);
+      setTagNames([]);
+      return;
+    }
+    try {
+      const [brRes, trRes] = await Promise.all([
+        fetch(`/api/sso/github/branches?accountId=${account.id}&repo=${encodeURIComponent(fullName)}`),
+        fetch(`/api/sso/github/tags?accountId=${account.id}&repo=${encodeURIComponent(fullName)}`),
+      ]);
+      if (brRes.ok) {
+        const bd = await brRes.json();
+        setBranchNames(bd.branches || []);
+      } else {
+        setBranchNames([]);
+      }
+      if (trRes.ok) {
+        const td = await trRes.json();
+        setTagNames(td.tags || []);
+      } else {
+        setTagNames([]);
+      }
+    } catch {
+      setBranchNames([]);
+      setTagNames([]);
+    }
+  };
+
+  const fetchDirectoryListing = async (
+    account: LinkedAccount,
+    repo: GitHubRepoSummary,
+    path: string,
+    ref: string
+  ) => {
+    let url = `/api/sso/${account.provider}/files?accountId=${account.id}&repo=${encodeURIComponent(repo.full_name)}&path=${encodeURIComponent(path)}`;
+    if (account.provider?.toLowerCase() === 'github' && ref) {
+      url += `&ref=${encodeURIComponent(ref)}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(errBody.error || response.statusText);
+    }
+    const data = await response.json();
+    return (data.files || []) as RepoFileEntry[];
+  };
+
+  const handleSelectAccount = async (account: LinkedAccount) => {
     setSelectedAccount(account);
     setSelectedRepo(null);
     setRepoFiles([]);
     setCurrentPath('');
     setRepoSearchQuery('');
+    setRepoUrlInput('');
+    setSpecPathInput('');
+    setBranchNames([]);
+    setTagNames([]);
+    setSelectedBranch('');
+    setSelectedTag('');
     setIsLoading(true);
     setErrorMessage('');
     setFetchedContent(null);
@@ -89,80 +178,155 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
       }
 
       const data = await response.json();
-      const sortedRepos = (data.repositories || []).sort((a: any, b: any) => {
+      const sortedRepos = ((data.repositories || []) as GitHubRepoSummary[]).sort((a, b) => {
         const nameA = (a.name || '').toLowerCase();
         const nameB = (b.name || '').toLowerCase();
         return nameA.localeCompare(nameB);
       });
       setRepositories(sortedRepos);
-    } catch (error: any) {
-      setErrorMessage(`Failed to load repositories: ${error.message}`);
+    } catch (error: unknown) {
+      setErrorMessage(`Failed to load repositories: ${formatError(error)}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelectRepo = async (repo: any) => {
+  const handleSelectRepo = async (repo: GitHubRepoSummary) => {
+    if (!selectedAccount) return;
+    const defaultBr = repo.default_branch || 'main';
     setSelectedRepo(repo);
-    setRepoFiles([]); // Clear files immediately
+    setRepoFiles([]);
     setIsLoading(true);
     setErrorMessage('');
     setCurrentPath('');
+    setSpecPathInput('');
+    setSelectedBranch(defaultBr);
+    setSelectedTag('');
     setFetchedContent(null);
     setFetchedFilename(null);
     setFileMetadata(null);
 
     try {
-      // Fetch files from the repository root
-      const response = await fetch(
-        `/api/sso/${selectedAccount.provider}/files?accountId=${selectedAccount.id}&repo=${repo.full_name}&path=`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch files: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setRepoFiles(data.files || []);
-    } catch (error: any) {
-      setErrorMessage(`Failed to load files: ${error.message}`);
+      await fetchBranchesAndTags(selectedAccount, repo.full_name);
+      const files = await fetchDirectoryListing(selectedAccount, repo, '', defaultBr);
+      setRepoFiles(files);
+    } catch (error: unknown) {
+      setErrorMessage(`Failed to load files: ${formatError(error)}`);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleLoadRepoFromUrl = async () => {
+    if (!selectedAccount || selectedAccount.provider?.toLowerCase() !== 'github') {
+      setErrorMessage('Select a GitHub-linked account first.');
+      return;
+    }
+    const parsed = parseGitHubRepoUrl(repoUrlInput);
+    if (!parsed) {
+      setErrorMessage('Enter a valid GitHub repository URL (e.g. https://github.com/org/repo or org/repo).');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+    setFetchedContent(null);
+    setFetchedFilename(null);
+    setFileMetadata(null);
+
+    try {
+      const metaRes = await fetch(
+        `/api/sso/github/repo?accountId=${selectedAccount.id}&repo=${encodeURIComponent(parsed.fullName)}`
+      );
+      if (!metaRes.ok) {
+        const errBody = await metaRes.json().catch(() => ({}));
+        throw new Error(errBody.error || metaRes.statusText);
+      }
+      const meta = await metaRes.json();
+      const repo = meta.repository as GitHubRepoSummary;
+      const defaultBr = repo.default_branch || 'main';
+      setSelectedRepo(repo);
+      setCurrentPath('');
+      setSpecPathInput('');
+      setSelectedBranch(defaultBr);
+      setSelectedTag('');
+      await fetchBranchesAndTags(selectedAccount, repo.full_name);
+      const files = await fetchDirectoryListing(selectedAccount, repo, '', defaultBr);
+      setRepoFiles(files);
+    } catch (error: unknown) {
+      setErrorMessage(formatError(error) || 'Failed to load repository from URL');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyRefAndReloadRoot = async (branch: string, tag: string) => {
+    if (!selectedAccount || !selectedRepo) return;
+    const ref = tag || branch || selectedRepo.default_branch || 'main';
+    setIsLoading(true);
+    setErrorMessage('');
+    setCurrentPath('');
+    try {
+      const files = await fetchDirectoryListing(selectedAccount, selectedRepo, '', ref);
+      setRepoFiles(files);
+    } catch (error: unknown) {
+      setErrorMessage(`Failed to load files: ${formatError(error)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBranchSelectChange = (value: string) => {
+    setSelectedBranch(value);
+    setSelectedTag('');
+    void applyRefAndReloadRoot(value, '');
+  };
+
+  const handleTagSelectChange = (value: string) => {
+    if (!value) {
+      const fallback = selectedRepo?.default_branch || 'main';
+      setSelectedTag('');
+      setSelectedBranch(fallback);
+      void applyRefAndReloadRoot(fallback, '');
+      return;
+    }
+    setSelectedTag(value);
+    setSelectedBranch('');
+    void applyRefAndReloadRoot('', value);
+  };
+
   const handleNavigateToPath = async (path: string) => {
-    setRepoFiles([]); // Clear files immediately
+    if (!selectedAccount || !selectedRepo) return;
+    const ref =
+      selectedTag || selectedBranch || selectedRepo.default_branch || 'main';
+    setRepoFiles([]);
     setIsLoading(true);
     setErrorMessage('');
     setCurrentPath(path);
 
     try {
-      const response = await fetch(
-        `/api/sso/${selectedAccount.provider}/files?accountId=${selectedAccount.id}&repo=${selectedRepo.full_name}&path=${path}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch files: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setRepoFiles(data.files || []);
-    } catch (error: any) {
-      setErrorMessage(`Failed to load files: ${error.message}`);
+      const files = await fetchDirectoryListing(selectedAccount, selectedRepo, path, ref);
+      setRepoFiles(files);
+    } catch (error: unknown) {
+      setErrorMessage(`Failed to load files: ${formatError(error)}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelectFile = async (file: any) => {
+  const resolveContentRef = () =>
+    selectedTag || selectedBranch || selectedRepo?.default_branch || 'main';
+
+  const handleSelectFile = async (file: RepoFileEntry) => {
+    if (!selectedAccount || !selectedRepo) return;
+
     if (file.type === 'dir') {
-      // Navigate into directory
       handleNavigateToPath(file.path);
       return;
     }
 
-    // Check if it's an OpenAPI file
+    setSpecPathInput(`/${file.path}`);
+
     const isOpenAPIFile =
       file.name.includes('openapi') ||
       file.name.includes('swagger') ||
@@ -179,9 +343,9 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
     setErrorMessage('');
 
     try {
-      // Fetch file content
+      const ref = resolveContentRef();
       const response = await fetch(
-        `/api/sso/${selectedAccount.provider}/content?accountId=${selectedAccount.id}&repo=${selectedRepo.full_name}&path=${file.path}&branch=${selectedRepo.default_branch}`
+        `/api/sso/${selectedAccount.provider}/content?accountId=${selectedAccount.id}&repo=${encodeURIComponent(selectedRepo.full_name)}&path=${encodeURIComponent(file.path)}&branch=${encodeURIComponent(ref)}`
       );
 
       if (!response.ok) {
@@ -192,23 +356,75 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
       const content = data.content;
       const filename = file.name;
 
-      // Extract metadata
       const metadata = extractFileMetadata(content);
       setFetchedContent(content);
       setFetchedFilename(filename);
       setFileMetadata(metadata);
 
-      // Notify parent that content is ready
       onSpecificationFetched(content, filename, metadata);
-    } catch (error: any) {
-      setErrorMessage(`Failed to load file: ${error.message}`);
+    } catch (error: unknown) {
+      setErrorMessage(`Failed to load file: ${formatError(error)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOpenSpecPath = async () => {
+    if (!selectedAccount || !selectedRepo) {
+      setErrorMessage('Select a repository first.');
+      return;
+    }
+    const raw = specPathInput.trim().replace(/^\/+/, '');
+    if (!raw) {
+      setErrorMessage('Enter a file path (e.g. specs/openapi.yaml).');
+      return;
+    }
+
+    const base = raw.split('/').pop() || raw;
+    const isOpenAPIFile =
+      base.includes('openapi') ||
+      base.includes('swagger') ||
+      base.endsWith('.json') ||
+      base.endsWith('.yaml') ||
+      base.endsWith('.yml');
+
+    if (!isOpenAPIFile) {
+      setErrorMessage('Path should point to an OpenAPI specification file (JSON or YAML).');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const ref = resolveContentRef();
+      const response = await fetch(
+        `/api/sso/${selectedAccount.provider}/content?accountId=${selectedAccount.id}&repo=${encodeURIComponent(selectedRepo.full_name)}&path=${encodeURIComponent(raw)}&branch=${encodeURIComponent(ref)}`
+      );
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        throw new Error(errBody.error || response.statusText);
+      }
+
+      const data = await response.json();
+      const content = data.content;
+      const filename = base;
+
+      const metadata = extractFileMetadata(content);
+      setFetchedContent(content);
+      setFetchedFilename(filename);
+      setFileMetadata(metadata);
+      onSpecificationFetched(content, filename, metadata);
+    } catch (error: unknown) {
+      setErrorMessage(`Failed to load file: ${formatError(error)}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Filter repositories based on search query
-  const filteredRepos = repositories.filter((repo: any) =>
+  const filteredRepos = repositories.filter((repo: GitHubRepoSummary) =>
     repo.name.toLowerCase().includes(repoSearchQuery.toLowerCase()) ||
     (repo.description && repo.description.toLowerCase().includes(repoSearchQuery.toLowerCase()))
   );
@@ -258,6 +474,144 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             <div className="text-sm text-red-700 dark:text-red-300">{errorMessage}</div>
           </div>
+        </div>
+      )}
+
+      {selectedAccount?.provider?.toLowerCase() === 'github' && (
+        <div className="flex-shrink-0 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-4">
+          <div>
+            <label
+              htmlFor="git-import-repo-url"
+              className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+            >
+              Repository URL
+            </label>
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                id="git-import-repo-url"
+                type="text"
+                value={repoUrlInput}
+                onChange={(e) => setRepoUrlInput(e.target.value)}
+                placeholder="https://github.com/org/repo or org/repo"
+                disabled={isLoading}
+                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+              />
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => void handleLoadRepoFromUrl()}
+                disabled={isLoading || !repoUrlInput.trim()}
+                className="shrink-0"
+              >
+                Load repository
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Paste a GitHub URL or <span className="font-mono">owner/repo</span>, then load to browse that repository at the branch or tag you choose below.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <span>Need access to private repos?</span>
+            <a
+              href="/ade/dashboard/linked-accounts"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-300"
+            >
+              Linked accounts
+            </a>
+          </div>
+
+          {selectedRepo && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="git-import-branch"
+                    className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Branch
+                  </label>
+                  <select
+                    id="git-import-branch"
+                    value={selectedTag ? '' : selectedBranch}
+                    onChange={(e) => handleBranchSelectChange(e.target.value)}
+                    disabled={isLoading || !!selectedTag}
+                    className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-60"
+                  >
+                    {selectedTag ? (
+                      <option value="">—</option>
+                    ) : null}
+                    {(branchNames.length > 0
+                      ? branchNames
+                      : selectedBranch
+                        ? [selectedBranch]
+                        : []
+                    ).map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="git-import-tag"
+                    className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Tag
+                  </label>
+                  <select
+                    id="git-import-tag"
+                    value={selectedTag}
+                    onChange={(e) => handleTagSelectChange(e.target.value)}
+                    disabled={isLoading}
+                    className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="">(none)</option>
+                    {tagNames.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="git-import-spec-path"
+                  className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
+                  Spec path
+                </label>
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input
+                    id="git-import-spec-path"
+                    type="text"
+                    value={specPathInput}
+                    onChange={(e) => setSpecPathInput(e.target.value)}
+                    placeholder="specs/openapi.yaml"
+                    disabled={isLoading}
+                    className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleOpenSpecPath()}
+                    disabled={isLoading || !specPathInput.trim()}
+                    className="shrink-0"
+                  >
+                    Open file
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Optional: type a path and open, or pick a file in the browser — the path updates when you select a file.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -350,7 +704,7 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
                 </span>
               </div>
             ) : (
-              filteredRepos.map((repo: any) => {
+              filteredRepos.map((repo: GitHubRepoSummary) => {
                 const isSelected = selectedRepo?.id === repo.id;
                 return (
                   <button
@@ -450,7 +804,7 @@ export const GitImportPanel: React.FC<GitImportPanelProps> = ({
                 )}
 
                 {/* File and directory list */}
-                {repoFiles.map((file: any, idx: number) => {
+                {repoFiles.map((file: RepoFileEntry, idx: number) => {
                 const isOpenAPIFile =
                   file.name.includes('openapi') ||
                   file.name.includes('swagger') ||

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../auth/[...nextauth]/route';
 import { getLinkedAccountById } from '@lib/db/helper';
 
+/** List branches (first page, up to 100). */
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -20,17 +21,17 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const accountId = searchParams.get('accountId');
     const repo = searchParams.get('repo');
-    const path = searchParams.get('path') || '';
-    const ref =
-      searchParams.get('ref') ||
-      searchParams.get('branch') ||
-      '';
 
     if (!accountId || !repo) {
       return NextResponse.json({ error: 'Account ID and repo are required' }, { status: 400 });
     }
 
-    // Get the linked account from database
+    const repoParts = repo.split('/');
+    if (repoParts.length !== 2 || !repoParts[0] || !repoParts[1]) {
+      return NextResponse.json({ error: 'repo must be in owner/repo format' }, { status: 400 });
+    }
+    const [repoOwner, repoName] = repoParts;
+
     const accountResult = await getLinkedAccountById(accountId, userId);
     const accountData = JSON.parse(accountResult);
 
@@ -44,23 +45,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No access token found for this account' }, { status: 401 });
     }
 
-    // Call GitHub API to get repository contents (ref = branch or tag name)
-    const pathSegments = path
-      ? path
-          .split('/')
-          .map((segment) => encodeURIComponent(segment))
-          .join('/')
-      : '';
-    const pathPart = pathSegments ? `/${pathSegments}` : '';
-    const refQuery = ref ? `?ref=${encodeURIComponent(ref)}` : '';
-    const url = `https://api.github.com/repos/${repo}/contents${pathPart}${refQuery}`;
+    const url = `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/branches?per_page=100`;
 
     const githubResponse = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${account.access_token}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
+        Authorization: `Bearer ${account.access_token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
     });
 
     if (!githubResponse.ok) {
@@ -74,43 +66,26 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      if (githubResponse.status === 404) {
-        return NextResponse.json(
-          { error: 'Repository or path not found' },
-          { status: 404 }
-        );
-      }
-
       return NextResponse.json(
         { error: `GitHub API error: ${githubResponse.statusText}` },
         { status: githubResponse.status }
       );
     }
 
-    const contents: unknown = await githubResponse.json();
+    const branches: unknown = await githubResponse.json();
+    const names = Array.isArray(branches)
+      ? branches
+          .map((b) => (typeof b === 'object' && b !== null && 'name' in b ? String((b as { name: string }).name) : ''))
+          .filter(Boolean)
+      : [];
 
-    // GitHub API returns an array for directory contents, single object for file
-    const rawList = Array.isArray(contents) ? contents : [contents];
-
-    // Transform GitHub API response to our format
-    const formattedFiles = rawList.map((item: Record<string, unknown>) => ({
-      name: String(item.name ?? ''),
-      path: String(item.path ?? ''),
-      type: item.type === 'dir' ? 'dir' : 'file',
-      size: item.size,
-      sha: item.sha,
-      url: item.url,
-      html_url: item.html_url,
-    }));
-
-    return NextResponse.json({ files: formattedFiles });
+    return NextResponse.json({ branches: names });
   } catch (error: unknown) {
-    console.error('Error fetching GitHub files:', error);
-    const message = error instanceof Error ? error.message : 'Failed to fetch files';
+    console.error('Error fetching GitHub branches:', error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch branches';
     return NextResponse.json(
       { error: message },
       { status: 500 }
     );
   }
 }
-
