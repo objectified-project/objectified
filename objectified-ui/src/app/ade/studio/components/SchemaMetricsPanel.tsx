@@ -9,11 +9,14 @@ import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import type { CanvasSuggestion } from '@/app/utils/canvas-suggestions';
 import { downloadSchemaScoreReportPdf } from '@/app/utils/export-schema-score-report-pdf';
-import { getNumericScoreTier } from '@/app/utils/numeric-score-tier';
+import { getNumericScoreTier, NUMERIC_SCORE_TIER_LEGEND } from '@/app/utils/numeric-score-tier';
+import { OVERALL_SCHEMA_QUALITY_WEIGHTS, type OverallSchemaQualityDetail } from '@/app/utils/overall-schema-quality';
 
 interface SchemaMetricsPanelProps {
   metrics: SchemaMetricsResult | null;
   layoutQuality?: LayoutQualityResult | null;
+  /** Weighted overall + letter grade; same formula as Studio header (#2548) */
+  overallSchemaQualityDetail?: OverallSchemaQualityDetail | null;
   /** Canvas improvement suggestions (#474) */
   suggestions?: CanvasSuggestion[];
   /** Shown on exported PDF cover (#252) */
@@ -29,6 +32,7 @@ interface SchemaMetricsPanelProps {
 export default function SchemaMetricsPanel({
   metrics,
   layoutQuality,
+  overallSchemaQualityDetail = null,
   suggestions = [],
   projectName,
   versionLabel,
@@ -176,6 +180,56 @@ export default function SchemaMetricsPanel({
               </div>
             </div>
           </div>
+          {/* Overall schema quality — matches import Quality Score presentation (#2548) */}
+          {overallSchemaQualityDetail && (
+            <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className={`text-3xl font-bold tabular-nums leading-none shrink-0 ${overallSchemaQualityDetail.tier.textClass}`}
+                    title={`${overallSchemaQualityDetail.tier.shortLabel} (${overallSchemaQualityDetail.tier.rangeLabel})`}
+                  >
+                    {overallSchemaQualityDetail.letterGrade}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                      Schema quality
+                    </div>
+                    <div className={`text-xs font-semibold mt-0.5 leading-tight ${overallSchemaQualityDetail.tier.textClass}`}>
+                      {overallSchemaQualityDetail.tier.shortLabel} — {overallSchemaQualityDetail.tier.detailLabel}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className={`text-2xl font-bold tabular-nums leading-none ${overallSchemaQualityDetail.tier.textClass}`}>
+                    {overallSchemaQualityDetail.overall}
+                  </div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 tabular-nums">/ 100</div>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 leading-snug">
+                Weighted blend — documentation {OVERALL_SCHEMA_QUALITY_WEIGHTS.documentation}, naming {OVERALL_SCHEMA_QUALITY_WEIGHTS.naming}, structural load {OVERALL_SCHEMA_QUALITY_WEIGHTS.structuralLoad}
+                {overallSchemaQualityDetail.layoutIncluded
+                  ? `, canvas layout ${OVERALL_SCHEMA_QUALITY_WEIGHTS.layout}.`
+                  : '.'}
+              </p>
+              <div className="mt-2 pt-2 border-t border-gray-200/80 dark:border-gray-600/80">
+                <div className="text-[9px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                  Score guide
+                </div>
+                <ul className="space-y-1 text-[10px] text-gray-600 dark:text-gray-300">
+                  {NUMERIC_SCORE_TIER_LEGEND.map((row) => (
+                    <li key={row.band} className="flex items-start gap-1.5">
+                      <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${row.barSolidClass}`} aria-hidden />
+                      <span>
+                        <span className="font-medium tabular-nums">{row.rangeLabel}:</span> {row.shortLabel}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           {/* Realtime schema complexity score (#556); click to see why */}
           <Popover.Root>
             <Popover.Trigger asChild>

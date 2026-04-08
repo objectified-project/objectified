@@ -3,8 +3,9 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Check, Gauge, Settings } from 'lucide-react';
+import { Check, Gauge, Settings, X } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
+import * as Dialog from '@radix-ui/react-dialog';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useStudio } from '../StudioContext';
 import { Spinner } from '../../../components/ui/Spinner';
@@ -13,7 +14,8 @@ import {
 } from '../../../../../lib/db/helper';
 import CanvasSettingsDialog from './CanvasSettingsDialog';
 import { cn } from '../../../../../lib/utils';
-import { getNumericScoreTier } from '@/app/utils/numeric-score-tier';
+import { getNumericScoreTier, NUMERIC_SCORE_TIER_LEGEND } from '@/app/utils/numeric-score-tier';
+import { OVERALL_SCHEMA_QUALITY_WEIGHTS } from '@/app/utils/overall-schema-quality';
 
 interface Project {
   id: string;
@@ -69,8 +71,11 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     setEdgeAnimation,
     searchHistoryCount,
     clearSearchHistoryFn,
-    schemaQualityScore
+    schemaQualityScore,
+    schemaQualityDetail
   } = useStudio();
+
+  const [schemaQualityDialogOpen, setSchemaQualityDialogOpen] = React.useState(false);
 
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [versions, setVersions] = React.useState<Version[]>([]);
@@ -360,33 +365,176 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
           </Select.Root>
         </div>
 
-        {/* Overall schema quality (#245) — live from Canvas; null on Code view or before metrics load */}
+        {/* Overall schema quality (#245) — live from Canvas; click for breakdown (#2548) */}
         {localProjectId && localVersionId && (
-          <div
-            className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0"
-            title={
-              schemaQualityScore != null
-                ? 'Overall schema quality (0–100): documentation, naming, structural load, and canvas layout. Updates live on the Canvas.'
-                : 'Open the Canvas view to compute a live schema quality score.'
-            }
-          >
-            <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
-            <div className="flex flex-col min-w-0">
-              <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
-                Schema quality
-              </span>
-              <span
-                className={cn(
-                  'text-2xl font-bold tabular-nums leading-none',
-                  schemaQualityScore != null
-                    ? getNumericScoreTier(schemaQualityScore).textClass
-                    : 'text-gray-400 dark:text-gray-500'
-                )}
+          <>
+            {schemaQualityScore != null ? (
+              <button
+                type="button"
+                onClick={() => setSchemaQualityDialogOpen(true)}
+                className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0 text-left hover:bg-gray-50 dark:hover:bg-gray-600/50 hover:border-indigo-300 dark:hover:border-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900 transition-colors"
+                title="Overall schema quality (0–100). Click for weighted breakdown and letter grade."
+                aria-label="Schema quality details"
               >
-                {schemaQualityScore != null ? schemaQualityScore : '—'}
-              </span>
-            </div>
-          </div>
+                <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                    Schema quality
+                  </span>
+                  <span className="flex items-baseline gap-1.5">
+                    <span
+                      className={cn(
+                        'text-2xl font-bold tabular-nums leading-none',
+                        getNumericScoreTier(schemaQualityScore).textClass
+                      )}
+                    >
+                      {schemaQualityScore}
+                    </span>
+                    {schemaQualityDetail && (
+                      <span
+                        className={cn(
+                          'text-lg font-bold tabular-nums leading-none',
+                          schemaQualityDetail.tier.textClass
+                        )}
+                        title={`Letter grade (${schemaQualityDetail.tier.rangeLabel})`}
+                      >
+                        {schemaQualityDetail.letterGrade}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </button>
+            ) : (
+              <div
+                className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0"
+                title="Open the Canvas view with classes on the canvas to compute a live schema quality score."
+              >
+                <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                    Schema quality
+                  </span>
+                  <span className="text-2xl font-bold tabular-nums leading-none text-gray-400 dark:text-gray-500">
+                    —
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <Dialog.Root open={schemaQualityDialogOpen} onOpenChange={setSchemaQualityDialogOpen}>
+              <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10000]" />
+                <Dialog.Content
+                  className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-[10001] w-full max-w-md max-h-[85vh] overflow-y-auto p-6 border border-gray-200 dark:border-gray-700"
+                >
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                      <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        Schema quality
+                      </Dialog.Title>
+                      <Dialog.Description className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Weighted blend of documentation, naming, inverted structural complexity, and canvas layout. Updates live on the Canvas.
+                      </Dialog.Description>
+                    </div>
+                    <Dialog.Close asChild>
+                      <button
+                        type="button"
+                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                        aria-label="Close"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </Dialog.Close>
+                  </div>
+
+                  {schemaQualityDetail ? (
+                    <>
+                      <div className="flex items-center justify-between gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 mb-4">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={cn('text-5xl font-bold tabular-nums', schemaQualityDetail.tier.textClass)}
+                            title={`${schemaQualityDetail.tier.shortLabel} (${schemaQualityDetail.tier.rangeLabel})`}
+                          >
+                            {schemaQualityDetail.letterGrade}
+                          </span>
+                          <div>
+                            <div className={cn('text-base font-semibold', schemaQualityDetail.tier.textClass)}>
+                              {schemaQualityDetail.tier.shortLabel} — {schemaQualityDetail.tier.detailLabel}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Letter grade · {schemaQualityDetail.tier.rangeLabel}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={cn('text-3xl font-bold tabular-nums', schemaQualityDetail.tier.textClass)}>
+                            {schemaQualityDetail.overall}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">/ 100</div>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                        Default weights: documentation {OVERALL_SCHEMA_QUALITY_WEIGHTS.documentation}, naming {OVERALL_SCHEMA_QUALITY_WEIGHTS.naming}, structural load {OVERALL_SCHEMA_QUALITY_WEIGHTS.structuralLoad}
+                        {schemaQualityDetail.layoutIncluded
+                          ? `, canvas layout ${OVERALL_SCHEMA_QUALITY_WEIGHTS.layout}.`
+                          : ' (canvas layout is included when the graph is laid out on the Canvas).'}
+                      </p>
+
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">Contributions</div>
+                      <table className="w-full text-xs text-left border-collapse mb-4">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
+                            <th className="py-1.5 pr-2 font-medium">Factor</th>
+                            <th className="py-1.5 pr-2 font-medium text-right tabular-nums">Value</th>
+                            <th className="py-1.5 pr-2 font-medium text-right">Weight</th>
+                            <th className="py-1.5 font-medium text-right tabular-nums">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {schemaQualityDetail.rows.map((row) => (
+                            <tr key={row.id} className="border-b border-gray-100 dark:border-gray-700/80">
+                              <td className="py-1.5 pr-2 text-gray-800 dark:text-gray-200">{row.label}</td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{Math.round(row.value)}</td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
+                                {(row.effectiveWeight * 100).toFixed(0)}%
+                              </td>
+                              <td className="py-1.5 text-right tabular-nums font-medium text-gray-800 dark:text-gray-100">
+                                {row.contribution.toFixed(1)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        Final score is the sum of contributions, rounded to a whole number 0–100 (same rule as the OpenAPI import quality score bands).
+                      </p>
+
+                      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 px-3 py-2">
+                        <div className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                          Score guide
+                        </div>
+                        <ul className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+                          {NUMERIC_SCORE_TIER_LEGEND.map((row) => (
+                            <li key={row.band} className="flex items-start gap-2">
+                              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${row.barSolidClass}`} aria-hidden />
+                              <span>
+                                <span className="font-medium tabular-nums">{row.rangeLabel}:</span> {row.shortLabel} — {row.detailLabel}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Detailed breakdown is unavailable. Open the Canvas with at least one class and a computed layout to see documentation, naming, structural load, and layout weights.
+                    </p>
+                  )}
+                </Dialog.Content>
+              </Dialog.Portal>
+            </Dialog.Root>
+          </>
         )}
 
         {/* View Switcher and Settings - only show when project and version selected */}
