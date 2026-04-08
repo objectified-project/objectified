@@ -14,6 +14,7 @@ import { convertProtobufToOpenAPI, isProtobuf } from './protobuf-converter';
 import { convertAvroToOpenAPI, isAvroSchemaObject } from './avro-converter';
 import { convertThriftToOpenAPI, isThrift } from './thrift-converter';
 import { inferArazzoSchemasFromWorkflows } from '../../../lib/importers/arazzo';
+import { letterGradeFromOverallPercent } from './numeric-score-tier';
 
 export interface AnalysisResult {
   isValid: boolean;
@@ -770,12 +771,7 @@ function calculateQualityScore(doc: any): {
     ...securityResult.issues
   ];
 
-  let grade: 'A' | 'B' | 'C' | 'D' | 'F';
-  if (overall >= 90) grade = 'A';
-  else if (overall >= 80) grade = 'B';
-  else if (overall >= 70) grade = 'C';
-  else if (overall >= 60) grade = 'D';
-  else grade = 'F';
+  const grade = letterGradeFromOverallPercent(overall);
 
   return {
     overall,

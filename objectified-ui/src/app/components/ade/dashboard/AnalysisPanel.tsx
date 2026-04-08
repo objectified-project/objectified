@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, XCircle, FileCode, AlertTriangle, X, Chevron
 import * as Progress from '@radix-ui/react-progress';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnalysisResult, QualityIssue, UnsupportedFeature } from '../../../utils/openapi-analyzer';
+import { getNumericScoreTier, NUMERIC_SCORE_TIER_LEGEND } from '../../../utils/numeric-score-tier';
 
 interface AnalysisPanelProps {
   fileName: string;
@@ -34,27 +35,7 @@ const categoryDescriptions: Record<string, { title: string; description: string 
 export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<'completeness' | 'consistency' | 'bestPractices' | 'security' | null>(null);
 
-  const getGradeColor = (grade: string) => {
-    switch (grade) {
-      case 'A': return 'text-green-600 dark:text-green-400';
-      case 'B': return 'text-blue-600 dark:text-blue-400';
-      case 'C': return 'text-yellow-600 dark:text-yellow-400';
-      case 'D': return 'text-orange-600 dark:text-orange-400';
-      case 'F': return 'text-red-600 dark:text-red-400';
-      default: return 'text-gray-600 dark:text-gray-400';
-    }
-  };
-
-  const getGradeLabel = (grade: string) => {
-    switch (grade) {
-      case 'A': return 'Excellent Quality';
-      case 'B': return 'Good Quality';
-      case 'C': return 'Fair Quality';
-      case 'D': return 'Poor Quality';
-      case 'F': return 'Needs Improvement';
-      default: return 'Unknown';
-    }
-  };
+  const overallTier = getNumericScoreTier(analysis.qualityScore.overall);
 
   // Get issues for a specific category
   const getIssuesForCategory = (category: 'completeness' | 'consistency' | 'bestPractices' | 'security'): QualityIssue[] => {
@@ -498,26 +479,42 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
           Quality Score
         </h3>
 
-        {/* Overall Grade */}
-        <div className="flex items-center justify-between mb-6 p-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+        {/* Overall score + letter grade (colors follow numeric bands #248) */}
+        <div className="flex items-center justify-between mb-4 p-6 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
-            <div className={`text-6xl font-bold ${getGradeColor(analysis.qualityScore.grade)}`}>
+            <div className={`text-6xl font-bold ${overallTier.textClass}`} title={`${overallTier.shortLabel} (${overallTier.rangeLabel})`}>
               {analysis.qualityScore.grade}
             </div>
             <div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {getGradeLabel(analysis.qualityScore.grade)}
+              <div className={`text-lg font-semibold ${overallTier.textClass}`}>
+                {overallTier.shortLabel} — {overallTier.detailLabel}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Based on specification analysis
+                Based on specification analysis · {overallTier.rangeLabel}
               </div>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-bold text-gray-900 dark:text-white">
+            <div className={`text-3xl font-bold ${overallTier.textClass} tabular-nums`}>
               {analysis.qualityScore.overall}%
             </div>
           </div>
+        </div>
+        <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 px-3 py-2">
+          <div className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+            Score guide
+          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+            {NUMERIC_SCORE_TIER_LEGEND.map((row) => (
+              <li key={row.band} className="flex items-start gap-2">
+                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${row.barSolidClass}`} aria-hidden />
+                <span>
+                  <span className="font-medium tabular-nums">{row.rangeLabel}:</span>{' '}
+                  {row.shortLabel} — {row.detailLabel}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {/* Quality Metrics - Clickable Cards */}
@@ -531,7 +528,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Completeness
                 </span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                <span className={`text-sm font-bold tabular-nums ${getNumericScoreTier(analysis.qualityScore.completeness).textClass}`}>
                   {analysis.qualityScore.completeness}%
                 </span>
               </div>
@@ -540,7 +537,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 value={analysis.qualityScore.completeness}
               >
                 <Progress.Indicator
-                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-transform duration-300"
+                  className={`h-full bg-gradient-to-r ${getNumericScoreTier(analysis.qualityScore.completeness).progressGradientClass} transition-transform duration-300`}
                   style={{ transform: `translateX(-${100 - analysis.qualityScore.completeness}%)` }}
                 />
               </Progress.Root>
@@ -563,7 +560,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Consistency
                 </span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                <span className={`text-sm font-bold tabular-nums ${getNumericScoreTier(analysis.qualityScore.consistency).textClass}`}>
                   {analysis.qualityScore.consistency}%
                 </span>
               </div>
@@ -572,7 +569,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 value={analysis.qualityScore.consistency}
               >
                 <Progress.Indicator
-                  className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-transform duration-300"
+                  className={`h-full bg-gradient-to-r ${getNumericScoreTier(analysis.qualityScore.consistency).progressGradientClass} transition-transform duration-300`}
                   style={{ transform: `translateX(-${100 - analysis.qualityScore.consistency}%)` }}
                 />
               </Progress.Root>
@@ -595,7 +592,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Best Practices
                 </span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                <span className={`text-sm font-bold tabular-nums ${getNumericScoreTier(analysis.qualityScore.bestPractices).textClass}`}>
                   {analysis.qualityScore.bestPractices}%
                 </span>
               </div>
@@ -604,7 +601,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 value={analysis.qualityScore.bestPractices}
               >
                 <Progress.Indicator
-                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-transform duration-300"
+                  className={`h-full bg-gradient-to-r ${getNumericScoreTier(analysis.qualityScore.bestPractices).progressGradientClass} transition-transform duration-300`}
                   style={{ transform: `translateX(-${100 - analysis.qualityScore.bestPractices}%)` }}
                 />
               </Progress.Root>
@@ -627,7 +624,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                   Security
                 </span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                <span className={`text-sm font-bold tabular-nums ${getNumericScoreTier(analysis.qualityScore.security).textClass}`}>
                   {analysis.qualityScore.security}%
                 </span>
               </div>
@@ -636,7 +633,7 @@ export function AnalysisPanel({ fileName, analysis }: AnalysisPanelProps) {
                 value={analysis.qualityScore.security}
               >
                 <Progress.Indicator
-                  className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-transform duration-300"
+                  className={`h-full bg-gradient-to-r ${getNumericScoreTier(analysis.qualityScore.security).progressGradientClass} transition-transform duration-300`}
                   style={{ transform: `translateX(-${100 - analysis.qualityScore.security}%)` }}
                 />
               </Progress.Root>

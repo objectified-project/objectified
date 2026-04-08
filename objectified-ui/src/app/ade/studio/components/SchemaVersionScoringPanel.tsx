@@ -6,6 +6,7 @@ import { cn } from '../../../../../lib/utils';
 import { easeOutCubic } from '../../../../../lib/animation-easing';
 import { getClassesWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { computePerSchemaScoresFromClasses } from '@/app/utils/schema-metrics';
+import { getNumericScoreTier } from '@/app/utils/numeric-score-tier';
 import type { PerSchemaScoreRow } from '@/app/utils/schema-metrics';
 import type { Version } from '../editor/components/types';
 
@@ -53,11 +54,7 @@ function AnimatedScoreGauge({
         : target <= 66
           ? 'text-amber-500'
           : 'text-rose-500'
-      : target >= 80
-        ? 'text-emerald-500'
-        : target >= 50
-          ? 'text-amber-500'
-          : 'text-rose-500';
+      : getNumericScoreTier(target).gaugeStrokeClass;
 
   React.useEffect(() => {
     const arc = arcRef.current;
