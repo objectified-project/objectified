@@ -1211,6 +1211,19 @@ export default function ClassPropertyEditDialog({ open, onClose, editingClassPro
                         />
                       )}
                     </div>
+
+                    {/* Owner */}
+                    <div className="mt-4 space-y-1">
+                      <Label htmlFor="owner" className="text-sm font-medium">Owner</Label>
+                      <Input
+                        id="owner"
+                        value={formData.owner || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
+                        placeholder="e.g. platform-team or @handle"
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">Stored as <code>x-owner</code> on this property schema (team or person responsible).</p>
+                    </div>
                   </div>
                 );
               })()}
