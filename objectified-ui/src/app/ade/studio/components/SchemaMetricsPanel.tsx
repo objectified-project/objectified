@@ -1,19 +1,23 @@
 'use client';
 
 import * as React from 'react';
-import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type, Network } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, X, Link2, Unlink, GitBranch, RefreshCw, Layout, Gauge, Lightbulb, LayoutGrid, Box, Layers, FileText, Type, Network, FileDown } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '../../../../../lib/utils';
 import type { LayoutQualityResult } from '@/app/utils/layout-quality';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
 import type { CanvasSuggestion } from '@/app/utils/canvas-suggestions';
+import { downloadSchemaScoreReportPdf } from '@/app/utils/export-schema-score-report-pdf';
 
 interface SchemaMetricsPanelProps {
   metrics: SchemaMetricsResult | null;
   layoutQuality?: LayoutQualityResult | null;
   /** Canvas improvement suggestions (#474) */
   suggestions?: CanvasSuggestion[];
+  /** Shown on exported PDF cover (#252) */
+  projectName?: string;
+  versionLabel?: string;
   /** Called when user triggers an action (e.g. apply layout) */
   onSuggestionAction?: (suggestion: CanvasSuggestion) => void;
   onClose?: () => void;
@@ -25,6 +29,8 @@ export default function SchemaMetricsPanel({
   metrics,
   layoutQuality,
   suggestions = [],
+  projectName,
+  versionLabel,
   onSuggestionAction,
   onClose,
   isMinimized = false,
@@ -97,6 +103,23 @@ export default function SchemaMetricsPanel({
             <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Schema Metrics</span>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                downloadSchemaScoreReportPdf({
+                  metrics,
+                  layoutQuality,
+                  suggestions,
+                  projectName,
+                  versionLabel,
+                })
+              }
+              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+              title="Export score report as PDF"
+              aria-label="Export score report as PDF"
+            >
+              <FileDown className="w-4 h-4" />
+            </button>
             {onMinimizeToggle && (
               <button
                 onClick={onMinimizeToggle}
