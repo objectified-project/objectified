@@ -46,10 +46,16 @@ export interface AnalysisResult {
   qualityScore: {
     overall: number;
     grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    /** Weighted breakdown — max points per category sum to 100 (#247) */
+    categories: QualityScoreCategories;
+    /** Same as categories.documentation.percent */
     completeness: number;
+    /** Raw naming/patterns score (feeds Design Quality) */
     consistency: number;
+    /** Same as categories.apiBestPractices.percent */
     bestPractices: number;
     security: number;
+    performance: number;
     issues: QualityIssue[];
   };
 
@@ -71,13 +77,98 @@ export interface AnalysisIssue {
   severity: 'critical' | 'high' | 'medium' | 'low';
 }
 
+/** Issue categories aligned with weighted quality breakdown (#247) */
+export type QualityScoreCategoryId =
+  | 'designQuality'
+  | 'documentation'
+  | 'apiBestPractices'
+  | 'security'
+  | 'performance';
+
+export interface QualityCategoryScore {
+  id: QualityScoreCategoryId;
+  label: string;
+  description: string;
+  percent: number;
+  maxPoints: number;
+  points: number;
+}
+
+export type QualityScoreCategories = Record<QualityScoreCategoryId, QualityCategoryScore>;
+
 export interface QualityIssue {
-  category: 'completeness' | 'consistency' | 'bestPractices' | 'security';
+  category: QualityScoreCategoryId;
   message: string;
   suggestion: string;
   path: string;
   line?: number;
   severity: 'high' | 'medium' | 'low';
+}
+
+const QUALITY_CATEGORY_META: Record<
+  QualityScoreCategoryId,
+  { label: string; description: string; maxPoints: number }
+> = {
+  designQuality: {
+    label: 'Design Quality',
+    description: 'Naming conventions, consistency, reusability',
+    maxPoints: 30
+  },
+  documentation: {
+    label: 'Documentation',
+    description: 'Descriptions, examples, external docs',
+    maxPoints: 20
+  },
+  apiBestPractices: {
+    label: 'API Best Practices',
+    description: 'RESTful patterns, HTTP methods, status codes',
+    maxPoints: 25
+  },
+  security: {
+    label: 'Security',
+    description: 'Authentication, authorization, input validation',
+    maxPoints: 15
+  },
+  performance: {
+    label: 'Performance',
+    description: 'Pagination, filtering, caching headers',
+    maxPoints: 10
+  }
+};
+
+function buildCategoryScore(id: QualityScoreCategoryId, percent: number): QualityCategoryScore {
+  const meta = QUALITY_CATEGORY_META[id];
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  return {
+    id,
+    label: meta.label,
+    description: meta.description,
+    percent: clamped,
+    maxPoints: meta.maxPoints,
+    points: Math.round((clamped / 100) * meta.maxPoints)
+  };
+}
+
+function zeroQualityScore(): AnalysisResult['qualityScore'] {
+  const ids: QualityScoreCategoryId[] = [
+    'designQuality',
+    'documentation',
+    'apiBestPractices',
+    'security',
+    'performance'
+  ];
+  const categories = Object.fromEntries(ids.map((id) => [id, buildCategoryScore(id, 0)])) as QualityScoreCategories;
+  return {
+    overall: 0,
+    grade: 'F',
+    categories,
+    completeness: 0,
+    consistency: 0,
+    bestPractices: 0,
+    security: 0,
+    performance: 0,
+    issues: []
+  };
 }
 
 /**
@@ -437,9 +528,9 @@ function countPaths(doc: any): number {
 }
 
 /**
- * Calculate completeness score with detailed issues
+ * Description coverage (schemas, properties, operations)
  */
-function calculateCompletenessWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+function calculateDescriptionCoverageWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
   let score = 0;
   let total = 0;
   const issues: QualityIssue[] = [];
@@ -447,14 +538,13 @@ function calculateCompletenessWithIssues(doc: any): { score: number; issues: Qua
   const schemas = doc.components?.schemas || doc.definitions || {};
   const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
 
-  // Check for descriptions
   Object.entries(schemas).forEach(([schemaName, schema]: [string, any]) => {
     total++;
     if (schema.description) {
       score++;
     } else {
       issues.push({
-        category: 'completeness',
+        category: 'documentation',
         message: `Schema "${schemaName}" is missing a description`,
         suggestion: `Add a description field to explain what this schema represents`,
         path: `${schemaPath}/${schemaName}`,
@@ -469,7 +559,7 @@ function calculateCompletenessWithIssues(doc: any): { score: number; issues: Qua
           score++;
         } else {
           issues.push({
-            category: 'completeness',
+            category: 'documentation',
             message: `Property "${propName}" in "${schemaName}" is missing a description`,
             suggestion: `Add a description to explain what this property represents`,
             path: `${schemaPath}/${schemaName}/properties/${propName}`,
@@ -480,7 +570,6 @@ function calculateCompletenessWithIssues(doc: any): { score: number; issues: Qua
     }
   });
 
-  // Check paths for descriptions
   if (doc.paths) {
     Object.entries(doc.paths).forEach(([pathName, pathItem]: [string, any]) => {
       Object.entries(pathItem).forEach(([method, operation]: [string, any]) => {
@@ -490,7 +579,7 @@ function calculateCompletenessWithIssues(doc: any): { score: number; issues: Qua
             score++;
           } else {
             issues.push({
-              category: 'completeness',
+              category: 'documentation',
               message: `Operation ${method.toUpperCase()} ${pathName} is missing a summary/description`,
               suggestion: `Add a summary or description to explain what this endpoint does`,
               path: `paths/${pathName}/${method}`,
@@ -506,6 +595,104 @@ function calculateCompletenessWithIssues(doc: any): { score: number; issues: Qua
     score: total > 0 ? Math.round((score / total) * 100) : 100,
     issues
   };
+}
+
+/**
+ * Example coverage: at least one illustrative example per schema where properties exist
+ */
+function calculateExampleCoverageWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  const issues: QualityIssue[] = [];
+  const schemas = doc.components?.schemas || doc.definitions || {};
+  const schemaPath = doc.components?.schemas ? 'components/schemas' : 'definitions';
+  const entries = Object.entries(schemas);
+  if (entries.length === 0) {
+    return { score: 100, issues: [] };
+  }
+
+  let score = 0;
+  entries.forEach(([schemaName, schema]: [string, any]) => {
+    const schemaEx =
+      schema.example !== undefined ||
+      (schema.examples && Object.keys(schema.examples).length > 0);
+    let propWithExample = 0;
+    let propTotal = 0;
+    if (schema.properties) {
+      Object.values(schema.properties).forEach((prop: any) => {
+        propTotal++;
+        if (prop.example !== undefined || (prop.examples && Object.keys(prop.examples).length > 0)) {
+          propWithExample++;
+        }
+      });
+    }
+    const hasEx = schemaEx || (propTotal > 0 && propWithExample / propTotal >= 0.34);
+    if (hasEx) {
+      score++;
+    } else {
+      issues.push({
+        category: 'documentation',
+        message: `Schema "${schemaName}" has few or no examples`,
+        suggestion: 'Add schema-level or property examples to illustrate payloads',
+        path: `${schemaPath}/${schemaName}`,
+        severity: 'low'
+      });
+    }
+  });
+
+  return {
+    score: Math.round((score / entries.length) * 100),
+    issues
+  };
+}
+
+/**
+ * External documentation (info.externalDocs, tag externalDocs)
+ */
+function calculateExternalDocsCoverageWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  const issues: QualityIssue[] = [];
+  let score = 100;
+  const pathCount = doc.paths ? Object.keys(doc.paths).length : 0;
+
+  if (!doc.info?.externalDocs?.url && pathCount > 10) {
+    score -= 25;
+    issues.push({
+      category: 'documentation',
+      message: 'info.externalDocs is not defined',
+      suggestion: 'Link to external documentation (e.g. developer portal or README)',
+      path: 'info/externalDocs',
+      severity: 'low'
+    });
+  }
+
+  if (Array.isArray(doc.tags) && pathCount > 10) {
+    const withoutExt = doc.tags.filter((t: any) => t && !t.externalDocs?.url);
+    if (doc.tags.length > 0 && withoutExt.length === doc.tags.length) {
+      score -= 10;
+      issues.push({
+        category: 'documentation',
+        message: 'Tags do not reference external documentation',
+        suggestion: 'Add externalDocs URLs on tags when sections have docs outside the spec',
+        path: 'tags',
+        severity: 'low'
+      });
+    }
+  }
+
+  return { score: Math.max(0, Math.min(100, score)), issues };
+}
+
+/** Documentation dimension: descriptions, examples, external docs (#247) */
+function calculateDocumentationWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  const a = calculateDescriptionCoverageWithIssues(doc);
+  const b = calculateExampleCoverageWithIssues(doc);
+  const c = calculateExternalDocsCoverageWithIssues(doc);
+  return {
+    score: Math.round((a.score + b.score + c.score) / 3),
+    issues: [...a.issues, ...b.issues, ...c.issues]
+  };
+}
+
+function calculateCompletenessWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  return calculateDocumentationWithIssues(doc);
 }
 
 /**
@@ -526,7 +713,7 @@ function calculateConsistencyWithIssues(doc: any): { score: number; issues: Qual
     if (!/^[A-Z][a-zA-Z0-9]*$/.test(name)) {
       score -= 5;
       issues.push({
-        category: 'consistency',
+        category: 'designQuality',
         message: `Schema name "${name}" does not follow PascalCase convention`,
         suggestion: `Rename to "${name.charAt(0).toUpperCase()}${name.slice(1).replace(/[_-](\w)/g, (_, c) => c.toUpperCase())}"`,
         path: `${schemaPath}/${name}`,
@@ -545,7 +732,7 @@ function calculateConsistencyWithIssues(doc: any): { score: number; issues: Qual
       if (hasCamelCase && hasSnakeCase) {
         score -= 5;
         issues.push({
-          category: 'consistency',
+          category: 'designQuality',
           message: `Schema "${schemaName}" has mixed property naming conventions (camelCase and snake_case)`,
           suggestion: `Use consistent naming convention for all properties - prefer camelCase`,
           path: `${schemaPath}/${schemaName}/properties`,
@@ -559,7 +746,40 @@ function calculateConsistencyWithIssues(doc: any): { score: number; issues: Qual
 }
 
 /**
- * Calculate best practices score with detailed issues
+ * Schema reuse via $ref / components (design quality)
+ */
+function calculateReusabilityWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  const issues: QualityIssue[] = [];
+  const schemas = doc.components?.schemas || doc.definitions || {};
+  const schemaNames = Object.keys(schemas);
+  if (schemaNames.length < 2) {
+    return { score: 100, issues: [] };
+  }
+
+  let refCount = 0;
+  function countRefs(obj: any): void {
+    if (!obj || typeof obj !== 'object') return;
+    if (typeof obj.$ref === 'string') refCount++;
+    Object.values(obj).forEach(countRefs);
+  }
+  countRefs(doc);
+
+  if (refCount < 2) {
+    issues.push({
+      category: 'designQuality',
+      message: 'Limited reuse of shared components via $ref',
+      suggestion: 'Reference shared schemas from components/schemas instead of duplicating inline structures',
+      path: 'components/schemas',
+      severity: 'low'
+    });
+    return { score: 65, issues };
+  }
+
+  return { score: 100, issues };
+}
+
+/**
+ * API best practices: REST surface, HTTP methods, status codes (#247)
  */
 function calculateBestPracticesWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
   let score = 100;
@@ -569,7 +789,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
   if (!doc.info) {
     score -= 20;
     issues.push({
-      category: 'bestPractices',
+      category: 'apiBestPractices',
       message: 'Missing "info" section',
       suggestion: 'Add an info section with title, version, and description',
       path: 'info',
@@ -579,7 +799,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
     if (!doc.info.version) {
       score -= 10;
       issues.push({
-        category: 'bestPractices',
+        category: 'apiBestPractices',
         message: 'Missing API version in info section',
         suggestion: 'Add a version field (e.g., "1.0.0") to the info section',
         path: 'info/version',
@@ -589,7 +809,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
     if (!doc.info.title) {
       score -= 10;
       issues.push({
-        category: 'bestPractices',
+        category: 'apiBestPractices',
         message: 'Missing API title in info section',
         suggestion: 'Add a title field to describe your API',
         path: 'info/title',
@@ -599,7 +819,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
     if (!doc.info.description) {
       score -= 5;
       issues.push({
-        category: 'bestPractices',
+        category: 'apiBestPractices',
         message: 'Missing API description in info section',
         suggestion: 'Add a description to explain what your API does',
         path: 'info/description',
@@ -609,7 +829,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
     if (!doc.info.contact) {
       score -= 5;
       issues.push({
-        category: 'bestPractices',
+        category: 'apiBestPractices',
         message: 'Missing contact information',
         suggestion: 'Add contact info (name, email, url) for API support',
         path: 'info/contact',
@@ -619,7 +839,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
     if (!doc.info.license) {
       score -= 5;
       issues.push({
-        category: 'bestPractices',
+        category: 'apiBestPractices',
         message: 'Missing license information',
         suggestion: 'Add a license field to specify the API license',
         path: 'info/license',
@@ -633,7 +853,7 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
   if (Object.keys(schemas).length > 0 && !doc.tags) {
     score -= 10;
     issues.push({
-      category: 'bestPractices',
+      category: 'apiBestPractices',
       message: 'No tags defined for API organization',
       suggestion: 'Add tags to group and organize your API endpoints',
       path: 'tags',
@@ -645,11 +865,35 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
   if (!doc.servers || doc.servers.length === 0) {
     score -= 5;
     issues.push({
-      category: 'bestPractices',
+      category: 'apiBestPractices',
       message: 'No servers defined',
       suggestion: 'Add server URLs to specify where your API is hosted',
       path: 'servers',
       severity: 'low'
+    });
+  }
+
+  // Successful HTTP status codes on operations
+  if (doc.paths) {
+    Object.entries(doc.paths).forEach(([pathName, pathItem]: [string, any]) => {
+      Object.entries(pathItem).forEach(([method, operation]: [string, any]) => {
+        if (!['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method)) return;
+        const responses = operation.responses || {};
+        const has2xx = Object.keys(responses).some((code) => {
+          const n = parseInt(code.replace(/[^0-9]/g, ''), 10);
+          return !Number.isNaN(n) && n >= 200 && n < 300;
+        });
+        if (!has2xx) {
+          score -= 8;
+          issues.push({
+            category: 'apiBestPractices',
+            message: `Operation ${method.toUpperCase()} ${pathName} has no 2xx response documented`,
+            suggestion: 'Document at least one successful response (e.g. 200, 201, 204)',
+            path: `paths/${pathName}/${method}/responses`,
+            severity: 'medium'
+          });
+        }
+      });
     });
   }
 
@@ -708,7 +952,141 @@ function calculateSecurityWithIssues(doc: any): { score: number; issues: Quality
     }
   }
 
+  // Input validation: request bodies should have validatable schemas
+  if (doc.paths) {
+    Object.entries(doc.paths).forEach(([pathName, pathItem]: [string, any]) => {
+      Object.entries(pathItem).forEach(([method, operation]: [string, any]) => {
+        if (!['post', 'put', 'patch'].includes(method)) return;
+        const rb = operation.requestBody;
+        if (!rb?.content) return;
+        for (const media of Object.values(rb.content) as any[]) {
+          const s = media?.schema;
+          if (!s) {
+            score -= 10;
+            issues.push({
+              category: 'security',
+              message: `Request body for ${method.toUpperCase()} ${pathName} has no schema`,
+              suggestion: 'Provide a schema under content types so inputs can be validated',
+              path: `paths/${pathName}/${method}/requestBody`,
+              severity: 'high'
+            });
+            break;
+          }
+          const hasShape =
+            s.$ref ||
+            s.type ||
+            s.properties ||
+            s.allOf ||
+            s.oneOf ||
+            s.anyOf ||
+            s.items;
+          if (!hasShape) {
+            score -= 8;
+            issues.push({
+              category: 'security',
+              message: `Request body schema for ${method.toUpperCase()} ${pathName} is not concrete enough for validation`,
+              suggestion: 'Use type/properties, composition, or $ref to describe the payload',
+              path: `paths/${pathName}/${method}/requestBody`,
+              severity: 'medium'
+            });
+          }
+          break;
+        }
+      });
+    });
+  }
+
   return { score: Math.max(0, score), issues };
+}
+
+const PAGINATION_PARAM = /^(limit|offset|page|cursor|pageSize|per_page|page_size)$/i;
+const FILTER_PARAM = /^(filter|q|query|search|tags)$/i;
+
+/**
+ * Pagination, filtering, caching headers (#247)
+ */
+function calculatePerformanceWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
+  const issues: QualityIssue[] = [];
+  if (!doc.paths || Object.keys(doc.paths).length === 0) {
+    return { score: 100, issues: [] };
+  }
+
+  let score = 100;
+  let getOps = 0;
+  let getsWithPaginationHint = 0;
+  let getsWithFilterHint = 0;
+  let anyCacheHeader = false;
+
+  Object.entries(doc.paths).forEach(([pathName, pathItem]: [string, any]) => {
+    Object.entries(pathItem).forEach(([method, operation]: [string, any]) => {
+      if (method !== 'get') return;
+      getOps++;
+      const params = [
+        ...(operation.parameters || []),
+        ...(pathItem.parameters || [])
+      ];
+      const names = params.map((p: any) => p?.name).filter(Boolean);
+      if (names.some((n: string) => PAGINATION_PARAM.test(n))) {
+        getsWithPaginationHint++;
+      }
+      if (names.some((n: string) => FILTER_PARAM.test(n))) {
+        getsWithFilterHint++;
+      }
+
+      const responses = operation.responses || {};
+      for (const res of Object.values(responses) as any[]) {
+        const hdrs = res?.headers;
+        if (!hdrs) continue;
+        const keys = Object.keys(hdrs).map((k) => k.toLowerCase());
+        if (
+          keys.some(
+            (k) =>
+              k === 'cache-control' ||
+              k === 'etag' ||
+              k === 'expires' ||
+              k === 'last-modified'
+          )
+        ) {
+          anyCacheHeader = true;
+        }
+      }
+    });
+  });
+
+  if (getOps >= 2 && getsWithPaginationHint === 0) {
+    score -= 25;
+    issues.push({
+      category: 'performance',
+      message: 'List-style GET operations should document pagination query parameters',
+      suggestion: 'Add parameters such as limit, offset, page, or cursor for large collections',
+      path: 'paths',
+      severity: 'medium'
+    });
+  }
+
+  if (getOps >= 1 && getsWithFilterHint === 0) {
+    score -= 15;
+    issues.push({
+      category: 'performance',
+      message: 'No filtering or search query parameters documented for GET operations',
+      suggestion: 'Consider filter, q, search, or domain-specific filters where applicable',
+      path: 'paths',
+      severity: 'low'
+    });
+  }
+
+  if (getOps >= 1 && !anyCacheHeader) {
+    score -= 20;
+    issues.push({
+      category: 'performance',
+      message: 'Responses do not document cache-related headers',
+      suggestion: 'Where appropriate, document Cache-Control, ETag, or Expires on responses',
+      path: 'paths',
+      severity: 'low'
+    });
+  }
+
+  return { score: Math.max(0, Math.min(100, score)), issues };
 }
 
 /**
@@ -740,35 +1118,44 @@ function calculateSecurity(doc: any): number {
 }
 
 /**
- * Calculate overall quality score with detailed issues
+ * Weighted overall quality score (#247)
  */
-function calculateQualityScore(doc: any): {
-  overall: number;
-  grade: 'A' | 'B' | 'C' | 'D' | 'F';
-  completeness: number;
-  consistency: number;
-  bestPractices: number;
-  security: number;
-  issues: QualityIssue[];
-} {
-  const completenessResult = calculateCompletenessWithIssues(doc);
+function calculateQualityScore(doc: any): AnalysisResult['qualityScore'] {
+  const documentationResult = calculateDocumentationWithIssues(doc);
   const consistencyResult = calculateConsistencyWithIssues(doc);
-  const bestPracticesResult = calculateBestPracticesWithIssues(doc);
+  const reusabilityResult = calculateReusabilityWithIssues(doc);
+  const apiBestPracticesResult = calculateBestPracticesWithIssues(doc);
   const securityResult = calculateSecurityWithIssues(doc);
+  const performanceResult = calculatePerformanceWithIssues(doc);
 
-  const overall = Math.round((
-    completenessResult.score +
-    consistencyResult.score +
-    bestPracticesResult.score +
-    securityResult.score
-  ) / 4);
+  const designQualityPercent = Math.round(
+    (consistencyResult.score + reusabilityResult.score) / 2
+  );
 
-  // Combine all issues
+  const categories: QualityScoreCategories = {
+    designQuality: buildCategoryScore('designQuality', designQualityPercent),
+    documentation: buildCategoryScore('documentation', documentationResult.score),
+    apiBestPractices: buildCategoryScore('apiBestPractices', apiBestPracticesResult.score),
+    security: buildCategoryScore('security', securityResult.score),
+    performance: buildCategoryScore('performance', performanceResult.score)
+  };
+
+  const overall = Math.min(
+    100,
+    categories.designQuality.points +
+      categories.documentation.points +
+      categories.apiBestPractices.points +
+      categories.security.points +
+      categories.performance.points
+  );
+
   const issues: QualityIssue[] = [
-    ...completenessResult.issues,
+    ...documentationResult.issues,
     ...consistencyResult.issues,
-    ...bestPracticesResult.issues,
-    ...securityResult.issues
+    ...reusabilityResult.issues,
+    ...apiBestPracticesResult.issues,
+    ...securityResult.issues,
+    ...performanceResult.issues
   ];
 
   const grade = letterGradeFromOverallPercent(overall);
@@ -776,10 +1163,12 @@ function calculateQualityScore(doc: any): {
   return {
     overall,
     grade,
-    completeness: completenessResult.score,
+    categories,
+    completeness: documentationResult.score,
     consistency: consistencyResult.score,
-    bestPractices: bestPracticesResult.score,
+    bestPractices: apiBestPracticesResult.score,
     security: securityResult.score,
+    performance: performanceResult.score,
     issues
   };
 }
@@ -1214,15 +1603,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           anyOf: 0
         }
       },
-      qualityScore: {
-        overall: 0,
-        grade: 'F',
-        completeness: 0,
-        consistency: 0,
-        bestPractices: 0,
-        security: 0,
-        issues: []
-      },
+      qualityScore: zeroQualityScore(),
       errors: [{
         type: 'error',
         message: `Syntax error: ${parseResult.error}`,
@@ -1261,15 +1642,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: `Swagger conversion failed: ${conversionResult.error}`,
@@ -1316,15 +1689,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: `OpenAPI 3.0 conversion failed: ${conversionResult.error}`,
@@ -1374,15 +1739,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: conversionResult.error ?? 'Avro conversion failed',
@@ -1430,15 +1787,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: `JSON Schema conversion failed: ${conversionResult.error}`,
@@ -1489,15 +1838,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: `GraphQL conversion failed: ${conversionResult.error}`,
@@ -1547,15 +1888,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: `GraphQL introspection conversion failed: ${conversionResult.error}`,
@@ -1605,15 +1938,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: conversionResult.error ?? 'AsyncAPI conversion failed',
@@ -1661,15 +1986,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: conversionResult.error ?? 'RAML conversion failed',
@@ -1718,15 +2035,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: conversionResult.error ?? 'Protobuf conversion failed',
@@ -1775,15 +2084,7 @@ export async function analyzeSpecification(fileContent: string, fileName: string
           customExtensions: [],
           compositionSchemas: { allOf: 0, oneOf: 0, anyOf: 0 }
         },
-        qualityScore: {
-          overall: 0,
-          grade: 'F',
-          completeness: 0,
-          consistency: 0,
-          bestPractices: 0,
-          security: 0,
-          issues: []
-        },
+        qualityScore: zeroQualityScore(),
         errors: [{
           type: 'error',
           message: conversionResult.error ?? 'Thrift conversion failed',

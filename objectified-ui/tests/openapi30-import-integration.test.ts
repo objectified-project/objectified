@@ -82,6 +82,18 @@ describe('OpenAPI 3.0 Import Integration', () => {
 
     expect(analysis.qualityScore.bestPractices).toBeGreaterThanOrEqual(0);
     expect(analysis.qualityScore.bestPractices).toBeLessThanOrEqual(100);
+
+    expect(analysis.qualityScore.performance).toBeGreaterThanOrEqual(0);
+    expect(analysis.qualityScore.performance).toBeLessThanOrEqual(100);
+
+    const cat = analysis.qualityScore.categories;
+    const pts =
+      cat.designQuality.points +
+      cat.documentation.points +
+      cat.apiBestPractices.points +
+      cat.security.points +
+      cat.performance.points;
+    expect(pts).toBe(analysis.qualityScore.overall);
   });
 
   it('should handle OpenAPI 3.0 with complex schemas', async () => {
