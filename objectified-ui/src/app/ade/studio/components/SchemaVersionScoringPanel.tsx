@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Gauge, Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../../../../lib/utils';
+import { easeOutCubic } from '../../../../../lib/animation-easing';
 import { getClassesWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { computePerSchemaScoresFromClasses } from '@/app/utils/schema-metrics';
 import type { PerSchemaScoreRow } from '@/app/utils/schema-metrics';
@@ -24,6 +25,7 @@ export interface SchemaVersionScoringPanelProps {
 
 const GAUGE_R = 16;
 const GAUGE_C = 2 * Math.PI * GAUGE_R;
+const GAUGE_ANIMATION_MS = 750;
 
 function AnimatedScoreGauge({
   value,
@@ -40,11 +42,36 @@ function AnimatedScoreGauge({
   const [display, setDisplay] = React.useState(0);
 
   React.useEffect(() => {
+    const target = Math.min(100, Math.max(0, value));
+    let cancelled = false;
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setDisplay(target);
+      return;
+    }
+
     setDisplay(0);
-    const id = window.requestAnimationFrame(() => {
-      setDisplay(Math.min(100, Math.max(0, value)));
-    });
-    return () => window.cancelAnimationFrame(id);
+    let start: number | null = null;
+    let raf = 0;
+
+    const step = (now: number) => {
+      if (cancelled) return;
+      if (start === null) start = now;
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / GAUGE_ANIMATION_MS);
+      const eased = easeOutCubic(t);
+      setDisplay(eased * target);
+      if (t < 1) {
+        raf = window.requestAnimationFrame(step);
+      }
+    };
+
+    raf = window.requestAnimationFrame(step);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf);
+    };
   }, [value, animationKey]);
 
   const offset = GAUGE_C * (1 - display / 100);
@@ -78,7 +105,7 @@ function AnimatedScoreGauge({
             cy="20"
             r={GAUGE_R}
             fill="none"
-            className={cn('stroke-current transition-[stroke-dashoffset] duration-700 ease-out', strokeClass)}
+            className={cn('stroke-current', strokeClass)}
             strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={GAUGE_C}

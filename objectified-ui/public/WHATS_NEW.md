@@ -5,7 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
-- **Version scoring:** New **Version scoring** panel (gauge icon) — pick a project version to see **per-schema** documentation, naming, and complexity scores with **animated radial gauges**
+- **Version scoring:** New **Version scoring** panel (gauge icon) — pick a project version to see **per-schema** documentation, naming, and complexity scores with **animated radial gauges** (eased arc and value; respects reduced motion)
 - **Schema timeline:** **Compare schema scores** between any two versions (complexity, documentation, naming compliance, and size metrics with deltas)
 - **Schema metrics & timeline:** Export **score reports as PDF** from the Schema Metrics panel (full breakdown) or the Schema timeline panel (per-version metrics history)
 - **Property editor:** Optional **Owner** field (team or person responsible) stored as OpenAPI extension **`x-owner`** on the property schema; available in class property edit and project property library dialogs
