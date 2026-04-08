@@ -425,7 +425,6 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
               <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 bg-black/50 z-[10000]" />
                 <Dialog.Content
-                  aria-describedby={undefined}
                   className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl z-[10001] w-full max-w-md max-h-[85vh] overflow-y-auto p-6 border border-gray-200 dark:border-gray-700"
                 >
                   <div className="flex items-start justify-between gap-3 mb-4">
@@ -433,9 +432,9 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
                       <Dialog.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Schema quality
                       </Dialog.Title>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      <Dialog.Description className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                         Weighted blend of documentation, naming, inverted structural complexity, and canvas layout. Updates live on the Canvas.
-                      </p>
+                      </Dialog.Description>
                     </div>
                     <Dialog.Close asChild>
                       <button
