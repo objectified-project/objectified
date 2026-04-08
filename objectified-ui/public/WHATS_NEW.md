@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Studio schema quality (#245):** **Overall score (0–100)** in the Studio header — weighted blend of documentation, naming, structural load (inverted complexity), and canvas layout quality; updates live on the Canvas
 - **Import quality score (#247):** **Weighted breakdown by category** — Design Quality (30 pts), Documentation (20), API Best Practices (25), Security (15), Performance (10); overall total out of 100 points with per-category progress and issues
 - **Score bands (#248):** Shared **green / yellow / orange / red** tiers for 0–100 scores (90+ excellent down to 0–49 poor) on import **Quality Score** (overall + per-metric bars and guide), **Schema Metrics** docs/naming bars, and **Version scoring** radial gauges (documentation & naming; complexity still uses its own low/medium/high scale)
 - **Version scoring:** New **Version scoring** panel (gauge icon) — pick a project version to see **per-schema** documentation, naming, and complexity scores with **animated radial gauges** (eased arc and value; respects reduced motion)

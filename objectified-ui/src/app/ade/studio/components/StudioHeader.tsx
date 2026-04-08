@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Check, Settings } from 'lucide-react';
+import { Check, Gauge, Settings } from 'lucide-react';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useStudio } from '../StudioContext';
@@ -12,6 +12,8 @@ import {
   getTagsForProject
 } from '../../../../../lib/db/helper';
 import CanvasSettingsDialog from './CanvasSettingsDialog';
+import { cn } from '../../../../../lib/utils';
+import { getNumericScoreTier } from '@/app/utils/numeric-score-tier';
 
 interface Project {
   id: string;
@@ -66,7 +68,8 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
     edgeAnimation,
     setEdgeAnimation,
     searchHistoryCount,
-    clearSearchHistoryFn
+    clearSearchHistoryFn,
+    schemaQualityScore
   } = useStudio();
 
   const [projects, setProjects] = React.useState<Project[]>([]);
@@ -356,6 +359,35 @@ export default function StudioHeader({ onProjectTagsLoaded }: StudioHeaderProps)
             </Select.Portal>
           </Select.Root>
         </div>
+
+        {/* Overall schema quality (#245) — live from Canvas; null on Code view or before metrics load */}
+        {localProjectId && localVersionId && (
+          <div
+            className="flex items-center gap-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-white/90 dark:bg-gray-700/40 px-3 py-1 shadow-sm shrink-0"
+            title={
+              schemaQualityScore != null
+                ? 'Overall schema quality (0–100): documentation, naming, structural load, and canvas layout. Updates live on the Canvas.'
+                : 'Open the Canvas view to compute a live schema quality score.'
+            }
+          >
+            <Gauge className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden />
+            <div className="flex flex-col min-w-0">
+              <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-none">
+                Schema quality
+              </span>
+              <span
+                className={cn(
+                  'text-2xl font-bold tabular-nums leading-none',
+                  schemaQualityScore != null
+                    ? getNumericScoreTier(schemaQualityScore).textClass
+                    : 'text-gray-400 dark:text-gray-500'
+                )}
+              >
+                {schemaQualityScore != null ? schemaQualityScore : '—'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* View Switcher and Settings - only show when project and version selected */}
         {localProjectId && localVersionId && (
