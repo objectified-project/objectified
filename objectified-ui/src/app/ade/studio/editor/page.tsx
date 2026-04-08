@@ -62,6 +62,7 @@ import {
   Ghost,
   Undo2,
   TrendingUp,
+  Gauge,
   Presentation,
   PanelLeft,
   Camera,
@@ -206,6 +207,7 @@ import DraggablePanel from '../components/DraggablePanel';
 import MemoryProfiler from '../components/MemoryProfiler';
 import SchemaMetricsPanel from '../components/SchemaMetricsPanel';
 import SchemaTimelinePanel from '../components/SchemaTimelinePanel';
+import SchemaVersionScoringPanel from '../components/SchemaVersionScoringPanel';
 import { useSearchHistory } from '../hooks/useSearchHistory';
 import {
   loadPresentationBookmarks,
@@ -757,6 +759,8 @@ const StudioContent = () => {
   const [schemaMetricsMinimized, setSchemaMetricsMinimized] = useState(false);
   const [schemaTimelineOpen, setSchemaTimelineOpen] = useState(false);
   const [schemaTimelineMinimized, setSchemaTimelineMinimized] = useState(false);
+  const [schemaVersionScoringOpen, setSchemaVersionScoringOpen] = useState(false);
+  const [schemaVersionScoringMinimized, setSchemaVersionScoringMinimized] = useState(false);
 
   // #547: Interactive dependency graph overlay – highlight $ref / allOf/anyOf/oneOf edges, dim the rest
   const [showDependencyOverlay, setShowDependencyOverlay] = useState(() => {
@@ -10039,6 +10043,15 @@ const StudioContent = () => {
                   <TrendingUp className="w-5 h-5" />
                 </button>
               )}
+              {!schemaVersionScoringOpen && (
+                <button
+                  onClick={() => setSchemaVersionScoringOpen(true)}
+                  className="p-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  title="Version scoring — per-schema breakdown with gauges"
+                >
+                  <Gauge className="w-5 h-5" />
+                </button>
+              )}
               {!memoryProfilerOpen && (
                 <button
                   onClick={() => setMemoryProfilerOpen(true)}
@@ -10160,6 +10173,25 @@ const StudioContent = () => {
                 onClose={() => setSchemaTimelineOpen(false)}
                 isMinimized={schemaTimelineMinimized}
                 onMinimizeToggle={() => setSchemaTimelineMinimized(!schemaTimelineMinimized)}
+              />
+            </DraggablePanel>
+          )}
+          {schemaVersionScoringOpen && !canvasPresentationActive && (
+            <DraggablePanel
+              storageKey="schema-version-scoring-panel"
+              defaultPosition={{ left: 20, top: 400 }}
+            >
+              <SchemaVersionScoringPanel
+                versions={versions}
+                selectedVersionId={selectedVersionId}
+                onSelectVersion={(versionId) => {
+                  setSelectedVersionId(versionId);
+                  const v = versions.find((x) => x.id === versionId);
+                  setIsReadOnly(v?.published ?? false);
+                }}
+                onClose={() => setSchemaVersionScoringOpen(false)}
+                isMinimized={schemaVersionScoringMinimized}
+                onMinimizeToggle={() => setSchemaVersionScoringMinimized(!schemaVersionScoringMinimized)}
               />
             </DraggablePanel>
           )}
