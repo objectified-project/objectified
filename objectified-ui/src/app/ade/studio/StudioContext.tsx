@@ -163,6 +163,9 @@ interface StudioContextType {
   /** When true, studio chrome (sidebar, studio header) is hidden for canvas presentation mode (#517). */
   canvasPresentationMode: boolean;
   setCanvasPresentationMode: (value: boolean) => void;
+  /** Live overall schema quality 0–100 from Canvas (#245); null when not on editor or no classes yet */
+  schemaQualityScore: number | null;
+  setSchemaQualityScore: Dispatch<SetStateAction<number | null>>;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -362,6 +365,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   const [clearSearchHistoryFn, setClearSearchHistoryFn] = useState<(() => void) | null>(null);
 
   const [canvasPresentationMode, setCanvasPresentationMode] = useState(false);
+  const [schemaQualityScore, setSchemaQualityScore] = useState<number | null>(null);
 
   // Persist grid settings to localStorage
   useEffect(() => {
@@ -537,7 +541,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       clearSearchHistoryFn,
       setClearSearchHistoryFn,
       canvasPresentationMode,
-      setCanvasPresentationMode
+      setCanvasPresentationMode,
+      schemaQualityScore,
+      setSchemaQualityScore
     }}>
       {children}
     </StudioContext.Provider>

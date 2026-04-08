@@ -188,6 +188,7 @@ import {
   ghostNodeClassName,
 } from '@/app/utils/canvas-ghost-mode';
 import { computeLayoutQuality } from '@/app/utils/layout-quality';
+import { computeOverallSchemaQualityScore } from '@/app/utils/overall-schema-quality';
 import {
   buildCanvasLayoutJsonDocument,
   CANVAS_LAYOUT_JSON_FORMAT_VERSION,
@@ -346,6 +347,7 @@ const StudioContent = () => {
     setSearchHistoryCount,
     setClearSearchHistoryFn,
     setCanvasPresentationMode,
+    setSchemaQualityScore,
   } = useStudio();
 
   // Toggle click-to-focus mode (defined after useStudio to access setContextClickToFocusEnabled)
@@ -868,6 +870,25 @@ const StudioContent = () => {
     if (classNodes.length === 0) return null;
     return computeLayoutQuality(nodes, edges);
   }, [nodes, edges]);
+
+  const overallSchemaQualityScore = useMemo(() => {
+    if (!schemaMetrics || !layoutQuality) return null;
+    return computeOverallSchemaQualityScore(schemaMetrics, layoutQuality);
+  }, [schemaMetrics, layoutQuality]);
+
+  useEffect(() => {
+    if (!contextProjectId || !contextVersionId) {
+      setSchemaQualityScore(null);
+      return;
+    }
+    setSchemaQualityScore(overallSchemaQualityScore);
+  }, [contextProjectId, contextVersionId, overallSchemaQualityScore, setSchemaQualityScore]);
+
+  useEffect(() => {
+    return () => {
+      setSchemaQualityScore(null);
+    };
+  }, [setSchemaQualityScore]);
 
   // Canvas improvement suggestions (#474)
   const groupMemberIds = useMemo(() => {
