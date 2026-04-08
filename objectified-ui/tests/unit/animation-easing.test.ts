@@ -1,3 +1,4 @@
+import { describe, it, expect } from '@jest/globals';
 import { easeOutCubic } from '../../lib/animation-easing';
 
 describe('easeOutCubic', () => {
