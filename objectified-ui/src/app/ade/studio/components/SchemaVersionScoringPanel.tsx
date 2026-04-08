@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Gauge, Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../../../../lib/utils';
+import { easeOutCubic } from '../../../../../lib/animation-easing';
 import { getClassesWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { computePerSchemaScoresFromClasses } from '@/app/utils/schema-metrics';
 import type { PerSchemaScoreRow } from '@/app/utils/schema-metrics';
@@ -24,6 +25,7 @@ export interface SchemaVersionScoringPanelProps {
 
 const GAUGE_R = 16;
 const GAUGE_C = 2 * Math.PI * GAUGE_R;
+const GAUGE_ANIMATION_MS = 750;
 
 function AnimatedScoreGauge({
   value,
@@ -37,29 +39,67 @@ function AnimatedScoreGauge({
   /** Bump to re-run mount animation */
   animationKey: string;
 }) {
-  const [display, setDisplay] = React.useState(0);
+  const arcRef = React.useRef<SVGCircleElement>(null);
+  const textRef = React.useRef<HTMLSpanElement>(null);
 
-  React.useEffect(() => {
-    setDisplay(0);
-    const id = window.requestAnimationFrame(() => {
-      setDisplay(Math.min(100, Math.max(0, value)));
-    });
-    return () => window.cancelAnimationFrame(id);
-  }, [value, animationKey]);
+  const target = Math.min(100, Math.max(0, value));
 
-  const offset = GAUGE_C * (1 - display / 100);
+  // Compute stroke color class from the final target value so it never
+  // changes during the animation (avoids class-swap thrash on every tick).
   const strokeClass =
     variant === 'complexity'
-      ? display <= 33
+      ? target <= 33
         ? 'text-emerald-500'
-        : display <= 66
+        : target <= 66
           ? 'text-amber-500'
           : 'text-rose-500'
-      : display >= 80
+      : target >= 80
         ? 'text-emerald-500'
-        : display >= 50
+        : target >= 50
           ? 'text-amber-500'
           : 'text-rose-500';
+
+  React.useEffect(() => {
+    const arc = arcRef.current;
+    const text = textRef.current;
+    if (!arc || !text) return;
+
+    let cancelled = false;
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      arc.style.strokeDashoffset = String(GAUGE_C * (1 - target / 100));
+      text.textContent = String(Math.round(target));
+      return;
+    }
+
+    // Reset to 0 imperatively – no React state, no re-render.
+    arc.style.strokeDashoffset = String(GAUGE_C);
+    text.textContent = '0';
+
+    let start: number | null = null;
+    let raf = 0;
+
+    const step = (now: number) => {
+      if (cancelled) return;
+      if (start === null) start = now;
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / GAUGE_ANIMATION_MS);
+      const eased = easeOutCubic(t);
+      const displayValue = eased * target;
+      arc.style.strokeDashoffset = String(GAUGE_C * (1 - displayValue / 100));
+      text.textContent = String(Math.round(displayValue));
+      if (t < 1) {
+        raf = window.requestAnimationFrame(step);
+      }
+    };
+
+    raf = window.requestAnimationFrame(step);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf);
+    };
+  }, [target, animationKey]);
 
   return (
     <div className="flex flex-col items-center gap-0.5 min-w-0">
@@ -74,19 +114,23 @@ function AnimatedScoreGauge({
             strokeWidth="4"
           />
           <circle
+            ref={arcRef}
             cx="20"
             cy="20"
             r={GAUGE_R}
             fill="none"
-            className={cn('stroke-current transition-[stroke-dashoffset] duration-700 ease-out', strokeClass)}
+            className={cn('stroke-current', strokeClass)}
             strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={GAUGE_C}
-            strokeDashoffset={offset}
+            strokeDashoffset={GAUGE_C}
           />
         </svg>
-        <span className="absolute inset-0 z-10 flex items-center justify-center text-[9px] font-semibold text-gray-800 dark:text-gray-100 tabular-nums pointer-events-none">
-          {Math.round(display)}
+        <span
+          ref={textRef}
+          className="absolute inset-0 z-10 flex items-center justify-center text-[9px] font-semibold text-gray-800 dark:text-gray-100 tabular-nums pointer-events-none"
+        >
+          0
         </span>
       </div>
       <span className="text-[9px] text-center text-gray-500 dark:text-gray-400 leading-tight max-w-[4.5rem] truncate" title={label}>
