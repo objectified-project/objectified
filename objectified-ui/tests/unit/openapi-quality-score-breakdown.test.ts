@@ -1,4 +1,5 @@
 import { analyzeSpecification } from '@/app/utils/openapi-analyzer';
+import { describe, expect, it } from '@jest/globals';
 
 describe('OpenAPI quality score breakdown (#247)', () => {
   it('exposes five weighted categories whose points sum to the overall score', async () => {

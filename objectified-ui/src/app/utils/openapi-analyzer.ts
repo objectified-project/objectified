@@ -645,20 +645,20 @@ function calculateExampleCoverageWithIssues(doc: any): { score: number; issues: 
 }
 
 /**
- * External documentation (info.externalDocs, tag externalDocs)
+ * External documentation (externalDocs, tag externalDocs)
  */
 function calculateExternalDocsCoverageWithIssues(doc: any): { score: number; issues: QualityIssue[] } {
   const issues: QualityIssue[] = [];
   let score = 100;
   const pathCount = doc.paths ? Object.keys(doc.paths).length : 0;
 
-  if (!doc.info?.externalDocs?.url && pathCount > 10) {
+  if (!doc.externalDocs?.url && pathCount > 10) {
     score -= 25;
     issues.push({
       category: 'documentation',
-      message: 'info.externalDocs is not defined',
+      message: 'externalDocs is not defined',
       suggestion: 'Link to external documentation (e.g. developer portal or README)',
-      path: 'info/externalDocs',
+      path: 'externalDocs',
       severity: 'low'
     });
   }
@@ -880,8 +880,8 @@ function calculateBestPracticesWithIssues(doc: any): { score: number; issues: Qu
         if (!['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(method)) return;
         const responses = operation.responses || {};
         const has2xx = Object.keys(responses).some((code) => {
-          const n = parseInt(code.replace(/[^0-9]/g, ''), 10);
-          return !Number.isNaN(n) && n >= 200 && n < 300;
+          const normalizedCode = code.trim().toUpperCase();
+          return normalizedCode === '2XX' || /^2\d\d$/.test(normalizedCode);
         });
         if (!has2xx) {
           score -= 8;
@@ -959,38 +959,44 @@ function calculateSecurityWithIssues(doc: any): { score: number; issues: Quality
         if (!['post', 'put', 'patch'].includes(method)) return;
         const rb = operation.requestBody;
         if (!rb?.content) return;
-        for (const media of Object.values(rb.content) as any[]) {
-          const s = media?.schema;
-          if (!s) {
-            score -= 10;
-            issues.push({
-              category: 'security',
-              message: `Request body for ${method.toUpperCase()} ${pathName} has no schema`,
-              suggestion: 'Provide a schema under content types so inputs can be validated',
-              path: `paths/${pathName}/${method}/requestBody`,
-              severity: 'high'
-            });
-            break;
-          }
-          const hasShape =
+        const mediaEntries = Object.values(rb.content) as any[];
+        const schemas = mediaEntries
+          .map((media) => media?.schema)
+          .filter((schema) => !!schema);
+
+        if (schemas.length === 0) {
+          score -= 10;
+          issues.push({
+            category: 'security',
+            message: `Request body for ${method.toUpperCase()} ${pathName} has no schema`,
+            suggestion: 'Provide a schema under content types so inputs can be validated',
+            path: `paths/${pathName}/${method}/requestBody`,
+            severity: 'high'
+          });
+          return;
+        }
+
+        const hasConcreteSchema = schemas.some((s) =>
+          !!(
             s.$ref ||
             s.type ||
             s.properties ||
             s.allOf ||
             s.oneOf ||
             s.anyOf ||
-            s.items;
-          if (!hasShape) {
-            score -= 8;
-            issues.push({
-              category: 'security',
-              message: `Request body schema for ${method.toUpperCase()} ${pathName} is not concrete enough for validation`,
-              suggestion: 'Use type/properties, composition, or $ref to describe the payload',
-              path: `paths/${pathName}/${method}/requestBody`,
-              severity: 'medium'
-            });
-          }
-          break;
+            s.items
+          )
+        );
+
+        if (!hasConcreteSchema) {
+          score -= 8;
+          issues.push({
+            category: 'security',
+            message: `Request body schema for ${method.toUpperCase()} ${pathName} is not concrete enough for validation`,
+            suggestion: 'Use type/properties, composition, or $ref to describe the payload',
+            path: `paths/${pathName}/${method}/requestBody`,
+            severity: 'medium'
+          });
         }
       });
     });
