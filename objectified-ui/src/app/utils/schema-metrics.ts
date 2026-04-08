@@ -449,7 +449,7 @@ export function computeSchemaMetrics(nodes: Node[], edges: Edge[]): SchemaMetric
     .map((n) => getNodeName(n!));
   const circularDependencyNodeIds = circularSccs.flat();
 
-  const { complexityScore, complexityLabel, complexityBreakdown } = computeComplexityScore({
+  const { complexityScore, complexityLabel, complexityBreakdown } = computeComplexityScoreFromAggregates({
     classCount,
     totalProperties,
     averagePropertiesPerClass,
@@ -653,18 +653,22 @@ export function getDependencyDepthMap(
   return depth;
 }
 
-/**
- * Compute a 0–100 schema complexity score, label, and per-factor breakdown (#556).
- * Based on class count, property count, relationships, depth, and cycles.
- */
-function computeComplexityScore(metrics: {
+/** Inputs for {@link computeComplexityScoreFromAggregates} (project-wide or per-class local subgraph). */
+export type AggregateComplexityMetrics = {
   classCount: number;
   totalProperties: number;
   averagePropertiesPerClass: number;
   relationshipCount: number;
   deepestChainLength: number;
   circularDependencyCount: number;
-}): {
+};
+
+/**
+ * Compute a 0–100 schema complexity score, label, and per-factor breakdown (#556).
+ * Based on class count, property count, relationships, depth, and cycles.
+ * Also used for per-class local metrics (#250).
+ */
+export function computeComplexityScoreFromAggregates(metrics: AggregateComplexityMetrics): {
   complexityScore: number;
   complexityLabel: 'Low' | 'Medium' | 'High';
   complexityBreakdown: ComplexityBreakdownItem[];
@@ -690,6 +694,136 @@ function computeComplexityScore(metrics: {
   const complexityLabel: 'Low' | 'Medium' | 'High' =
     complexityScore <= 33 ? 'Low' : complexityScore <= 66 ? 'Medium' : 'High';
   return { complexityScore, complexityLabel, complexityBreakdown: breakdown };
+}
+
+/** One class (schema) row for version scoring breakdown (#250). */
+export interface PerSchemaScoreRow {
+  classId: string;
+  className: string;
+  /** 0–100: class + properties with non-empty descriptions */
+  documentationScore: number;
+  /** 0–100: PascalCase class name and camelCase property names */
+  namingScore: number;
+  /** 0–100: aggregate complexity model applied to this class’s local stats */
+  complexityScore: number;
+  complexityLabel: 'Low' | 'Medium' | 'High';
+}
+
+function computeDocumentationScoreForClass(node: Node): number {
+  const data = node.data as {
+    description?: string;
+    properties?: Array<{ description?: string }>;
+  };
+  let documented = 0;
+  let total = 0;
+  total += 1;
+  documented += hasDocumentation(data?.description) ? 1 : 0;
+  const props = data?.properties;
+  if (Array.isArray(props)) {
+    for (const p of props) {
+      total += 1;
+      documented += hasDocumentation(p?.description) ? 1 : 0;
+    }
+  }
+  return total === 0 ? 100 : Math.round((documented / total) * 100);
+}
+
+function computeNamingScoreForClass(node: Node): number {
+  const data = node.data as {
+    name?: string;
+    properties?: Array<{ name?: string }>;
+  };
+  const className = typeof data?.name === 'string' ? data.name : node.id;
+  let compliant = 0;
+  let total = 0;
+  total += 1;
+  compliant += detectNamingConvention(className) === 'PascalCase' ? 1 : 0;
+  const props = data?.properties;
+  if (Array.isArray(props)) {
+    for (const p of props) {
+      total += 1;
+      const propName = typeof p?.name === 'string' ? p.name.trim() : '';
+      compliant += propName !== '' && detectNamingConvention(propName) === 'camelCase' ? 1 : 0;
+    }
+  }
+  return total === 0 ? 100 : Math.round((compliant / total) * 100);
+}
+
+/**
+ * Per-class documentation, naming, and complexity scores for the current graph (#250).
+ * Complexity uses the same weighted aggregate model as the project-wide score, with local counts.
+ */
+export function computePerSchemaScores(nodes: Node[], edges: Edge[]): PerSchemaScoreRow[] {
+  const classNodes = getClassNodes(nodes);
+  if (classNodes.length === 0) return [];
+
+  const degreeMap = getDegreePerNode(classNodes, edges);
+  const adj = buildDirectedAdjacency(edges);
+  const nodeIds = new Set(classNodes.map((n) => n.id));
+  const { circularSccs } = countCircularDependencies(adj, nodeIds);
+  const inCycle = new Set<string>();
+  for (const scc of circularSccs) {
+    for (const id of scc) inCycle.add(id);
+  }
+
+  // Pre-compute longest-path depths for all nodes in a single DFS pass (memoized).
+  // This avoids O(N * (N+E)) repeated calls by sharing memo across all starting nodes.
+  const depthMemo = new Map<string, number>();
+  function longestPathMemo(nodeId: string, visitedInPath: Set<string>): number {
+    if (visitedInPath.has(nodeId)) return 0;
+    if (depthMemo.has(nodeId)) return depthMemo.get(nodeId)!;
+    const next = adj.get(nodeId);
+    if (!next || next.length === 0) {
+      depthMemo.set(nodeId, 0);
+      return 0;
+    }
+    visitedInPath.add(nodeId);
+    let max = 0;
+    for (const t of next) {
+      const d = 1 + longestPathMemo(t, visitedInPath);
+      if (d > max) max = d;
+    }
+    visitedInPath.delete(nodeId);
+    depthMemo.set(nodeId, max);
+    return max;
+  }
+  for (const n of classNodes) {
+    longestPathMemo(n.id, new Set());
+  }
+
+  const rows: PerSchemaScoreRow[] = classNodes.map((n) => {
+    const className = getNodeName(n);
+    const props = getPropertyCount(n);
+    const degree = degreeMap.get(n.id) ?? 0;
+    const chainLen = depthMemo.get(n.id) ?? 0;
+    const { complexityScore, complexityLabel } = computeComplexityScoreFromAggregates({
+      classCount: 1,
+      totalProperties: props,
+      averagePropertiesPerClass: props,
+      relationshipCount: degree,
+      deepestChainLength: chainLen,
+      circularDependencyCount: inCycle.has(n.id) ? 1 : 0,
+    });
+    return {
+      classId: n.id,
+      className,
+      documentationScore: computeDocumentationScoreForClass(n),
+      namingScore: computeNamingScoreForClass(n),
+      complexityScore,
+      complexityLabel,
+    };
+  });
+
+  rows.sort((a, b) => a.className.localeCompare(b.className));
+  return rows;
+}
+
+/**
+ * Per-class scores from persisted class rows (same shape as studio / timeline APIs) (#250).
+ */
+export function computePerSchemaScoresFromClasses(classes: unknown[]): PerSchemaScoreRow[] {
+  const { nodes, edges } = buildGraphForSchemaMetrics(classes);
+  return computePerSchemaScores(nodes, edges);
 }
 
 /** Per-node heatmap value set for #560 (complexity, change frequency, usage, documentation). */
