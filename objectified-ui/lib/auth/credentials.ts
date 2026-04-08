@@ -84,8 +84,11 @@ export const checkLinkingIntent = async () => {
           cookieStore.delete('oauth_link_intent');
           return intent;
         }
+        // Expired intent cookie; clear it and treat as no intent
+        cookieStore.delete('oauth_link_intent');
       } catch {
-        // Malformed or stale intent cookie; treat as no intent
+        // Malformed intent cookie; clear it and treat as no intent
+        cookieStore.delete('oauth_link_intent');
       }
     }
   } catch {
