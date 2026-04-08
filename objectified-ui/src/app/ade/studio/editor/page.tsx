@@ -10119,6 +10119,8 @@ const StudioContent = () => {
                   metrics={schemaMetrics}
                   layoutQuality={layoutQuality}
                   suggestions={canvasSuggestions}
+                  projectName={selectedProject?.name}
+                  versionLabel={selectedVersion?.version_id}
                   onSuggestionAction={handleSuggestionAction}
                   onClose={() => setSchemaMetricsOpen(false)}
                   isMinimized={schemaMetricsMinimized}
@@ -10149,6 +10151,7 @@ const StudioContent = () => {
               <SchemaTimelinePanel
                 versions={versions}
                 selectedVersionId={selectedVersionId}
+                projectName={selectedProject?.name}
                 onSelectVersion={(versionId) => {
                   setSelectedVersionId(versionId);
                   const v = versions.find((x) => x.id === versionId);

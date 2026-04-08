@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { History, ChevronDown, ChevronUp, X, Loader2 } from 'lucide-react';
+import { History, ChevronDown, ChevronUp, X, Loader2, FileDown } from 'lucide-react';
 import { cn } from '../../../../../lib/utils';
 import { getClassesWithPropertiesAndTagsWithSession } from '../../../../../lib/api/rest-client';
 import { computeSchemaMetricsFromClasses } from '@/app/utils/schema-metrics';
 import type { SchemaMetricsResult } from '@/app/utils/schema-metrics';
+import { downloadSchemaTimelineScoreReportPdf } from '@/app/utils/export-schema-score-report-pdf';
 
 export interface SchemaTimelineVersion {
   id: string;
@@ -18,6 +19,8 @@ export interface SchemaTimelineVersion {
 export interface SchemaTimelinePanelProps {
   versions: SchemaTimelineVersion[];
   selectedVersionId: string;
+  /** Shown on exported PDF (#252) */
+  projectName?: string;
   onSelectVersion?: (versionId: string) => void;
   onClose?: () => void;
   isMinimized?: boolean;
@@ -56,6 +59,7 @@ function buildPolylinePoints(xs: number[], ys: number[]): string {
 export default function SchemaTimelinePanel({
   versions,
   selectedVersionId,
+  projectName,
   onSelectVersion,
   onClose,
   isMinimized = false,
@@ -184,6 +188,26 @@ export default function SchemaTimelinePanel({
           <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">Schema timeline</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() =>
+              downloadSchemaTimelineScoreReportPdf({
+                projectName,
+                rows: points.map((p) => ({
+                  versionLabel: p.label,
+                  createdAt: p.createdAt,
+                  metrics: p.metrics,
+                  loadError: p.loadError,
+                })),
+              })
+            }
+            disabled={loading || points.length === 0}
+            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 disabled:opacity-40 disabled:pointer-events-none"
+            title="Export version history as PDF"
+            aria-label="Export version history as PDF"
+          >
+            <FileDown className="w-4 h-4" />
+          </button>
           {onMinimizeToggle && (
             <button
               type="button"
