@@ -5,6 +5,7 @@ We continue to improve the platform based on your feedback with improvements and
 ---
 
 ## UI:
+- **Property editor:** Optional **Owner** field (team or person responsible) stored as OpenAPI extension **`x-owner`** on the property schema; available in class property edit and project property library dialogs
 - **Import from URL:** Source tabs switch between File, URL, Clipboard, Git, and SwaggerHub; URL step matches the import spec (auth, URL options including cache, **Test URL** and **Next** in the dialog footer)
 - **Git import:** Load a GitHub repository by URL or `owner/repo`, pick a **branch** or **tag**, optionally type a **spec path** and open it, or browse the tree — directory listing uses the selected ref (same behavior when choosing a repo from the list)
 - **OpenAPI import:** Import step shows the **Import Execution** layout — progress with schema index and ETA, per-schema live checklist (success / warning / in progress / pending), expandable import log, and technical summary in a collapsible section

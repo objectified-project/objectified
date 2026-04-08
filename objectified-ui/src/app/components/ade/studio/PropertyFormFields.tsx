@@ -267,6 +267,8 @@ export interface PropertyFormData {
   writeOnly?: boolean;
   deprecated?: boolean;
   deprecationMessage?: string;
+  /** Team or person responsible; persisted as OpenAPI extension `x-owner` on the property schema */
+  owner?: string;
   examples?: string[]; // Array of example values (JSON strings)
 
   // Object constraints
@@ -608,7 +610,8 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
     return {
       basicInfo: (d.description || '').trim() !== '' || (d.default || '').trim() !== ''
         || (d.examples && d.examples.length > 0) || (d.title || '').trim() !== '',
-      propertyFlags: d.required || d.nullable || d.readOnly || d.writeOnly || d.deprecated || (d.deprecationMessage || '').trim() !== '',
+      propertyFlags: d.required || d.nullable || d.readOnly || d.writeOnly || d.deprecated || (d.deprecationMessage || '').trim() !== ''
+        || (d.owner || '').trim() !== '',
       stringConstraints: (d.minLength || '').trim() !== '' || (d.maxLength || '').trim() !== '' || (d.pattern || '').trim() !== '' || (d.format || '').trim() !== '',
       numberConstraints: (d.minimum || '').trim() !== '' || (d.maximum || '').trim() !== '' || (d.multipleOf || '').trim() !== '' || d.minimumType || d.maximumType,
       arrayConstraints: (d.minItems || '').trim() !== '' || (d.maxItems || '').trim() !== '' || d.uniqueItems
@@ -1250,6 +1253,21 @@ export const PropertyFormFields: React.FC<PropertyFormFieldsProps> = ({
               }}
             />
           </Collapse>
+
+          <TextField
+            label="Owner"
+            size="small"
+            fullWidth
+            value={data.owner || ''}
+            onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange('owner', e.target.value)}
+            placeholder="e.g. platform-team or @handle"
+            helperText="Stored as x-owner on this property schema (team or person responsible)."
+            sx={{
+              mt: 1.5,
+              bgcolor: isDark ? '#0f172a' : 'white',
+              '& .MuiOutlinedInput-root': { borderRadius: 2 },
+            }}
+          />
         </Box>
       )}
 
