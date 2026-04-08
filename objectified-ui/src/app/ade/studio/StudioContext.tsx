@@ -165,7 +165,7 @@ interface StudioContextType {
   setCanvasPresentationMode: (value: boolean) => void;
   /** Live overall schema quality 0–100 from Canvas (#245); null when not on editor or no classes yet */
   schemaQualityScore: number | null;
-  setSchemaQualityScore: Dispatch<SetStateAction<number | null>>;
+  setSchemaQualityScore: (value: number | null) => void;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
