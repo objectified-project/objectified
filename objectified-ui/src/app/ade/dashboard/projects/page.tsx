@@ -1,8 +1,8 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, Layers } from 'lucide-react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import { Plus, Edit2, Trash2, FolderOpen, Lock, Upload, AlertTriangle, MoreVertical, ExternalLink, Bot, FileEdit, Layers, TrendingUp } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,10 @@ import {
   getProjectStartTemplate,
   type ProjectOpenApiMetadata,
 } from '../../../utils/project-templates';
+import { getProjectQualityHistory } from '../../../utils/project-quality-score-history';
+import { getNumericScoreTier } from '../../../utils/numeric-score-tier';
+import { ProjectQualityTrendSparkline } from '../../../components/ade/dashboard/ProjectQualityTrendSparkline';
+import { ProjectQualityHistoryDialog } from '../../../components/ade/dashboard/ProjectQualityHistoryDialog';
 
 type ProjectMetadata = ProjectOpenApiMetadata;
 
@@ -84,6 +88,9 @@ const Projects = () => {
   const [metadataLicenseIdentifier, setMetadataLicenseIdentifier] = useState('');
   const [metadataLicenseUrl, setMetadataLicenseUrl] = useState('');
   const [selectedStartTemplateId, setSelectedStartTemplateId] = useState('blank');
+  const [qualityHistoryEpoch, setQualityHistoryEpoch] = useState(0);
+  const [qualityTrendProject, setQualityTrendProject] = useState<Project | null>(null);
+  const prevImportOpen = useRef(false);
 
   const currentTenantId = (session?.user as any)?.current_tenant_id;
   const currentUserId = (session?.user as any)?.user_id;
@@ -96,6 +103,21 @@ const Projects = () => {
   useEffect(() => {
     if (currentTenantId) loadProjects();
   }, [currentTenantId]);
+
+  useEffect(() => {
+    if (prevImportOpen.current && !showNewImportDialog) {
+      setQualityHistoryEpoch((e) => e + 1);
+    }
+    prevImportOpen.current = showNewImportDialog;
+  }, [showNewImportDialog]);
+
+  const projectQualityHistoryMap = useMemo(() => {
+    const m: Record<string, ReturnType<typeof getProjectQualityHistory>> = {};
+    for (const p of projects) {
+      m[p.id] = getProjectQualityHistory(p.id);
+    }
+    return m;
+  }, [projects, qualityHistoryEpoch]);
 
   const loadProjects = async () => {
     if (!currentTenantId) return;
@@ -150,7 +172,10 @@ const Projects = () => {
   };
 
   const handleImportClick = () => setShowImportDialog(true);
-  const handleImportSuccess = async () => await loadProjects();
+  const handleImportSuccess = async () => {
+    await loadProjects();
+    setQualityHistoryEpoch((e) => e + 1);
+  };
 
   const handleCreateSubmit = async () => {
     if (!projectName.trim()) { setErrorMessage('Project name is required'); return; }
@@ -394,6 +419,12 @@ const Projects = () => {
                   <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Description
                   </th>
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-52">
+                    <span className="inline-flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                      Quality trend
+                    </span>
+                  </th>
                   <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
                     Status
                   </th>
@@ -433,6 +464,33 @@ const Projects = () => {
                           {project.metadata.summary}
                         </div>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap align-middle">
+                      {(() => {
+                        const qh = projectQualityHistoryMap[project.id] ?? [];
+                        const latest = qh.length > 0 ? qh[qh.length - 1] : null;
+                        const tier = latest ? getNumericScoreTier(latest.overall) : null;
+                        if (!latest) {
+                          return (
+                            <span className="text-xs text-gray-400 dark:text-gray-600" title="No import scores recorded yet in this browser">
+                              —
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setQualityTrendProject(project)}
+                            className="flex items-center gap-2 text-left rounded-lg border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-indigo-50/60 dark:hover:bg-indigo-950/40 px-2 py-1 -mx-2 -my-1 transition-colors w-full min-w-0"
+                            title="Open quality score history"
+                          >
+                            <div className="h-8 w-24 shrink-0 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-900/80 border border-gray-200/80 dark:border-gray-700">
+                              <ProjectQualityTrendSparkline history={qh} className="h-full w-full" />
+                            </div>
+                            <span className={`text-sm font-semibold tabular-nums shrink-0 ${tier?.textClass ?? ''}`}>{latest.overall}</span>
+                          </button>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-2">
@@ -783,6 +841,15 @@ const Projects = () => {
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      <ProjectQualityHistoryDialog
+        open={qualityTrendProject !== null}
+        onOpenChange={(open) => {
+          if (!open) setQualityTrendProject(null);
+        }}
+        projectName={qualityTrendProject?.name ?? ''}
+        history={qualityTrendProject ? projectQualityHistoryMap[qualityTrendProject.id] ?? [] : []}
+      />
 
       {/* New Import Dialog (Step 1 - Source Selection) */}
       {currentTenantId && currentUserId && (

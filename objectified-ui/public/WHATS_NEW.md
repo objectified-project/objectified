@@ -20,6 +20,7 @@ We continue to improve the platform based on your feedback with improvements and
 
 
 ## Projects:
+- **Quality score history (#246):** After a successful **Import specification** run, the OpenAPI **overall quality score** is saved in this browser per project; the projects table shows a **sparkline** and latest score, with a **trend chart** and history table in a detail dialog
 - Added ability to start a new project from a template
 
 ## Groups:
